@@ -581,3 +581,94 @@ final clubProvider = StateNotifierProvider<ClubNotifier, ClubState>((ref) {
   }
   return notifier;
 });
+
+
+// ── «Война района» (Квартал 2.0, Ф6, бэкенд 09.2026) ─────────────────────────
+
+class WarStanding {
+  final String clubId;
+  final String name;
+  final double areaM2;
+  final int pieces;
+  final int place;
+  final bool isMine;
+
+  const WarStanding({
+    required this.clubId,
+    required this.name,
+    required this.areaM2,
+    required this.pieces,
+    required this.place,
+    required this.isMine,
+  });
+}
+
+class WarThreat {
+  final String attackerName;
+  final String victimName;
+  final bool mine;
+  final double areaM2;
+  final int atMs;
+
+  const WarThreat({
+    required this.attackerName,
+    required this.victimName,
+    required this.mine,
+    required this.areaM2,
+    required this.atMs,
+  });
+}
+
+class WarData {
+  final List<WarStanding> standings;
+  final List<WarThreat> threats;
+
+  const WarData({this.standings = const [], this.threats = const []});
+}
+
+final _warDio = Dio(
+  BaseOptions(
+    baseUrl: ApiConfig.baseUrl,
+    connectTimeout: ApiConfig.connectTimeout,
+    receiveTimeout: ApiConfig.receiveTimeout,
+    headers: {'Content-Type': 'application/json', 'Connection': 'close'},
+  ),
+);
+
+/// Позиции клубов по земле + лента угроз моего клуба за 7 дней.
+final clubWarProvider = FutureProvider.autoDispose<WarData>((ref) async {
+  final token = ref.watch(authProvider).token;
+  if (token == null || token.isEmpty) return const WarData();
+  final res = await _warDio.get<Map<String, dynamic>>(
+    '/clubs/war',
+    options: Options(headers: {'Authorization': 'Bearer $token'}),
+  );
+  final data = res.data ?? {};
+  return WarData(
+    standings: (data['standings'] as List? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(
+          (j) => WarStanding(
+            clubId: j['clubId']?.toString() ?? '',
+            name: j['name']?.toString() ?? 'Клуб',
+            areaM2: (j['areaM2'] as num?)?.toDouble() ?? 0,
+            pieces: (j['pieces'] as num?)?.toInt() ?? 0,
+            place: (j['place'] as num?)?.toInt() ?? 0,
+            isMine: j['isMine'] == true,
+          ),
+        )
+        .toList(),
+    threats: (data['threats'] as List? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(
+          (j) => WarThreat(
+            attackerName: j['attackerName']?.toString() ?? 'Бегун',
+            victimName: j['victimName']?.toString() ?? 'Бегун',
+            mine: j['mine'] == true,
+            areaM2: (j['areaM2'] as num?)?.toDouble() ?? 0,
+            atMs: (j['atMs'] as num?)?.toInt() ?? 0,
+          ),
+        )
+        .toList(),
+  );
+});

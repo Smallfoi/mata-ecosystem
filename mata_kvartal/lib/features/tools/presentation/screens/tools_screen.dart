@@ -10,7 +10,7 @@ import '../../../../core/theme/app_theme.dart';
 /// экрана «Бег» в свой экран). Сетка карточек с «живыми» иконками → роуты /tools/*.
 enum _ToolAnim { sweep, beat, slide, swing, spin }
 
-const _tools = <({
+final _tools = <({
   IconData icon,
   String title,
   String sub,
@@ -66,7 +66,7 @@ class ToolsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bg,
       ),
       child: SafeArea(
@@ -74,7 +74,7 @@ class ToolsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(20, 14, 20, 2),
               child: Text(
                 'Инструменты',
@@ -85,7 +85,7 @@ class ToolsScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
               child: Text(
                 'Офлайн-помощники для бега',
@@ -181,7 +181,7 @@ class _ToolCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   entry.sub,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                  style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
                 ),
               ],
             ),

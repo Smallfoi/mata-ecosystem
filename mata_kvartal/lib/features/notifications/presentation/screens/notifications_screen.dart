@@ -83,6 +83,17 @@ class _Empty extends StatelessWidget {
 }
 
 ({IconData icon, Color color}) _meta(String type, String title) {
+  // Разбор забега (анти-чит): три исхода, по которым бегун должен понять, что
+  // с его баллами — ждём, начислили или не засчитали.
+  if (title.startsWith('Забег на проверке')) {
+    return (icon: CupertinoIcons.clock_fill, color: AppColors.warning);
+  }
+  if (title.startsWith('Забег подтверждён')) {
+    return (icon: CupertinoIcons.checkmark_seal_fill, color: AppColors.success);
+  }
+  if (title.startsWith('Забег не засчитан')) {
+    return (icon: CupertinoIcons.exclamationmark_triangle_fill, color: AppColors.error);
+  }
   if (type == 'level' || title.contains('ровень')) {
     return (icon: CupertinoIcons.star_fill, color: AppColors.warning);
   }

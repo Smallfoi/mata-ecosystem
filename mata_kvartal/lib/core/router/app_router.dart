@@ -3,17 +3,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/data/auth_provider.dart';
 import '../../features/auth/presentation/screens/phone_screen.dart';
+import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/auth/presentation/screens/otp_screen.dart';
 import '../../features/map/presentation/screens/map_screen.dart';
+import '../../features/run/data/completed_runs_provider.dart';
 import '../../features/run/presentation/screens/run_screen.dart';
+import '../../features/run/presentation/screens/run_result_screen.dart';
+import '../../features/run/presentation/screens/run_passport_screen.dart';
+import '../../features/run/presentation/screens/runs_journal_screen.dart';
 import '../../features/permissions/presentation/location_setup_sheet.dart';
-import '../../features/leaderboard/presentation/screens/leaderboard_screen.dart';
+import '../../features/league/presentation/screens/focus_screen.dart';
+import '../../features/league/presentation/screens/league_screen.dart';
+import '../../features/trails/data/trails_provider.dart';
+import '../../features/trails/presentation/screens/trails_screen.dart';
+import '../../features/workouts/presentation/screens/watch_sync_screen.dart';
+import '../../features/league/presentation/screens/division_hub_screen.dart';
 import '../../features/races/data/races_provider.dart';
 import '../../features/races/presentation/screens/races_screen.dart';
 import '../../features/races/presentation/screens/race_detail_screen.dart';
 import '../../features/club/presentation/screens/club_screen.dart';
 import '../../features/club/presentation/screens/club_scan_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/profile/presentation/screens/theme_screen.dart';
+import '../../features/medals/presentation/hall_screen.dart';
+import '../../features/profile/presentation/screens/trophy_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../features/profile/presentation/screens/legal_documents_screen.dart';
 import '../../features/profile/presentation/screens/privacy_screen.dart';
@@ -80,6 +93,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (_, __) => const NoTransitionPage(child: SplashScreen()),
       ),
       GoRoute(
+        path: '/auth/welcome',
+        pageBuilder: (_, __) => const NoTransitionPage(child: WelcomeScreen()),
+      ),
+      GoRoute(
         path: '/auth/phone',
         pageBuilder: (_, __) => const NoTransitionPage(child: PhoneScreen()),
       ),
@@ -95,6 +112,28 @@ final routerProvider = Provider<GoRouter>((ref) {
             const NoTransitionPage(child: ConsentGateScreen()),
       ),
       // Скан QR приглашения — полноэкранный (вне шелла), как камера в Тинькофф.
+      // «Зачем ты бегаешь» — поверх вкладок: это разговор, а не раздел приложения.
+      GoRoute(
+        path: '/focus',
+        builder: (_, __) => const FocusScreen(),
+      ),
+      // Церемония итогов пробежки (Ф1) — на весь экран, без таб-бара.
+      GoRoute(
+        path: '/run/result',
+        builder: (_, state) =>
+            RunResultScreen(result: state.extra as RunResult),
+      ),
+      // «Паспорт пробежки» + журнал (дизайн 05.09.2026): детальный экран
+      // с маршрутом-героем и шарингом в любой момент.
+      GoRoute(
+        path: '/runs',
+        builder: (_, __) => const RunsJournalScreen(),
+      ),
+      GoRoute(
+        path: '/runs/passport',
+        builder: (_, state) =>
+            RunPassportScreen(run: state.extra as CompletedRun),
+      ),
       GoRoute(
         path: '/club/scan',
         builder: (_, __) => const ClubScanScreen(),
@@ -149,13 +188,29 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // 2 — Рейтинг
+          // 2 — Рейтинг (внутри него живёт «Лига»: то же место в голове —
+          //     «как я выгляжу на фоне других», но зачётов несколько)
           StatefulShellBranch(
             navigatorKey: tabNavigatorKeys[2],
             routes: [
               GoRoute(
                 path: '/leaderboard',
-                builder: (_, __) => const LeaderboardScreen(),
+                builder: (_, __) => const DivisionHubScreen(),
+              ),
+              GoRoute(
+                path: '/league',
+                builder: (_, __) => const LeagueScreen(),
+              ),
+              GoRoute(
+                path: '/trails',
+                builder: (_, __) => const TrailsScreen(),
+              ),
+              // Тропу передаём объектом: список уже загружен, второй запрос
+              // ради названия и длины не нужен.
+              GoRoute(
+                path: '/trails/detail',
+                builder: (_, state) =>
+                    TrailDetailScreen(trail: state.extra as Trail),
               ),
             ],
           ),
@@ -212,6 +267,24 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/profile/privacy',
                 builder: (_, __) => const PrivacyScreen(),
+              ),
+              // Зал славы (пьедестал, утверждён 02.09.2026); полный каталог
+              // 44 штампов — вложенным маршрутом за кнопкой «Все медали».
+              GoRoute(
+                path: '/profile/trophies',
+                builder: (_, __) => const TrophyHallScreen(),
+              ),
+              GoRoute(
+                path: '/profile/trophies/all',
+                builder: (_, __) => const MedalCatalogScreen(),
+              ),
+              GoRoute(
+                path: '/profile/theme',
+                builder: (_, __) => const ThemeScreen(),
+              ),
+              GoRoute(
+                path: '/profile/watch',
+                builder: (_, __) => const WatchSyncScreen(),
               ),
               GoRoute(
                 path: '/profile/legal',

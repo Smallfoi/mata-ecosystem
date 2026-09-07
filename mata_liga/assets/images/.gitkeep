@@ -1,2 +1,0 @@
-# Папка объявлена в pubspec.yaml (assets/images/). Файл .gitkeep нужен,
-# чтобы git сохранял пустую директорию и flutter analyze не падал.

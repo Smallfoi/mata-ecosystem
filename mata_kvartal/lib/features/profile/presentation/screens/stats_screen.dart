@@ -23,7 +23,7 @@ class StatsScreen extends ConsumerWidget {
       ),
       body: stats.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(
+        error: (_, __) => Center(
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
@@ -55,7 +55,7 @@ class StatsScreen extends ConsumerWidget {
               _Stat('На сумму', '${s.totalSpent} ₽', Icons.payments_outlined),
             ]),
             const SizedBox(height: 22),
-            const Text(
+            Text(
               'Статистика едина во всех приложениях экосистемы: покупки и заказы '
               'учитываются из МАТА Store.',
               style: TextStyle(fontSize: 13, height: 1.4, color: AppColors.muted),
@@ -76,7 +76,7 @@ class _SectionTitle extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 10),
         child: Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w800,
             color: AppColors.ink,
@@ -134,7 +134,7 @@ class _StatCard extends StatelessWidget {
               stat.value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: AppColors.ink,
@@ -143,7 +143,7 @@ class _StatCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               stat.label,
-              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+              style: TextStyle(fontSize: 12, color: AppColors.muted),
             ),
           ],
         ),

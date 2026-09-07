@@ -18,18 +18,16 @@
   `version.json` с `mata-club.ru` падал. Поставлен bucket CORS `GET/HEAD *` (put_bucket_cors через
   ВРЕМЕННЫЙ статический ключ SA — создать/поставить/удалить). Публичным медиа `*` безопасно.
 
-## `flutter build apk --release` для «Лиги» ставит на телефон БОЕВУЮ сборку
+## debug и release смотрят на РАЗНЫЕ бэкенды — знай, что ставишь
 
-`ApiConfig.baseUrl` выбирается по `kReleaseMode`: release → `api.mata-club.ru`, debug →
-`127.0.0.1:8000`. Поэтому привычная команда `flutter build apk --release` даёт «Лигу»,
-которая ходит на прод — а «Лига» это стройка, ей там не место (D-61). 30.08.2026 так
-и вышло: тестовое приложение оказалось на телефоне владельца боевым.
-
-Для «Лиги» правильно: `flutter build apk --debug` + `adb reverse tcp:8000 tcp:8000`.
-Проверить, что стоит на телефоне, можно по размеру и содержимому APK: debug ≈ 240 МБ и
-содержит `assets/flutter_assets/kernel_blob.bin`, release ≈ 83 МБ и содержит `libapp.so`.
-
-Для «Квартала» — наоборот: он боевой, ему нужен release.
+`ApiConfig.baseUrl` выбирается по `kReleaseMode`: release → `api.mata-club.ru` (ПРОД),
+debug → `127.0.0.1:8000` (локалка, нужен `adb reverse tcp:8000 tcp:8000`).
+Разработка/проверки на устройстве — debug; боевые релизы — только CI
+(«Android release»). 30.08.2026 release-сборка тогдашней dev-«Лиги» незаметно
+оказалась на проде — с 05.09.2026 «Лиги» больше нет (D-70), но правило то же:
+прежде чем ставить APK, знай, на какой бэкенд он ходит.
+Отличить по факту: debug ≈ 240 МБ и содержит `assets/flutter_assets/kernel_blob.bin`,
+release ≈ 83 МБ и содержит `libapp.so`.
 
 ## Health Connect тянет за собой toolchain: AGP ≥ 8.9.1 и compileSdk 36
 

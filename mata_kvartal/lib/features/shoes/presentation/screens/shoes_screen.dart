@@ -242,12 +242,12 @@ class _ShoeTile extends ConsumerWidget {
         title: const Text('Удалить кроссовки?'),
         content: Text(
           'Убрать «${shoe.model}» из приложения?',
-          style: const TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена',
+            child: Text('Отмена',
                 style: TextStyle(color: AppColors.textSecondary)),
           ),
           FilledButton(
@@ -330,7 +330,7 @@ class _ShoeTile extends ConsumerWidget {
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.only(left: 6),
                 constraints: const BoxConstraints(),
-                icon: const Icon(CupertinoIcons.trash,
+                icon: Icon(CupertinoIcons.trash,
                     size: 18, color: AppColors.textTertiary),
                 onPressed: () => _confirmDelete(context, ref),
               ),

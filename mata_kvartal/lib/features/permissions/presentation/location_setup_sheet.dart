@@ -105,7 +105,7 @@ class LocationSetupScreen extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             CupertinoIcons.exclamationmark_triangle_fill,
                             color: AppColors.warning,
                             size: 16,
@@ -193,7 +193,11 @@ class _Step extends StatelessWidget {
               : AppColors.separator,
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+        Row(
         children: [
           Container(
             width: 30,
@@ -206,14 +210,14 @@ class _Step extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: done
-                ? const Icon(
+                ? Icon(
                     CupertinoIcons.check_mark,
                     color: AppColors.success,
                     size: 16,
                   )
                 : Text(
                     '$index',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.electricBlue,
                       fontWeight: FontWeight.w800,
                     ),
@@ -241,16 +245,21 @@ class _Step extends StatelessWidget {
               ],
             ),
           ),
-          if (!done && onTap != null) ...[
-            const SizedBox(width: 8),
-            TextButton(
+        ],
+      ),
+        // Кнопка — своей строкой: длинные лейблы («Отключить экономию»)
+        // больше не зажимают заголовок в столбик.
+        if (!done && onTap != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
               onPressed: onTap,
               child: Text(
                 actionLabel,
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -291,7 +300,7 @@ class LocationWarningBanner extends ConsumerWidget {
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 CupertinoIcons.location_slash_fill,
                 color: AppColors.warning,
                 size: 20,
@@ -319,7 +328,7 @@ class LocationWarningBanner extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(
+              Icon(
                 CupertinoIcons.chevron_right,
                 color: AppColors.warning,
                 size: 16,

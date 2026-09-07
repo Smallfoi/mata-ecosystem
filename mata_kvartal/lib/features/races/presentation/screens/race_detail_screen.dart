@@ -76,7 +76,7 @@ class RaceDetailScreen extends ConsumerWidget {
             pinned: true,
             expandedHeight: 210,
             backgroundColor: AppColors.bgDark,
-            iconTheme: const IconThemeData(color: AppColors.ink),
+            iconTheme: IconThemeData(color: AppColors.ink),
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
@@ -107,7 +107,7 @@ class RaceDetailScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(race.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w800, height: 1.1)),
                   const SizedBox(height: 12),
                   _infoRow(CupertinoIcons.calendar, dateText),
@@ -120,7 +120,7 @@ class RaceDetailScreen extends ConsumerWidget {
                   ],
                   if (race.distances.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    const Text('Дистанции',
+                    Text('Дистанции',
                         style: TextStyle(color: AppColors.textTertiary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
                     const SizedBox(height: 8),
                     Wrap(
@@ -136,7 +136,7 @@ class RaceDetailScreen extends ConsumerWidget {
                               border: Border.all(color: AppColors.separator),
                             ),
                             child: Text(dist,
-                                style: const TextStyle(
+                                style: TextStyle(
                                     color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700)),
                           ),
                       ],
@@ -145,7 +145,7 @@ class RaceDetailScreen extends ConsumerWidget {
                   if (race.description.isNotEmpty) ...[
                     const SizedBox(height: 20),
                     Text(race.description,
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 14.5, height: 1.5)),
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 14.5, height: 1.5)),
                   ],
                   if (race.points > 0) ...[
                     const SizedBox(height: 20),
@@ -158,12 +158,12 @@ class RaceDetailScreen extends ConsumerWidget {
                       ),
                       child: Row(
                         children: [
-                          const Icon(CupertinoIcons.circle_grid_hex_fill,
+                          Icon(CupertinoIcons.circle_grid_hex_fill,
                               color: AppColors.success, size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text('+${race.points} баллов за финиш — в общий баланс экосистемы',
-                                style: const TextStyle(color: AppColors.ink, fontSize: 13.5)),
+                                style: TextStyle(color: AppColors.ink, fontSize: 13.5)),
                           ),
                         ],
                       ),
@@ -225,7 +225,7 @@ class RaceDetailScreen extends ConsumerWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(text,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
           ),
         ],
       );
@@ -263,12 +263,12 @@ class RaceDetailScreen extends ConsumerWidget {
         child: OutlinedButton(
           onPressed: onTap,
           style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: AppColors.separator),
+            side: BorderSide(color: AppColors.separator),
             padding: const EdgeInsets.symmetric(vertical: 15),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
           child: Text(text,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink)),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink)),
         ),
       );
 }

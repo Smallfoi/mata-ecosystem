@@ -215,7 +215,7 @@ class _IntervalTimerScreenState extends State<IntervalTimerScreen> {
                   label: Text(p.label),
                   backgroundColor: AppColors.bgElevated,
                   side: BorderSide(color: AppColors.separator),
-                  labelStyle: const TextStyle(
+                  labelStyle: TextStyle(
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w700,
                   ),
@@ -298,7 +298,7 @@ class _IntervalTimerScreenState extends State<IntervalTimerScreen> {
                     const SizedBox(height: 6),
                     Text(
                       _mmss(_remaining),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 68,
                         fontWeight: FontWeight.w900,

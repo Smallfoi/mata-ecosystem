@@ -90,12 +90,12 @@ class UpdateChecker {
     messenger.showMaterialBanner(
       MaterialBanner(
         backgroundColor: AppColors.bgSurface,
-        leading: const Icon(Icons.system_update, color: AppColors.accent),
+        leading: Icon(Icons.system_update, color: AppColors.accent),
         content: Text(
           versionName.isNotEmpty
               ? 'Доступна новая версия $versionName. Обновить приложение?'
               : 'Доступно обновление приложения. Обновить?',
-          style: const TextStyle(color: AppColors.ink),
+          style: TextStyle(color: AppColors.ink),
         ),
         actions: [
           TextButton(
@@ -103,7 +103,7 @@ class UpdateChecker {
               prefs.setInt(_prefsDismissedCode, code);
               messenger.hideCurrentMaterialBanner();
             },
-            child: const Text('Позже', style: TextStyle(color: AppColors.muted)),
+            child: Text('Позже', style: TextStyle(color: AppColors.muted)),
           ),
           TextButton(
             onPressed: () async {
@@ -114,7 +114,7 @@ class UpdateChecker {
               );
             },
             child:
-                const Text('Обновить', style: TextStyle(color: AppColors.accent)),
+                Text('Обновить', style: TextStyle(color: AppColors.accent)),
           ),
         ],
       ),

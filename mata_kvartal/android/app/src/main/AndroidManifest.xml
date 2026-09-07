@@ -14,7 +14,20 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Камера: скан QR-кода приглашения в клуб (mobile_scanner) -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Сохранение стикера в галерею на Android 8–9; с Android 10 (API 29)
+         MediaStore пишет в Pictures без разрешений -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Health Connect: тренировки с часов (COROS, Samsung, Amazfit, Polar и прочих)
+         приходят в общее хранилище Android, откуда мы их и читаем. Только чтение:
+         записывать чужие данные мы не собираемся. -->
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
 
     <application
         android:label="КВАРТАЛ"
@@ -43,13 +56,43 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Android 13 и ниже: то же обоснование доступа к Health Connect -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
         </activity>
+
+        <!-- Health Connect требует экран «зачем нам эти данные», иначе доступ не дают.
+             Android 14+ спрашивает через VIEW_PERMISSION_USAGE, до 13 включительно —
+             через ACTION_SHOW_PERMISSIONS_RATIONALE. Нужны оба. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <service
             android:name=".KvartalLocationService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <!-- Стикеры для сторис Инстаграма: Инста читает файл по content://-uri
+             этого провайдера (свой, отдельный от share_plus). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.instashare"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/insta_share_paths" />
+        </provider>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -66,6 +109,10 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Проверить, есть ли на телефоне Health Connect (иначе предложим установить) -->
+        <package android:name="com.google.android.apps.healthdata" />
+        <!-- Шаринг стикера в сторис: увидеть Инстаграм на Android 11+ -->
+        <package android:name="com.instagram.android" />
         <!-- url_launcher: открыть страницу регистрации на забег во внешнем браузере -->
         <intent>
             <action android:name="android.intent.action.VIEW"/>

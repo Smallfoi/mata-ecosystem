@@ -231,6 +231,7 @@ class ZoneNotifier extends StateNotifier<AsyncValue<List<BlockZone>>> {
     }
   }
 
+
   Future<void> retry() async {
     state = const AsyncValue.loading();
     await _init();

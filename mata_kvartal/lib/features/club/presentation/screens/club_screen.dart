@@ -286,6 +286,12 @@ class _ClubSliverHeader extends ConsumerWidget {
               // Анимированная тема — только без обложки (иначе фото — главный фон).
               if (hasClub && !hasCover)
                 Positioned.fill(child: ClubHeaderBackground(style: s)),
+              // Графит (Ф8): светлые пресеты гасим тёмной вуалью — светлый
+              // текст шапки читается, оттенок пресета остаётся подсветкой.
+              if (AppColors.isGraphite && !hasCover)
+                const DecoratedBox(
+                  decoration: BoxDecoration(color: Color(0xD920252B)),
+                ),
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
@@ -319,7 +325,7 @@ class _ClubSliverHeader extends ConsumerWidget {
                                               width: 2,
                                             ),
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             CupertinoIcons.camera_fill,
                                             size: 11,
                                             color: AppColors.ink,
@@ -421,7 +427,7 @@ class _ClubSliverHeader extends ConsumerWidget {
                       child: InkWell(
                         customBorder: const CircleBorder(),
                         onTap: () => _editClubCover(context, ref, hasCover),
-                        child: const SizedBox(
+                        child: SizedBox(
                           width: 48,
                           height: 48,
                           child: Icon(
@@ -494,14 +500,14 @@ class _DiscoverBodyState extends ConsumerState<_DiscoverBody> {
         const SizedBox(height: 10),
         TextField(
           controller: _searchCtrl,
-          style: const TextStyle(color: AppColors.textPrimary),
+          style: TextStyle(color: AppColors.textPrimary),
           textInputAction: TextInputAction.search,
           onSubmitted: (value) =>
               ref.read(clubProvider.notifier).refresh(search: value),
           decoration: InputDecoration(
             hintText:
                 '\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0438\u043b\u0438 \u0433\u043e\u0440\u043e\u0434',
-            hintStyle: const TextStyle(color: AppColors.textTertiary),
+            hintStyle: TextStyle(color: AppColors.textTertiary),
             prefixIcon: const Icon(CupertinoIcons.search, size: 18),
             suffixIcon: IconButton(
               tooltip: '\u0418\u0441\u043a\u0430\u0442\u044c',
@@ -514,11 +520,11 @@ class _DiscoverBodyState extends ConsumerState<_DiscoverBody> {
             fillColor: AppColors.bgCard,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: AppColors.separator),
+              borderSide: BorderSide(color: AppColors.separator),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: AppColors.separator),
+              borderSide: BorderSide(color: AppColors.separator),
             ),
           ),
         ),
@@ -537,6 +543,8 @@ class _DiscoverBodyState extends ConsumerState<_DiscoverBody> {
           )
         else
           ...state.clubs.map((club) => _ClubListTile(club: club)),
+        const SizedBox(height: 12),
+        const _DistrictWarCard(),
       ],
     );
   }
@@ -592,6 +600,8 @@ class _MyClubBody extends ConsumerWidget {
         _SectionHeader(title: 'Захваченные районы'),
         const SizedBox(height: 10),
         _ClubTerritoryCard(club: club),
+        const SizedBox(height: 12),
+        const _DistrictWarCard(),
         const SizedBox(height: 18),
         SizedBox(
           width: double.infinity,
@@ -604,7 +614,7 @@ class _MyClubBody extends ConsumerWidget {
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.error,
-              side: const BorderSide(color: AppColors.error),
+              side: BorderSide(color: AppColors.error),
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             onPressed: state.isMutating
@@ -636,7 +646,7 @@ Future<void> _confirmLeaveClub(
                   'и вызовами. Отменить это нельзя.'
             : 'Ты перестанешь быть участником клуба «${club.name}». '
                   'Вступить снова можно будет по приглашению или заявке.',
-        style: const TextStyle(color: AppColors.muted),
+        style: TextStyle(color: AppColors.muted),
       ),
       actions: [
         TextButton(
@@ -802,7 +812,7 @@ class _ClubChallengeSection extends ConsumerWidget {
                       ? null
                       : () => _confirmCancelChallenge(context, ref),
                   behavior: HitTestBehavior.opaque,
-                  child: const Padding(
+                  child: Padding(
                     padding: EdgeInsets.all(4),
                     child: Icon(
                       CupertinoIcons.xmark,
@@ -866,14 +876,14 @@ class _ClubChallengeSection extends ConsumerWidget {
                             c.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textPrimary,
                             ),
                           ),
                         ),
                         Text(
                           _kmLabel(c.km),
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1002,7 +1012,7 @@ class _ChallengeFormSheetState extends ConsumerState<_ChallengeFormSheet> {
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: AppColors.error)),
+              Text(_error!, style: TextStyle(color: AppColors.error)),
             ],
             const SizedBox(height: 18),
             FilledButton(
@@ -1150,7 +1160,7 @@ class _RacesEntryCard extends StatelessWidget {
               color: AppColors.soft,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               CupertinoIcons.calendar,
               size: 18,
               color: AppColors.accentInk,
@@ -1170,7 +1180,7 @@ class _RacesEntryCard extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(
+          Icon(
             CupertinoIcons.chevron_right,
             size: 18,
             color: AppColors.faint,
@@ -1202,7 +1212,7 @@ class _OwnerToolsCard extends StatelessWidget {
             color: AppColors.soft,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(
+          child: Icon(
             CupertinoIcons.slider_horizontal_3,
             size: 18,
             color: AppColors.accentInk,
@@ -1283,7 +1293,7 @@ class _InviteCodeCard extends ConsumerWidget {
                   color: AppColors.soft,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(
+                child: Icon(
                   CupertinoIcons.person_2,
                   color: AppColors.accentInk,
                   size: 22,
@@ -1336,7 +1346,7 @@ class _InviteCodeCard extends ConsumerWidget {
           // \u0420\u0430\u0437\u0434\u0435\u043b\u0438\u0442\u0435\u043b\u044c \u00ab\u0438\u043b\u0438 \u043a\u043e\u0434 \u0432\u0440\u0443\u0447\u043d\u0443\u044e\u00bb.
           Row(
             children: [
-              const Expanded(child: Divider(color: AppColors.line)),
+              Expanded(child: Divider(color: AppColors.line)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Text(
@@ -1344,19 +1354,19 @@ class _InviteCodeCard extends ConsumerWidget {
                   style: TextStyle(color: AppColors.faint, fontSize: 11),
                 ),
               ),
-              const Expanded(child: Divider(color: AppColors.line)),
+              Expanded(child: Divider(color: AppColors.line)),
             ],
           ),
           const SizedBox(height: 12),
           TextField(
             controller: controller,
-            style: const TextStyle(color: AppColors.ink),
+            style: TextStyle(color: AppColors.ink),
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _submit(context, ref),
             decoration: InputDecoration(
               hintText: '\u041a\u043e\u0434 \u0438\u043b\u0438 \u0441\u0441\u044b\u043b\u043a\u0430 \u043f\u0440\u0438\u0433\u043b\u0430\u0448\u0435\u043d\u0438\u044f',
-              hintStyle: const TextStyle(color: AppColors.faint),
-              prefixIcon: const Icon(
+              hintStyle: TextStyle(color: AppColors.faint),
+              prefixIcon: Icon(
                 CupertinoIcons.ticket,
                 size: 18,
                 color: AppColors.muted,
@@ -1374,7 +1384,7 @@ class _InviteCodeCard extends ConsumerWidget {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.accentInk, width: 1.5),
+                borderSide: BorderSide(color: AppColors.accentInk, width: 1.5),
               ),
             ),
           ),
@@ -1672,7 +1682,7 @@ class _MemberTile extends StatelessWidget {
           ),
           Text(
             _kmLabel(member.km),
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.electricBlue,
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -1713,7 +1723,7 @@ class _RequestTile extends ConsumerWidget {
                 ? null
                 : () =>
                       ref.read(clubProvider.notifier).rejectRequest(request.id),
-            icon: const Icon(
+            icon: Icon(
               CupertinoIcons.xmark_circle_fill,
               color: AppColors.error,
             ),
@@ -1725,7 +1735,7 @@ class _RequestTile extends ConsumerWidget {
                 : () => ref
                       .read(clubProvider.notifier)
                       .approveRequest(request.id),
-            icon: const Icon(
+            icon: Icon(
               CupertinoIcons.check_mark_circled_solid,
               color: AppColors.success,
             ),
@@ -1890,7 +1900,7 @@ class _ClubFormSheetState extends ConsumerState<_ClubFormSheet> {
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: AppColors.error)),
+              Text(_error!, style: TextStyle(color: AppColors.error)),
             ],
             const SizedBox(height: 18),
             SizedBox(
@@ -2131,7 +2141,7 @@ class _EditField extends StatelessWidget {
     controller: controller,
     maxLines: maxLines,
     keyboardType: keyboardType,
-    style: const TextStyle(color: AppColors.textPrimary),
+    style: TextStyle(color: AppColors.textPrimary),
     decoration: InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon, size: 18),
@@ -2139,11 +2149,11 @@ class _EditField extends StatelessWidget {
       fillColor: AppColors.bgCard,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.separator),
+        borderSide: BorderSide(color: AppColors.separator),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.separator),
+        borderSide: BorderSide(color: AppColors.separator),
       ),
     ),
   );
@@ -2420,4 +2430,175 @@ class _FutureModuleCard extends StatelessWidget {
     subtitle: subtitle,
     color: AppColors.info,
   );
+}
+
+/// Ф6 «Клубная война»: щит района — реальный лидерборд районов
+/// (GET /leaderboard/districts). Мой район подсвечен лаймом.
+class _DistrictWarCard extends ConsumerWidget {
+  const _DistrictWarCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(clubWarProvider);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Война района',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Чей клуб держит больше земли',
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+          const SizedBox(height: 12),
+          async.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CupertinoActivityIndicator(),
+              ),
+            ),
+            error: (_, __) => Text(
+              'Не удалось загрузить районы — потяни вниз, чтобы обновить.',
+              style: TextStyle(fontSize: 12.5, color: AppColors.faint),
+            ),
+            data: (war) {
+              if (war.standings.isEmpty && war.threats.isEmpty) {
+                return Text(
+                  'Пока никто не захватил территорию. Замкни первый круг!',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.faint),
+                );
+              }
+              final maxArea = war.standings
+                  .map((d) => d.areaM2)
+                  .fold<double>(1, (a, b) => a > b ? a : b);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final d in war.standings) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  d.isMine
+                                      ? '${d.name} · твой клуб'
+                                      : d.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: d.isMine
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                _fmtArea(d.areaM2),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: d.isMine
+                                      ? AppColors.limeDeep
+                                      : AppColors.muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: (d.areaM2 / maxArea).clamp(0.02, 1.0),
+                              minHeight: 5,
+                              backgroundColor: AppColors.soft,
+                              valueColor: AlwaysStoppedAnimation(
+                                d.isMine
+                                    ? AppColors.limeDeep
+                                    : AppColors.zoneNeutral,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (war.threats.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Угрозы недели',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.warm,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    for (final t in war.threats.take(5))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 5),
+                        child: Row(
+                          children: [
+                            Icon(
+                              CupertinoIcons.flag_fill,
+                              size: 12,
+                              color: AppColors.warm,
+                            ),
+                            const SizedBox(width: 7),
+                            Expanded(
+                              child: Text(
+                                '${t.attackerName} отрезал '
+                                '${_fmtArea(t.areaM2)} у '
+                                '${t.mine ? 'тебя' : t.victimName}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: AppColors.ink,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => context.go('/run'),
+                        child: const Text('Вернуть бегом'),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _fmtArea(double m2) {
+    if (m2 >= 10000) return '${(m2 / 10000).toStringAsFixed(1)} га';
+    return '${m2.round()} м²';
+  }
 }

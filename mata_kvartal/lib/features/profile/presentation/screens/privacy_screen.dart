@@ -31,9 +31,9 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: const Text('Удалить аккаунт?',
+        title: Text('Удалить аккаунт?',
             style: TextStyle(color: AppColors.textPrimary)),
-        content: const Text(
+        content: Text(
           'Это навсегда удалит ваш аккаунт, баллы, территории, заказы, '
           'кроссовки и историю во всей экосистеме. Действие необратимо.',
           style: TextStyle(color: AppColors.textSecondary),
@@ -45,7 +45,7 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Удалить', style: TextStyle(color: AppColors.error)),
+            child: Text('Удалить', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -118,14 +118,14 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
               ),
               child: ListTile(
                 leading: _deleting
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: AppColors.error),
                       )
-                    : const Icon(CupertinoIcons.trash, color: AppColors.error, size: 20),
-                title: const Text('Удалить аккаунт',
+                    : Icon(CupertinoIcons.trash, color: AppColors.error, size: 20),
+                title: Text('Удалить аккаунт',
                     style: TextStyle(
                         color: AppColors.error, fontWeight: FontWeight.w700)),
                 onTap: _deleting ? null : _confirmDelete,
@@ -146,7 +146,7 @@ class _SectionTitle extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 6, left: 4),
         child: Text(
           text.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.textTertiary,
             fontSize: 12,
             fontWeight: FontWeight.w800,
@@ -163,7 +163,7 @@ class _Hint extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
         child: Text(text,
-            style: const TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+            style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
       );
 }
 
@@ -194,10 +194,10 @@ class _PrivacyToggle extends StatelessWidget {
       child: SwitchListTile(
         secondary: Icon(icon, color: AppColors.textPrimary, size: 20),
         title: Text(label,
-            style: const TextStyle(
+            style: TextStyle(
                 color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle,
-            style: const TextStyle(color: AppColors.textTertiary, fontSize: 12)),
+            style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
         value: value,
         activeColor: AppColors.electricBlue,
         onChanged: onChanged,

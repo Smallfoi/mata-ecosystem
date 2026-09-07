@@ -143,7 +143,7 @@ class _SizeTile extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.electricBlue,
               fontSize: 22,
               fontWeight: FontWeight.w900,

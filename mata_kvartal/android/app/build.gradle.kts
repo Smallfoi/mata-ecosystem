@@ -22,7 +22,10 @@ val hasReleaseKeystore = keystorePropertiesFile.exists()
 
 android {
     namespace = "ru.mata.kvartal"
-    compileSdk = flutter.compileSdkVersion
+    // 36, а не flutter.compileSdkVersion (35): androidx.health.connect собирается
+    // только против Android 16. Компиляция против нового SDK — не то же самое, что
+    // targetSdk: поведение приложения на телефонах от этого не меняется.
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -40,8 +43,10 @@ android {
         applicationId = "ru.mata.kvartal"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // mobile_scanner (скан QR клуба) требует minSdk 23 — иначе manifest merger падает.
-        minSdk = maxOf(flutter.minSdkVersion, 23)
+        // mobile_scanner (скан QR клуба) требует minSdk 23, health (Health Connect) — 26.
+        // Берём больший: Health Connect и так живёт с Android 9, так что мы никого
+        // не теряем сверх того, кого уже потеряли.
+        minSdk = maxOf(flutter.minSdkVersion, 26)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

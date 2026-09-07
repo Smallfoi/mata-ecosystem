@@ -1,0 +1,450 @@
+<title>365 дней Квартала</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  --bg:#F4F1EA; --paper:#FFFDF8; --ink:#20252B; --ink2:#5A6470; --line:#E4DFD2;
+  --accent:#57BCD8; --accent-ink:#136A82; --lime:#DFF45F; --lime-ink:#37410B;
+  --danger:#C24B3A; --danger-bg:#FBEEE9; --ok:#3E7D4E; --ok-bg:#EDF5EA;
+  --warn-bg:#FBF4DC; --warn-ink:#7A5D12; --card:#FFFDF8; --chip:#ECE7DA; --code:#EDEAE0;
+  --arch:#E8F4F8; --arch-ink:#136A82; --today:#EEF6D9; --today-ink:#4D5A10; --street:#F6E9D6; --street-ink:#7A4B12; --ep:#EDE6F5; --ep-ink:#4F3A78;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14181C; --paper:#1B2126; --ink:#E8EAED; --ink2:#9AA5B0; --line:#2C343B;
+    --accent:#57BCD8; --accent-ink:#8ED4E8; --lime:#DFF45F; --lime-ink:#37410B;
+    --danger:#E07A66; --danger-bg:#2A1D1A; --ok:#7CBF8A; --ok-bg:#1B2A1E;
+    --warn-bg:#2A2517; --warn-ink:#E3C86A; --card:#1B2126; --chip:#242C33; --code:#232A31;
+    --arch:#16303A; --arch-ink:#8ED4E8; --today:#22301A; --today-ink:#D6EC55; --street:#33271A; --street-ink:#E8B878; --ep:#2A2438; --ep-ink:#C9B6EC;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14181C; --paper:#1B2126; --ink:#E8EAED; --ink2:#9AA5B0; --line:#2C343B;
+  --accent:#57BCD8; --accent-ink:#8ED4E8; --lime:#DFF45F; --lime-ink:#37410B;
+  --danger:#E07A66; --danger-bg:#2A1D1A; --ok:#7CBF8A; --ok-bg:#1B2A1E;
+  --warn-bg:#2A2517; --warn-ink:#E3C86A; --card:#1B2126; --chip:#242C33; --code:#232A31;
+  --arch:#16303A; --arch-ink:#8ED4E8; --today:#22301A; --today-ink:#D6EC55; --street:#33271A; --street-ink:#E8B878; --ep:#2A2438; --ep-ink:#C9B6EC;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.65 Manrope,system-ui,sans-serif;margin:0}
+.wrap{max-width:960px;margin:0 auto;padding:0 20px 90px}
+h1,h2,h3,h4{font-family:Unbounded,Manrope,sans-serif;text-wrap:balance;line-height:1.2}
+h1{font-size:clamp(26px,5vw,44px);font-weight:800;margin:14px 0 10px}
+h2{font-size:clamp(19px,3vw,26px);font-weight:700;margin:0 0 14px}
+h3{font-size:16px;font-weight:700;margin:28px 0 10px}
+h4{font-size:14px;font-weight:700;margin:0 0 6px}
+p{margin:10px 0;max-width:76ch}
+a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.eyebrow{font-family:Unbounded,sans-serif;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink)}
+header.hero{padding:54px 0 8px}
+.hero-sub{color:var(--ink2);max-width:72ch;font-size:17px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 0}
+.meta span{background:var(--chip);border-radius:999px;padding:5px 13px;font-size:13px;font-weight:600;color:var(--ink2)}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin:26px 0 0}
+nav.toc a{border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--ink);background:var(--paper)}
+section{margin-top:58px}
+.secnum{font-family:Unbounded,sans-serif;font-size:12px;font-weight:700;color:var(--accent-ink);letter-spacing:.12em;display:block;margin-bottom:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+.tldr{border-left:4px solid var(--accent);display:grid;gap:10px}
+.tldr .row{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start}
+.tldr .dot{width:10px;height:10px;border-radius:3px;background:var(--accent);margin-top:8px}
+.tldr .row p{margin:0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:18px 0}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat b{font-family:Unbounded,sans-serif;font-size:21px;font-weight:700;display:block;font-variant-numeric:tabular-nums}
+.stat span{font-size:12.5px;color:var(--ink2);font-weight:600}
+.callout{border-radius:12px;padding:16px 18px;margin:18px 0}
+.callout p{margin:6px 0}
+.callout.warn{background:var(--warn-bg)} .callout.warn b{color:var(--warn-ink)}
+.callout.good{background:var(--ok-bg)} .callout.good b{color:var(--ok)}
+.callout.bad{background:var(--danger-bg)} .callout.bad b{color:var(--danger)}
+.callout .tag{font-family:Unbounded,sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;display:block;margin-bottom:4px}
+.callout.warn .tag{color:var(--warn-ink)} .callout.good .tag{color:var(--ok)} .callout.bad .tag{color:var(--danger)}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+@media(max-width:700px){.cols2,.cols3{grid-template-columns:1fr}}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);margin:16px 0}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:13.5px}
+th{font-family:Unbounded,sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:var(--card)}
+td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+tr:last-child td{border-bottom:none}
+td.num{font-family:Unbounded,sans-serif;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ln{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.06em;border-radius:6px;padding:2px 7px;text-transform:uppercase;white-space:nowrap}
+.ln.arch{background:var(--arch);color:var(--arch-ink)}
+.ln.today{background:var(--today);color:var(--today-ink)}
+.ln.street{background:var(--street);color:var(--street-ink)}
+.ln.ep{background:var(--ep);color:var(--ep-ink)}
+ul.clean{padding-left:20px} ul.clean li{margin:7px 0}
+.persona{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0}
+.persona .p{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.persona .p b{font-family:Unbounded,sans-serif;font-size:13px;display:block;margin-bottom:4px}
+.persona .p span{font-size:13.5px;color:var(--ink2)}
+.formula{display:grid;grid-template-columns:auto 1fr;gap:12px 14px;align-items:start;margin:14px 0}
+.formula .t{font-family:Unbounded,sans-serif;font-weight:800;font-size:12px;color:var(--accent-ink);white-space:nowrap;padding-top:3px;font-variant-numeric:tabular-nums}
+.formula p{margin:0}
+.recs{counter-reset:rec;display:grid;gap:10px;margin:16px 0}
+.rec{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+.rec::before{counter-increment:rec;content:counter(rec);font-family:Unbounded,sans-serif;font-weight:800;color:var(--accent-ink);font-size:15px;padding-top:1px;font-variant-numeric:tabular-nums}
+.rec b{font-weight:800} .rec p{margin:4px 0 0;font-size:14.5px}
+.script{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0}
+.script .hd{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.script .hd b{font-family:Unbounded,sans-serif;font-size:14px}
+.script .row{display:grid;grid-template-columns:110px 1fr;gap:10px;padding:8px 0;border-top:1px dashed var(--line);font-size:14px}
+.script .row:first-of-type{border-top:none}
+.script .k{font-weight:800;color:var(--ink2);font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding-top:2px}
+.script .row p{margin:0}
+.voice{background:var(--code);border-radius:10px;padding:12px 14px;font-size:14.5px;line-height:1.6;margin:6px 0}
+.caption{display:inline-block;background:var(--ink);color:var(--bg);font-family:Unbounded,sans-serif;font-weight:700;font-size:11.5px;padding:3px 8px;border-radius:5px;margin:2px 4px 2px 0}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .caption{background:var(--lime);color:#37410B}}
+:root[data-theme="dark"] .caption{background:var(--lime);color:#37410B}
+.q{display:grid;gap:8px;margin:14px 0}
+.q .item{display:grid;grid-template-columns:30px 1fr;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 14px;font-size:14.5px}
+.q .n{font-family:Unbounded,sans-serif;font-weight:800;color:var(--danger);font-size:13px;padding-top:2px}
+code{background:var(--code);border-radius:6px;padding:2px 6px;font-size:13.5px}
+details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:14px 0}
+summary{cursor:pointer;font-weight:800;font-size:14px}
+.footer{margin-top:70px;border-top:1px solid var(--line);padding-top:18px;color:var(--ink2);font-size:13px}
+@media (prefers-reduced-motion:no-preference){header.hero{animation:up .5s ease both}@keyframes up{from{opacity:.01;transform:translateY(8px)}to{opacity:1;transform:none}}}
+</style>
+
+<div class="wrap">
+<header class="hero">
+  <span class="eyebrow">МАТА · маркетинговый план · v1 на утверждение · 06.09.2026</span>
+  <h1>365 дней Квартала</h1>
+  <p class="hero-sub">План кампании build-in-public: весь путь проекта от первой строки кода до публичного запуска превращаем в ежедневный сериал коротких видео. Стратегия, формат, площадки, календарь на год с первыми 30 днями посуточно, офлайн-план в Якутске и протокол, по которому я работаю вашим маркетинг-ассистентом.</p>
+  <div class="meta"><span>4 исследования</span><span>212 событий в банке историй</span><span>12 сюжетных арок</span><span>30 дней расписаны по дням</span></div>
+  <nav class="toc">
+    <a href="#tldr">Главное</a><a href="#why">Цель и для кого</a><a href="#learn">Что узнали</a><a href="#show">Концепция шоу</a><a href="#reel">Анатомия ролика</a><a href="#platforms">Площадки и закон</a><a href="#calendar">Календарь</a><a href="#cards">Карточки съёмки</a><a href="#offline">Офлайн-план</a><a href="#protocol">Как работаем</a><a href="#questions">Вопросы к вам</a>
+  </nav>
+</header>
+
+<section id="tldr">
+  <span class="secnum">РЕЗЮМЕ</span>
+  <h2>Главное — в восьми пунктах</h2>
+  <div class="card tldr">
+    <div class="row"><span class="dot"></span><p><b>У нас есть то, чего нет ни у кого в русскоязычном интернете:</b> ежедневного видео-дневника создания приложения на русском не существует (проверено), а дневника, где приложение пишет ИИ, а человек тестирует его бегом при −40 — тем более. Ниша пустая, заходим первыми.</p></div>
+    <div class="row"><span class="dot"></span><p><b>Ваш эталон — Омар Рзаев (Voon) — разобран покадрово.</b> Его формула работает: «Я + результат» в первые 3 секунды, одна фраза ценности в каждом ролике, слово-CTA в комментариях, серия «День N». Его лучший ролик — 146 тыс. просмотров. Но у него нет ИИ-персонажа, нет города и нет игры — и 4 сентября он запустил ровно наш формат «365 дней». Мы отличаемся, а не копируем.</p></div>
+    <div class="row"><span class="dot"></span><p><b>Сериал ведут двое:</b> Михаил на улице Якутска и Claude в терминале. Каждый ролик — одна деталь проекта, но у нас 86 дней истории позади, поэтому счётчик начинается не с «Дня 1», а с <b>«Дня 89»</b> — это само по себе хук.</p></div>
+    <div class="row"><span class="dot"></span><p><b>Две линии, чтобы зритель не терял нить:</b> «Архив» (что мы делали такого-то числа — 212 готовых событий) и «Сегодня» (что происходит прямо сейчас: тестеры, забеги, зима). Формула «БЫЛО → СТАЛО» связывает их: «В мае мы хотели резать Якутск на шестиугольники. Вот что вышло».</p></div>
+    <div class="row"><span class="dot"></span><p><b>Ритм: 5 деталей в будни (20–40 с) + суббота «Улица» (живой забег) + воскресный «Эпизод недели» (50–60 с)</b> + ежедневный бэкстейдж в Telegram. Ежедневность нужна для серии, но без хука она не растит (проверено антикейсом: 30 дней Reels → +25 подписчиков).</p></div>
+    <div class="row"><span class="dot"></span><p><b>Площадки:</b> VK Клипы — основной канал (80% молодёжи в VK, 3,2 млрд просмотров клипов в день, полностью легально), Telegram — штаб и сообщество, YouTube Shorts — охват, Instagram* — личная хроника без «скачайте». Реклама в Instagram запрещена законом с 01.09.2025, платить Meta нельзя, звать в VPN нельзя.</p></div>
+    <div class="row"><span class="dot"></span><p><b>Контент не заменяет улицу.</b> В Якутске уже есть якорь — «5 вёрст» каждую субботу, 706 участников за всё время; 26 сентября — «Забег Олонхо» на 1 800 человек; до 15 сентября — грант Росмолодёжи до 1 млн ₽. Первые 90 дней офлайн расписаны по неделям.</p></div>
+    <div class="row"><span class="dot"></span><p><b>Как это работает дальше:</b> вы говорите «что снимаем сегодня» — я даю карточку съёмки (хук, кадры, текст, титры, вопрос, пост в Telegram). Раз в неделю — разбор цифр и календарь на следующую неделю. Всё живёт в репозитории в <code>docs/marketing/</code>, банк историй пополняется из журнала автоматически.</p></div>
+  </div>
+</section>
+
+<section id="why">
+  <span class="secnum">РАЗДЕЛ 1</span>
+  <h2>Цель и для кого</h2>
+  <p>Кампания должна отвечать на два вопроса в каждом ролике, не занудствуя: <b>зачем мы это делаем</b> и <b>для кого</b>. Ответы уже сформулированы проектом — их надо не придумать, а произнести.</p>
+  <div class="cols2">
+    <div class="card"><h4>Зачем — миссия одной фразой</h4><p>«Не три отдельных продукта, а одна система: пробежал в Квартале — заработал баллы — потратил в МАТА Store». Бег превращается в вещи. Квартал — игра, где город захватывают ногами, а с версии 2.0 — «каждый бежит в своей лиге, никаких проигравших». МАТА — семейное дело из Якутска (Михаил + Алёна + Татариновы), где Strava и Nike ушли из сторов, а рынок «полупустой».</p></div>
+    <div class="card"><h4>Для кого — три круга</h4><p><b>Ядро:</b> бегуны Якутска (клубы, «5 вёрст», студенты СВФУ), 18–35, кто хочет повода выйти на улицу и живого сообщества. <b>Второй круг:</b> бегуны РФ, оставшиеся без Strava, и «не хочет войны / медленный / новичок / с часами» — их держит «своя лига» и режим свободной пробежки. <b>Третий круг (зрители сериала):</b> все, кому интересно, как ИИ строит настоящий продукт — предприниматели, айтишники, «вайб-кодеры». Они не побегут, но принесут охват и прессу.</p></div>
+  </div>
+  <h3>Цели по этапам</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Этап</th><th>Когда</th><th>Цель кампании</th><th>Как измеряем</th></tr>
+    <tr><td><b>Закрытый тест</b></td><td>сентябрь–ноябрь 2026</td><td>Собрать первую сотню живых бегунов Якутска и аудиторию наблюдателей до публичного релиза; дефицит инвайтов — валюта</td><td>300 установок, 100 недельно активных, 10 амбассадоров; 1 000 подписчиков суммарно VK+TG; удержание эпизода-2 &gt;30%</td></tr>
+    <tr><td><b>Зима-1</b></td><td>декабрь 2026 – февраль 2027</td><td>Доказать, что игра живёт при −40 (манежи, «крытые кварталы»); первый сезон с финалом; RuStore</td><td>первый сезон закрыт, 3 очных ивента, 1 корпоративный клуб, публикация в RuStore</td></tr>
+    <tr><td><b>Публичный запуск</b></td><td>весна 2027</td><td>Открыть Квартал всей республике, Хабаровск вторым городом; Store с продажами</td><td>доживание до 3-й пробежки &gt;50%, удержание 8-й недели &gt;35%, баллы → покупка &gt;15% активных (метрики из стратегии)</td></tr>
+    <tr><td><b>Финал сериала</b></td><td>сентябрь 2027</td><td>День 454: год эфира — «что стало с городом»; серия медалей 2027</td><td>карта Якутска «закрашена» на N%, пресса, второй сезон</td></tr>
+  </table></div>
+</section>
+
+<section id="learn">
+  <span class="secnum">РАЗДЕЛ 2</span>
+  <h2>Что мы узнали из четырёх исследований</h2>
+
+  <h3>Омар Рзаев и Voon — эталон подачи под микроскопом</h3>
+  <p>Москва, iOS-разработчик, соло. Приложение Voon (бывш. Veloon) — GPS-трекер для вело и бега, «конкурент Strava»; захвата территорий нет. Instagram 4 305 подписчиков, Telegram 2 570, 2 048 тестировщиков в TestFlight. Ведёт с 23 июля, 8 роликов; с 4 сентября — ежедневная серия «365 дней». Все 8 роликов просмотрены покадрово, 6 расшифрованы, Telegram прочитан целиком.</p>
+  <div class="cols2">
+    <div class="card"><h4>Что у него работает — берём</h4>
+      <ul class="clean">
+        <li><b>Хук-утверждение от первого лица за 3 с:</b> «Я сделал приложение…» (19 тыс. лайков), «…на котором не заработаю ни рубля» (146 тыс. просмотров).</li>
+        <li><b>Петля «поездка = тест → заметил → починил → снова поехал»</b> — сквозная драматургия.</li>
+        <li><b>UI на реальном устройстве в реальной среде</b> (телефон на руле) и плавающие карточки статистики поверх уличного видео.</li>
+        <li><b>Одна фраза ценности в каждом ролике:</b> «бесплатно, без подписок, просто пользуйся».</li>
+        <li><b>Слово-CTA в комментариях + воронка в Telegram:</b> «пиши ТЕСТ» → 6,5 тыс. комментариев.</li>
+        <li><b>Счётчик серии, «завтра покажу», сетка 365</b>, финальная карточка, сделанная как интерфейс.</li>
+        <li><b>Назвать врага:</b> «конкурент Strava», мем Кунг-фу Панда против Тай Лунга.</li>
+        <li>Баги как есть («скорость 7 932 км/ч») — работает на доверие.</li>
+      </ul></div>
+    <div class="card"><h4>Где он слаб — обходим</h4>
+      <ul class="clean">
+        <li>Одна история происхождения пересказана 4 раза за 6 недель.</li>
+        <li>Ровный монотонный закадр 50–65 с, юмор только в монтаже.</li>
+        <li>Имя приложения не звучит, сменил на ходу после 146 тыс. просмотров.</li>
+        <li>Слово-CTA без бота — тысячи «тест» тонут, вопросы теряются.</li>
+        <li>Паузы 10–17 дней → охват в Telegram упал вдвое.</li>
+        <li>Только iOS полтора месяца — «а для андроида?» под каждым роликом.</li>
+        <li>Провалы: лирика без продукта (270 лайков) и «мелкая фича как лайфхак» (333).</li>
+      </ul></div>
+  </div>
+  <div class="callout good"><span class="tag">Чем мы отличаемся</span><p><b>ИИ-разработчик как персонаж</b> (у него нет), <b>Якутск и −40</b> как визуал экстремального теста (его POV с руля → наш POV с варежкой), <b>карта, которая раскрашивается</b> — готовая визуальная прогрессия на год («захвачено 3% Якутска → 40%»), <b>44 живые медали и магазин</b> — осязаемая петля «пробежал → баллы → вещь», <b>клубы и войны районов</b> — социальный контент. И у нас есть 86 дней истории — мы не начинаем с нуля.</p></div>
+
+  <h3>Русскоязычная ниша и мировые эталоны</h3>
+  <p>Русскоязычный build-in-public живёт в тексте (Telegram, vc.ru, Habr) — «Инди-хакеры: стартапы из 💩 и 🥢», «Саша пилит сервис», «Бегущий стартап» Петра Антонова (беговое AI-приложение, только текст). Видео-девлоги есть только у геймдева на YouTube. Мировые ориентиры: Marc Lou (6 столпов контента, хук-число «I made $87 507 in May»), Riley Brown (скринкаст «строю приложение на глазах», хук дописывается после съёмки), The Indie Scrolls (ежедневный «Day N» — к 116-му дню о нём написала пресса просто за упорство). Вывод: <b>«День N + одна деталь + сквозной заголовок» сам генерирует прессу</b>, а ежедневность без хука не растит.</p>
+
+  <h3>Спортивные сообщества Якутска — контент не заменяет улицу</h3>
+  <p>«5 вёрст Якутск Дохсун» — каждую субботу 9:00 в ЦПКиО, круглый год включая −40: 220 стартов, 706 уникальных участников. Клуб «Дьулуур» (Артур Корякин) — зимние забеги в парке с рекордом −51°C. Самый медийный бегун республики — Александр Моедо (рекорд России в суточном беге, 285 км). Зимой — четыре манежа, «Триумф» с кругом 330 м — идеальный «крытый квартал». Кейсы: Лига Героев начинала с 300 человек на полигоне; Turf потерял «тысячи игроков в зонных пустынях» — гексы сеять только там, где есть люди; Niantic держала Ingress в закрытой бете год — дефицит инвайтов создаёт спрос. Подробный офлайн-план — в разделе 8.</p>
+</section>
+
+<section id="show">
+  <span class="secnum">РАЗДЕЛ 3</span>
+  <h2>Концепция шоу</h2>
+  <h3>Название</h3>
+  <p>Рабочее: <b>«Квартал. День N»</b> — счётчик от первого коммита 13.06.2026; первый ролик выходит как «День 89». Запасные: «Захват» (короче, агрессивнее) и «Строим Квартал» (понятнее холодному зрителю). Рекомендую первое: слово «Квартал» звучит в каждом заголовке (урок Voon — имя должно звучать), а «День 89» сразу говорит «у нас есть история».</p>
+  <h3>Персонажи</h3>
+  <div class="persona">
+    <div class="p"><b>Михаил</b><span>владелец, Якутск. Улица, телефон в руке, бег, тестирование, решения «убрать / верни как было». Его цитаты — заголовки.</span></div>
+    <div class="p"><b>Claude</b><span>ИИ-разработчик. Терминал, ночные смены, дневник на 286 записей, признаёт ошибки письменно, «взломал сам себя».</span></div>
+    <div class="p"><b>Якутск</b><span>−40, 62° с.ш. (в декабре светло 10:20–15:10), манежи, «5 вёрст», Ысыах и сэргэ на медалях.</span></div>
+    <div class="p"><b>Антагонисты</b><span>Infinix, который убивает фон; Strava, которая «не знает, что такое −40»; GitHub, который хотел денег; Let's Encrypt с лимитом 5 сертификатов.</span></div>
+  </div>
+  <h3>Две линии и одна формула</h3>
+  <div class="formula">
+    <span class="t">АРХИВ</span><p>«N-го числа мы делали то-то». 212 событий из журнала, каждое с готовым кадром. Рассказываем хронологически, но не подряд — по арке недели. Помечено <span class="ln arch">Архив</span>.</p>
+    <span class="t">СЕГОДНЯ</span><p>Что происходит прямо сейчас: тестеры, забеги, баги, решения. Помечено <span class="ln today">Сегодня</span>, суббота — <span class="ln street">Улица</span> (живой забег), воскресенье — <span class="ln ep">Эпизод</span> недели.</p>
+    <span class="t">БЫЛО → СТАЛО</span><p>Сквозная формула, чтобы архив не был занудством: каждая архивная деталь заканчивается тем, во что она превратилась сегодня. «Так мы думали в мае. Так это выглядит сейчас».</p>
+    <span class="t">ЗАЧЕМ</span><p>Односекундная карточка в одном и том же месте кадра в каждом ролике: «КВАРТАЛ — захватывай город бегом. Якутск → Россия». Это онбординг для тех, кто пришёл с середины.</p>
+    <span class="t">ВОПРОС</span><p>Финал ролика — вопрос зрителю, а не «скачайте»: «какой квартал взять первым?», «вы бы открыли код?». Даёт комментарии, отправки другу и юридически безопасен в Instagram*.</p>
+    <span class="t">КВАРТАЛ</span><p>Слово-CTA: «напиши КВАРТАЛ — пришлю ссылку на тест». Только с ботом-автоответчиком в Telegram (у Voon без бота тысячи комментариев утонули). Ссылка — mata-club.ru/app.</p>
+  </div>
+  <h3>Рубрики (столпы контента)</h3>
+  <div class="cols3">
+    <div class="card"><h4>ИИ сделал за ночь</h4><p>Ночные смены, «выключи компьютер», 10 PR к утру. Самая непонятная и самая вирусная часть.</p></div>
+    <div class="card"><h4>Баг дня</h4><p>Одна строка INTERNET, скорость 7 932 км/ч, 19 пустых медалей. Провалы как есть.</p></div>
+    <div class="card"><h4>Глаз владельца</h4><p>Что ИИ пропустил, а Михаил поймал: невидимая кнопка, старый логотип в заявке COROS.</p></div>
+    <div class="card"><h4>Правило вместо фикса</h4><p>«Придумай правило» → CI-страж. Как обратная связь становится памятью ИИ.</p></div>
+    <div class="card"><h4>Цифры недели</h4><p>Коммиты, тесты, установки, захваченные м². Числа как доказательство.</p></div>
+    <div class="card"><h4>Улица</h4><p>Забеги, «5 вёрст», тестеры, −40, манежи. То, чего нет у «диванных» девлогов.</p></div>
+  </div>
+</section>
+
+<section id="reel">
+  <span class="secnum">РАЗДЕЛ 4</span>
+  <h2>Анатомия ролика</h2>
+  <div class="cols2">
+    <div class="card"><h4>Формат «Деталь» — 20–40 секунд, будни</h4>
+      <div class="formula">
+        <span class="t">0–3 с</span><p>Хук-утверждение с цифрой, провалом или парадоксом. Текст на экране — те же 3–6 слов.</p>
+        <span class="t">3–6 с</span><p>Карточка «Квартал. День N» + «зачем» (1 с).</p>
+        <span class="t">6–28 с</span><p>Показ: экран телефона / терминал / улица. Жёсткие склейки, не фейды. «Было → стало».</p>
+        <span class="t">финал</span><p>Результат + вопрос. Концовка перетекает в начало (пересмотры).</p>
+      </div></div>
+    <div class="card"><h4>Формат «Эпизод» — 50–60 секунд, воскресенье</h4>
+      <div class="formula">
+        <span class="t">0–3 с</span><p>Хук недели (лучший момент из 6 деталей).</p>
+        <span class="t">3–10 с</span><p>«Неделя N: что построили, что сломали». Цифры недели.</p>
+        <span class="t">10–50 с</span><p>Нарезка деталей + один новый кадр с улицы + голос Михаила (мнение, а не отчёт).</p>
+        <span class="t">финал</span><p>«На следующей неделе —…» + слово КВАРТАЛ.</p>
+      </div></div>
+  </div>
+  <h3>Хуки под наш материал</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Тип</th><th>Почему работает</th><th>Наши примеры</th></tr>
+    <tr><td><b>Цифра</b></td><td>лучшие хуки Marc Lou — число или вся идея в одной строке</td><td>«653 коммита. 0 пользователей. День 89», «34 дня тишины», «Медаль № 27 из 44»</td></tr>
+    <tr><td><b>Провал</b></td><td>очеловечивает, шерится</td><td>«ИИ полчаса чинил баг, которого не было — телефон спал», «Корзину на 50 000 ₽ можно было оформить за 1 рубль»</td></tr>
+    <tr><td><b>Парадокс</b></td><td>у Voon — 146 тыс. просмотров</td><td>«Наш код открыт, потому что GitHub хотел денег», «Погоду в Якутске нам присылает Норвегия»</td></tr>
+    <tr><td><b>ИИ сделал за ночь</b></td><td>формула Riley Brown</td><td>«Я лёг спать. Утром приложение стало другим: 10 PR»</td></tr>
+    <tr><td><b>Вы просили</b></td><td>самая высокая конверсия в действие</td><td>«Вчера 40 комментариев „а для андроида?“ Ответ: сегодня»</td></tr>
+    <tr><td><b>Враг</b></td><td>Voon: «конкурент Strava»</td><td>«Strava не знает, что такое −40», «Moneyrun платит 70 ₽ за марафон. Мы — не платим. Вот почему»</td></tr>
+    <tr><td><b>Прямое обращение</b></td><td>×2,1 сохранений</td><td>«Если ты бегаешь в Якутске зимой — это для тебя»</td></tr>
+    <tr><td><b>Ставки</b></td><td>68% досмотра против 41%</td><td>«Если не починим GPS до субботы — забег сорвётся»</td></tr>
+  </table></div>
+  <h3>Правила кадра</h3>
+  <ul class="clean">
+    <li><b>Субтитры вшиты всегда</b> — до 85% смотрят без звука; в русском антикейсе именно их отсутствие названо причиной провала. Стиль один на всю серию (Unbounded для заголовков, как в приложении).</li>
+    <li><b>9:16, 1080×1920</b>, важное — в средних 60% кадра (безопасные зоны всех площадок), лицо и экран — в верхних двух третях.</li>
+    <li><b>Первый кадр = обложка:</b> 3–6 слов + «Квартал. День N» в одном и том же месте, одинаковые первые 0,8 с в каждом эпизоде.</li>
+    <li><b>Хук записываем после основного ролика</b> (приём Riley Brown) — тогда он обещает ровно то, что показано.</li>
+    <li><b>Реальные экраны, не скринкасты «в вакууме»:</b> телефон в руке на улице, терминал на мониторе с отражением комнаты. Виджеты статистики «выходят в мир» поверх видео.</li>
+    <li>Один «тёплый» кадр на ролик (собака, семья, чай в −40) — по образцу Voon, но не больше одного.</li>
+    <li><b>Два формата экспорта:</b> без водяных знаков чужих площадок; наша подпись — «знак + КВАРТАЛ» (как решено для сторис 06.09).</li>
+  </ul>
+</section>
+
+<section id="platforms">
+  <span class="secnum">РАЗДЕЛ 5</span>
+  <h2>Площадки и закон</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Приоритет</th><th>Площадка</th><th>Роль</th><th>Почему и как</th></tr>
+    <tr><td class="num">1</td><td><b>VK Клипы + сообщество</b></td><td>основной канал коротких видео</td><td>80% аудитории младше 25 — в VK; 3,2 млрд просмотров клипов в день; алгоритм любит серии и сохранения; полностью легально: ссылки, «скачай», промокоды — можно</td></tr>
+    <tr><td class="num">2</td><td><b>Telegram-канал + чат</b></td><td>штаб, бэкстейдж, сообщество, бот «КВАРТАЛ»</td><td>68% молодёжи; чейнджлоги, «задай вопрос ИИ», голосования по развилкам, ссылка на тест. Охваты в 2026 нестабильны (замедления) — ключевое дублируем в Max</td></tr>
+    <tr><td class="num">3</td><td><b>YouTube Shorts</b></td><td>охват 18–34 + англоязычная версия истории «ИИ строит продукт»</td><td>22 млн ежедневно в РФ через VPN; ничего не покупать у Google из РФ; без монетизации</td></tr>
+    <tr><td class="num">4</td><td><b>Instagram*</b></td><td>личная хроника основателя — только информация о своём продукте</td><td>21% молодёжи; ваш эталон живёт здесь. Ограничения — ниже</td></tr>
+    <tr><td class="num">5</td><td>Max, RuTube Shorts, Дзен</td><td>автозеркала</td><td>один клик из VK / через «ПроБлогер» Яндекса; аудитория старше, но госпродвижение Max</td></tr>
+    <tr><td class="num">—</td><td>TikTok</td><td>нет</td><td>публикации из РФ отключены с 2022; обходы = бан</td></tr>
+  </table></div>
+  <div class="callout bad"><span class="tag">Где нельзя — закон 72-ФЗ и практика 2026</span>
+    <p><b>В Instagram* и на любых заблокированных ресурсах запрещена реклама</b> с 01.09.2025 — любая: нативная, бартер, промокоды, «скачайте по ссылке», закреп старых интеграций. Штраф ИП 4–20 тыс. ₽, юрлицу до 500 тыс. ₽; первое дело ФАС — октябрь 2025, «ироничная распаковка» не спасла.</p>
+    <p><b>Можно:</b> вести аккаунт и рассказывать о своём продукте как информацию (позиция ФАС в изложении Forbes/eLama). <b>Граница:</b> «купите/скачайте», промокоды, скидки, восторженные оценки — могут переквалифицировать. Поэтому в Instagram* серия — хроника с вопросом в финале, а «скачай в RuStore / mata-club.ru» — только в VK и Telegram.</p>
+    <p><b>Нельзя платить Meta</b> (верификация признана «финансированием экстремизма»), <b>нельзя звать в VPN</b> (штраф 50–80 тыс. ₽ гражданам), при упоминании — пометка «*принадлежит Meta, признанной экстремистской и запрещённой в РФ». Реклама у блогеров на любой площадке — только с маркировкой ERID.</p>
+  </div>
+</section>
+
+<section id="calendar">
+  <span class="secnum">РАЗДЕЛ 6</span>
+  <h2>Календарь: 365 дней</h2>
+  <h3>Архитектура года — 12 месяцев, 12 арок</h3>
+  <p>Каждый месяц — одна главная архивная арка (рассказываем прошлое) и одна живая линия (то, что происходит). Архив идёт хронологически, живая линия привязана к реальным датам Якутска.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Месяц</th><th>Дни</th><th>Архивная арка</th><th>Живая линия</th><th>Ключевые даты</th></tr>
+    <tr><td><b>Сентябрь</b></td><td>89–110</td><td>Старт: один аккаунт, переезд за день, территория = маршрут, античит</td><td>манифест, «5 вёрст», первые тестеры, Забег Олонхо</td><td>15.09 грант, 20.09 «День 100», 26.09 Олонхо</td></tr>
+    <tr><td><b>Октябрь</b></td><td>111–141</td><td>QA владельца, ночные смены, Конструктор, 34 дня тишины</td><td>закрытая бета по инвайтам, амбассадоры, предзасев зон, «Захват парка»</td><td>03.10 первый свой ивент, конец улицы</td></tr>
+    <tr><td><b>Ноябрь</b></td><td>142–171</td><td>Имя МАТА, безопасность («total: 1»), прод-запуск с пятью граблями</td><td>сезон «Зима-1», манежи, «крытые кварталы», тест при −40</td><td>01.11 старт сезона, Кубок СВФУ</td></tr>
+    <tr><td><b>Декабрь</b></td><td>172–202</td><td>Запуск-анимация (200 мс), дизайн, знак «Последний метр»</td><td>финал сезона на забеге «Дьулуур», НГ-медаль, «Год в Квартале»</td><td>начало декабря — финал, 31.12 итоги</td></tr>
+    <tr><td><b>Январь</b></td><td>203–233</td><td>Своя лига, Лига → Квартал, тропы, часы (Health Connect)</td><td>Полюс холода, разведка Хабаровска, RuStore</td><td>01.01 «Забег обещаний» (Хабаровск), 16–17.01 Оймякон</td></tr>
+    <tr><td><b>Февраль</b></td><td>234–261</td><td>44 медали за 9 итераций, живые эмблемы, «19 пустых слоёв»</td><td>iPhone/TestFlight, второй сезон зимы</td><td>—</td></tr>
+    <tr><td><b>Март</b></td><td>262–292</td><td>2FA и «мы наняли ИИ взломать себя», сотрудники</td><td>Store с продажами: касса, «Честный знак», 1С</td><td>28.03 Ледовый забег «Кубок Водоканала»</td></tr>
+    <tr><td><b>Апрель</b></td><td>293–322</td><td>Сторис «выше Стравы», карта друзей (три слоя)</td><td>весна, карта друзей этап 1, подготовка публичного запуска</td><td>—</td></tr>
+    <tr><td><b>Май</b></td><td>323–353</td><td>Договор SIGMA, вход по коду, деньги (0,39 ₽ за звонок)</td><td>публичный запуск, ЗаБег.РФ, Хабаровск</td><td>23.05 ЗаБег.РФ</td></tr>
+    <tr><td><b>Июнь</b></td><td>354–384</td><td>ретроспектива «год проекту»</td><td>Забег единства, юбилейный эпизод 13.06</td><td>12.06, 13.06 — год с первого коммита</td></tr>
+    <tr><td><b>Июль</b></td><td>385–415</td><td>что не вошло: идеи, «двери в никуда», Codex</td><td>drivee-полумарафон, лето, Ысыах-медаль</td><td>18.07 полумарафон</td></tr>
+    <tr><td><b>Август–сентябрь</b></td><td>416–454</td><td>—</td><td>финал: «что стало с городом», серия медалей 2027, второй сезон сериала</td><td>день 454 = 365 роликов</td></tr>
+  </table></div>
+
+  <h3>Первые 30 дней — по дням</h3>
+  <p>Старт — среда 9 сентября (день 89): понедельник и вторник на утверждение, аккаунты и бота. Номера в скобках — события из банка историй (<code>docs/marketing/CONTENT_BANK.md</code>), там у каждого есть подробности и идея кадра.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Дата</th><th>День</th><th>Линия</th><th>Тема</th><th>Хук (первые 3 секунды)</th><th>Кадры</th><th>Финал</th></tr>
+    <tr><td>ср 09.09</td><td class="num">89</td><td><span class="ln today">Сегодня</span></td><td>Манифест</td><td>«Приложение для бега при −40 пишет ИИ. Это день 89»</td><td>улица Якутска → лог коммитов на мониторе → карта с зонами → счётчик 653</td><td>«Завтра — почему наш код открыт»</td></tr>
+    <tr><td>чт 10.09</td><td class="num">90</td><td><span class="ln arch">Архив 13.06</span></td><td>Почему код открыт (4)</td><td>«GitHub хотел денег за защиту ветки. Поэтому весь наш код открыт»</td><td>скрин 403 → публичный репозиторий → 652 PR</td><td>«Вы бы открыли код?»</td></tr>
+    <tr><td>пт 11.09</td><td class="num">91</td><td><span class="ln today">Сегодня</span></td><td>Что такое Квартал за 20 с (1, 8)</td><td>«В мае мы хотели резать Якутск на шестиугольники»</td><td>PRD с гексами → улица: петля замыкается → заливка зоны на телефоне</td><td>«Какой квартал взять первым?»</td></tr>
+    <tr><td>сб 12.09</td><td class="num">92</td><td><span class="ln street">Улица</span></td><td>«5 вёрст» (офлайн-план)</td><td>«120 человек бегут каждую субботу при любой погоде. Мы пришли к ним первыми»</td><td>старт 9:00 ЦПКиО, телефон в руке, захват парка, лица</td><td>«Кто из вас там бегает?»</td></tr>
+    <tr><td>вс 13.09</td><td class="num">93</td><td><span class="ln ep">Эпизод 1</span></td><td>Кто мы и зачем</td><td>лучший момент недели</td><td>нарезка 4 деталей + голос Михаила «зачем я это делаю»</td><td>КВАРТАЛ → ссылка на тест</td></tr>
+    <tr><td>пн 14.09</td><td class="num">94</td><td><span class="ln arch">Архив 13–14.06</span></td><td>У ИИ нет памяти (7)</td><td>«У ИИ нет памяти. Вот его дневник — 286 записей»</td><td>скролл WORKLOG → три журнала → «читает перед каждой сменой»</td><td>«Что бы вы записали первым?»</td></tr>
+    <tr><td>вт 15.09</td><td class="num">95</td><td><span class="ln today">Сегодня</span></td><td>Заявка на грант (офлайн-план)</td><td>«Дедлайн сегодня в 12:00 по Москве. Мы подали заявку на миллион»</td><td>форма заявки → цифры проекта → «на что пойдут деньги»</td><td>«Дадут?»</td></tr>
+    <tr><td>ср 16.09</td><td class="num">96</td><td><span class="ln arch">Архив 15.06</span></td><td>Переезд за день (12)</td><td>«Переехали на другой сервер за день. Приложения не заметили»</td><td>таймлайн 4 отметки времени → «678 баллов / Золото» уже из Django</td><td>→ стало: прод за 3 тыс./мес</td></tr>
+    <tr><td>чт 17.09</td><td class="num">97</td><td><span class="ln arch">Архив 16–17.06</span></td><td>Телефон убивает бег (18–19)</td><td>«Ваш телефон убивает беговые приложения. Вот список брендов»</td><td>Infinix, трек обрывается → две строки манифеста → трек живёт</td><td>«Какой у вас телефон?»</td></tr>
+    <tr><td>пт 18.09</td><td class="num">98</td><td><span class="ln arch">Архив 18.06</span></td><td>Одна строка (24)</td><td>«Магазин полдня не видел интернет из-за одной строки»</td><td>пустой каталог → строка INTERNET крупно → каталог</td><td>«Самая простая причина ищется последней»</td></tr>
+    <tr><td>сб 19.09</td><td class="num">99</td><td><span class="ln street">Улица</span></td><td>Первые тестеры</td><td>«Дали приложение пяти незнакомым бегунам. Вот что они сказали»</td><td>«5 вёрст» №2, лица тестеров, их экраны, честные цитаты</td><td>«Хотите в тест? КВАРТАЛ»</td></tr>
+    <tr><td>вс 20.09</td><td class="num">100</td><td><span class="ln ep">Эпизод 2</span></td><td>День 100</td><td>«День 100. Вот все цифры»</td><td>653 коммита, 604 теста, 44 медали, 34 дня тишины, 0 подписки</td><td>«Что дальше — в комментариях»</td></tr>
+    <tr><td>пн 21.09</td><td class="num">101</td><td><span class="ln arch">Архив 21.06</span></td><td>Погода из Норвегии (42)</td><td>«Погоду в Якутске нам присылает Норвегия»</td><td>чип «…» → MET Norway → живое небо с луной</td><td>→ стало: «лучшее время для пробежки»</td></tr>
+    <tr><td>вт 22.09</td><td class="num">102</td><td><span class="ln arch">Архив 21.06</span></td><td>Сервер никому не верит (45)</td><td>«Любой мог намайнить баллы. Смотрите»</td><td>запрос amount: 999999 → 403 → «сервер сам считает»</td><td>«Пробовали накрутить шагомер?»</td></tr>
+    <tr><td>ср 23.09</td><td class="num">103</td><td><span class="ln today">Сегодня</span></td><td>44 медали (188, 201)</td><td>«Их нарисовал ИИ за 9 итераций. Вот что он рисовал в первой»</td><td>«паутина Человека-паука» → сетка 44 живых медалей → реверс «03:35 · старт до рассвета»</td><td>«Какую хотите первой?»</td></tr>
+    <tr><td>чт 24.09</td><td class="num">104</td><td><span class="ln arch">Архив 23–24.06</span></td><td>«Ты что, ничего не сделал?» (52)</td><td>«CI зелёный, а телефон показывает старое. Момент, когда я перестал верить ИИ»</td><td>два одинаковых скрина → flutter clean → правки появились</td><td>«Как вы проверяете подрядчика?»</td></tr>
+    <tr><td>пт 25.09</td><td class="num">105</td><td><span class="ln today">Сегодня</span></td><td>Канун Олонхо</td><td>«Завтра 1 800 человек пробегут по центру. Мы раздаём им это»</td><td>выдача пакетов, флаер с QR, «захвати кварталы вокруг трассы»</td><td>«Увидимся на старте»</td></tr>
+    <tr><td>сб 26.09</td><td class="num">106</td><td><span class="ln street">Улица</span></td><td>Забег Олонхо</td><td>«1 800 бегунов. Сколько кварталов они захватят?»</td><td>площадь Республики, костюмы, телефоны, живая карта с растущими зонами</td><td>«Итоги — завтра»</td></tr>
+    <tr><td>вс 27.09</td><td class="num">107</td><td><span class="ln ep">Эпизод 3</span></td><td>Итоги Олонхо</td><td>«N кварталов за один забег»</td><td>карта до/после, лица, установки за день, медаль забега</td><td>КВАРТАЛ</td></tr>
+    <tr><td>пн 28.09</td><td class="num">108</td><td><span class="ln arch">Архив 28–29.06</span></td><td>Ночные смены (65)</td><td>«Я сказал ИИ: сделай всё и выключи компьютер. Утром…»</td><td>тёмная комната → коммиты с ночными таймстампами → утренний отчёт</td><td>«Доверили бы ИИ ночь?»</td></tr>
+    <tr><td>вт 29.09</td><td class="num">109</td><td><span class="ln arch">Архив 14.08</span></td><td>Имя (96)</td><td>«Наше имя оказалось чужим китайским брендом. Перебрали 50»</td><td>список зачёркивается → МАТА → «Михаил + Алёна + Татариновы»</td><td>«Как бы назвали вы?»</td></tr>
+    <tr><td>ср 30.09</td><td class="num">110</td><td><span class="ln today">Сегодня</span></td><td>Свободная пробежка (200)</td><td>«Есть люди, которые не хотят войны за районы. Для них — этот переключатель»</td><td>переключатель «Захват | Свободная» одним тапом, темп/км</td><td>«Вы — захватчик или свободный?»</td></tr>
+    <tr><td>чт 01.10</td><td class="num">111</td><td><span class="ln arch">Архив 05–06.07</span></td><td>Чинил вслепую (83)</td><td>«ИИ дважды починил баг по описанию. Оба раза мимо»</td><td>два фикса → реальный браузер → причина видна сразу</td><td>«Правило: сначала смотреть»</td></tr>
+    <tr><td>пт 02.10</td><td class="num">112</td><td><span class="ln arch">Архив 07.07–09.08</span></td><td>34 дня тишины (85)</td><td>«Месяц без единого коммита. Что случилось?»</td><td>пустой календарь → ваш ответ (нужен, см. вопросы)</td><td>«Бывало у вас такое?»</td></tr>
+    <tr><td>сб 03.10</td><td class="num">113</td><td><span class="ln street">Улица</span></td><td>«Захват парка» (офлайн-план)</td><td>«Первая битва за парк: 5 вёрст против Дьулуур против СВФУ»</td><td>командный зачёт, 10 зон, приз — первый дроп Store</td><td>«Кто победил — завтра»</td></tr>
+    <tr><td>вс 04.10</td><td class="num">114</td><td><span class="ln ep">Эпизод 4</span></td><td>Итоги месяца</td><td>«Месяц в эфире. Честные цифры»</td><td>просмотры, подписчики, установки, активные; что не сработало</td><td>«Продолжаем?»</td></tr>
+    <tr><td>пн 05.10</td><td class="num">115</td><td><span class="ln arch">Архив 18.08</span></td><td>«total: 1» (105)</td><td>«Корзину на 50 000 ₽ можно было оформить за 1 рубль»</td><td>запрос total: 1 → «сервер считает сам» → 11/11 атак отбито</td><td>→ стало: 2FA у всех</td></tr>
+    <tr><td>вт 06.10</td><td class="num">116</td><td><span class="ln arch">Архив 21.08</span></td><td>ИИ выдумал факт (119)</td><td>«ИИ выдумал факт про наш продукт — и сам себя поправил»</td><td>цитата поправки → «в декабре светло 10:20–15:10»</td><td>«Часто ли ИИ врёт? Да. Вот как ловим»</td></tr>
+    <tr><td>ср 07.10</td><td class="num">117</td><td><span class="ln today">Сегодня</span></td><td>Зима идёт (офлайн-план)</td><td>«Через месяц −30. Как захватывать кварталы, когда на улице нельзя?»</td><td>манеж «Триумф», круг 330 м, «крытые кварталы», сезон «Зима-1»</td><td>«Бегаете зимой?»</td></tr>
+    <tr><td>чт 08.10</td><td class="num">118</td><td><span class="ln arch">Архив 23.08</span></td><td>День запуска сервера (141)</td><td>«Пять граблей за один день — и к полуночи status: ok»</td><td>терминал health → список граблей → «прод за 3 тысячи в месяц»</td><td>«Что дальше — октябрь»</td></tr>
+  </table></div>
+  <p>Баланс месяца: 15 архивных деталей, 7 «сегодня», 4 «улицы», 4 эпизода. Архив идёт по порядку (июнь → август), живая линия — по календарю Якутска. Дни 119–454 расписываю по неделям по мере хода — см. протокол.</p>
+</section>
+
+<section id="cards">
+  <span class="secnum">РАЗДЕЛ 7</span>
+  <h2>Карточки съёмки — как выглядит «что снимаем сегодня»</h2>
+  <p>Так я отвечаю на команду «что снимаем сегодня»: одна карточка на ролик, без воды. Ниже — две первые, готовые к съёмке.</p>
+
+  <div class="script">
+    <div class="hd"><b>День 89 · ср 09.09</b><span class="ln today">Сегодня</span><span class="ln ep">Манифест · 40 с</span></div>
+    <div class="row"><span class="k">Хук</span><p><span class="caption">Приложение для бега при −40 пишет ИИ</span> Михаил на улице, телефон в руке, первая фраза в камеру.</p></div>
+    <div class="row"><span class="k">Кадры</span><p>1) 0–3 с — улица Якутска, Михаил идёт на камеру, говорит хук. 2) 3–6 с — карточка «Квартал. День 89». 3) 6–14 с — монитор: <code>git log</code> бежит, счётчик «653 коммита» поверх. 4) 14–24 с — телефон: карта Якутска, петля замыкается, зона заливается лаймом. 5) 24–32 с — быстрая нарезка: 44 медали, магазин, терминал ночью. 6) 32–40 с — Михаил в кадре, финал.</p></div>
+    <div class="row"><span class="k">Голос</span><div class="voice">Меня зовут Михаил, я из Якутска. 89 дней назад ИИ написал первую строку кода приложения, где город захватывают бегом: замкнул маршрут — забрал квартал. С тех пор — 653 коммита, 44 медали и ноль пользователей, потому что мы ещё в тесте. Я ставлю задачи и бегаю, он пишет код по ночам. Зачем? Чтобы в городе, где зимой светло пять часов, был повод выйти на улицу. С сегодняшнего дня показываю всё: что сделали, что сломали, что выкинули. Каждый день — одна деталь.</div></div>
+    <div class="row"><span class="k">Титры</span><p><span class="caption">День 89</span><span class="caption">653 коммита</span><span class="caption">0 пользователей</span><span class="caption">Замкнул маршрут — забрал квартал</span></p></div>
+    <div class="row"><span class="k">Финал</span><p>«Завтра расскажу, почему весь наш код открыт. Подписывайся». Карточка «зачем» на 1 с: «КВАРТАЛ — захватывай город бегом. Якутск → Россия».</p></div>
+    <div class="row"><span class="k">Telegram</span><p>Пост: «День 89. Стартуем. Здесь — бэкстейдж: что ИИ сделал за ночь, что я сломал днём. Тест-сборка для Android — по слову КВАРТАЛ боту». Закрепить как оглавление серии.</p></div>
+  </div>
+
+  <div class="script">
+    <div class="hd"><b>День 90 · чт 10.09</b><span class="ln arch">Архив 13.06</span><span class="ln ep">Деталь · 25 с</span></div>
+    <div class="row"><span class="k">Хук</span><p><span class="caption">GitHub хотел денег. Поэтому наш код открыт</span> Экран с ошибкой 403 крупно, голос за кадром.</p></div>
+    <div class="row"><span class="k">Кадры</span><p>1) 0–3 с — скрин «403: protected branches require Pro». 2) 3–5 с — «Квартал. День 90 · архив 13 июня». 3) 5–15 с — экран: github.com/Smallfoi/mata-ecosystem, Public, скролл коммитов. 4) 15–22 с — терминал: <code>gh pr list</code>, счётчик «652 PR влито». 5) 22–25 с — карточка вопроса.</p></div>
+    <div class="row"><span class="k">Голос</span><div class="voice">13 июня, первый день. Мы хотели запретить прямые правки в главную ветку — чтобы каждая строка проходила проверку. GitHub ответил: на приватном репозитории это платно. Мы сделали код открытым. С тех пор все 652 изменения прошли через проверку, и любой может прочитать, как ИИ строит приложение. Так наш build-in-public начался ещё до того, как мы решили его вести.</div></div>
+    <div class="row"><span class="k">Титры</span><p><span class="caption">13 июня 2026</span><span class="caption">403</span><span class="caption">Public</span><span class="caption">652 PR</span></p></div>
+    <div class="row"><span class="k">Финал</span><p>«Вы бы открыли код своего продукта?» — вопрос на карточке. Без ссылок (в Instagram* — только вопрос; в VK — ссылка на репозиторий в описании).</p></div>
+    <div class="row"><span class="k">Telegram</span><p>Ссылка на репозиторий + «прочитайте docs/WORKLOG.md — это дневник ИИ на 286 записей».</p></div>
+  </div>
+</section>
+
+<section id="offline">
+  <span class="secnum">РАЗДЕЛ 8</span>
+  <h2>Офлайн-план: первые 90 дней в Якутске</h2>
+  <p>Логика: сентябрь — последний уличный месяц, ловим «Забег Олонхо»; октябрь — посев через «5 вёрст» и амбассадоров; ноябрь–декабрь — первый зимний сезон в манежах с финалом на забеге «Дьулуур».</p>
+  <div class="recs">
+    <div class="rec"><div><b>До 15 сентября — Росмолодёжь.Гранты</b><p>2-й сезон, до 1 млн ₽, номинация #будь_здоров, заявитель 14–35 лет через myrosmol.ru, дедлайн 15.09 12:00 мск. Параллельно — Технопарк «Якутия»: акселератор «Спринт 2.0» (до 24.09), статус резидента ИТ-парка.</p></div></div>
+    <div class="rec"><div><b>12, 19, 26 сентября — «5 вёрст»</b><p>Прийти командой, пробежать, познакомиться с директорами; предложить «спонсорство волонтёрам» (чай, фото, светоотражайки) без брендирования трассы; собрать 10–15 первых тестеров на месте. Свой субботний старт против них не запускать — встраиваться.</p></div></div>
+    <div class="rec"><div><b>26 сентября — «Забег Олонхо»</b><p>~1 800 участников, старт 11:00 с пл. Республики, выдача пакетов 24–25.09 в ДС «50 лет Победы». Написать организаторам (zabegolonho.ru) и в Управление ФКиС: флаер с QR в пакет, стол в стартовом городке, спецквест «захвати кварталы вокруг трассы» с медалью в приложении.</p></div></div>
+    <div class="rec"><div><b>21 сентября – 18 октября — закрытая бета и посев карты</b><p>30–50 «якорных» зон только там, где точно будут люди (ЦПКиО, «Дохсун», «Туймаада», «Юность», «Триумф», Спортмастеры, кампус СВФУ, набережная). Никаких зон в спальных районах без игроков (урок Turf). Двойные баллы за первый захват.</p></div></div>
+    <div class="rec"><div><b>10 амбассадоров по модели Niantic</b><p>Директора «5 вёрст», Артур Корякин («Дьулуур»), Салтыковы (Ykt Run), Марфа Троева, тренеры Fitness Life, студенты ИФКиС; Александр Моедо — как лицо. KPI: 2 выхода в месяц, ≥5 человек, фото; перки: ранний доступ, мерч, баллы, «своя точка на карте», по 3 инвайта.</p></div></div>
+    <div class="rec"><div><b>3 октября — «Захват парка»</b><p>Суббота 9:45, сразу после финиша «5 вёрст» (люди уже на месте): 10 зон вокруг парка, командный зачёт «5 вёрст vs Дьулуур vs СВФУ», приз — первый дроп MATA Store. Один плотный ивент вместо десяти рассеянных.</p></div></div>
+    <div class="rec"><div><b>Корпоративный пилот</b><p>1–2 компании, где бег уже есть: КЛБ АО «Водоканал» (организатор Ледового забега), Fitness Life / Sinet / drivee. Формат «клуб компании» в приложении, три месяца зачёта км, финал на зимнем забеге (урок Лиги Героев: корпоративные команды — самый дешёвый канал массовки).</p></div></div>
+    <div class="rec"><div><b>1 ноября — 6 декабря — сезон «Зима-1»</b><p>«Крытые кварталы» в четырёх манежах (главный — «Триумф», круг 330 м) + короткие «морозные вылазки» с множителем за температуру. Обнуление очков в сезоне, накопительный ранг. Store как награда: капсула «−40» (лимит 100 шт., только за баллы), ступени 30/60/100 км в месяц.</p></div></div>
+    <div class="rec"><div><b>Начало декабря — финал на забеге «Дьулуур»</b><p>Награждение, дроп, анонс «Зима-2» до Ледового забега 28 марта. Заявки на следующие деньги: Фонд президентских грантов (нужен НКО-партнёр — команда «5 вёрст»), «Студенческий стартап» ФСИ, Sinet Spark / Yakutia2World (IT-деньги Якутска 10 лет финансируют бег).</p></div></div>
+    <div class="rec"><div><b>Разведка Хабаровска</b><p>Контакты: Екатерина Фридман (S95), филиал «Не будь как Гриша», AmurRun, Минспорт края (программа «Доступный спорт», 2026 — Год спорта). Целевая дата — 1 января 2027, «Забег обещаний» на набережной (700+ человек, гос-организатор).</p></div></div>
+  </div>
+  <div class="callout warn"><span class="tag">Чего не делать</span><p>Не запускать свой субботний старт против «5 вёрст». Не платить рублями за километры (Moneyrun). Не засевать зонами пустые районы. Не тратить на таргет — Enklepp и Turf росли на стартах, постерах и личном присутствии. Не открывать публичный релиз до 100 активных: дефицит инвайтов — валюта.</p></div>
+  <p><b>Ориентиры на 90 дней:</b> 300 установок · 100 недельно активных · 10 амбассадоров · 3 очных ивента · 1 корпоративный клуб · 1 распроданный дроп · 1 поданная и 2 подготовленные заявки на гранты.</p>
+</section>
+
+<section id="protocol">
+  <span class="secnum">РАЗДЕЛ 9</span>
+  <h2>Как мы работаем: протокол ассистента</h2>
+  <div class="cols2">
+    <div class="card"><h4>Ваши команды</h4>
+      <ul class="clean">
+        <li><b>«Что снимаем сегодня»</b> — получаете карточку съёмки (как в разделе 7): хук, кадры по секундам, текст голоса, титры, финал, пост в Telegram.</li>
+        <li><b>«План на неделю»</b> — 7 карточек с учётом того, что произошло в проекте за неделю.</li>
+        <li><b>«Разбор недели: …»</b> + цифры (просмотры, досмотры, комментарии, подписчики, установки) — анализ, что сработало, и корректировка календаря.</li>
+        <li><b>«Новый факт: …»</b> — любая история с улицы, от тестеров, из жизни — ложится в банк с датой.</li>
+        <li><b>«Снял день N»</b> — отмечаю в календаре, следующие дни сдвигаются сами.</li>
+      </ul></div>
+    <div class="card"><h4>Что делаю сам, без команды</h4>
+      <ul class="clean">
+        <li>Раз в неделю читаю журнал проекта (WORKLOG, решения, коммиты всех сессий) и добавляю новые события в банк историй — параллельные сессии ничего не теряют.</li>
+        <li>Держу календарь на 4 недели вперёд с балансом архив / сегодня / улица.</li>
+        <li>Готовлю материалы к кадрам: скриншоты экранов, терминала, диффов, «до/после», данные для титров.</li>
+        <li>Слежу за датами Якутска (забеги, дедлайны грантов) и юридическими рамками формулировок.</li>
+      </ul></div>
+  </div>
+  <h3>Где всё живёт</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Файл</th><th>Что это</th><th>Кто пишет</th></tr>
+    <tr><td><code>docs/marketing/README.md</code></td><td>правила кампании и этот протокол — читает любая сессия</td><td>я, по вашим решениям</td></tr>
+    <tr><td><code>docs/marketing/CONTENT_BANK.md</code></td><td>банк историй: 212 событий с кадрами, арки, цифры, мотивы; пополняется еженедельно</td><td>я, из журнала + ваших фактов</td></tr>
+    <tr><td><code>docs/marketing/CALENDAR.md</code></td><td>календарь: что снято, что дальше, цифры по каждому ролику</td><td>я; отметки «снято» — по вашим командам</td></tr>
+    <tr><td><code>docs/marketing/plan-365.html</code></td><td>этот план (эталон); обновляется по мере решений</td><td>я</td></tr>
+  </table></div>
+  <h3>Метрики, которые прошу присылать раз в неделю</h3>
+  <p>По каждому ролику: просмотры, удержание на 3-й секунде (или «пропуски» в Instagram*), досмотры, сохранения, комментарии, отправки. По каналам: подписчики. По продукту: установки, недельно активные, комментарии со словом КВАРТАЛ. Пороги, по которым понимаем, что формат работает: удержание на 3-й секунде &gt;70%, «удержание эпизода 2» &gt;30% (сколько посмотревших первый ролик серии посмотрели второй за 48 часов), рост установок в дни «улицы».</p>
+</section>
+
+<section id="questions">
+  <span class="secnum">РАЗДЕЛ 10</span>
+  <h2>Что нужно от вас</h2>
+  <h3>Решения на этой неделе</h3>
+  <div class="q">
+    <div class="item"><span class="n">1</span><p><b>Название серии:</b> «Квартал. День N» / «Захват» / «Строим Квартал» / своё. Рекомендую первое.</p></div>
+    <div class="item"><span class="n">2</span><p><b>Кто в кадре:</b> вы сами говорящей головой + закадр, или только закадр и экраны? Эталон Voon — гибрид: голос за кадром, лицо на 3–5 с в ролике. Это работает и снимает страх камеры.</p></div>
+    <div class="item"><span class="n">3</span><p><b>Площадки:</b> подтверждаете VK Клипы + Telegram + YouTube Shorts + Instagram* (хроника)? Какие аккаунты уже есть и в каком состоянии — пришлите ссылки.</p></div>
+    <div class="item"><span class="n">4</span><p><b>Дата старта:</b> среда 09.09 (день 89) — или сдвигаем? От неё считаются все дни календаря.</p></div>
+    <div class="item"><span class="n">5</span><p><b>Бот «КВАРТАЛ» в Telegram</b> — автоответ ссылкой на тест-сборку. Могу собрать за один день на нашем бэкенде; нужен только токен от BotFather.</p></div>
+    <div class="item"><span class="n">6</span><p><b>Грант Росмолодёжи до 15.09</b> — подаём? Заявителю должно быть 14–35 лет. Если да — готовлю текст заявки из паспорта экосистемы завтра.</p></div>
+  </div>
+  <h3>Пробелы в истории — нужны ваши ответы для первых 30 дней</h3>
+  <div class="q">
+    <div class="item"><span class="n">7</span><p><b>Что было до 13 июня:</b> когда родилась идея, первый код, папка sport_store — для манифеста и «Дня 89».</p></div>
+    <div class="item"><span class="n">8</span><p><b>Пауза 7 июля – 9 августа</b> (34 дня без коммитов): отпуск, бренд с mudreza, бумаги, сомнения? Это ролик 2 октября — зрителю нужна причина.</p></div>
+    <div class="item"><span class="n">9</span><p><b>Алёна и семья в имени МАТА</b> — можно ли рассказывать публично (ролик 29 сентября). Это самая человеческая история проекта.</p></div>
+    <div class="item"><span class="n">10</span><p><b>Тестеры:</b> кто эти ~10 человек, как их нашли, что сказали — в журналах их голоса нет.</p></div>
+    <div class="item"><span class="n">11</span><p><b>Ваши пробежки:</b> «Рассвет» 24.06 в 03:35 — что это было? Первый настоящий захват, 8 км 5 сентября — есть фото и скрины?</p></div>
+    <div class="item"><span class="n">12</span><p><b>Эмоции в ключевые моменты:</b> «стале-сборка» 23.06 («стоило доверия»), «жопа полнейшая» 22.08, «придумай правило» 05.09 — что вы думали об ИИ в эти минуты.</p></div>
+    <div class="item"><span class="n">13</span><p><b>Сколько стоит ИИ-разработка</b> (подписка, VPN, железо) — нигде не записано, а «приложение за N рублей в месяц» — сильнейший хук. Раскрываем?</p></div>
+    <div class="item"><span class="n">14</span><p><b>Своё фото и видео:</b> референсы сайта — баннеры с Taobao, в эфир нельзя. Нужны ваши кадры пробежек, города, телефона в руке. Первую неделю можно снять на телефон за одну прогулку.</p></div>
+  </div>
+  <p>Остальные вопросы (Codex, mudreza и Роспатент, ОКВЭД/РКН/«Честный знак», ассортимент и 1С, Apple Developer, домен, дата публичного запуска) — в банке историй, понадобятся к соответствующим месяцам.</p>
+</section>
+
+<div class="footer">План v1 · 06.09.2026 · Основа: разбор omarrzaev.inc (8 роликов покадрово, 100 постов Telegram), исследование площадок РФ-2026 и авторов build-in-public, беговая среда Якутска и Хабаровска с кейсами запусков, банк историй из 286 записей журнала, 70 решений и 653 коммитов проекта. Обновляется по мере решений владельца.</div>
+</div>

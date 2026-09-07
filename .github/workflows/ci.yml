@@ -24,14 +24,12 @@ jobs:
         # checks защиты main — сохраняем их; папки переименованы (D-34):
         # kvartal-app → mata_kvartal, sport_store → mata_store.
         include:
+          # «Лига» (D-59) стала Кварталом 05.09.2026 (D-70): dev-приложение
+          # удалено, его кодовая база теперь и есть mata_kvartal.
           - app: kvartal-app
             dir: mata_kvartal
           - app: sport_store
             dir: mata_store
-          # «Лига» — отдельное приложение под перестройку геймификации (D-59):
-          # «Квартал» остаётся стабильным для тестировщиков, лига едет своим темпом.
-          - app: liga-app
-            dir: mata_liga
     defaults:
       run:
         working-directory: ${{ matrix.dir }}

@@ -107,7 +107,7 @@ class _CadenceMetronomeScreenState extends State<CadenceMetronomeScreen> {
                       children: [
                         Text(
                           '$_spm',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.textPrimary,
                             fontSize: 56,
                             fontWeight: FontWeight.w900,
@@ -139,7 +139,7 @@ class _CadenceMetronomeScreenState extends State<CadenceMetronomeScreen> {
                         label: Text('$p'),
                         backgroundColor: AppColors.bgElevated,
                         side: BorderSide(color: AppColors.separator),
-                        labelStyle: const TextStyle(
+                        labelStyle: TextStyle(
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w700,
                         ),

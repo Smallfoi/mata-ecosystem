@@ -79,7 +79,7 @@ class _WeatherDetailSheet extends ConsumerWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.86,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -114,7 +114,7 @@ class _WeatherDetailSheet extends ConsumerWidget {
                   const Spacer(),
                   IconButton(
                     visualDensity: VisualDensity.compact,
-                    icon: const Icon(
+                    icon: Icon(
                       CupertinoIcons.refresh,
                       size: 18,
                       color: AppColors.textSecondary,
@@ -125,7 +125,7 @@ class _WeatherDetailSheet extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               async.when(
-                loading: () => const Padding(
+                loading: () => Padding(
                   padding: EdgeInsets.symmetric(vertical: 28),
                   child: Center(
                     child: CircularProgressIndicator(
@@ -133,7 +133,7 @@ class _WeatherDetailSheet extends ConsumerWidget {
                     ),
                   ),
                 ),
-                error: (_, __) => const Padding(
+                error: (_, __) => Padding(
                   padding: EdgeInsets.symmetric(vertical: 20),
                   child: Text(
                     'Не удалось загрузить погоду.\nПроверь интернет и попробуй обновить.',
@@ -281,7 +281,7 @@ class _WeatherBody extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(CupertinoIcons.snow, size: 16, color: AppColors.info),
+              Icon(CupertinoIcons.snow, size: 16, color: AppColors.info),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -309,13 +309,13 @@ class _BestRunBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final window = bestRunWindow(hourly);
-    if (window == null) return const SizedBox.shrink();
+    if (window == null) return SizedBox.shrink();
     final hours = hourly.take(18).toList();
 
     String hh(DateTime t) => t.hour.toString().padLeft(2, '0');
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
         color: AppColors.bgElevated,
         borderRadius: BorderRadius.circular(14),
@@ -324,7 +324,7 @@ class _BestRunBlock extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
+            children: [
               Icon(Icons.directions_run, size: 16, color: AppColors.accentInk),
               SizedBox(width: 7),
               Text(
@@ -384,7 +384,7 @@ class _BestRunBlock extends StatelessWidget {
               for (var i = 0; i < hours.length; i += 3)
                 Text(
                   hh(hours[i].timeLocal),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textTertiary,
                     fontSize: 9.5,
                   ),
@@ -451,12 +451,12 @@ class _StatTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             label,
-            style: const TextStyle(color: AppColors.textTertiary, fontSize: 11),
+            style: TextStyle(color: AppColors.textTertiary, fontSize: 11),
           ),
           const SizedBox(height: 2),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w600,

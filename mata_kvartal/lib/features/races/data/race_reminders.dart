@@ -104,6 +104,22 @@ class RaceReminders {
     return parts.isEmpty ? 'Не пропусти старт' : parts.join(' · ');
   }
 
+  /// Публичное разовое планирование (дайджест недели и т.п.): отменяет
+  /// прежнее уведомление с тем же id и ставит новое.
+  static Future<void> scheduleAt({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime when,
+  }) async {
+    await init();
+    if (!_inited || !when.isAfter(DateTime.now())) return;
+    try {
+      await _plugin.cancel(id);
+    } catch (_) {}
+    await _zoned(id, title, body, when);
+  }
+
   static Future<void> _zoned(
       int id, String title, String body, DateTime when) async {
     try {

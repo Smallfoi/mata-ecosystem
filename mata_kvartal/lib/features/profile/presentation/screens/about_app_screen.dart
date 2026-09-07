@@ -82,7 +82,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                 children: [
                   const KvartalLogoMark(size: 56, animated: false, glow: false),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'КВАРТАЛ',
                     style: TextStyle(
                       fontSize: 24,
@@ -95,7 +95,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                   Text(
                     'Бег, территории и баллы экосистемы МАТА',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 13, color: AppColors.muted),
+                    style: TextStyle(fontSize: 13, color: AppColors.muted),
                   ),
                 ],
               ),
@@ -113,13 +113,13 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
               children: [
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  leading: const Icon(
+                  leading: Icon(
                     CupertinoIcons.arrow_down_circle,
                     color: AppColors.textPrimary,
                   ),
                   title: Text(
                     _checking ? 'Проверяю…' : 'Проверить обновление',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
@@ -142,11 +142,11 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                   const _Divider(),
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    leading: const Icon(
+                    leading: Icon(
                       CupertinoIcons.cloud_download,
                       color: AppColors.accentInk,
                     ),
-                    title: const Text(
+                    title: Text(
                       'Скачать новую версию',
                       style: TextStyle(
                         fontSize: 15,
@@ -164,11 +164,11 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
               children: [
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  leading: const Icon(
+                  leading: Icon(
                     CupertinoIcons.device_phone_portrait,
                     color: AppColors.textPrimary,
                   ),
-                  title: const Text(
+                  title: Text(
                     'Страница тест-сборок',
                     style: TextStyle(
                       fontSize: 15,
@@ -176,7 +176,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'mata-club.ru/app.html',
                     style: TextStyle(fontSize: 13, color: AppColors.muted),
                   ),
@@ -185,7 +185,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            const Center(
+            Center(
               child: Text(
                 '© МАТА. Экосистема: Квартал · Store · сайт',
                 style: TextStyle(fontSize: 12, color: AppColors.muted),
@@ -220,7 +220,7 @@ class _Divider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      const Divider(height: 1, thickness: 1, color: AppColors.separator);
+      Divider(height: 1, thickness: 1, color: AppColors.separator);
 }
 
 class _Row extends StatelessWidget {
@@ -237,11 +237,11 @@ class _Row extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 15, color: AppColors.muted),
+            style: TextStyle(fontSize: 15, color: AppColors.muted),
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,

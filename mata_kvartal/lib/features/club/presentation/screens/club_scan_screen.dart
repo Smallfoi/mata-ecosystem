@@ -68,13 +68,13 @@ class _ClubScanScreenState extends ConsumerState<ClubScanScreen> {
                   children: [
                     IconButton(
                       tooltip: 'Назад',
-                      icon: const Icon(Icons.arrow_back, color: AppColors.ink),
+                      icon: Icon(Icons.arrow_back, color: AppColors.ink),
                       onPressed: () => context.pop(),
                     ),
                     const Spacer(),
                     IconButton(
                       tooltip: 'Фонарик',
-                      icon: const Icon(Icons.flash_on, color: AppColors.ink),
+                      icon: Icon(Icons.flash_on, color: AppColors.ink),
                       onPressed: () => _controller.toggleTorch(),
                     ),
                   ],
@@ -85,7 +85,7 @@ class _ClubScanScreenState extends ConsumerState<ClubScanScreen> {
                   child: Text(
                     'Наведите камеру на QR-код приглашения в клуб',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.ink,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,

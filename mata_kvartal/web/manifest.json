@@ -1,6 +1,6 @@
 {
-    "name": "kvartal_app",
-    "short_name": "kvartal_app",
+    "name": "liga_app",
+    "short_name": "liga_app",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

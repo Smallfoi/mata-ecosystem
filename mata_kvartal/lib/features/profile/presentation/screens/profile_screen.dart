@@ -1,4 +1,6 @@
 import '../../../../shared/widgets/tab_visibility.dart';
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +14,15 @@ import '../../../loyalty/data/loyalty_provider.dart';
 import '../../../loyalty/presentation/widgets/loyalty_card.dart';
 import '../../../notifications/data/notifications_provider.dart';
 import '../../../run/data/completed_runs_provider.dart';
+import '../../../medals/data/medal_defs.dart';
+import '../../../medals/data/medals_provider.dart';
+import '../../data/me_stats_provider.dart';
+import '../../data/digest_service.dart';
+import '../../../league/data/division_provider.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/kvartal_logo.dart';
 import '../../../shoes/data/shoes_provider.dart';
+import '../../../workouts/data/health_sync.dart';
 import '../../../territory/data/territory_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -47,6 +57,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     if (state == AppLifecycleState.resumed) {
       ref.read(authProvider.notifier).restoreSession();
       ref.read(loyaltyProvider.notifier).refresh();
+      ref.read(healthSyncProvider.notifier).autoSync();
+      ref.read(notificationsProvider.notifier).refresh();
     }
   }
 
@@ -59,8 +71,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       ref.read(shoesProvider.notifier).refresh(),
       ref.read(authProvider.notifier).restoreSession(),
       ref.read(completedRunsProvider.notifier).load(),
+      // Лента: счётчик на колокольчике живёт здесь, поэтому обновляем его
+      // вместе с экраном — иначе он показывал бы цифру со времени входа.
+      ref.read(notificationsProvider.notifier).refresh(),
+      // Тренировки с часов: пришли в Health Connect — подтянем и начислим.
+      ref.read(healthSyncProvider.notifier).autoSync(),
     ]);
-  }
+      // Ф7: свежий дайджест недели + перепланирование уведомления вс 20:00.
+    ref.invalidate(weekDigestProvider);
+    unawaited(ref.read(weekDigestProvider.future).catchError((_) => null));
+}
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +108,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Ф4 «Статус бегуна»: уровень города + недельный стрик.
+                    const _LevelHeader(),
+                    const SizedBox(height: 12),
+                    const _StreakRow(),
+                    const SizedBox(height: 12),
                     const _PointsCard(),
                     const SizedBox(height: 12),
                     const _StatsRow(),
@@ -103,15 +128,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       onTap: () => context.push('/tools'),
                     ),
                     _AccountCard(user: user),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Достижения',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const _BadgesGrid(),
+                    const SizedBox(height: 12),
+                    const _TrophyEntryRow(),
                     const SizedBox(height: 24),
                     Text(
                       'Активность',
@@ -131,6 +149,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 }
+
+/// Счётчик непрочитанного: постоянная пара «заливка + текст», одинаковая в обеих
+/// темах — маленькая цифра обязана читаться всегда.
+const Color _badgeFill = Color(0xFFD9483B);
+const Color _badgeInk = Color(0xFFFFFFFF);
 
 class _NotificationsBell extends StatelessWidget {
   final int unread;
@@ -154,7 +177,11 @@ class _NotificationsBell extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4),
               constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               decoration: BoxDecoration(
-                color: AppColors.error,
+                // Константная пара к заливке: `error` в графитовой теме светлеет
+                // до лососевого, а `ink` там же становится почти белым — цифра
+                // на счётчике пропадала. На цветной заливке инвертируемые токены
+                // не используем (правило владельца после бага с лаймом).
+                color: _badgeFill,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.bgDark, width: 1.5),
               ),
@@ -162,7 +189,7 @@ class _NotificationsBell extends StatelessWidget {
               child: Text(
                 unread > 9 ? '9+' : '$unread',
                 style: const TextStyle(
-                  color: AppColors.ink,
+                  color: _badgeInk,
                   fontSize: 9,
                   fontWeight: FontWeight.w800,
                   height: 1,
@@ -202,7 +229,7 @@ class _ProfileAppBar extends ConsumerWidget {
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          decoration: const BoxDecoration(color: AppColors.bg),
+          decoration: BoxDecoration(color: AppColors.bg),
           child: SafeArea(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -218,11 +245,11 @@ class _ProfileAppBar extends ConsumerWidget {
                         bottom: 0,
                         child: Container(
                           padding: const EdgeInsets.all(5),
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             color: AppColors.electricBlue,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             CupertinoIcons.pencil,
                             size: 11,
                             color: AppColors.ink,
@@ -254,7 +281,7 @@ class _ProfileAppBar extends ConsumerWidget {
                   ),
                   child: Text(
                     city,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.ink,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -597,7 +624,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               width: 2,
                             ),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             CupertinoIcons.camera_fill,
                             size: 13,
                             color: AppColors.ink,
@@ -636,7 +663,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 14),
-                Text(_error!, style: const TextStyle(color: AppColors.error)),
+                Text(_error!, style: TextStyle(color: AppColors.error)),
               ],
               const SizedBox(height: 24),
               SizedBox(
@@ -678,7 +705,7 @@ class _EditField extends StatelessWidget {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: const TextStyle(color: AppColors.textPrimary),
+      style: TextStyle(color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 18),
@@ -727,6 +754,16 @@ class SettingsScreen extends ConsumerWidget {
               label:
                   '\u0413\u0435\u043e\u043b\u043e\u043a\u0430\u0446\u0438\u044f \u0438 \u0444\u043e\u043d\u043e\u0432\u044b\u0439 \u0440\u0435\u0436\u0438\u043c',
               onTap: () => context.push('/run/location-access'),
+            ),
+            _SettingsTile(
+              icon: CupertinoIcons.time,
+              label: 'Часы и приложения',
+              onTap: () => context.push('/profile/watch'),
+            ),
+            _SettingsTile(
+              icon: CupertinoIcons.moon_fill,
+              label: 'Тема',
+              onTap: () => context.push('/profile/theme'),
             ),
             _SettingsTile(
               icon: CupertinoIcons.bell_fill,
@@ -803,7 +840,7 @@ class _SettingsTile extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: color),
         ),
-        trailing: const Icon(
+        trailing: Icon(
           CupertinoIcons.chevron_right,
           color: AppColors.textDisabled,
           size: 16,
@@ -876,7 +913,7 @@ class _PointsCard extends ConsumerWidget {
               ),
               child: Text(
                 loyalty.levelTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.onDark,
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
@@ -916,13 +953,6 @@ class _PointsCard extends ConsumerWidget {
   }
 }
 
-String _formatTxnDate(String? iso) {
-  if (iso == null) return '';
-  final dt = DateTime.tryParse(iso)?.toLocal();
-  if (dt == null) return '';
-  String two(int n) => n.toString().padLeft(2, '0');
-  return '${two(dt.day)}.${two(dt.month)}.${dt.year} ${two(dt.hour)}:${two(dt.minute)}';
-}
 
 /// История баллов экосистемы (за что начислено/списано). Открывается тапом по карточке.
 class PointsHistoryScreen extends ConsumerStatefulWidget {
@@ -933,7 +963,11 @@ class PointsHistoryScreen extends ConsumerStatefulWidget {
       _PointsHistoryScreenState();
 }
 
+/// Кошелёк (Ф7 «Экономика баллов», утверждено 31.08.2026): карта лояльности,
+/// строка ценности «1 балл = 1 ₽», фильтры и история по дням.
 class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
+  int _filter = 0; // 0 — все · 1 — начисления · 2 — списания
+
   @override
   void initState() {
     super.initState();
@@ -945,141 +979,261 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final loyalty = ref.watch(loyaltyProvider);
-    final txns = loyalty.transactions;
+    final stats = ref.watch(meStatsProvider).valueOrNull;
+    final txns = switch (_filter) {
+      1 => loyalty.transactions.where((t) => t.amount >= 0).toList(),
+      2 => loyalty.transactions.where((t) => t.amount < 0).toList(),
+      _ => loyalty.transactions,
+    };
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        backgroundColor: AppColors.bgDark,
-        title: const Text('История баллов'),
+        backgroundColor: AppColors.bg,
+        title: const Text('Кошелёк'),
       ),
       body: SafeArea(
-        child: Column(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            // Единая карта лояльности МАТА (дизайн-проект v5): материал уровня,
-            // «живые» анимации, переворот на QR, тап по QR — во весь экран.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-              child: Center(
-                child: Builder(
-                  builder: (context) {
-                    final user = ref.watch(authProvider).user;
-                    return LoyaltyCard3D(
-                      balance: loyalty.balance,
-                      levelLabel: loyalty.levelTitle,
-                      holderName: user?.name ?? 'Бегун КВАРТАЛ',
-                      // QR кодирует ПОСТОЯННЫЙ 6-значный код лояльности (не баланс).
-                      qrData: loyalty.code.isNotEmpty
-                          ? loyalty.code
-                          : (user?.id ?? ''),
-                      tier: switch (loyalty.level) {
-                        'platinum' => LoyaltyCardTier.platinum,
-                        'gold' => LoyaltyCardTier.gold,
-                        'silver' => LoyaltyCardTier.silver,
-                        _ => LoyaltyCardTier.basic,
-                      },
-                    );
-                  },
-                ),
+            // Единая карта лояльности МАТА (дизайн-проект v5).
+            Center(
+              child: Builder(
+                builder: (context) {
+                  final user = ref.watch(authProvider).user;
+                  return LoyaltyCard3D(
+                    balance: loyalty.balance,
+                    levelLabel: loyalty.levelTitle,
+                    holderName: user?.name ?? 'Бегун КВАРТАЛ',
+                    qrData: loyalty.code.isNotEmpty
+                        ? loyalty.code
+                        : (user?.id ?? ''),
+                    tier: switch (loyalty.level) {
+                      'platinum' => LoyaltyCardTier.platinum,
+                      'gold' => LoyaltyCardTier.gold,
+                      'silver' => LoyaltyCardTier.silver,
+                      _ => LoyaltyCardTier.basic,
+                    },
+                  );
+                },
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+            const SizedBox(height: 8),
+            Center(
               child: Text(
                 'нажми карту — QR для кассы МАТА Store',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.textTertiary,
+                  color: AppColors.faint,
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            // Цепочка ценности: бег → баллы → скидка в Store.
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.block,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '1 балл = 1 ₽ скидки в МАТА Store',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFEDEFE8),
+                    ),
+                  ),
+                  if (stats != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      '+${stats.earned} заработано · −${stats.spent} потрачено',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFDFF45F),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Фильтры.
+            Row(
+              children: [
+                for (final (idx, label) in const [
+                  (0, 'Все'),
+                  (1, 'Начисления'),
+                  (2, 'Списания'),
+                ]) ...[
+                  GestureDetector(
+                    onTap: () => setState(() => _filter = idx),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 13,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _filter == idx
+                            ? AppColors.ink
+                            : AppColors.paper,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: _filter == idx
+                              ? AppColors.ink
+                              : AppColors.line,
+                        ),
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: _filter == idx
+                              ? AppColors.bg
+                              : AppColors.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
             if (txns.isEmpty)
-              Expanded(
+              Padding(
+                padding: const EdgeInsets.only(top: 40),
                 child: Center(
                   child: Text(
                     loyalty.isLoading
                         ? 'Загрузка…'
                         : 'Пока нет операций с баллами',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textTertiary,
+                      color: AppColors.faint,
                     ),
                   ),
                 ),
               )
             else
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: txns.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) {
-                    final t = txns[i];
-                    final meta = _loyaltySourceMeta(t.source);
-                    final positive = t.amount >= 0;
-                    final accent = positive
-                        ? AppColors.success
-                        : AppColors.error;
-                    return Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.separator),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: accent.withValues(alpha: 0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(meta.icon, size: 20, color: accent),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  t.description.isNotEmpty
-                                      ? t.description
-                                      : meta.label,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: AppColors.textPrimary,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _formatTxnDate(t.createdAt),
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(color: AppColors.textTertiary),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${positive ? '+' : ''}${t.amount}',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: accent,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            const SizedBox(height: 8),
+              ..._groupedTxns(context, txns),
           ],
         ),
       ),
     );
+  }
+
+  /// Группировка операций по дням: Сегодня · Вчера · ДД.ММ.
+  List<Widget> _groupedTxns(BuildContext context, List<LoyaltyTxn> txns) {
+    final out = <Widget>[];
+    String? lastDay;
+    for (final t in txns) {
+      final day = _dayLabel(t.createdAt);
+      if (day != lastDay) {
+        lastDay = day;
+        out.add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
+            child: Text(
+              day.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: AppColors.faint,
+              ),
+            ),
+          ),
+        );
+      }
+      out.add(_txnRow(context, t));
+      out.add(const SizedBox(height: 8));
+    }
+    return out;
+  }
+
+  Widget _txnRow(BuildContext context, LoyaltyTxn t) {
+    final meta = _loyaltySourceMeta(t.source);
+    final positive = t.amount >= 0;
+    // Словарь цвета Ф7: начисления — лайм («моё» растёт), списания — тёплый.
+    final accent = positive ? AppColors.limeDeep : AppColors.warm;
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(meta.icon, size: 19, color: accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t.description.isNotEmpty ? t.description : meta.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  _formatTxnTime(t.createdAt),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.faint,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${positive ? '+' : ''}${t.amount}',
+            style: TextStyle(
+              fontFamily: AppTheme.fontDisplay,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _dayLabel(String? createdAt) {
+    final d = DateTime.tryParse(createdAt ?? '')?.toLocal();
+    if (d == null) return 'Ранее';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(d.year, d.month, d.day);
+    final diff = today.difference(day).inDays;
+    if (diff == 0) return 'Сегодня';
+    if (diff == 1) return 'Вчера';
+    return '${day.day.toString().padLeft(2, '0')}.${day.month.toString().padLeft(2, '0')}';
+  }
+
+  static String _formatTxnTime(String? createdAt) {
+    final d = DateTime.tryParse(createdAt ?? '')?.toLocal();
+    if (d == null) return '';
+    return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
 }
 
@@ -1180,7 +1334,7 @@ class _FootprintCard extends ConsumerWidget {
               color: AppColors.electricBlue.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               CupertinoIcons.map_fill,
               color: AppColors.electricBlue,
               size: 21,
@@ -1209,7 +1363,7 @@ class _FootprintCard extends ConsumerWidget {
           ),
           Text(
             formatAreaM2(area),
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.electricBlue,
               fontSize: 17,
               fontWeight: FontWeight.w900,
@@ -1266,7 +1420,7 @@ class _ShoesCard extends ConsumerWidget {
                 color: AppColors.electricBlue.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.directions_run,
                 color: AppColors.electricBlue,
                 size: 22,
@@ -1298,7 +1452,7 @@ class _ShoesCard extends ConsumerWidget {
             if (value != null) ...[
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.electricBlue,
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
@@ -1306,137 +1460,13 @@ class _ShoesCard extends ConsumerWidget {
               ),
               const SizedBox(width: 6),
             ],
-            const Icon(
+            Icon(
               CupertinoIcons.chevron_right,
               color: AppColors.textTertiary,
               size: 18,
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _BadgesGrid extends ConsumerWidget {
-  const _BadgesGrid();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final runs = ref.watch(completedRunsProvider);
-    final loyalty = ref.watch(loyaltyProvider);
-    final totalKm = runs.fold<double>(0, (s, r) => s + r.distanceKm);
-    final runsCount = runs.length;
-    final captures = runs.where((r) => r.capturedTerritory).length;
-    final badges = [
-      (
-        CupertinoIcons.snow,
-        '\u0410\u0440\u043a\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439',
-        AppColors.info,
-        runsCount >= 1,
-      ),
-      (
-        CupertinoIcons.bolt_fill,
-        '\u0421\u043f\u0440\u0438\u043d\u0442\u0435\u0440',
-        AppColors.warning,
-        totalKm >= 5,
-      ),
-      (
-        CupertinoIcons.flame_fill,
-        '\u0421\u0435\u0440\u0438\u044f 7',
-        AppColors.error,
-        runsCount >= 7,
-      ),
-      (
-        CupertinoIcons.moon_stars_fill,
-        '\u042f\u043a\u0443\u0442\u0441\u043a',
-        AppColors.textSecondary,
-        totalKm >= 10,
-      ),
-      (
-        CupertinoIcons.star_fill,
-        '\u041b\u0435\u0433\u0435\u043d\u0434\u0430',
-        AppColors.warning,
-        loyalty.balance >= 500,
-      ),
-      (
-        CupertinoIcons.location_north_fill,
-        '\u0412\u044b\u0441\u043e\u0442\u043d\u0438\u043a',
-        AppColors.success,
-        captures >= 3,
-      ),
-    ];
-
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      childAspectRatio: 1.02,
-      children: badges
-          .map(
-            (b) => _BadgeTile(
-              icon: b.$1,
-              label: b.$2,
-              color: b.$3,
-              unlocked: b.$4,
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _BadgeTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool unlocked;
-  const _BadgeTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.unlocked,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        color: unlocked ? color.withValues(alpha: 0.12) : AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: unlocked
-            ? Border.all(color: color.withValues(alpha: 0.3))
-            : Border.all(color: AppColors.separator),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 28,
-            color: unlocked ? color : AppColors.textDisabled,
-          ),
-          const SizedBox(height: 6),
-          SizedBox(
-            width: double.infinity,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                softWrap: false,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: unlocked
-                      ? AppColors.textPrimary
-                      : AppColors.textDisabled,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1522,6 +1552,296 @@ class _ActivityHeatmap extends ConsumerWidget {
             }),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Ф4 «Статус бегуна» (утверждено 31.08.2026) ───────────────────────────────
+
+/// Шапка уровня: цвет уровня красит карточку, прогресс — по периметру знака.
+class _LevelHeader extends ConsumerWidget {
+  const _LevelHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(meStatsProvider);
+    final stats = statsAsync.valueOrNull;
+    final km = stats?.totalKm ?? 0;
+    final level = RunnerLevel.fromKm(km);
+    final next = level.next;
+    final progress = level.progress(km);
+    final left = next == null ? 0.0 : (next.minKm - km).clamp(0.0, 1e9).toDouble();
+    // На чёрном «Городе» и сером «Асфальте» контраст держит светлый текст.
+    const onLevel = Color(0xFFF2F4EE);
+    final dimmed = onLevel.withValues(alpha: .78);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            level.color,
+            Color.lerp(level.color, const Color(0xFF14181C), .38)!,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(AppTheme.rMd),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'УРОВЕНЬ · ${level.roman}',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.6,
+                    color: dimmed,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  level.title,
+                  style: const TextStyle(
+                    fontFamily: AppTheme.fontDisplay,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    height: 1.05,
+                    color: onLevel,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  statsAsync.isLoading
+                      ? 'считаем километры…'
+                      : next == null
+                          ? '${_fmtKm(km)} км всего · статус вечный'
+                          : '${_fmtKm(km)} км всего · до уровня «${next.title}» — ${_fmtKm(left)} км',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: dimmed,
+                  ),
+                ),
+                if (stats?.milestone != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    'веха ${stats!.milestone!.atKm} км через '
+                    '${_fmtKm(stats.milestone!.leftKm)} км '
+                    '(+${stats.milestone!.reward} баллов)',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFDFF45F),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Прогресс уровня — заполнение периметра знака (не кольцо!).
+          SizedBox(
+            width: 58,
+            height: 58,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Подложка: полный контур слабым тоном.
+                Opacity(
+                  opacity: .30,
+                  child: CustomPaint(
+                    painter: KvartalMarkPainter(
+                      outline: onLevel,
+                      fill: Colors.transparent,
+                      close: 1,
+                    ),
+                  ),
+                ),
+                CustomPaint(
+                  painter: KvartalMarkPainter(
+                    outline: onLevel,
+                    fill: Colors.transparent,
+                    close: 1,
+                    draw: progress <= 0 ? .03 : progress,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _fmtKm(double v) => v >= 100
+      ? v.round().toString()
+      : (v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1));
+}
+
+/// Недельный стрик: недели подряд с хотя бы одной пробежкой.
+class _StreakRow extends ConsumerWidget {
+  const _StreakRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Серверный стрик (учитывает часы и авто-заморозку); локальный — фолбэк.
+    final server = ref.watch(meStatsProvider).valueOrNull?.streak;
+    final localStreak = ref.watch(weekStreakProvider);
+    final form = ref.watch(weekFormProvider);
+    final streak = server?.weeks ?? localStreak;
+    final ranThisWeek = server?.thisWeekDone ?? form.any((d) => d);
+    final frozenCount = server?.frozenWeeks.length ?? 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(AppTheme.rSm),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            CupertinoIcons.flame_fill,
+            size: 20,
+            color: streak > 0 ? AppColors.limeDeep : AppColors.disabled,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  streak > 0
+                      ? 'Серия: $streak ${_weeks(streak)} подряд'
+                      : 'Серия ещё не началась',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  streak > 0
+                      ? (ranThisWeek
+                          ? 'Эта неделя уже в серии — так держать'
+                          : 'Пробеги на этой неделе, чтобы серия жила')
+                      : 'Одна пробежка в неделю — и серия пошла',
+                  style: TextStyle(fontSize: 12, color: AppColors.muted),
+                ),
+              ],
+            ),
+          ),
+          if (frozenCount > 0) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF8FA8D8).withValues(alpha: .16),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '❄ $frozenCount',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF8FA8D8),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _weeks(int n) {
+    final mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 14) return 'недель';
+    return switch (n % 10) {
+      1 => 'неделя',
+      2 || 3 || 4 => 'недели',
+      _ => 'недель',
+    };
+  }
+}
+
+/// Вход в трофейный зал (медали переехали туда с профиля).
+class _TrophyEntryRow extends ConsumerWidget {
+  const _TrophyEntryRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // «Штамп МАТА»: счёт открытых медалей ведёт сервер (D-64).
+    final medals = ref.watch(medalsProvider).valueOrNull;
+    final unlocked = medals?.where((m) => m.earned).length;
+    final total = medals?.length ?? kMedals.length;
+    return Material(
+      color: AppColors.paper,
+      borderRadius: BorderRadius.circular(AppTheme.rSm),
+      child: InkWell(
+        onTap: () => context.push('/profile/trophies'),
+        borderRadius: BorderRadius.circular(AppTheme.rSm),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppTheme.rSm),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.lime,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(
+                  CupertinoIcons.rosette,
+                  size: 18,
+                  color: Color(0xFF171C19),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Трофейный зал',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                    Text(
+                      unlocked == null
+                          ? 'Штамп МАТА · $total наград'
+                          : '$unlocked из $total медалей',
+                      style: TextStyle(fontSize: 12, color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                CupertinoIcons.chevron_right,
+                size: 16,
+                color: AppColors.faint,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

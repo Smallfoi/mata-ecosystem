@@ -137,7 +137,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 Center(
                   child: Text(
                     _localError!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.error,
                       fontSize: 14,
                     ),
@@ -146,7 +146,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               ],
               const SizedBox(height: 16),
               if (_resending)
-                const Center(
+                Center(
                   child: CircularProgressIndicator(
                     color: AppColors.electricBlue,
                   ),
@@ -179,7 +179,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: AppColors.bgElevated),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Тестовый код: 1234',
                     style: TextStyle(
                       color: AppColors.textDisabled,

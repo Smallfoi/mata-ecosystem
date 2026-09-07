@@ -29,8 +29,14 @@ TerritoryRel _relFromString(String? s) {
 /// Реальная территория с PostGIS-бэка (D-09). Контур(ы) уже сглажены сервером.
 class ServerTerritory {
   final String ownerId;
+
+  /// Имя владельца — публичная часть паспорта квартала (Ф2), как в рейтинге.
+  final String ownerName;
   final String? clubId;
   final TerritoryRel rel;
+
+  /// Когда захвачен (мс) — «держит N дней» в паспорте.
+  final int capturedAtMs;
 
   /// Сколько часов осталось до конца 72ч-удержания (для UI «защищено ещё Nч»).
   final double? holdHoursLeft;
@@ -40,15 +46,19 @@ class ServerTerritory {
 
   const ServerTerritory({
     required this.ownerId,
+    this.ownerName = 'Бегун',
     required this.clubId,
     required this.rel,
     required this.rings,
     this.holdHoursLeft,
+    this.capturedAtMs = 0,
   });
 
   factory ServerTerritory.fromJson(Map<String, dynamic> json) {
     final geojson = json['geojson'];
     return ServerTerritory(
+      ownerName: json['ownerName']?.toString() ?? 'Бегун',
+      capturedAtMs: (json['capturedAtMs'] as num?)?.toInt() ?? 0,
       ownerId: json['ownerId']?.toString() ?? '',
       clubId: json['clubId']?.toString(),
       rel: _relFromString(json['rel']?.toString()),

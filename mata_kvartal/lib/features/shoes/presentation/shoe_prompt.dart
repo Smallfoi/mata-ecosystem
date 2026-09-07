@@ -66,7 +66,7 @@ class _AddShoeDialog extends StatelessWidget {
           children: [
             _PromptImage(url: shoe.imageUrl),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Добавить кроссовки?',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -81,7 +81,7 @@ class _AddShoeDialog extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -145,7 +145,7 @@ class _MiniButton extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 shape: const StadiumBorder(),
                 foregroundColor: AppColors.textSecondary,
-                side: const BorderSide(color: AppColors.separator),
+                side: BorderSide(color: AppColors.separator),
               ),
               child: Text(label,
                   style: const TextStyle(
@@ -170,7 +170,7 @@ class _PromptImage extends StatelessWidget {
         color: AppColors.electricBlue.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: const Icon(Icons.directions_run,
+      child: Icon(Icons.directions_run,
           color: AppColors.electricBlue, size: 40),
     );
     if (!resolved.startsWith('http')) return placeholder;

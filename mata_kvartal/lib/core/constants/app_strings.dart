@@ -6,7 +6,7 @@
   // Tab labels
   static const tabMap = 'Карта';
   static const tabRun = 'Бег';
-  static const tabLeaderboard = 'Рейтинг';
+  static const tabLeaderboard = 'Лига';
   static const tabClub = 'Клуб';
   static const tabProfile = 'Профиль';
   static const tabEvents = 'Старты';

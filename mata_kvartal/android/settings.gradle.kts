@@ -18,7 +18,10 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "8.7.3" apply false
+    // 8.9.1 — минимум, который требует androidx.health.connect (Health Connect,
+    // импорт тренировок с часов). Он же первый, который умеет compileSdk 36.
+    // В «Квартале» намеренно остаётся 8.7.3: там ничего не меняем.
+    id("com.android.application") version "8.9.1" apply false
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
 }
 

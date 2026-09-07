@@ -224,7 +224,7 @@ class ToolTimePicker extends StatelessWidget {
     return SizedBox(
       height: height,
       child: CupertinoTheme(
-        data: const CupertinoThemeData(
+        data: CupertinoThemeData(
           brightness: Brightness.dark,
           textTheme: CupertinoTextThemeData(
             pickerTextStyle: TextStyle(
@@ -310,7 +310,7 @@ class _ToolValuePickerState extends State<ToolValuePicker> {
               Center(
                 child: Text(
                   s,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,

@@ -1,8 +1,8 @@
 name: kvartal_app
-description: "       "
+description: "МАТА Лига — беговое приложение экосистемы МАТА: своя лига для каждого бегуна."
 publish_to: 'none'
 
-version: 0.1.7+2
+version: 0.2.0+3
 
 environment:
   sdk: ^3.8.1
@@ -49,6 +49,9 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4
 
+  # Шаринг-карточка пробежки (Ф1 «Праздник»): рендер RepaintBoundary → PNG → share.
+  share_plus: ^10.1.4
+
   # Открытие внешних ссылок (напр. страница регистрации на забег).
   url_launcher: ^6.3.1
   package_info_plus: ^8.1.1  # текущий versionCode для проверки обновлений
@@ -65,6 +68,7 @@ dependencies:
   audioplayers: ^6.1.0
   vibration: ^3.0.0
   sentry_flutter: ^9.26.0
+  health: ^13.3.1
 
 dev_dependencies:
   flutter_test:
@@ -82,3 +86,49 @@ flutter:
     - assets/icons/
     - assets/zones.json
     - assets/audio/
+    # «Штамп МАТА»: 44 аверса + 5 реверсов, выгружены из эталона
+    # docs/design/medals/ (WebP 768px, попиксельно тот рендер, что утверждён).
+    - assets/medals/
+    # Живые эмблемы: база+слои послойного экспорта (пилот, конвейер партиями).
+    - assets/medals/anim/
+
+  # Квартал 2.0 (Ф8): Manrope — дисплей/заголовки, Inter — текст и данные.
+  # Unbounded остаётся зарегистрированным для знака «КВАРТАЛ» на сплэше.
+  fonts:
+    # Слово «Instagram» на кнопках шаринга — фирменным курсивом (Grand Hotel,
+    # OFL: открытый двойник логотайпа Инсты; сам Billabong проприетарен).
+    - family: GrandHotel
+      fonts:
+        - asset: assets/fonts/GrandHotel-Regular.ttf
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope-400.ttf
+          weight: 400
+        - asset: assets/fonts/Manrope-500.ttf
+          weight: 500
+        - asset: assets/fonts/Manrope-600.ttf
+          weight: 600
+        - asset: assets/fonts/Manrope-700.ttf
+          weight: 700
+        - asset: assets/fonts/Manrope-800.ttf
+          weight: 800
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-400.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-500.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-600.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-700.ttf
+          weight: 700
+        - asset: assets/fonts/Inter-800.ttf
+          weight: 800
+    - family: Unbounded
+      fonts:
+        - asset: assets/fonts/Unbounded-600.ttf
+          weight: 600
+        - asset: assets/fonts/Unbounded-700.ttf
+          weight: 700
+        - asset: assets/fonts/Unbounded-800.ttf
+          weight: 800

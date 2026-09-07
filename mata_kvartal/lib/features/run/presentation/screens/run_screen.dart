@@ -12,7 +12,10 @@ import '../../../map/data/zone_provider.dart';
 import '../../../territory/data/territory_provider.dart';
 import '../../../permissions/data/location_access_provider.dart';
 import '../../../permissions/presentation/location_setup_sheet.dart';
+import '../../data/run_mode_provider.dart';
 import '../../data/run_provider.dart';
+import 'run_result_screen.dart';
+import 'runs_journal_screen.dart' show RunTileCard;
 import '../../data/completed_runs_provider.dart';
 import '../../../shoes/presentation/shoe_run_picker.dart';
 import '../../../../shared/widgets/kvartal_logo.dart';
@@ -77,7 +80,7 @@ class _IdleViewState extends ConsumerState<_IdleView> {
       backgroundColor: AppColors.bgDark,
       // Фоновый градиент (синий сверху → чёрный) — как на профиле/клубе/рейтинге.
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.bg,
         ),
         child: SafeArea(
@@ -85,13 +88,18 @@ class _IdleViewState extends ConsumerState<_IdleView> {
             onRefresh: _refresh,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 128),
               child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _RunHeader(),
                 const SizedBox(height: 16),
                 const LocationWarningBanner(),
+                // Ф3: первый квест до первой пробежки — короткий и достижимый.
+                if (recentRuns.isEmpty) ...[
+                  const _FirstQuestCard(),
+                  const SizedBox(height: 16),
+                ],
                 _QuickStatsRow(stats: stats),
                 const SizedBox(height: 20),
                 _StartCard(),
@@ -128,8 +136,8 @@ class _IdleViewState extends ConsumerState<_IdleView> {
                       ),
                     ),
                     GestureDetector(
-                      onTap: () {},
-                      child: const Text(
+                      onTap: () => context.push('/runs'),
+                      child: Text(
                         'Все',
                         style: TextStyle(
                           fontSize: 13,
@@ -144,7 +152,13 @@ class _IdleViewState extends ConsumerState<_IdleView> {
                 if (recentRuns.isEmpty)
                   const _EmptyRunsHint()
                 else
-                  ...recentRuns.take(3).map((r) => _RunTile(run: r)),
+                  for (final r in recentRuns.take(3)) ...[
+                    RunTileCard(
+                      run: r,
+                      onTap: () => context.push('/runs/passport', extra: r),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
               ],
             ),
           ),
@@ -156,9 +170,10 @@ class _IdleViewState extends ConsumerState<_IdleView> {
 }
 
 
-class _RunHeader extends StatelessWidget {
+class _RunHeader extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(runModeProvider);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -174,7 +189,9 @@ class _RunHeader extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              'Якутск · территория ждёт',
+              mode == RunMode.free
+                  ? 'Якутск · беги в своём темпе'
+                  : 'Якутск · территория ждёт',
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
@@ -241,12 +258,13 @@ class _RunStats {
   }
 }
 
-class _QuickStatsRow extends StatelessWidget {
+class _QuickStatsRow extends ConsumerWidget {
   final _RunStats stats;
   const _QuickStatsRow({required this.stats});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isFreeRun = ref.watch(runModeProvider) == RunMode.free;
     return Row(
       children: [
         _QuickStat(
@@ -263,12 +281,21 @@ class _QuickStatsRow extends StatelessWidget {
           color: AppColors.accentInk,
         ),
         const SizedBox(width: 10),
-        _QuickStat(
-          icon: CupertinoIcons.location_fill,
-          value: '${stats.totalZones}',
-          label: 'зон моих',
-          color: AppColors.accentInk,
-        ),
+        // Свободному бегуну зоны не нужны — вместо них километры недели.
+        if (isFreeRun)
+          _QuickStat(
+            icon: CupertinoIcons.chart_bar_alt_fill,
+            value: stats.weekKm.toStringAsFixed(1),
+            label: 'км за неделю',
+            color: AppColors.accentInk,
+          )
+        else
+          _QuickStat(
+            icon: CupertinoIcons.location_fill,
+            value: '${stats.totalZones}',
+            label: 'зон моих',
+            color: AppColors.accentInk,
+          ),
       ],
     );
   }
@@ -302,7 +329,7 @@ class _QuickStat extends StatelessWidget {
             const SizedBox(height: 7),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
@@ -312,7 +339,7 @@ class _QuickStat extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 color: AppColors.textSecondary,
               ),
@@ -327,6 +354,7 @@ class _QuickStat extends StatelessWidget {
 class _StartCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(runModeProvider);
     return GestureDetector(
           onTap: () async {
             // Перед стартом спрашиваем, в каких кроссовках бежим — с выбранной
@@ -339,7 +367,7 @@ class _StartCard extends ConsumerWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 colors: [AppColors.graphite, Color(0xFF15181C)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -363,13 +391,17 @@ class _StartCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Замкни маршрут. Забери квартал.',
+                        mode == RunMode.free
+                            ? 'Темп, дистанция, время. Твой бег.'
+                            : 'Замкни маршрут. Забери квартал.',
                         style: TextStyle(
                           fontSize: 14,
                           color: AppColors.onDark.withValues(alpha: 0.72),
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 14),
+                      const _RunModeSwitch(),
+                      const SizedBox(height: 14),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 18,
@@ -379,19 +411,21 @@ class _StartCard extends ConsumerWidget {
                           color: AppColors.lime,
                           borderRadius: BorderRadius.circular(AppTheme.rPill),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: [
+                          children: const [
+                            // На лайме — только константный тёмный: AppColors.ink
+                            // в графитовой теме светлый и на лайме невидим.
                             Icon(
                               CupertinoIcons.play_fill,
-                              color: AppColors.ink,
+                              color: Color(0xFF171C19),
                               size: 13,
                             ),
                             SizedBox(width: 8),
                             Text(
                               'НАЧАТЬ',
                               style: TextStyle(
-                                color: AppColors.ink,
+                                color: Color(0xFF171C19),
                                 fontWeight: FontWeight.w800,
                                 fontSize: 13,
                                 letterSpacing: 1.2,
@@ -445,6 +479,57 @@ class _StartCard extends ConsumerWidget {
   }
 }
 
+/// Переключатель режима пробежки прямо на карточке старта: один тап —
+/// и «чистый бегун» убирает игру в захват, один тап — возвращает.
+/// Выбор запоминается между сессиями (kvartal.run_mode.v1).
+class _RunModeSwitch extends ConsumerWidget {
+  const _RunModeSwitch();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(runModeProvider);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final option in RunMode.values) ...[
+          if (option != RunMode.values.first) const SizedBox(width: 8),
+          GestureDetector(
+            // Перехватывает тап раньше карточки — старт не сработает.
+            onTap: () => ref.read(runModeProvider.notifier).set(option),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: mode == option
+                    ? AppColors.lime.withValues(alpha: 0.16)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(AppTheme.rPill),
+                border: Border.all(
+                  color: mode == option
+                      ? AppColors.lime.withValues(alpha: 0.8)
+                      : AppColors.onDark.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Text(
+                option.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                  color: mode == option
+                      ? AppColors.lime
+                      : AppColors.onDark.withValues(alpha: 0.65),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 // ── Экран активной тренировки ──────────────────────────────────────────────
 
 class _ActiveRunView extends ConsumerWidget {
@@ -455,6 +540,7 @@ class _ActiveRunView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(runProvider.notifier);
     final isActive = runState.status == RunStatus.active;
+    final isFreeRun = ref.watch(runModeProvider) == RunMode.free;
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -478,7 +564,7 @@ class _ActiveRunView extends ConsumerWidget {
                         shape: BoxShape.circle,
                         border: Border.all(color: AppColors.separator),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         CupertinoIcons.xmark,
                         color: AppColors.textSecondary,
                         size: 16,
@@ -491,7 +577,7 @@ class _ActiveRunView extends ConsumerWidget {
 
               Text(
                 runState.distanceKm.toStringAsFixed(2),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 84,
                   fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary,
@@ -499,7 +585,7 @@ class _ActiveRunView extends ConsumerWidget {
                   letterSpacing: -4,
                 ),
               ),
-              const Text(
+              Text(
                 'КМ',
                 style: TextStyle(
                   fontSize: 12,
@@ -531,8 +617,11 @@ class _ActiveRunView extends ConsumerWidget {
                       label: 'ТЕМП',
                       value: '${runState.paceFormatted}/км',
                     ),
-                    _MetricDivider(),
-                    const _MetricTile(label: 'ЗОНЫ', value: '+0'),
+                    // В свободном режиме зон нет — метрика была бы шумом.
+                    if (!isFreeRun) ...[
+                      _MetricDivider(),
+                      const _MetricTile(label: 'ЗОНЫ', value: '+0'),
+                    ],
                   ],
                 ),
               ),
@@ -574,11 +663,65 @@ class _ActiveRunView extends ConsumerWidget {
 
   void _showStopDialog(BuildContext context, WidgetRef ref) {
     final run = ref.read(runProvider);
+    final distance = run.distanceKm.toStringAsFixed(2);
+
+    // Завершение без захвата — общий путь свободного режима и незамкнутого
+    // контура. Километры всё равно уйдут на сервер (зачёты/дивизион/баллы).
+    void finishWithoutCapture(BuildContext ctx) {
+      final result = RunResult(
+        route: List.of(run.route),
+        elapsed: run.elapsed,
+        distanceMeters: run.distanceMeters,
+        capturedZones: 0,
+        capturedTerritory: false,
+        finishedAt: DateTime.now(),
+        runId: '',
+      );
+      ref.read(runProvider.notifier).stop();
+      Navigator.pop(ctx);
+      // Без захвата — без салюта: церемония пройдёт тихой веткой.
+      context.push('/run/result', extra: result);
+    }
+
+    // Свободный режим: никакой риторики захвата — только бег и его цифры.
+    if (ref.read(runModeProvider) == RunMode.free) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.bgCard,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Завершить пробежку?'),
+          content: Text(
+            'Дистанция: $distance км\n'
+            'Время: ${run.elapsedFormatted}',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Продолжить'),
+            ),
+            FilledButton(
+              onPressed: () => finishWithoutCapture(ctx),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.electricBlue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Завершить'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final zoneNotifier = ref.read(zoneProvider.notifier);
     final closure = zoneNotifier.inspectLoopClosure(run.route);
     final canCapture = closure.canCapture;
     final gap = closure.gapMeters.round();
-    final distance = run.distanceKm.toStringAsFixed(2);
     final captureHint = canCapture
         ? 'Контур замкнут по GPS. Подтверди захват территории.'
         : closure.hasEnoughDistance
@@ -598,7 +741,7 @@ class _ActiveRunView extends ConsumerWidget {
           'Время: ${run.elapsedFormatted}\n'
           'До старта: $gap м\n'
           '$captureHint',
-          style: const TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
@@ -607,11 +750,7 @@ class _ActiveRunView extends ConsumerWidget {
           ),
           if (!canCapture)
             TextButton(
-              onPressed: () {
-                ref.read(runProvider.notifier).stop();
-                Navigator.pop(ctx);
-                context.go('/map');
-              },
+              onPressed: () => finishWithoutCapture(ctx),
               child: const Text('Завершить без захвата'),
             ),
           FilledButton(
@@ -633,6 +772,15 @@ class _ActiveRunView extends ConsumerWidget {
                             elapsedSeconds: run.elapsed.inSeconds,
                           ),
                     );
+                    final result = RunResult(
+                      route: List.of(run.route),
+                      elapsed: run.elapsed,
+                      distanceMeters: run.distanceMeters,
+                      capturedZones: captured.length,
+                      capturedTerritory: true,
+                      finishedAt: DateTime.now(),
+                      runId: '',
+                    );
                     ref
                         .read(runProvider.notifier)
                         .stop(
@@ -640,7 +788,7 @@ class _ActiveRunView extends ConsumerWidget {
                           capturedTerritory: true,
                         );
                     Navigator.pop(ctx);
-                    context.go('/map');
+                    context.push('/run/result', extra: result);
                   }
                 : null,
             style: FilledButton.styleFrom(
@@ -782,7 +930,7 @@ class _EmptyRunsHint extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.separator),
       ),
-      child: const Text(
+      child: Text(
         'Завершённые пробежки появятся здесь после первого старта.',
         style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
       ),
@@ -834,7 +982,7 @@ class _WeeklyGoalCard extends StatelessWidget {
               value: progress,
               minHeight: 8,
               backgroundColor: AppColors.bgElevated,
-              valueColor: const AlwaysStoppedAnimation(AppColors.electricBlue),
+              valueColor: AlwaysStoppedAnimation(AppColors.electricBlue),
             ),
           ),
           const SizedBox(height: 10),
@@ -852,66 +1000,52 @@ class _WeeklyGoalCard extends StatelessWidget {
   }
 }
 
-class _RunTile extends StatelessWidget {
-  final CompletedRun run;
-  const _RunTile({required this.run});
+
+/// Ф3 «Вход в игру»: первый квест — 800 метров, конец кроется медалью дня 1.
+class _FirstQuestCard extends StatelessWidget {
+  const _FirstQuestCard();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
+        color: AppColors.block,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.separator),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.electricBlue.withValues(alpha: 0.13),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              CupertinoIcons.location_north_fill,
-              color: AppColors.warning,
-              size: 20,
+          const Text(
+            'ПЕРВЫЙ КВЕСТ',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.6,
+              color: Color(0xFFDFF45F),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  run.dateLabel,
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${run.distanceKm.toStringAsFixed(2)} км',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
+          const SizedBox(height: 6),
+          const Text(
+            'Пробеги 800 метров',
+            style: TextStyle(
+              fontFamily: AppTheme.fontDisplay,
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFEDEFE8),
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                run.elapsedFormatted,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              Text(
-                '${run.paceFormatted} /км',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
-              ),
-            ],
+          const SizedBox(height: 4),
+          const Text(
+            'Небольшой круг у дома — этого достаточно. '
+            'За первую пробежку — стальной штамп «Первый бег».',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF9AA59D),
+            ),
           ),
         ],
       ),

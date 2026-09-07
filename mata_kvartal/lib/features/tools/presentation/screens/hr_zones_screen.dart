@@ -17,7 +17,7 @@ class _HrZonesScreenState extends State<HrZonesScreen> {
   int _age = 30;
   int? _restHr;
 
-  static const _zoneColors = <Color>[
+  static final _zoneColors = <Color>[
     AppColors.info,
     AppColors.success,
     AppColors.warning,
@@ -71,7 +71,7 @@ class _HrZonesScreenState extends State<HrZonesScreen> {
                       const Spacer(),
                       Text(
                         '$maxHr уд/мин',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.electricBlue,
                           fontSize: 18,
                           fontWeight: FontWeight.w900,

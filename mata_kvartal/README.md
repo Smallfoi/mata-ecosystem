@@ -1,16 +1,23 @@
-# kvartal_app
+# КВАРТАЛ
 
-A new Flutter project.
+Боевое беговое приложение экосистемы МАТА: захват территорий по реальному
+маршруту, дивизионы и сезоны, медали «Штамп МАТА», клубы и баллы; каждая
+пробежка попадает сразу в несколько зачётов.
 
-## Getting Started
+До 05.09.2026 эта кодовая база развивалась под временным именем «ЛИГА»
+(`ru.mata.liga`) параллельно со старым Кварталом; теперь это и есть Квартал
+(`ru.mata.kvartal`, D-69).
 
-This project is a starting point for a Flutter application.
+- Что строим: `../docs/LEAGUE_PLAN.md`
+- Зачем: `../docs/STRATEGY_KVARTAL.md`
+- Часы и партнёрские заявки: `../docs/WEARABLES_PARTNERS.md`
+- Правила работы: `CLAUDE.md`
 
-A few resources to get you started if this is your first Flutter project:
+## Запуск
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```
+flutter pub get
+flutter analyze
+flutter test
+flutter run
+```

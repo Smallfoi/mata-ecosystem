@@ -2,19 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_colors.dart';
 
-/// Тема КВАРТАЛА в языке сайта МАТА (D-42).
+/// Тема «Квартал 2.0» (Ф8, утверждено 31.08.2026).
 ///
-/// Со сайта переносится не только палитра, но и ритм: скругления 14/22/30,
-/// мягкие широкие тени без чёрных краёв, кнопка-«таблетка» и одна фирменная
-/// кривая движения. Типографика — Unbounded для крупного, Manrope для текста.
+/// Ритм прежний: скругления 14/22/30, мягкие тени, кнопка-«таблетка», одна
+/// кривая движения. Типографика пакета дизайнов: Manrope — крупное/заголовки,
+/// Inter — текст и данные. Тема строится из геттеров AppColors, поэтому одна
+/// функция [current] отдаёт и графитовый, и светлый интерьер.
 class AppTheme {
   AppTheme._();
 
-  /// Шрифт текста.
-  static const fontText = 'Manrope';
+  /// Шрифт текста и данных.
+  static const fontText = 'Inter';
 
   /// Шрифт крупных заголовков и чисел.
-  static const fontDisplay = 'Unbounded';
+  static const fontDisplay = 'Manrope';
 
   // Скругления сайта.
   static const rSm = 14.0;
@@ -41,13 +42,13 @@ class AppTheme {
   static TextStyle display(
     double size, {
     FontWeight weight = FontWeight.w700,
-    Color color = AppColors.ink,
+    Color? color,
     double? height,
   }) => TextStyle(
     fontFamily: fontDisplay,
     fontSize: size,
     fontWeight: weight,
-    color: color,
+    color: color ?? AppColors.ink,
     height: height,
     letterSpacing: -0.02 * size,
     // Цифры не должны «прыгать» на бегу.
@@ -55,11 +56,11 @@ class AppTheme {
   );
 
   /// Мелкая подпись капсом с разрядкой — «eyebrow» с сайта.
-  static TextStyle eyebrow({Color color = AppColors.accentInk}) => TextStyle(
+  static TextStyle eyebrow({Color? color}) => TextStyle(
     fontFamily: fontText,
     fontSize: 11,
     fontWeight: FontWeight.w800,
-    color: color,
+    color: color ?? AppColors.accentInk,
     letterSpacing: 0.18 * 11,
   );
 
@@ -78,29 +79,34 @@ class AppTheme {
     height: height,
   );
 
-  static ThemeData get light {
+  /// Текущая тема — по AppColors.isGraphite (выставляет тема-контроллер).
+  static ThemeData current() {
+    final g = AppColors.isGraphite;
+    // Главное действие: на светлом — графитовая кнопка с лаймовым текстом
+    // (как в дизайн-проектах), на графите — лаймовая кнопка с тёмным текстом.
+    final ctaBg = g ? AppColors.lime : AppColors.block;
+    final ctaFg = g ? const Color(0xFF171C19) : AppColors.lime;
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.light,
+      brightness: g ? Brightness.dark : Brightness.light,
       fontFamily: fontText,
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.graphite,
-        onPrimary: AppColors.onDark,
+      colorScheme: ColorScheme(
+        brightness: g ? Brightness.dark : Brightness.light,
+        primary: ctaBg,
+        onPrimary: ctaFg,
         secondary: AppColors.accent,
-        onSecondary: AppColors.ink,
+        onSecondary: AppColors.onDark,
         tertiary: AppColors.lime,
-        onTertiary: AppColors.ink,
+        onTertiary: const Color(0xFF171C19),
         surface: AppColors.paper,
         onSurface: AppColors.ink,
         surfaceContainerHighest: AppColors.soft,
-        // Тональные кнопки (IconButton.filledTonal) берут цвет отсюда. Без явных
-        // значений Material выводил ярко-голубой контейнер, и одинаковые по смыслу
-        // кнопки выглядели по-разному.
+        // Тональные кнопки (IconButton.filledTonal) берут цвет отсюда.
         secondaryContainer: AppColors.soft,
         onSecondaryContainer: AppColors.accentInk,
         outline: AppColors.line,
         error: AppColors.error,
-        onError: AppColors.onDark,
+        onError: g ? const Color(0xFF171C19) : AppColors.onDark,
       ),
       scaffoldBackgroundColor: AppColors.bg,
       appBarTheme: AppBarTheme(
@@ -108,11 +114,10 @@ class AppTheme {
         foregroundColor: AppColors.ink,
         elevation: 0,
         scrolledUnderElevation: 0,
-        systemOverlayStyle: const SystemUiOverlayStyle(
+        systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          // База светлая — иконки статус-бара тёмные.
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.light,
+          statusBarIconBrightness: g ? Brightness.light : Brightness.dark,
+          statusBarBrightness: g ? Brightness.dark : Brightness.light,
         ),
         titleTextStyle: display(19, weight: FontWeight.w600),
       ),
@@ -121,31 +126,31 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(rMd),
-          side: const BorderSide(color: AppColors.line),
+          side: BorderSide(color: AppColors.line),
         ),
         margin: EdgeInsets.zero,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.graphite,
-          foregroundColor: AppColors.onDark,
+          backgroundColor: ctaBg,
+          foregroundColor: ctaFg,
           // Только высота: Size.fromHeight — это Size(бесконечность, 54), и в Row
           // такая кнопка требует бесконечную ширину и роняет раскладку экрана.
           minimumSize: const Size(64, 54),
           shape: const StadiumBorder(),
-          textStyle: _t(15, FontWeight.w800, AppColors.onDark, letterSpacing: 0.15),
+          textStyle: _t(15, FontWeight.w800, ctaFg, letterSpacing: 0.15),
           elevation: 0,
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.graphite,
-          foregroundColor: AppColors.onDark,
+          backgroundColor: ctaBg,
+          foregroundColor: ctaFg,
           // Только высота: Size.fromHeight — это Size(бесконечность, 54), и в Row
           // такая кнопка требует бесконечную ширину и роняет раскладку экрана.
           minimumSize: const Size(64, 54),
           shape: const StadiumBorder(),
-          textStyle: _t(15, FontWeight.w800, AppColors.onDark, letterSpacing: 0.15),
+          textStyle: _t(15, FontWeight.w800, ctaFg, letterSpacing: 0.15),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -154,7 +159,7 @@ class AppTheme {
           // Только высота: Size.fromHeight — это Size(бесконечность, 54), и в Row
           // такая кнопка требует бесконечную ширину и роняет раскладку экрана.
           minimumSize: const Size(64, 54),
-          side: const BorderSide(color: AppColors.line),
+          side: BorderSide(color: AppColors.line),
           shape: const StadiumBorder(),
           textStyle: _t(15, FontWeight.w800, AppColors.ink, letterSpacing: 0.15),
         ),
@@ -170,29 +175,29 @@ class AppTheme {
         fillColor: AppColors.paper,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(rMd),
-          borderSide: const BorderSide(color: AppColors.line),
+          borderSide: BorderSide(color: AppColors.line),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(rMd),
-          borderSide: const BorderSide(color: AppColors.line),
+          borderSide: BorderSide(color: AppColors.line),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(rMd),
-          borderSide: const BorderSide(color: AppColors.accent, width: 2),
+          borderSide: BorderSide(color: AppColors.accent, width: 2),
         ),
         hintStyle: _t(15, FontWeight.w400, AppColors.disabled),
         labelStyle: _t(15, FontWeight.w500, AppColors.muted),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
-      dividerTheme: const DividerThemeData(
+      dividerTheme: DividerThemeData(
         color: AppColors.line,
         thickness: 1,
         space: 1,
       ),
-      iconTheme: const IconThemeData(color: AppColors.muted, size: 24),
+      iconTheme: IconThemeData(color: AppColors.muted, size: 24),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.lime,
-        foregroundColor: AppColors.ink,
+        foregroundColor: Color(0xFF171C19),
         elevation: 0,
         shape: CircleBorder(),
       ),
@@ -203,10 +208,10 @@ class AppTheme {
         shape: const StadiumBorder(),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: AppColors.paper,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(rLg)),
         ),
       ),
@@ -216,7 +221,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLg)),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: AppColors.graphite,
+        backgroundColor: g ? AppColors.panel : AppColors.block,
         contentTextStyle: _t(14, FontWeight.w600, AppColors.onDark),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rSm)),
@@ -243,8 +248,7 @@ class AppTheme {
     );
   }
 
-  /// Прежнее имя темы. Экраны и `main.dart` ссылались на `AppTheme.dark`;
-  /// оставлено, чтобы переход не ломал сборку. Ночную поверхность соберём
-  /// отдельно — см. D-42.
-  static ThemeData get dark => light;
+  /// Прежние имена. Оба отдают текущий интерьер — см. [current].
+  static ThemeData get light => current();
+  static ThemeData get dark => current();
 }

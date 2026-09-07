@@ -42,13 +42,13 @@ class _StatusStyle {
 _StatusStyle _statusStyle(String s) {
   switch (s) {
     case 'open':
-      return const _StatusStyle(AppColors.success, 'Регистрация');
+      return _StatusStyle(AppColors.success, 'Регистрация');
     case 'closed':
-      return const _StatusStyle(AppColors.textTertiary, 'Регистрация закрыта');
+      return _StatusStyle(AppColors.textTertiary, 'Регистрация закрыта');
     case 'done':
-      return const _StatusStyle(AppColors.textTertiary, 'Завершён');
+      return _StatusStyle(AppColors.textTertiary, 'Завершён');
     default:
-      return const _StatusStyle(AppColors.warning, 'Скоро');
+      return _StatusStyle(AppColors.warning, 'Скоро');
   }
 }
 
@@ -81,7 +81,7 @@ class _RacesScreenState extends ConsumerState<RacesScreen> {
         ? region
         : (sel.label.isNotEmpty ? sel.label : 'Мой регион');
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bg,
       ),
       child: SafeArea(
@@ -89,7 +89,7 @@ class _RacesScreenState extends ConsumerState<RacesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(20, 14, 20, 2),
               child: Text(
                 'Старты',
@@ -106,7 +106,7 @@ class _RacesScreenState extends ConsumerState<RacesScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Календарь беговых событий',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   ),
@@ -130,7 +130,7 @@ class _RacesScreenState extends ConsumerState<RacesScreen> {
             ),
             Expanded(
               child: async.when(
-                loading: () => const Center(
+                loading: () => Center(
                   child: CircularProgressIndicator(color: AppColors.electricBlue),
                 ),
                 error: (_, __) =>
@@ -196,7 +196,7 @@ class _RegionChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(CupertinoIcons.placemark_fill,
+            Icon(CupertinoIcons.placemark_fill,
                 size: 13, color: AppColors.electricBlue),
             const SizedBox(width: 5),
             ConstrainedBox(
@@ -205,7 +205,7 @@ class _RegionChip extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.accentInk,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -213,7 +213,7 @@ class _RegionChip extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 3),
-            const Icon(CupertinoIcons.chevron_down,
+            Icon(CupertinoIcons.chevron_down,
                 size: 12, color: AppColors.electricBlue),
           ],
         ),
@@ -250,7 +250,7 @@ class _RegionPicker extends ConsumerWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.72,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.soft,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         border: Border(top: BorderSide(color: AppColors.separator)),
@@ -263,13 +263,13 @@ class _RegionPicker extends ConsumerWidget {
             Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.only(top: 10, bottom: 6),
+              margin: EdgeInsets.only(top: 10, bottom: 6),
               decoration: BoxDecoration(
                 color: AppColors.line,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(20, 6, 20, 8),
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -285,7 +285,7 @@ class _RegionPicker extends ConsumerWidget {
             ),
             Flexible(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
                 children: [
                   if (plannedCount > 0)
                     _RegionOption(
@@ -315,9 +315,9 @@ class _RegionPicker extends ConsumerWidget {
                     selected: sel.mode == RegionMode.majors,
                     onTap: () => choose(RegionSelection.majors),
                   ),
-                  const Divider(color: AppColors.separator, height: 18),
+                  Divider(color: AppColors.separator, height: 18),
                   ...regionsAsync.when(
-                    loading: () => const [
+                    loading: () => [
                       Padding(
                         padding: EdgeInsets.all(18),
                         child: Center(
@@ -326,7 +326,7 @@ class _RegionPicker extends ConsumerWidget {
                         ),
                       ),
                     ],
-                    error: (_, __) => const [
+                    error: (_, __) => [
                       Padding(
                         padding: EdgeInsets.all(16),
                         child: Text('Не удалось загрузить регионы',
@@ -403,7 +403,7 @@ class _RegionOption extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.ink,
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
@@ -414,7 +414,7 @@ class _RegionOption extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 1),
                       child: Text(
                         subtitle!,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: AppColors.textTertiary, fontSize: 11.5),
                       ),
                     ),
@@ -422,7 +422,7 @@ class _RegionOption extends StatelessWidget {
               ),
             ),
             if (selected)
-              const Icon(CupertinoIcons.check_mark,
+              Icon(CupertinoIcons.check_mark,
                   size: 16, color: AppColors.electricBlue),
           ],
         ),
@@ -561,7 +561,7 @@ class _RaceCard extends StatelessWidget {
                     race.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.ink,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -571,7 +571,7 @@ class _RaceCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(CupertinoIcons.location_solid,
+                      Icon(CupertinoIcons.location_solid,
                           size: 13, color: AppColors.electricBlue),
                       const SizedBox(width: 5),
                       Expanded(
@@ -579,7 +579,7 @@ class _RaceCard extends StatelessWidget {
                           [race.city, race.place].where((s) => s.isNotEmpty).join(' · '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
                         ),
                       ),
                     ],
@@ -600,7 +600,7 @@ class _RaceCard extends StatelessWidget {
                             ),
                             child: Text(
                               dist,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.ink,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -614,12 +614,12 @@ class _RaceCard extends StatelessWidget {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Icon(CupertinoIcons.circle_grid_hex_fill,
+                        Icon(CupertinoIcons.circle_grid_hex_fill,
                             size: 14, color: AppColors.success),
                         const SizedBox(width: 6),
                         Text(
                           '+${race.points} баллов за финиш',
-                          style: const TextStyle(
+                          style: TextStyle(
                               color: AppColors.success, fontSize: 12.5, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -676,12 +676,12 @@ class _RaceCard extends StatelessWidget {
           children: [
             Text(
               d.day.toString().padLeft(2, '0'),
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w800, height: 0.95),
             ),
             Text(
               _months[d.month].toUpperCase(),
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1),
             ),
           ],
@@ -701,11 +701,11 @@ class _Empty extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(CupertinoIcons.calendar, size: 44, color: AppColors.textTertiary),
+            Icon(CupertinoIcons.calendar, size: 44, color: AppColors.textTertiary),
             const SizedBox(height: 12),
             Text(text,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
           ],
         ),
       ),

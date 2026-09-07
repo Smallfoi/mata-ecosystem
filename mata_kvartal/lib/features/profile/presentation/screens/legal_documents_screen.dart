@@ -66,7 +66,7 @@ class _DocTile extends StatelessWidget {
         border: Border.all(color: AppColors.separator),
       ),
       child: ListTile(
-        leading: const Icon(CupertinoIcons.doc_text,
+        leading: Icon(CupertinoIcons.doc_text,
             color: AppColors.accentBlue, size: 20),
         title: Text(
           doc.title,
@@ -80,7 +80,7 @@ class _DocTile extends StatelessWidget {
           child: Row(
             children: [
               Text('ред. ${doc.version}',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 12, color: AppColors.textSecondary)),
               if (doc.required) ...[
                 const SizedBox(width: 8),
@@ -91,7 +91,7 @@ class _DocTile extends StatelessWidget {
                     color: AppColors.accentBlue.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text('обязательный',
+                  child: Text('обязательный',
                       style: TextStyle(
                           fontSize: 10, color: AppColors.accentBlue)),
                 ),
@@ -99,7 +99,7 @@ class _DocTile extends StatelessWidget {
             ],
           ),
         ),
-        trailing: const Icon(CupertinoIcons.chevron_right,
+        trailing: Icon(CupertinoIcons.chevron_right,
             color: AppColors.textDisabled, size: 16),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => _LegalDocView(doc: doc)),
@@ -128,7 +128,7 @@ class _LegalDocView extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
           children: [
             Text('Редакция ${doc.version}',
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 12, color: AppColors.textSecondary)),
             const SizedBox(height: 12),
             ..._renderMarkdown(doc.body),
@@ -160,13 +160,13 @@ class _LegalDocView extends StatelessWidget {
         widgets.add(Container(
           margin: const EdgeInsets.symmetric(vertical: 4),
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.bgSurface,
             border: Border(
                 left: BorderSide(color: AppColors.accentBlue, width: 3)),
           ),
           child: SelectableText(_stripInline(line.substring(2)),
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 13, color: AppColors.textSecondary, height: 1.4)),
         ));
       } else if (RegExp(r'^[-*] ').hasMatch(line)) {
@@ -175,13 +175,13 @@ class _LegalDocView extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 7, right: 8),
                 child: Icon(Icons.circle, size: 5, color: AppColors.accentBlue),
               ),
               Expanded(
                 child: SelectableText(_stripInline(line.substring(2)),
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 14, color: AppColors.textPrimary, height: 1.45)),
               ),
             ],
@@ -191,7 +191,7 @@ class _LegalDocView extends StatelessWidget {
         widgets.add(Padding(
           padding: const EdgeInsets.symmetric(vertical: 3),
           child: SelectableText(_stripInline(line),
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 14, color: AppColors.textPrimary, height: 1.5)),
         ));
       }
@@ -229,7 +229,7 @@ class _Message extends StatelessWidget {
           const SizedBox(height: 12),
           Text(text,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary)),
+              style: TextStyle(color: AppColors.textSecondary)),
           if (onRetry != null) ...[
             const SizedBox(height: 16),
             OutlinedButton(onPressed: onRetry, child: const Text('Повторить')),
@@ -344,7 +344,7 @@ class _ConsentGateScreenState extends ConsumerState<ConsentGateScreen> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                     children: [
-                      const Text(
+                      Text(
                         'Чтобы продолжить, ознакомьтесь и примите обязательные документы:',
                         style: TextStyle(
                             fontSize: 15,
@@ -361,17 +361,17 @@ class _ConsentGateScreenState extends ConsumerState<ConsentGateScreen> {
                                   Border.all(color: AppColors.separator),
                             ),
                             child: ListTile(
-                              leading: const Icon(CupertinoIcons.doc_text,
+                              leading: Icon(CupertinoIcons.doc_text,
                                   color: AppColors.accentBlue, size: 20),
                               title: Text(d.title,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       color: AppColors.textPrimary,
                                       fontSize: 14)),
-                              subtitle: const Text('нажмите, чтобы прочитать',
+                              subtitle: Text('нажмите, чтобы прочитать',
                                   style: TextStyle(
                                       color: AppColors.textSecondary,
                                       fontSize: 12)),
-                              trailing: const Icon(
+                              trailing: Icon(
                                   CupertinoIcons.chevron_right,
                                   color: AppColors.textDisabled,
                                   size: 16),
@@ -384,7 +384,7 @@ class _ConsentGateScreenState extends ConsumerState<ConsentGateScreen> {
                       if (_error != null) ...[
                         const SizedBox(height: 4),
                         Text(_error!,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 color: AppColors.error, fontSize: 13)),
                       ],
                     ],
@@ -426,7 +426,7 @@ class _AcceptBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgSurface,
         border: Border(top: BorderSide(color: AppColors.separator)),
       ),
@@ -448,7 +448,7 @@ class _AcceptBar extends StatelessWidget {
                         MaterialTapTargetSize.shrinkWrap,
                   ),
                   const SizedBox(width: 6),
-                  const Expanded(
+                  Expanded(
                     child: Padding(
                       padding: EdgeInsets.only(top: 10),
                       child: Text(
@@ -478,7 +478,7 @@ class _AcceptBar extends StatelessWidget {
           ),
           TextButton(
             onPressed: onLogout,
-            child: const Text('Выйти',
+            child: Text('Выйти',
                 style: TextStyle(color: AppColors.textSecondary)),
           ),
         ],

@@ -7,6 +7,7 @@ import '../../core/constants/app_strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/services/update_checker.dart';
 import '../../core/theme/app_colors.dart';
+import '../../features/league/data/league_provider.dart';
 import '../../features/shoes/data/shoes_provider.dart';
 import '../../features/shoes/presentation/shoe_prompt.dart';
 import 'kvartal_logo.dart';
@@ -24,6 +25,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   // Спрашиваем про новые покупки один раз за запуск приложения.
   bool _askedPending = false;
   bool _asking = false;
+  bool _askedFocus = false;
 
   void _onTap(int index) {
     // Закрываем модальный лист/диалог, открытый на покидаемой вкладке (погода,
@@ -49,9 +51,29 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     _asking = false;
   }
 
+  /// Первый вход — спрашиваем, зачем человек бегает, и отправляем его на
+  /// подходящий экран. Гибкость без этого вопроса превращается в кашу: пять
+  /// зачётов, территории, тропы и клубы разом новичок не осилит.
+  ///
+  /// Спрашиваем один раз: ответ (в том числе «пропустить») хранится в профиле
+  /// на сервере, а не локально — иначе вопрос всплывёт на втором устройстве.
+  Future<void> _maybeAskFocus() async {
+    if (_askedFocus) return;
+    _askedFocus = true;
+    try {
+      final profile = await ref.read(runnerProfileProvider.future);
+      if (!mounted || !profile.needsFocus) return;
+      context.push('/focus');
+    } catch (_) {
+      // Нет сети — спросим в следующий раз, это не повод задерживать человека.
+      _askedFocus = false;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAskFocus());
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAskPending());
     // Проверка обновления тест-сборки (Android): баннер, если в S3 версия новее.
     WidgetsBinding.instance
@@ -66,9 +88,71 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     return Scaffold(
       extendBody: true,
       body: widget.navigationShell,
+      // Центральная кнопка «Бег» — приподнятая плита знака (мотив эмблемы
+      // дивизиона и медалей): док по центру, наполовину над баром.
+      floatingActionButton: _RunPlate(
+        isActive: widget.navigationShell.currentIndex == 1,
+        onTap: () => _onTap(1),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: _KvartalNavBar(
         currentIndex: widget.navigationShell.currentIndex,
         onTap: _onTap,
+      ),
+    );
+  }
+}
+
+// ── Плита «Бег» над баром ────────────────────────────────────────────────────
+
+class _RunPlate extends StatelessWidget {
+  final bool isActive;
+  final VoidCallback onTap;
+  const _RunPlate({required this.isActive, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        // Плита всегда графитовая (замечание владельца: тёмный знак на лайме
+        // смотрится плохо). Активность — яркий знак, полная лаймовая рамка,
+        // сильное свечение по контуру и лёгкий рост плиты.
+        width: isActive ? 62 : 58,
+        height: isActive ? 62 : 58,
+        decoration: BoxDecoration(
+          color: AppColors.block,
+          borderRadius: BorderRadius.circular(isActive ? 20 : 19),
+          border: Border.all(
+            color: AppColors.lime.withValues(alpha: isActive ? 1 : .45),
+            width: isActive ? 1.8 : 1.3,
+          ),
+          boxShadow: [
+            // Свечение строго по контуру плиты — без кругов и пульсов.
+            BoxShadow(
+              color: AppColors.lime.withValues(alpha: isActive ? .5 : .15),
+              blurRadius: isActive ? 26 : 10,
+              spreadRadius: isActive ? 2 : 1,
+            ),
+            BoxShadow(
+              color: const Color(0x66101312),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Center(
+          child: KvartalLogoMark(
+            size: isActive ? 33 : 30,
+            animated: isActive,
+            glow: false,
+            outline: const Color(0xFFEDEFE8),
+            fill: AppColors.lime,
+          ),
+        ),
       ),
     );
   }
@@ -154,31 +238,15 @@ class _RunNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Сама плита знака — приподнятый FAB над баром (_RunPlate); в баре
+    // остаётся только подпись, выровненная по остальным вкладкам.
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              width: 56,
-              height: 32,
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.lime : AppColors.soft,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Center(
-                child: KvartalLogoMark(
-                  size: 24,
-                  animated: isActive,
-                  glow: false,
-                ),
-              ),
-            ),
-            const SizedBox(height: 3),
             Text(
               AppStrings.tabRun,
               style: TextStyle(
@@ -189,6 +257,7 @@ class _RunNavItem extends StatelessWidget {
                 color: isActive ? AppColors.ink : AppColors.muted,
               ),
             ),
+            const SizedBox(height: 8),
           ],
         ),
       ),

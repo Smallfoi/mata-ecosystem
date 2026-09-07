@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/kvartal_logo.dart';
@@ -8,6 +9,7 @@ import '../../../../shared/widgets/phone_mask.dart';
 import '../../../profile/data/legal_provider.dart';
 import '../../../profile/presentation/screens/legal_documents_screen.dart';
 import '../../data/auth_provider.dart';
+import 'welcome_screen.dart';
 
 class PhoneScreen extends ConsumerStatefulWidget {
   const PhoneScreen({super.key});
@@ -18,6 +20,20 @@ class PhoneScreen extends ConsumerStatefulWidget {
 
 class _PhoneScreenState extends ConsumerState<PhoneScreen> {
   final _phoneCtrl = PhoneMaskController(hintColor: AppColors.disabled);
+
+  @override
+  void initState() {
+    super.initState();
+    // Ф3 «Вход в игру»: до первого логина — обещание и механика.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      if (!(prefs.getBool(kWelcomeSeenKey) ?? false)) {
+        context.go('/auth/welcome');
+      }
+    });
+  }
+
   final _passCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   String _mode = 'login'; // login | register | reset
@@ -78,7 +94,7 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
         );
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: AppColors.disabled),
+      hintStyle: TextStyle(color: AppColors.disabled),
       filled: true,
       fillColor: AppColors.panel,
       prefixIcon: prefixIcon,
@@ -131,7 +147,7 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
                     ),
                   ],
                 ),
-                child: const Center(
+                child: Center(
                   child: KvartalLogoMark(
                     size: 46,
                     outline: AppColors.onDark,
@@ -204,7 +220,7 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
               ),
               if (auth.error != null) ...[
                 const SizedBox(height: 12),
-                Text(auth.error!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+                Text(auth.error!, style: TextStyle(color: AppColors.error, fontSize: 13)),
               ],
               const SizedBox(height: 22),
               SizedBox(
@@ -220,10 +236,10 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
               ),
               const SizedBox(height: 12),
               if (_mode == 'login') ...[
-                Center(child: TextButton(onPressed: () => _setMode('register'), child: const Text('Нет аккаунта? Регистрация', style: TextStyle(color: AppColors.accentInk)))),
-                Center(child: TextButton(onPressed: () => _setMode('reset'), child: const Text('Забыл пароль?', style: TextStyle(color: AppColors.muted)))),
+                Center(child: TextButton(onPressed: () => _setMode('register'), child: Text('Нет аккаунта? Регистрация', style: TextStyle(color: AppColors.accentInk)))),
+                Center(child: TextButton(onPressed: () => _setMode('reset'), child: Text('Забыл пароль?', style: TextStyle(color: AppColors.muted)))),
               ] else
-                Center(child: TextButton(onPressed: () => _setMode('login'), child: const Text('Уже есть аккаунт? Войти', style: TextStyle(color: AppColors.accentInk)))),
+                Center(child: TextButton(onPressed: () => _setMode('login'), child: Text('Уже есть аккаунт? Войти', style: TextStyle(color: AppColors.accentInk)))),
               const SizedBox(height: 8),
               Center(
                 child: GestureDetector(

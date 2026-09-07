@@ -7,9 +7,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/location_provider.dart';
 import '../../data/zone_provider.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../league/data/division_provider.dart';
+import '../../../league/data/league_provider.dart';
+import '../../../weather/domain/run_window.dart';
 import '../../../run/data/run_provider.dart';
 import '../../../territory/data/territory_provider.dart';
 import '../../../weather/data/weather_provider.dart';
@@ -35,6 +40,10 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
   bool get _hasCarto => _cartoKey.isNotEmpty;
 
   bool _followUser = true;
+
+  // Легенда карты: свёрнута по умолчанию, не закрывает карту.
+
+  bool _legendOpen = false;
   bool _baseMapFailed = false;
   int _tileErrorCount = 0;
   int _tileLayerReloadId = 0;
@@ -177,9 +186,11 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
               initialZoom: 16,
               minZoom: 5,
               maxZoom: 20,
+              onTap: (_, latLng) => _onMapTap(latLng),
               onMapEvent: (e) {
                 if (e is MapEventMove && e.source == MapEventSource.onDrag) {
                   if (_followUser) setState(() => _followUser = false);
+                  if (_legendOpen) setState(() => _legendOpen = false);
                 }
                 // Перезагружаем территории только на РУЧНЫЕ жесты (пан/зум),
                 // но не на программное авто-слежение во время бега — иначе
@@ -243,8 +254,16 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                       for (final ring in t.rings)
                         Polygon(
                           points: ring,
-                          color: _territoryFill(t.rel),
-                          borderColor: _territoryBorder(t.rel),
+                          // Видимый decay (Ф2): чем ближе конец удержания,
+                          // тем бледнее квартал — землю пора обновлять бегом.
+                          color: _territoryFill(
+                            t.rel,
+                            freshness: _freshness(t.holdHoursLeft),
+                          ),
+                          borderColor: _territoryBorder(
+                            t.rel,
+                            freshness: _freshness(t.holdHoursLeft),
+                          ),
                           borderStrokeWidth: 1.6,
                         ),
                   ],
@@ -272,7 +291,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                       point: runState.route.first,
                       width: 30,
                       height: 34,
-                      child: const _RoutePointMarker(
+                      child: _RoutePointMarker(
                         label: 'Старт',
                         color: AppColors.success,
                         icon: CupertinoIcons.play_fill,
@@ -318,9 +337,19 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                       ],
                     ),
                   ),
+                  // Блок «Сегодня» (Ф2): окно бега · дивизион · неделя —
+                  // сразу под шапкой (раскладка владельца, 01.09).
+                  // Во время бега прячется — не мешать.
+                  if (runState.status == RunStatus.idle) const _TodayRow(),
                   Padding(
-                    padding: const EdgeInsets.only(left: 16, top: 2, bottom: 4),
-                    child: _Legend(),
+                    padding: const EdgeInsets.only(left: 14, top: 2, bottom: 4),
+                    // Легенда сворачиваемая: тап — развернуть, тап по карте
+                    // или пан — свернётся сама. Свёрнутая не закрывает карту.
+                    child: _CollapsibleLegend(
+                      open: _legendOpen,
+                      onToggle: () =>
+                          setState(() => _legendOpen = !_legendOpen),
+                    ),
                   ),
                 ],
               ),
@@ -329,7 +358,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
 
           // ── Loading indicator ────────────────────────────────────────────
           if (zonesAsync is AsyncLoading)
-            const Center(
+            Center(
               child: _Glass(
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 child: Row(
@@ -366,13 +395,13 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         CupertinoIcons.wifi_slash,
                         color: AppColors.error,
                         size: 24,
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Зоны не загружены',
                         style: TextStyle(
                           color: AppColors.ink,
@@ -382,7 +411,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'GPS работает.\nЗапусти бэкенд и нажми «Повторить».',
                         style: TextStyle(color: AppColors.muted, fontSize: 11),
                         textAlign: TextAlign.center,
@@ -465,10 +494,14 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                         },
                       ),
                     ),
-                  _BottomPanel(
-                    runState: runState,
-                    territories: territories,
-                    closureStatus: closureStatus,
+                  Padding(
+                    // Плита «Бег» приподнята над баром — панели нужен воздух.
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _BottomPanel(
+                      runState: runState,
+                      territories: territories,
+                      closureStatus: closureStatus,
+                    ),
                   ),
                 ],
               ),
@@ -479,12 +512,231 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
     );
   }
 
+  /// Тап по карте — паспорт квартала (Ф2): чей, защита, как забрать.
+  void _onMapTap(LatLng point) {
+    // Тап по карте сворачивает развёрнутую легенду (следующий тап — паспорт).
+    if (_legendOpen) {
+      setState(() => _legendOpen = false);
+      return;
+    }
+    final territories = ref.read(territoryProvider).territories;
+    for (final t in territories) {
+      for (final ring in t.rings) {
+        if (_pointInPolygon(point, ring)) {
+          _showQuarterPassport(
+            rel: t.rel,
+            holdHoursLeft: t.holdHoursLeft,
+            ownerName: t.ownerName,
+            capturedAtMs: t.capturedAtMs,
+          );
+          return;
+        }
+      }
+    }
+    final zones = ref.read(zoneProvider).valueOrNull ?? const <BlockZone>[];
+    for (final z in zones) {
+      if (_pointInPolygon(point, z.vertices)) {
+        _showQuarterPassport(
+          rel: switch (z.owner) {
+            ZoneOwner.mine => TerritoryRel.mine,
+            ZoneOwner.club => TerritoryRel.club,
+            ZoneOwner.enemy => TerritoryRel.enemy,
+            ZoneOwner.free => null,
+          },
+          holdHoursLeft: null,
+        );
+        return;
+      }
+    }
+  }
+
+  static String _heldLabel(int capturedAtMs) {
+    final captured =
+        DateTime.fromMillisecondsSinceEpoch(capturedAtMs);
+    final days = DateTime.now().difference(captured).inDays;
+    if (days <= 0) return 'Захвачен сегодня';
+    if (days == 1) return 'Держит 1 день';
+    final tail = days % 10;
+    final word = (days % 100 >= 11 && days % 100 <= 14)
+        ? 'дней'
+        : tail == 1
+            ? 'день'
+            : (tail >= 2 && tail <= 4)
+                ? 'дня'
+                : 'дней';
+    return 'Держит $days $word';
+  }
+
+  static bool _pointInPolygon(LatLng p, List<LatLng> poly) {
+    var inside = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      final a = poly[i];
+      final b = poly[j];
+      if ((a.latitude > p.latitude) != (b.latitude > p.latitude) &&
+          p.longitude <
+              (b.longitude - a.longitude) *
+                      (p.latitude - a.latitude) /
+                      (b.latitude - a.latitude) +
+                  a.longitude) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  void _showQuarterPassport({
+    TerritoryRel? rel,
+    double? holdHoursLeft,
+    String? ownerName,
+    int capturedAtMs = 0,
+  }) {
+    final (title, color, note) = switch (rel) {
+      TerritoryRel.mine => (
+        'Мой квартал',
+        AppColors.lime,
+        'Это твоя земля. Бегай рядом, чтобы её удерживать.',
+      ),
+      TerritoryRel.club => (
+        'Квартал клуба',
+        AppColors.teal,
+        'Держит твой клуб. Общая оборона — общая заслуга.',
+      ),
+      TerritoryRel.enemy => (
+        ownerName != null && ownerName.isNotEmpty
+            ? 'Квартал: $ownerName'
+            : 'Чужой квартал',
+        AppColors.warm,
+        'Замкни маршрут вокруг него — и он твой.',
+      ),
+      null => (
+        'Ничей квартал',
+        AppColors.zoneNeutral,
+        'Свободная земля. Замкни маршрут вокруг — и он твой.',
+      ),
+    };
+    final protected = holdHoursLeft != null && holdHoursLeft > 0;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.paper,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontFamily: AppTheme.fontDisplay,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (capturedAtMs > 0) ...[
+                Text(
+                  _heldLabel(capturedAtMs),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted,
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+              if (holdHoursLeft != null) ...[
+                // Прочность квартала: сколько удержания осталось (Ф2, decay).
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: (holdHoursLeft / 168).clamp(0.0, 1.0),
+                    minHeight: 5,
+                    backgroundColor: AppColors.soft,
+                    valueColor: AlwaysStoppedAnimation(
+                      holdHoursLeft < 24
+                          ? AppColors.warm
+                          : AppColors.limeDeep,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  holdHoursLeft < 24
+                      ? 'Выцветает: осталось ${holdHoursLeft.round()} ч'
+                      : 'Прочность: ещё ${(holdHoursLeft / 24).floor()} дн '
+                          'удержания',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: holdHoursLeft < 24
+                        ? AppColors.warm
+                        : AppColors.accentInk,
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+              if (protected) ...[
+                Text(
+                  'Под защитой ещё ${holdHoursLeft.round()} ч',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accentInk,
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+              Text(
+                note,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: AppColors.muted,
+                ),
+              ),
+              if (rel != TerritoryRel.mine && rel != TerritoryRel.club) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      context.go('/run');
+                    },
+                    child: const Text('Бежать за ним'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Color _fill(ZoneOwner owner, {bool flash = false}) {
     if (flash) return AppColors.warning.withValues(alpha: 0.42);
     return switch (owner) {
       ZoneOwner.mine => AppColors.hexOwned.withValues(alpha: 0.22),
       ZoneOwner.enemy => AppColors.hexEnemy.withValues(alpha: 0.18),
-      ZoneOwner.club => AppColors.success.withValues(alpha: 0.18),
+      ZoneOwner.club => AppColors.teal.withValues(alpha: 0.20),
       ZoneOwner.free => Colors.transparent,
     };
   }
@@ -494,24 +746,34 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
     return switch (owner) {
       ZoneOwner.mine => AppColors.hexOwned.withValues(alpha: 0.70),
       ZoneOwner.enemy => AppColors.hexEnemy.withValues(alpha: 0.58),
-      ZoneOwner.club => AppColors.success.withValues(alpha: 0.58),
+      ZoneOwner.club => AppColors.teal.withValues(alpha: 0.62),
       ZoneOwner.free => AppColors.zoneNeutral.withValues(alpha: 0.55),
     };
   }
 
-  // Реальные территории с сервера — та же палитра, чуть плотнее заливка,
-  // чтобы захваченные маршрутом области читались поверх демо-сетки.
-  Color _territoryFill(TerritoryRel rel) => switch (rel) {
-    TerritoryRel.mine => AppColors.hexOwned.withValues(alpha: 0.28),
-    TerritoryRel.club => AppColors.success.withValues(alpha: 0.24),
-    TerritoryRel.enemy => AppColors.hexEnemy.withValues(alpha: 0.24),
-  };
+  /// Свежесть удержания 0..1 (168ч = только что захвачен).
+  static double _freshness(double? holdHoursLeft) =>
+      ((holdHoursLeft ?? 168) / 168).clamp(0.0, 1.0);
 
-  Color _territoryBorder(TerritoryRel rel) => switch (rel) {
-    TerritoryRel.mine => AppColors.hexOwned.withValues(alpha: 0.85),
-    TerritoryRel.club => AppColors.success.withValues(alpha: 0.75),
-    TerritoryRel.enemy => AppColors.hexEnemy.withValues(alpha: 0.70),
-  };
+  // Реальные территории с сервера — та же палитра; насыщенность = прочность
+  // (словарь Ф2: выцветающий квартал видно ещё до потери).
+  Color _territoryFill(TerritoryRel rel, {double freshness = 1}) {
+    final k = 0.45 + 0.55 * freshness;
+    return switch (rel) {
+      TerritoryRel.mine => AppColors.hexOwned.withValues(alpha: 0.28 * k),
+      TerritoryRel.club => AppColors.teal.withValues(alpha: 0.24 * k),
+      TerritoryRel.enemy => AppColors.hexEnemy.withValues(alpha: 0.24 * k),
+    };
+  }
+
+  Color _territoryBorder(TerritoryRel rel, {double freshness = 1}) {
+    final k = 0.5 + 0.5 * freshness;
+    return switch (rel) {
+      TerritoryRel.mine => AppColors.hexOwned.withValues(alpha: 0.85 * k),
+      TerritoryRel.club => AppColors.teal.withValues(alpha: 0.75 * k),
+      TerritoryRel.enemy => AppColors.hexEnemy.withValues(alpha: 0.70 * k),
+    };
+  }
 }
 
 // ── Markers ───────────────────────────────────────────────────────────────────
@@ -528,9 +790,9 @@ class _MapErrorNotice extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(CupertinoIcons.wifi_slash, color: AppColors.warning, size: 28),
+          Icon(CupertinoIcons.wifi_slash, color: AppColors.warning, size: 28),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             '\u041a\u0430\u0440\u0442\u0430 \u043d\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u0430',
             style: TextStyle(
               color: AppColors.ink,
@@ -540,7 +802,7 @@ class _MapErrorNotice extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             '\u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u043d\u0442\u0435\u0440\u043d\u0435\u0442 \u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c\u00bb.',
             style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.25),
             textAlign: TextAlign.center,
@@ -846,10 +1108,10 @@ class _KvartalTopLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Glass(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: const [
+        children: [
           KvartalLogoBadge(size: 24),
           SizedBox(height: 4),
           Row(
@@ -901,7 +1163,7 @@ class _WeatherChip extends ConsumerWidget {
       onTap: () => showWeatherDetailSheet(context),
       child: _Glass(
         // Поля подобраны так, чтобы высота дотягивала до нормы 48 dp.
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -912,15 +1174,15 @@ class _WeatherChip extends ConsumerWidget {
               size: 13,
               color: AppColors.info,
             ),
-            const SizedBox(width: 5),
+            SizedBox(width: 5),
             Text(
               tempText,
               style: Theme.of(
                 context,
               ).textTheme.labelMedium?.copyWith(color: AppColors.ink),
             ),
-            const SizedBox(width: 4),
-            const Icon(
+            SizedBox(width: 4),
+            Icon(
               CupertinoIcons.chevron_down,
               size: 10,
               color: AppColors.textTertiary,
@@ -934,20 +1196,75 @@ class _WeatherChip extends ConsumerWidget {
 
 // ── Legend ────────────────────────────────────────────────────────────────────
 
+class _CollapsibleLegend extends StatelessWidget {
+  final bool open;
+  final VoidCallback onToggle;
+  const _CollapsibleLegend({required this.open, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onToggle,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topLeft,
+        child: open
+            ? _Legend()
+            // Свёрнутая: компактная плитка 2×2 цветов словаря.
+            : _Glass(
+                padding: const EdgeInsets.all(7),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _dot(AppColors.hexOwned),
+                        const SizedBox(width: 3),
+                        _dot(AppColors.teal),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _dot(AppColors.hexEnemy),
+                        const SizedBox(width: 3),
+                        _dot(AppColors.zoneNeutral),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _dot(Color c) => Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+      );
+}
+
 class _Legend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Glass(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          _LegendDot(color: AppColors.hexOwned, label: 'Мои'),
+        children: [
+          _LegendDot(color: AppColors.hexOwned, label: 'Моё'),
           SizedBox(height: 3),
-          _LegendDot(color: AppColors.hexEnemy, label: 'Чужие'),
+          _LegendDot(color: AppColors.teal, label: 'Клуба'),
           SizedBox(height: 3),
-          _LegendDot(color: AppColors.success, label: 'Клуб'),
+          _LegendDot(color: AppColors.hexEnemy, label: 'Чужое'),
+          SizedBox(height: 3),
+          _LegendDot(color: AppColors.zoneNeutral, label: 'Ничьё'),
         ],
       ),
     );
@@ -970,7 +1287,7 @@ class _LegendDot extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 5),
-        Text(label, style: const TextStyle(color: AppColors.ink, fontSize: 10)),
+        Text(label, style: TextStyle(color: AppColors.ink, fontSize: 10)),
       ],
     );
   }
@@ -1027,9 +1344,12 @@ class _BottomPanel extends StatelessWidget {
         territories.where((t) => t.rel == TerritoryRel.club).length;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: _Glass(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: isRunning ? 12 : 7,
+        ),
         child: isRunning
             ? Row(
                 children: [
@@ -1055,6 +1375,7 @@ class _BottomPanel extends StatelessWidget {
                     value: '$mine',
                     icon: CupertinoIcons.hexagon,
                     color: AppColors.hexOwned,
+                    compact: true,
                   ),
                   _Div(),
                   _Stat(
@@ -1062,13 +1383,15 @@ class _BottomPanel extends StatelessWidget {
                     value: '$enemy',
                     icon: CupertinoIcons.flag,
                     color: AppColors.hexEnemy,
+                    compact: true,
                   ),
                   _Div(),
                   _Stat(
                     label: 'Клуб',
                     value: '$club',
                     icon: CupertinoIcons.person_2,
-                    color: AppColors.success,
+                    color: AppColors.teal,
+                    compact: true,
                   ),
                 ],
               ),
@@ -1081,16 +1404,48 @@ class _Stat extends StatelessWidget {
   final String label, value;
   final IconData? icon;
   final Color? color;
+
+  /// Компактный режим (счётчики зон): панель ниже — карту видно больше.
+  final bool compact;
   const _Stat({
     required this.label,
     required this.value,
     this.icon,
     this.color,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = color ?? AppColors.ink;
+    if (compact) {
+      // Одна строка: иконка · число · подпись.
+      return Expanded(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: c),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              value,
+              style: TextStyle(
+                fontFamily: AppTheme.fontDisplay,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: c,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(fontSize: 11.5, color: AppColors.muted),
+            ),
+          ],
+        ),
+      );
+    }
     return Expanded(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1114,4 +1469,119 @@ class _Div extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       Container(width: 1, height: 36, color: AppColors.bgElevated);
+}
+
+// ── Блок «Сегодня» (Ф2 «Карта-дом») ──────────────────────────────────────────
+
+class _TodayRow extends ConsumerWidget {
+  const _TodayRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weather = ref.watch(weatherProvider).valueOrNull;
+    final win = bestRunWindow(weather?.hourly ?? const []);
+    final level = ref.watch(runnerLevelProvider).valueOrNull;
+    final me = ref.watch(leagueBoardDataProvider).valueOrNull?.me;
+    final form = ref.watch(weekFormProvider);
+    final days = form.where((d) => d).length;
+
+    // Кламп масштаба текста: на телефонах с крупным шрифтом карточки не рвёт.
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.0,
+      child: SizedBox(
+      height: 62,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 6),
+        children: [
+          if (win != null)
+            _TodayCard(
+              icon: CupertinoIcons.timer,
+              title: 'Окно бега',
+              value:
+                  '${win.start.hour}:00–${win.end.hour}:00',
+              onTap: () => showWeatherDetailSheet(context),
+            ),
+          _TodayCard(
+            icon: CupertinoIcons.chart_bar_alt_fill,
+            title: 'Дивизион',
+            value: [
+              if (level != null) level.title,
+              if (me?.place != null) '#${me!.place}',
+            ].join(' · ').isEmpty
+                ? 'загрузка…'
+                : [
+                    if (level != null) level.title,
+                    if (me?.place != null) '#${me!.place}',
+                  ].join(' · '),
+            onTap: () => context.go('/leaderboard'),
+          ),
+          _TodayCard(
+            icon: CupertinoIcons.calendar,
+            title: 'Неделя',
+            value: '$days из 7 дней',
+            onTap: () => context.go('/leaderboard'),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+}
+
+class _TodayCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final VoidCallback onTap;
+
+  const _TodayCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: _Glass(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: AppColors.accentInk),
+              const SizedBox(width: 8),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .6,
+                      color: AppColors.faint,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
