@@ -77,12 +77,29 @@ def redeem(request):
     )
 
 
-# Источники, которые СЕРВЕР начисляет сам (анти-чит S-04) — клиент их слать не может,
-# иначе очки (= деньги в Store) подделываются:
-#   runnerRun       → /v1/runs (расчёт по дистанции/времени);
+# Баллы — это деньги в Store, поэтому начисляет их ТОЛЬКО сервер (анти-чит S-04).
+#   runnerRun       → /v1/runs (расчёт по дистанции и времени);
 #   runnerTerritory → /v1/territories/capture (после валидной геометрии захвата);
-#   purchase/registration → /v1/orders (по сумме заказа / первому заказу).
-_SERVER_ONLY_SOURCES = {"runnerRun", "runnerTerritory", "purchase", "registration"}
+#   purchase/registration → /v1/orders (по сумме заказа / первому заказу);
+#   runnerMilestone/runnerDivision/runnerSeason → league и runs.milestones;
+#   redeem          → /v1/loyalty/redeem (там проверяется баланс).
+#
+# Здесь БЕЛЫЙ список, а не чёрный — и это принципиально. Раньше стоял чёрный из
+# четырёх источников, и он устарел молча: Квартал 2.0 добавил награды за вехи,
+# дивизионы и сезоны, и ни один в список не попал. Клиент мог прислать
+# `{"source": "runnerDivision", "amount": 999999}` и выписать себе денег.
+# Хуже того, проходил и `redeem` с ПОЛОЖИТЕЛЬНОЙ суммой: списание превращалось
+# в начисление.
+#
+# Чёрный список требует помнить о нём при каждом новом источнике. Белый —
+# наоборот: новый источник по умолчанию запрещён, и чтобы его разрешить, надо
+# прийти сюда и объяснить зачем. Сейчас клиенту не нужен ни один: всё, что
+# приносит баллы, считает сервер.
+_CLIENT_ALLOWED_SOURCES: set[str] = set()
+
+# Потолок на случай, если в белый список когда-нибудь что-то добавят: даже
+# разрешённый источник не должен уметь выписать состояние одной строкой.
+MAX_CLIENT_AMOUNT = 1000
 
 
 @api_view(["POST"])
@@ -93,9 +110,19 @@ def transactions(request):
     d = request.data
     run_id = d.get("runId")
     order_id = d.get("orderId")
-    source = d.get("source")
-    if source in _SERVER_ONLY_SOURCES:
-        return Response({"detail": "Начисления за бег считает сервер"}, status=403)
+    source = str(d.get("source") or "")
+    if source not in _CLIENT_ALLOWED_SOURCES:
+        return Response(
+            {"detail": "Баллы начисляет сервер — клиентские начисления не принимаются"},
+            status=403,
+        )
+    try:
+        amount = int(d.get("amount") or 0)
+    except (TypeError, ValueError):
+        return Response({"detail": "Сумма должна быть числом"}, status=400)
+    if not 0 < amount <= MAX_CLIENT_AMOUNT:
+        # Отрицательная сумма — это списание, у него свой адрес с проверкой баланса.
+        return Response({"detail": "Недопустимая сумма начисления"}, status=400)
     # Идемпотентность: по (user, runId, source) для забегов и
     # по (user, orderId, source) для покупок/начислений за заказ — без дублей.
     if run_id and LoyaltyTransaction.objects.filter(
@@ -108,7 +135,7 @@ def transactions(request):
         return Response({"ok": True, "deduped": True})
     add_txn(
         uid,
-        int(d.get("amount") or 0),
+        amount,
         source,
         d.get("description") or "",
         order_id,
