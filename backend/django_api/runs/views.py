@@ -4,7 +4,7 @@
                              СЕРВЕР сам валидирует забег и начисляет очки за бег
                              (клиент очки больше не присылает — иначе их можно подделать).
 Требуется Bearer-токен. Сырой GPS-маршрут НЕ принимаем/не храним (приватность §2)."""
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 
 from django.core.cache import cache
 from django.utils import timezone
@@ -56,17 +56,32 @@ def _validate(uid, distance_m, duration_s, finished, mock=False):
         return "Скорость выше 40 км/ч (спуфинг/телепорт)"
     if distance_m > MAX_RUN_DISTANCE_M:
         return "Дистанция за забег неправдоподобна"
-    # Суточные лимиты по валидным забегам за календарный день (UTC).
+    # Суточные лимиты за календарный день (UTC).
     day_start = finished.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
     todays = list(
         Run.objects.filter(
             user_id=uid, flagged=False, finished_at__gte=day_start,
-            finished_at__lt=day_start.replace(hour=23, minute=59, second=59),
+            finished_at__lt=day_end,
         )
     )
     if len(todays) >= MAX_RUNS_PER_DAY:  # анти-спам: слишком много забегов за сутки
         return "Слишком много забегов за день"
-    if sum(r.distance_m for r in todays) + distance_m > MAX_DAY_DISTANCE_M:
+
+    # Дистанцию считаем по СВОИМ забегам И импорту с часов вместе. Раздельные
+    # потолки обходятся тривиально: набрал лимит импортом, потом столько же
+    # своими забегами — и суточная норма удвоилась. Импорт (workouts/views.py)
+    # уже считает обе стороны; здесь этого не хватало.
+    from workouts.models import ExternalWorkout
+
+    imported = sum(
+        w.distance_m
+        for w in ExternalWorkout.objects.filter(
+            user_id=uid, flagged=False, run_id="",
+            started_at__gte=day_start, started_at__lt=day_end,
+        )
+    )
+    if sum(r.distance_m for r in todays) + imported + distance_m > MAX_DAY_DISTANCE_M:
         return "Превышен суточный лимит дистанции"
     return ""
 

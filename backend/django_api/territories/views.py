@@ -13,8 +13,10 @@
 """
 import json
 import secrets
+from datetime import timedelta
 
 from django.db import connection, transaction
+from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
@@ -63,6 +65,10 @@ MIN_CAPTURE_AREA_M2 = 100  # меньше — это не реальная пе�
 MAX_CAPTURE_AREA_M2 = 2_000_000  # 2 км² за один забег — неправдоподобно (спуфинг/телепорт)
 MAX_SPEED_MS = 11.2  # ~40 км/ч — серверный потолок скорости (см. CLAUDE.md)
 CAPTURE_COOLDOWN_S = 30  # защита от спама захватами
+# Суточный потолок захватов. Кулдауна в 30 секунд мало: он ограничивает темп, но
+# не сумму — за сутки это 2880 захватов и 144 000 баллов, то есть деньги в Store
+# из воздуха. Живому бегуну двадцати захватов в день с запасом хватает.
+MAX_CAPTURES_PER_DAY = 20
 TERRITORY_POINTS = 50  # очки за захват (анти-чит S-04: начисляет сервер, не клиент)
 
 
@@ -84,7 +90,11 @@ def capture(request):
     if len(pts) > 20_000:
         return Response({"detail": "Слишком много точек в маршруте"}, status=400)
 
-    # Античит по скорости: клиент опционально шлёт дистанцию и время забега.
+    # Античит по скорости. ВАЖНО: проверка срабатывает только когда клиент сам
+    # прислал дистанцию и время — то есть выключается простым их отсутствием.
+    # Полагаться на неё как на защиту нельзя, она лишь отсекает явную небрежность.
+    # Настоящий ограничитель — суточный потолок захватов ниже: он не зависит от
+    # того, что клиент решил о себе сообщить.
     distance = request.data.get("distanceMeters")
     elapsed = request.data.get("elapsedSeconds")
     try:
@@ -98,6 +108,18 @@ def capture(request):
                 )
     except (TypeError, ValueError):
         pass  # некорректные числа просто игнорируем, не блокируем легитимный захват
+
+    # Суточный потолок: считаем по начисленным за захват баллам, а не по строкам
+    # территорий — территория у человека одна и обновляется, а начисления в
+    # истории баллов остаются и врать не могут.
+    since = timezone.now() - timedelta(days=1)
+    if LoyaltyTransaction.objects.filter(
+        user_id=uid, source="runnerTerritory", created_at__gte=since
+    ).count() >= MAX_CAPTURES_PER_DAY:
+        return Response(
+            {"detail": "Слишком много захватов за сутки — попробуй завтра."},
+            status=429,
+        )
 
     ring = [(float(p[1]), float(p[0])) for p in pts]  # (lng, lat)
     if ring[0] != ring[-1]:
