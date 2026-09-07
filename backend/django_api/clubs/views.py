@@ -2,6 +2,7 @@ import secrets
 from datetime import timedelta
 
 from django.utils import timezone
+from django.db.models import Sum
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
@@ -28,21 +29,49 @@ def _uid(request):
 
 
 def _balance(uid) -> int:
-    return sum(
-        t.amount for t in LoyaltyTransaction.objects.filter(user_id=uid).only("amount")
-    )
+    """Баланс одним агрегатом в БД, а не суммой всех строк в Python."""
+    return LoyaltyTransaction.objects.filter(user_id=uid).aggregate(
+        s=Sum("amount"))["s"] or 0
 
 
 def _km(uid) -> float:
     """Суммарный пробег за всё время (км). Растёт с каждым забегом, не тратится —
     в отличие от баллов кошелька. Источник — начисления за бег (runnerRun)/10."""
-    pts = sum(
-        t.amount
-        for t in LoyaltyTransaction.objects.filter(
-            user_id=uid, source="runnerRun"
-        ).only("amount")
-    )
+    pts = LoyaltyTransaction.objects.filter(
+        user_id=uid, source="runnerRun"
+    ).aggregate(s=Sum("amount"))["s"] or 0
     return round(pts / 10.0, 1)
+
+
+def _km_of_users(uids) -> dict:
+    """Пробег СРАЗУ ДЛЯ ВСЕХ перечисленных бегунов — одним запросом.
+
+    Раньше километры считались вызовом `_km()` на каждого участника каждого
+    клуба. На 60 клубах по 83 человека это 5000 запросов к базе и две секунды
+    на одну страницу списка клубов — при трёх воркерах на проде страница
+    занимала бы весь сервер.
+    """
+    uids = list(uids)
+    if not uids:
+        return {}
+    rows = (
+        LoyaltyTransaction.objects
+        .filter(user_id__in=uids, source="runnerRun")
+        .values("user_id")
+        .annotate(pts=Sum("amount"))
+    )
+    return {r["user_id"]: round((r["pts"] or 0) / 10.0, 1) for r in rows}
+
+
+def _names_of(uids) -> dict:
+    """Имена скопом — вместо запроса на каждого участника."""
+    uids = list(uids)
+    if not uids:
+        return {}
+    return {
+        a.id: (a.name or "—")
+        for a in Account.objects.filter(id__in=uids).only("id", "name")
+    }
 
 
 def _km_between(uid, start, end) -> float:
@@ -56,6 +85,21 @@ def _km_between(uid, start, end) -> float:
     return round(pts / 10.0, 1)
 
 
+def _km_between_users(uids, start, end) -> dict:
+    """Пробег за период сразу для всех участников — одним запросом."""
+    uids = list(uids)
+    if not uids:
+        return {}
+    rows = (
+        LoyaltyTransaction.objects
+        .filter(user_id__in=uids, source="runnerRun",
+                created_at__gte=start, created_at__lt=end)
+        .values("user_id")
+        .annotate(pts=Sum("amount"))
+    )
+    return {r["user_id"]: round((r["pts"] or 0) / 10.0, 1) for r in rows}
+
+
 def _challenge_json(club_id):
     """Активный челлендж клуба + прогресс и вклад участников, либо None."""
     now = timezone.now()
@@ -66,12 +110,19 @@ def _challenge_json(club_id):
     )
     if not ch:
         return None
+    # Вклад участников — двумя запросами на весь клуб, а не по два на каждого:
+    # на клубе в сотню человек это была разница в двести обращений к базе.
+    uids = list(
+        ClubMember.objects.filter(club_id=club_id).values_list("user_id", flat=True)
+    )
+    km_by_user = _km_between_users(uids, ch.start_at, ch.end_at)
+    names = _names_of(uids)
     contribs, total = [], 0.0
-    for m in ClubMember.objects.filter(club_id=club_id):
-        km = _km_between(m.user_id, ch.start_at, ch.end_at)
+    for uid_ in uids:
+        km = km_by_user.get(uid_, 0.0)
         total += km
         if km > 0:
-            contribs.append({"userId": m.user_id, "name": _name_of(m.user_id), "km": km})
+            contribs.append({"userId": uid_, "name": names.get(uid_, "—"), "km": km})
     contribs.sort(key=lambda x: x["km"], reverse=True)
     secs_left = (ch.end_at - now).total_seconds()
     return {
@@ -115,26 +166,57 @@ def _name_of(uid):
 
 def _members_json(club_id):
     # Личные баллы кошелька в клубе не показываем — у участника отдаём вклад в км.
+    members = list(ClubMember.objects.filter(club_id=club_id))
+    uids = [m.user_id for m in members]
+    km, names = _km_of_users(uids), _names_of(uids)
     out = [
-        {"userId": m.user_id, "name": _name_of(m.user_id), "role": m.role,
-         "km": _km(m.user_id)}
-        for m in ClubMember.objects.filter(club_id=club_id)
+        {"userId": m.user_id, "name": names.get(m.user_id, "—"), "role": m.role,
+         "km": km.get(m.user_id, 0.0)}
+        for m in members
     ]
     out.sort(key=lambda x: x["km"], reverse=True)
     return out
 
 
-def _summary(club: Club) -> dict:
-    members = list(ClubMember.objects.filter(club_id=club.id))
+def _summary(club: Club, total_km=None, member_count=None) -> dict:
+    """Карточка клуба. Километры и число участников можно передать снаружи —
+    список клубов считает их сразу для всех одним запросом (см. `_club_totals`)."""
+    if total_km is None or member_count is None:
+        members = list(ClubMember.objects.filter(club_id=club.id))
+        km = _km_of_users(m.user_id for m in members)
+        member_count = len(members)
+        total_km = round(sum(km.values()), 1)
     return {
         "id": club.id, "name": club.name, "logo": club.logo, "city": club.city,
         "description": club.description, "ownerId": club.owner_id,
-        "joinPolicy": club.join_policy, "memberCount": len(members),
+        "joinPolicy": club.join_policy, "memberCount": member_count,
         "style": club.style or "minimal",
         "cover": club.cover,
         # Активность клуба — суммарный пробег (км), а не баллы (баллы тратятся/динамичны).
-        "totalKm": round(sum(_km(m.user_id) for m in members), 1),
+        "totalKm": total_km,
     }
+
+
+def _club_totals(club_ids):
+    """Километры и число участников для СПИСКА клубов — двумя запросами на всё.
+
+    Ключевая часть починки списка клубов: раньше он стоил запрос на каждого
+    участника каждого клуба.
+    """
+    club_ids = list(club_ids)
+    if not club_ids:
+        return {}, {}
+    links = list(
+        ClubMember.objects.filter(club_id__in=club_ids).values_list("club_id", "user_id")
+    )
+    counts = {}
+    for cid, _uid_ in links:
+        counts[cid] = counts.get(cid, 0) + 1
+    km_by_user = _km_of_users({u for _c, u in links})
+    totals = {}
+    for cid, u in links:
+        totals[cid] = totals.get(cid, 0.0) + km_by_user.get(u, 0.0)
+    return {c: round(v, 1) for c, v in totals.items()}, counts
 
 
 def _detail(club: Club, uid) -> dict:
@@ -158,7 +240,11 @@ def clubs_root(request):
         if search:
             from django.db.models import Q
             qs = qs.filter(Q(name__icontains=search) | Q(city__icontains=search))
-        result = [_summary(c) for c in qs.order_by("-created_at")]
+        clubs = list(qs.order_by("-created_at"))
+        totals, counts = _club_totals(c.id for c in clubs)
+        result = [
+            _summary(c, totals.get(c.id, 0.0), counts.get(c.id, 0)) for c in clubs
+        ]
         result.sort(key=lambda c: c["totalKm"], reverse=True)
         return Response(result)
     # POST — create
