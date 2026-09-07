@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart' show Color;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
 import '../../profile/data/me_stats_provider.dart';
 import '../../run/data/completed_runs_provider.dart';
@@ -120,14 +120,7 @@ final weekFormProvider = Provider.autoDispose<List<bool>>((ref) {
 
 // ── Серверный дивизион недели (Квартал 2.0, бэкенд 09.2026) ─────────────────
 
-final _divDio = Dio(
-  BaseOptions(
-    baseUrl: ApiConfig.baseUrl,
-    connectTimeout: ApiConfig.connectTimeout,
-    receiveTimeout: ApiConfig.receiveTimeout,
-    headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-  ),
-);
+final _divDio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
 class DivisionMemberRow {
   final String userId;

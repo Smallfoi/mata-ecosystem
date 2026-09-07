@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
 import '../../races/data/race_reminders.dart';
 
@@ -27,14 +27,7 @@ class WeekDigest {
   });
 }
 
-final _digestDio = Dio(
-  BaseOptions(
-    baseUrl: ApiConfig.baseUrl,
-    connectTimeout: ApiConfig.connectTimeout,
-    receiveTimeout: ApiConfig.receiveTimeout,
-    headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-  ),
-);
+final _digestDio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
 final weekDigestProvider = FutureProvider.autoDispose<WeekDigest?>((ref) async {
   final token = ref.watch(authProvider).token;

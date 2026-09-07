@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
 import 'medal_defs.dart';
 
@@ -64,14 +64,7 @@ class MedalFull {
   bool get earned => state.earned;
 }
 
-final _medalsDio = Dio(
-  BaseOptions(
-    baseUrl: ApiConfig.baseUrl,
-    connectTimeout: ApiConfig.connectTimeout,
-    receiveTimeout: ApiConfig.receiveTimeout,
-    headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-  ),
-);
+final _medalsDio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
 final medalsProvider = FutureProvider.autoDispose<List<MedalFull>>((ref) async {
   final token = ref.watch(authProvider).token;

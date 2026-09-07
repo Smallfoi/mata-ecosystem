@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
 import '../../loyalty/data/loyalty_provider.dart';
 import '../../notifications/data/notifications_provider.dart';
@@ -128,14 +128,7 @@ class CompletedRunsNotifier extends StateNotifier<List<CompletedRun>> {
   /// id забегов, уже доставленных на бэк (чтобы не слать повторно).
   Set<String> _synced = {};
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-      headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-    ),
-  );
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
   String? get _token {
     final t = ref.read(authProvider).token;

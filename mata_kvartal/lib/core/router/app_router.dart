@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../features/auth/data/auth_provider.dart';
 import '../../features/auth/presentation/screens/phone_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
@@ -87,6 +88,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/splash',
     refreshListenable: notifier,
     redirect: notifier.redirect,
+    // Крошки переходов между экранами (D-32): в карточке ошибки видно, откуда
+    // человек пришёл. «Упало на профиле» и «упало на профиле сразу после
+    // финиша забега» — разные баги, и различает их только этот след.
+    observers: [SentryNavigatorObserver()],
     routes: [
       GoRoute(
         path: '/splash',

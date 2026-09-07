@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
 
 /// Личная статистика пользователя из общего бэка (GET /v1/me/stats):
@@ -99,14 +99,7 @@ final meStatsProvider = FutureProvider.autoDispose<MeStats>((ref) async {
   if (token == null || token.isEmpty) {
     throw Exception('Не авторизован');
   }
-  final dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-      headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-    ),
-  );
+  final dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
   final r = await dio.get<Map<String, dynamic>>(
     '/me/stats',
     options: Options(headers: {'Authorization': 'Bearer $token'}),

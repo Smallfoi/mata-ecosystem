@@ -8,6 +8,32 @@ from django.db.models import Sum
 from django.utils import timezone
 
 
+def _errors_tile():
+    """Плитка «Ошибки» на главной (D-32).
+
+    Смысл плитки не в цифре, а в том, чтобы владелец увидел проблему, НЕ заходя
+    специально в трекер. Открытая админка — это то, что перед глазами каждый день;
+    отдельную вкладку открывают, когда уже что-то заподозрили.
+
+    Трекер — внешняя система: он может быть не настроен, лежать или тормозить.
+    Поэтому любой сбой превращается в тихий прочерк, а не в упавшую главную
+    страницу. Дашборд важнее наблюдаемости.
+    """
+    from common import glitchtip
+
+    if not glitchtip.is_configured():
+        return {"title": "Ошибки", "value": "—", "icon": "bug_report"}
+    try:
+        issues, error = glitchtip.fetch_issues(query="is:unresolved")
+        if error:
+            return {"title": "Ошибки", "value": "нет связи", "icon": "bug_report"}
+        summary = glitchtip.summarize(issues)
+        return {"title": "Ошибки без разбора", "value": summary["errors"],
+                "icon": "bug_report"}
+    except Exception:
+        return {"title": "Ошибки", "value": "—", "icon": "bug_report"}
+
+
 def dashboard_callback(request, context):
     from accounts.models import Account
     from catalog.models import Product
@@ -102,6 +128,7 @@ def dashboard_callback(request, context):
              "sub": f"−{points_spent} потрачено", "icon": "loyalty"},
         ],
         "extra_stats": [
+            _errors_tile(),
             {"title": "Аккаунтов на проверке", "value": accounts_review,
              "icon": "gpp_maybe"},
             {"title": "Забегов помечено (чит)", "value": runs_flagged,

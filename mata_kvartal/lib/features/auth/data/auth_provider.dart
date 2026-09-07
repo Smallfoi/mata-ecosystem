@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 
 enum AuthStatus { unauthenticated, codeSent, authenticated }
 
@@ -93,6 +94,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
     restoreSession();
   }
 
+  /// Кто попал в ошибку — привязываем к событиям трекера (D-32).
+  ///
+  /// Перехватываем присвоение состояния, а не дописываем вызов в каждое место
+  /// входа: их несколько, и один рано или поздно забыли бы. Так любой путь —
+  /// вход, восстановление сессии, выход — обновляет контекст сам.
+  ///
+  /// В трекер уходит ТОЛЬКО идентификатор. Ни телефона, ни почты, ни имени:
+  /// чтобы посчитать «сколько людей задел этот баг», хватает id, а хранить
+  /// персональные данные в системе ошибок незачем (152-ФЗ).
+  @override
+  set state(AuthState value) {
+    super.state = value;
+    try {
+      final id = value.user?.id;
+      Sentry.configureScope((scope) {
+        scope.setUser(id == null || id.isEmpty ? null : SentryUser(id: id));
+      });
+    } catch (_) {
+      // трекер не настроен — контекст не обязателен
+    }
+  }
+
   static const _tokenPrefsKey = 'kvartal.auth.token.v1';
   static const _phonePrefsKey = 'kvartal.auth.phone.v1';
   static const _userIdPrefsKey = 'kvartal.auth.user_id.v1';
@@ -101,14 +124,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   static const _userCityPrefsKey = 'kvartal.auth.user_city.v1';
   static const _userAvatarPrefsKey = 'kvartal.auth.user_avatar.v1';
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-      headers: {'Content-Type': 'application/json'},
-    ),
-  );
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
   // Токен входа — в защищённом хранилище (Android Keystore / iOS Keychain),
   // а не в открытых SharedPreferences (S-08, launch-gate §13).

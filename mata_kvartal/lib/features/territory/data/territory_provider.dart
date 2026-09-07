@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
 import '../../loyalty/data/loyalty_provider.dart';
 import '../../run/data/route_cleaner.dart';
@@ -144,14 +144,7 @@ class TerritoryNotifier extends StateNotifier<TerritoryState> {
   final Ref ref;
   TerritoryNotifier(this.ref) : super(const TerritoryState());
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-      headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-    ),
-  );
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
   String? get _token {
     final token = ref.read(authProvider).token;
@@ -406,14 +399,7 @@ final territoryProvider =
 final footprintAreaProvider = FutureProvider.autoDispose<double>((ref) async {
   final token = ref.watch(authProvider).token;
   if (token == null || token.isEmpty) return 0;
-  final dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-      headers: const {'Content-Type': 'application/json', 'Connection': 'close'},
-    ),
-  );
+  final dio = ApiClient.create(headers: const {'Content-Type': 'application/json', 'Connection': 'close'});
   try {
     final res = await dio.get<Map<String, dynamic>>(
       '/footprint',
