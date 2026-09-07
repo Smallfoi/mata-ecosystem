@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/api/api_config.dart';
 import '../../auth/data/auth_provider.dart';
 
@@ -177,12 +177,7 @@ class RaceRegion {
       );
 }
 
-final _racesDio = Dio(BaseOptions(
-  baseUrl: ApiConfig.baseUrl,
-  connectTimeout: ApiConfig.connectTimeout,
-  receiveTimeout: ApiConfig.receiveTimeout,
-  headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-));
+final _racesDio = ApiClient.create();
 
 /// Последняя известная позиция (без запроса свежего фикса — мгновенно, не блокирует).
 /// Для «моего региона» как fallback, если город в профиле не заполнен.

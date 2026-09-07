@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health/health.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
 
 /// Тренировки с часов через Health Connect (LEAGUE_PLAN, этап 2).
@@ -101,14 +101,7 @@ class HealthSyncNotifier extends StateNotifier<HealthSyncState> {
   final Health _health = Health();
   bool _configured = false;
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-      headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-    ),
-  );
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
   Future<void> _configure() async {
     if (_configured) return;

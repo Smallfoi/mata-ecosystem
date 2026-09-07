@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import '../screens/main_shell.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/catalog/catalog_screen.dart';
@@ -14,6 +15,8 @@ import '../screens/loyalty/loyalty_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
+  // Крошки переходов между экранами (D-32) — путь пользователя до падения.
+  observers: [SentryNavigatorObserver()],
   routes: [
     StatefulShellRoute.indexedStack(
       builder: (context, state, shell) => MainShell(shell: shell),

@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 
 /// Правовой документ экосистемы МАТА (соглашение, политика, согласие, оферта,
 /// правила баллов/сообщества). Единый источник правды — backend: документы
@@ -36,12 +36,7 @@ class LegalDoc {
       );
 }
 
-final _legalDio = Dio(BaseOptions(
-  baseUrl: ApiConfig.baseUrl,
-  connectTimeout: ApiConfig.connectTimeout,
-  receiveTimeout: ApiConfig.receiveTimeout,
-  headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-));
+final _legalDio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
 /// Загрузить опубликованные документы. С токеном — у каждого проставлен
 /// `accepted` (принят ли пользователем); без токена — `accepted == null`.

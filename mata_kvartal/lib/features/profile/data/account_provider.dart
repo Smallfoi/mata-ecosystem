@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
 
 /// Настройки приватности (LAUNCH_READINESS §2) и удаление аккаунта (§13).
@@ -48,14 +48,7 @@ class AccountNotifier extends StateNotifier<AccountState> {
   final Ref ref;
   AccountNotifier(this.ref) : super(const AccountState());
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-      headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-    ),
-  );
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
   Options? _auth() {
     final t = ref.read(authProvider).token;

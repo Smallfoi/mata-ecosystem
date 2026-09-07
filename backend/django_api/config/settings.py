@@ -550,6 +550,8 @@ if SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
 
+    from common import sentry_scrub
+
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[DjangoIntegration()],
@@ -559,4 +561,9 @@ if SENTRY_DSN:
         release=os.environ.get("SENTRY_RELEASE") or None,  # git sha/версия → трекинг регрессий
         traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0")),
         send_default_pii=False,  # 152-ФЗ: не отправляем ПДн в события по умолчанию
+        # `send_default_pii=False` убирает только то, что SDK добавляет САМ (тело
+        # запроса, cookies, IP). Телефон в тексте исключения или токен в локальной
+        # переменной он не тронет — их вычищаем сами (common/sentry_scrub.py).
+        before_send=sentry_scrub.before_send,
+        before_breadcrumb=sentry_scrub.before_breadcrumb,
     )

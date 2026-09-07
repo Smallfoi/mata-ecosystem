@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/api/api_config.dart';
 import '../../auth/data/auth_provider.dart';
 
@@ -118,14 +119,7 @@ class ShoesNotifier extends StateNotifier<ShoesState> {
 
   ShoesNotifier(this.ref) : super(const ShoesState());
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-      headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-    ),
-  );
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
   static const _pendingKey = 'kvartal.shoes.pending.v1';
 

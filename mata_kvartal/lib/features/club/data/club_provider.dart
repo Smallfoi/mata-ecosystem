@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/api/api_config.dart';
 import '../../auth/data/auth_provider.dart';
 
@@ -220,14 +221,7 @@ class ClubNotifier extends StateNotifier<ClubState> {
   final Ref ref;
   ClubNotifier(this.ref) : super(const ClubState());
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-      headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-    ),
-  );
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
   Future<void> refresh({String? search}) async {
     final token = ref.read(authProvider).token;
@@ -626,14 +620,7 @@ class WarData {
   const WarData({this.standings = const [], this.threats = const []});
 }
 
-final _warDio = Dio(
-  BaseOptions(
-    baseUrl: ApiConfig.baseUrl,
-    connectTimeout: ApiConfig.connectTimeout,
-    receiveTimeout: ApiConfig.receiveTimeout,
-    headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-  ),
-);
+final _warDio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
 
 /// Позиции клубов по земле + лента угроз моего клуба за 7 дней.
 final clubWarProvider = FutureProvider.autoDispose<WarData>((ref) async {

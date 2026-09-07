@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'api_config.dart';
 
 /// Тонкая обёртка над HTTP для общения с backend.
@@ -12,8 +13,31 @@ class ApiException implements Exception {
   final String message;
   ApiException(this.statusCode, this.message);
 
+  /// В текст исключения тело ответа НЕ кладём (D-32).
+  ///
+  /// Именно `toString()` уезжает в трекер ошибок, когда исключение никто не
+  /// поймал. А в теле ответа сервера бывает всё: телефон, почта, адрес заказа.
+  /// Для показа пользователю и разбора в коде есть поле `message` — оно осталось
+  /// нетронутым; наружу уходит только код ответа, которого для диагностики
+  /// достаточно.
   @override
-  String toString() => 'ApiException($statusCode): $message';
+  String toString() => 'ApiException($statusCode)';
+}
+
+/// Путь без идентификаторов: `/orders/1042` → `/orders/…`.
+///
+/// Номер заказа в крошке — и данные пользователя, и помеха: трекер разбил бы
+/// одну ошибку на сотни карточек, по одной на каждый номер.
+String _routeOf(Uri? url) {
+  if (url == null) return '?';
+  return url.path
+      .split('/')
+      .map((seg) => seg.isNotEmpty &&
+              (RegExp(r'^\d+$').hasMatch(seg) ||
+                  RegExp(r'^[0-9a-fA-F_\-]{8,}$').hasMatch(seg))
+          ? '…'
+          : seg)
+      .join('/');
 }
 
 class ApiClient {
@@ -121,6 +145,7 @@ class ApiClient {
   }
 
   dynamic _decode(http.Response res) {
+    _breadcrumb(res);
     if (res.statusCode >= 200 && res.statusCode < 300) {
       if (res.body.isEmpty) return null;
       return jsonDecode(utf8.decode(res.bodyBytes));
@@ -132,6 +157,29 @@ class ApiClient {
       onUnauthorized?.call();
     }
     throw ApiException(res.statusCode, res.body);
+  }
+
+  /// След запроса для карточки ошибки (D-32): куда ходили и что ответили.
+  /// Ни тела, ни заголовков, ни параметров — только маршрут, метод и код.
+  void _breadcrumb(http.Response res) {
+    try {
+      final ok = res.statusCode >= 200 && res.statusCode < 300;
+      final method = res.request?.method ?? 'GET';
+      final route = _routeOf(res.request?.url);
+      Sentry.addBreadcrumb(Breadcrumb(
+        type: 'http',
+        category: 'http',
+        level: ok ? SentryLevel.info : SentryLevel.error,
+        message: '$method $route → ${res.statusCode}',
+        data: {
+          'endpoint': route,
+          'method': method,
+          'status': res.statusCode,
+        },
+      ));
+    } catch (_) {
+      // трекер не настроен — крошка не обязана работать
+    }
   }
 
   void close() => _client.close();
