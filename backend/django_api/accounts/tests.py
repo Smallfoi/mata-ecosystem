@@ -593,7 +593,11 @@ class ProPushTests(TestCase):
 
             self.assertTrue(request_code("+79148278470"))
 
-        self.assertEqual(calls[0]["body"], {"widget": "widget-uuid", "recipient": "+79148278470"})
+        # Поле именно `widgetId`. Раньше тут стояло `widget` — и код, и тест
+        # писались по одному предположению, поэтому проверка проходила, а запрос
+        # провайдер отклонил бы. Сверено с документацией.
+        self.assertEqual(calls[0]["body"],
+                         {"widgetId": "widget-uuid", "recipient": "+79148278470"})
         self.assertEqual(cache.get("otp:+79148278470")["requestId"], "req-1")
 
     def test_no_widget_is_a_configuration_error(self):
@@ -634,6 +638,51 @@ class ProPushTests(TestCase):
             self.assertFalse(check_code("+79148278470", "0000"))
 
         self.assertEqual(len(calls), 2, "закрывать сессию после неверного кода нельзя")
+
+    def test_resend_switches_channel_without_a_body(self):
+        """Каскад каналов — то, ради чего брали ProPush.
+
+        Провайдер требует запрос БЕЗ тела: лишний Content-Type ломает вызов.
+        """
+        calls, patched = self._api([
+            (200, {"requestId": "req-r"}),
+            (201, {"success": True}),
+        ])
+        with mock.patch.dict(os.environ, self.ENV), patched:
+            from accounts.sms import request_code, resend_code
+
+            request_code("+79148278470")
+            self.assertTrue(resend_code("+79148278470"))
+
+        self.assertIn("/resend", calls[1]["path"])
+        self.assertIsNone(calls[1]["body"], "у переотправки не должно быть тела")
+
+    def test_resend_without_session_is_refused(self):
+        calls, patched = self._api([(201, {"success": True})])
+        with mock.patch.dict(os.environ, self.ENV), patched:
+            from accounts.sms import resend_code
+
+            self.assertFalse(resend_code("+79990000000"))
+        self.assertEqual(calls, [])
+
+    def test_widget_status_reports_blocked(self):
+        """Заблокированный виджет выглядит как «вход не работает» — называем причину."""
+        _calls, patched = self._api([(200, {"name": "МАТА", "isActive": True,
+                                            "isBlocked": True})])
+        with mock.patch.dict(os.environ, self.ENV), patched:
+            from accounts.sms import propush_widget_status
+
+            out = propush_widget_status()
+        self.assertFalse(out["ok"])
+        self.assertIn("заблокирован", out["reason"])
+
+    def test_widget_status_ok(self):
+        _calls, patched = self._api([(200, {"name": "МАТА", "isActive": True,
+                                            "isBlocked": False})])
+        with mock.patch.dict(os.environ, self.ENV), patched:
+            from accounts.sms import propush_widget_status
+
+            self.assertTrue(propush_widget_status()["ok"])
 
     def test_codeless_channel_needs_no_code(self):
         """Пользователь подтвердил вход кнопкой на телефоне — вводить нечего."""

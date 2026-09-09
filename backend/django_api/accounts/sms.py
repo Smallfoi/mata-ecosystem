@@ -171,8 +171,10 @@ class _ProPushProvider:
         widget = (os.environ.get("SIGMA_WIDGET") or "").strip()
         if not widget:
             return ""
+        # Поле называется именно `widgetId` — сверено с документацией провайдера
+        # (user.sigmasms.ru/documentation/api/OTP). С `widget` запрос отклонялся.
         code, data = _propush_call(
-            "POST", "", {"widget": widget, "recipient": phone}
+            "POST", "", {"widgetId": widget, "recipient": phone}
         )
         return str(data.get("requestId") or "") if 200 <= code < 300 else ""
 
@@ -195,6 +197,18 @@ class _ProPushProvider:
         )
         return 200 <= status < 300 and bool(data.get("success"))
 
+    def resend(self, request_id):
+        """Переключить доставку на следующий канал виджета.
+
+        Ради этого ProPush и брали вместо ручной отправки: если SimPush не дошёл,
+        сервис сам переходит к звонку, потом к SMS. Без этого вызова человек
+        с недоставленным кодом просто упирается в тупик.
+
+        Тела у запроса нет — провайдер требует именно так.
+        """
+        status, data = _propush_call("POST", f"/{request_id}/resend")
+        return 200 <= status < 300 and bool(data.get("success"))
+
     def complete(self, request_id, phone):
         """Финальная проверка + закрытие сессии. Успешна только один раз."""
         status, data = _propush_call(
@@ -203,6 +217,37 @@ class _ProPushProvider:
             params=f"?recipient={urllib.parse.quote(phone)}",
         )
         return 200 <= status < 300 and bool(data.get("success"))
+
+
+def propush_widget_status():
+    """Жив ли виджет: активен и не заблокирован.
+
+    Нужно для проверки готовности к запуску. Заблокированный виджет выглядит
+    как «вход просто не работает», и без этой проверки причину пришлось бы
+    искать в логах.
+    """
+    widget = (os.environ.get("SIGMA_WIDGET") or "").strip()
+    if not widget:
+        return {"ok": False, "reason": "SIGMA_WIDGET не задан"}
+    code, data = _propush_call("GET", f"/widget/{widget}")
+    if not (200 <= code < 300):
+        return {"ok": False, "reason": f"провайдер ответил {code or 'обрывом связи'}"}
+    if data.get("isBlocked"):
+        return {"ok": False, "reason": "виджет заблокирован", "name": data.get("name")}
+    if not data.get("isActive"):
+        return {"ok": False, "reason": "виджет неактивен", "name": data.get("name")}
+    return {"ok": True, "name": data.get("name") or ""}
+
+
+def resend_code(phone) -> bool:
+    """Отправить код заново, сменив канал (только ProPush)."""
+    if not _is_propush():
+        return request_code(phone)
+    rec = cache.get(f"otp:{phone}") or {}
+    request_id = rec.get("requestId")
+    if not request_id:
+        return False
+    return _ProPushProvider().resend(request_id)
 
 
 def _provider():
