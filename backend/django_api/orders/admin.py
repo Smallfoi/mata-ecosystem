@@ -1,11 +1,30 @@
 from django.contrib import admin, messages
-from unfold.admin import ModelAdmin
+from django.urls import reverse
+from django.utils.html import format_html
+from unfold.admin import ModelAdmin, TabularInline
 
 from common.adminutils import ExportCsvMixin, UserRefMixin
 
-from .awards import refund_redeemed_points, revoke_purchase_points
-from .models import Order
-from .payment import PaymentError, create_refund
+from .models import Order, OrderReturn
+from .returns import RETURNABLE, ReturnError, make_return, return_plan
+
+
+class OrderReturnInline(TabularInline):
+    """История возвратов на карточке заказа. Оформляется на отдельной странице."""
+
+    model = OrderReturn
+    extra = 0
+    can_delete = False
+    fields = ("created_at", "amount_rub", "points_returned", "points_revoked",
+              "status", "refund_id", "created_by", "error")
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Сумма, ₽")
+    def amount_rub(self, obj):
+        return f"{obj.amount_kop / 100:.2f}"
 
 
 @admin.register(Order)
@@ -27,8 +46,16 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
     search_fields = ("order_id", "user_id")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
-    readonly_fields = ("payload", "created_at", "onec_taken_at", "onec_number",
-                       "onec_status", "onec_status_at")
+    readonly_fields = ("return_link", "payload", "created_at", "onec_taken_at",
+                       "onec_number", "onec_status", "onec_status_at")
+    inlines = (OrderReturnInline,)
+
+    @admin.display(description="Возврат")
+    def return_link(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html('<a href="{}">Оформить возврат — целиком или частями</a>',
+                           reverse("order_return", args=[obj.pk]))
 
     @admin.display(description="1С")
     def onec_state(self, obj):
@@ -43,28 +70,26 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
     actions = ("mark_paid", "mark_shipped", "mark_delivered", "mark_cancelled",
                "refund_payment", "export_as_csv")
 
-    @admin.action(description="Вернуть деньги покупателю (ЮKassa)")
+    @admin.action(description="Вернуть деньги покупателю целиком (ЮKassa)")
     def refund_payment(self, request, queryset):
-        """Полный возврат оплаченного заказа + возврат списанных баллов.
+        """Полный возврат: всё, что ещё не вернули, вместе с доставкой (D-73).
 
-        Возврат делает ЮKassa по нашему запросу; заказ помечается «возвращён».
-        Заказы без платежа (dev-режим, неоплаченные) пропускаем — возвращать нечего.
+        Идёт через ту же логику, что и возврат частями: деньги по чеку, списанные
+        баллы — назад, начисленные — снять. Частями — на странице заказа.
+        Заказы без платежа ЮKassa (разработка, неоплаченные) пропускаем.
         """
         done, skipped, failed = 0, 0, []
         for order in queryset:
-            if not order.payment_id or order.payment_status != "paid":
+            if order.payment_status not in RETURNABLE or not order.payment_id:
                 skipped += 1
                 continue
             try:
-                create_refund(order.payment_id, order.total, f"Возврат заказа {order.order_id}")
-            except PaymentError as e:
+                left = [row["index"] for row in return_plan(order)
+                        if row["subject"] == "commodity" and not row["returned"]]
+                make_return(order.pk, left, by=request.user.get_username())
+            except ReturnError as e:
                 failed.append(f"{order.order_id}: {e}")
                 continue
-            order.payment_status = "refunded"
-            order.status = "cancelled"
-            order.save(update_fields=["payment_status", "status"])
-            refund_redeemed_points(order)  # баллы, потраченные на этот заказ, — назад
-            revoke_purchase_points(order)  # и начисленные за покупку — снять
             done += 1
         if done:
             self.message_user(request, f"Возвращено заказов: {done}", messages.SUCCESS)

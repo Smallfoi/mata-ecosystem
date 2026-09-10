@@ -1,0 +1,175 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+{# «Возврат по заказу» (D-73): деньги по чеку, баллы в той же доле, доставка — с последней вещью. #}
+<style>
+  .rv-sum{display:flex;gap:.75rem;flex-wrap:wrap;margin:0 0 1rem}
+  .rv-tile{flex:1;min-width:150px;border:1px solid #e2e6ea;border-radius:.6rem;padding:.7rem .9rem;background:#fff}
+  .dark .rv-tile{background:#1f2937;border-color:#374151}
+  .rv-tile b{display:block;font-size:1.3rem;line-height:1.2;font-variant-numeric:tabular-nums}
+  .rv-tile span{font-size:.8rem;color:#6f7278}
+  .rv-note{padding:.8rem 1rem;border-radius:.5rem;background:#eef7ff;border:1px solid #b8dcf5;color:#14567a;margin:0 0 1rem}
+  .dark .rv-note{background:#14283a;border-color:#2b5878;color:#bfe2f7}
+  .rv-err{padding:.8rem 1rem;border-radius:.5rem;background:#fdf2f2;border:1px solid #f5c6c6;color:#93262e;margin:0 0 1rem}
+  .dark .rv-err{background:#3a1d1f;border-color:#6b2f33;color:#f3b8bc}
+  .rv-hint{padding:.8rem 1rem;border-radius:.5rem;background:#fff6e5;border:1px solid #f5d99a;color:#7a5b12;margin:0 0 1rem;font-size:.88rem;line-height:1.5}
+  .dark .rv-hint{background:#3a2f12;border-color:#6b551f;color:#f0d9a0}
+  .rv-card{display:block;border:1px solid #e2e6ea;border-radius:.7rem;background:#fff;margin:0 0 1rem;overflow:hidden}
+  .dark .rv-card{background:#1f2937;border-color:#374151}
+  .rv-head{display:flex;gap:.9rem;align-items:flex-start;flex-wrap:wrap;padding:.9rem 1rem;border-bottom:1px solid #eceff1}
+  .dark .rv-head{border-color:#374151}
+  .rv-who{flex:1;min-width:220px}
+  .rv-who h3{margin:0 0 .2rem;font-size:1.05rem}
+  .rv-meta{font-size:.8rem;color:#6f7278}
+  .rv-nums{display:flex;gap:1.1rem;flex-wrap:wrap;align-items:center}
+  .rv-num{text-align:right}
+  .rv-num b{display:block;font-size:1.05rem;font-variant-numeric:tabular-nums}
+  .rv-num span{font-size:.72rem;color:#6f7278}
+  .rv-wrap{overflow-x:auto}
+  table.rv{width:100%;border-collapse:collapse;min-width:640px}
+  table.rv th,table.rv td{padding:.5rem .6rem;border-bottom:1px solid #eceff1;text-align:left;font-size:.86rem;vertical-align:middle}
+  .dark table.rv th,.dark table.rv td{border-color:#374151}
+  table.rv td.n,table.rv th.n{text-align:right;font-variant-numeric:tabular-nums}
+  table.rv tr.done td{opacity:.55}
+  .rv-reason{color:#b45309;font-size:.82rem}
+  .dark .rv-reason{color:#fbbf24}
+  .rv-acts{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;padding:.7rem 1rem;background:#fafbfc}
+  .dark .rv-acts{background:#111827}
+  .rv-btn{padding:.35rem .75rem;border-radius:.45rem;border:1px solid #cbd2d6;background:#fff;cursor:pointer;font-size:.82rem;font-weight:600;color:#20252b}
+  .dark .rv-btn{background:#1f2937;border-color:#4b5563;color:#e5e7eb}
+  .rv-btn.bad{background:#e5484d;border-color:#e5484d;color:#fff}
+  form.inline{display:inline}
+  .rv-empty{padding:1.6rem 1rem;text-align:center;color:#6f7278}
+</style>
+
+{% if note %}<div class="rv-note">{{ note }}</div>{% endif %}
+{% if error %}<div class="rv-err">{{ error }}</div>{% endif %}
+
+<div class="rv-sum">
+  <div class="rv-tile"><b>{{ paid_rub }} ₽</b><span>оплачено деньгами</span></div>
+  <div class="rv-tile"><b>{{ redeemed }}</b><span>баллов списано на заказ</span></div>
+  <div class="rv-tile"><b>{{ earned }}</b><span>баллов начислено за заказ</span></div>
+  <div class="rv-tile"><b>{{ payment_label }}</b><span>оплата</span></div>
+</div>
+
+<div class="rv-hint">
+  Отметьте вещи, которые вернул покупатель, и нажмите «Рассчитать». Деньги возвращаются
+  <b>по суммам из чека</b>: скидка баллами разложена по всем позициям. Потраченные баллы
+  возвращаются, а начисленные за заказ снимаются — в той же доле. <b>Доставка возвращается
+  вместе с последней вещью</b> заказа. Если начисленные баллы уже потрачены, баланс
+  покупателя уйдёт в минус: его закроют новые начисления.
+</div>
+
+{% if not returnable %}
+  <div class="rv-card"><div class="rv-empty">
+    {% if order.payment_status == 'refunded' %}Заказ уже возвращён целиком.
+    {% else %}Вернуть можно только заказ, оплата которого прошла через ЮKassa.{% endif %}
+  </div></div>
+{% endif %}
+
+<form method="post" class="rv-card">{% csrf_token %}
+  <div class="rv-wrap">
+  <table class="rv">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Позиция</th>
+        <th class="n">Цена</th>
+        <th class="n">Оплачено деньгами</th>
+        <th>Состояние</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr class="{% if row.returned %}done{% endif %}">
+        <td>
+          {% if returnable and not row.is_delivery and not row.returned %}
+            <input type="checkbox" name="line" value="{{ row.index }}" aria-label="Вернуть: {{ row.name }}" {% if row.checked %}checked{% endif %}>
+          {% endif %}
+        </td>
+        <td>{{ row.name }}</td>
+        <td class="n">{{ row.gross_rub }} ₽</td>
+        <td class="n">{{ row.paid_rub }} ₽</td>
+        <td>
+          {% if row.returned %}возвращено
+          {% elif row.is_delivery %}вернётся с последней вещью
+          {% else %}у покупателя{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if returnable %}
+  <div class="rv-acts">
+    <button class="rv-btn" type="submit" name="action" value="preview">Рассчитать</button>
+  </div>
+  {% endif %}
+</form>
+
+{% if plan %}
+<div class="rv-card">
+  <div class="rv-head">
+    <div class="rv-who">
+      <h3>Вернём покупателю</h3>
+      <div class="rv-meta">
+        {% if plan.completes %}Это последние вещи заказа — вместе с доставкой.
+        {% else %}Часть заказа: доставка остаётся за покупателем.{% endif %}
+      </div>
+    </div>
+    <div class="rv-nums">
+      <div class="rv-num"><b>{{ plan.amount_rub }} ₽</b><span>деньгами</span></div>
+      <div class="rv-num"><b>+{{ plan.points_back }}</b><span>баллов на счёт</span></div>
+      <div class="rv-num"><b>−{{ plan.points_off }}</b><span>начисленных снимем</span></div>
+    </div>
+  </div>
+  <div class="rv-acts">
+    {% if may_edit %}
+    <form class="inline" method="post"
+          onsubmit="return confirm('Вернуть {{ plan.amount_rub|escapejs }} ₽ покупателю? Деньги уйдут через ЮKassa.')">
+      {% csrf_token %}
+      {% for i in chosen %}<input type="hidden" name="line" value="{{ i }}">{% endfor %}
+      <button class="rv-btn bad" type="submit" name="action" value="confirm">Провести возврат</button>
+    </form>
+    {% else %}
+    <span class="rv-reason">Провести возврат может сотрудник с правом редактировать заказы.</span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if returns %}
+<div class="rv-card">
+  <div class="rv-head"><div class="rv-who"><h3>Возвраты по заказу</h3></div></div>
+  <div class="rv-wrap">
+  <table class="rv">
+    <thead>
+      <tr>
+        <th>Когда (якут.)</th>
+        <th class="n">Деньги</th>
+        <th class="n">Баллов назад</th>
+        <th class="n">Снято начисленных</th>
+        <th>Статус</th>
+        <th>Кто оформил</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in returns %}
+      <tr>
+        <td>{{ r.when }}</td>
+        <td class="n">{{ r.amount }} ₽</td>
+        <td class="n">{{ r.back }}</td>
+        <td class="n">{{ r.off }}</td>
+        <td>{{ r.status }}{% if r.error %} · <span class="rv-reason">{{ r.error }}</span>{% endif %}</td>
+        <td>{{ r.by|default:"—" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+<p><a href="{% url 'admin:orders_order_change' order.pk %}">← к заказу {{ order.order_id }}</a></p>
+{% endblock %}

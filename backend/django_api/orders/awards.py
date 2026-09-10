@@ -13,6 +13,8 @@
 Каждая функция проверяет, не начисляла ли уже по этому заказу: вебхук ЮKassa может
 прийти несколько раз (при 5xx она повторяет доставку), и повтор не должен задваивать.
 """
+from django.db.models import Sum
+
 from loyalty.models import LoyaltyTransaction, add_txn
 
 _PURCHASE_RATE = 10   # ₽ на 1 балл
@@ -72,36 +74,62 @@ def redeem_for_order(user_id, order_id, amount, order_sum) -> str:
     return ""
 
 
+def _sum(order, source) -> int:
+    return LoyaltyTransaction.objects.filter(
+        user_id=order.user_id, order_id=order.order_id, source=source
+    ).aggregate(s=Sum("amount"))["s"] or 0
+
+
+def redeemed_for(order) -> int:
+    """Сколько баллов списано на заказ при оформлении."""
+    return -_sum(order, "redeem")
+
+
+def earned_for(order) -> int:
+    """Сколько баллов начислено за покупку (без бонуса за первый заказ)."""
+    return _sum(order, "purchase")
+
+
+def return_redeemed_points(order, amount, description) -> int:
+    """Вернуть на счёт часть списанных на заказ баллов — не больше ещё не возвращённого.
+
+    Частями (D-73) или целиком. Возвращает, сколько баллов вернули.
+    """
+    left = redeemed_for(order) - _sum(order, "redeem_refund")
+    n = min(max(0, int(amount)), left)
+    if n > 0:
+        add_txn(order.user_id, n, "redeem_refund", description, order.order_id)
+    return n
+
+
+def revoke_earned_points(order, amount, description) -> int:
+    """Снять часть начисленных за покупку баллов — не больше ещё не снятого.
+
+    Баланс может уйти в минус, если начисленное уже потрачено: так решил владелец
+    (D-73) — минус закрывают будущие начисления, деньгами из возврата не удерживаем.
+    Возвращает, сколько баллов сняли.
+    """
+    left = earned_for(order) + _sum(order, "purchase_revoke")
+    n = min(max(0, int(amount)), left)
+    if n > 0:
+        add_txn(order.user_id, -n, "purchase_revoke", description, order.order_id)
+    return n
+
+
 def revoke_purchase_points(order) -> None:
-    """Снять баллы, начисленные за покупку, если деньги вернули покупателю.
+    """Снять всё ещё не снятое из начисленного за покупку (полный возврат денег).
 
     Иначе возврат превращается в дырку: товар и деньги у покупателя, а баллы
     (то есть скидка на следующую покупку) остались начисленными. Бонус за первый
     заказ не трогаем — он за факт знакомства с магазином, а не за конкретный товар.
     """
-    uid, oid = order.user_id, order.order_id
-    if _has_txn(uid, oid, "purchase_revoke"):
-        return
-    earned = LoyaltyTransaction.objects.filter(
-        user_id=uid, order_id=oid, source="purchase"
-    ).first()
-    if not earned or earned.amount <= 0:
-        return
-    add_txn(uid, -earned.amount, "purchase_revoke", "Отмена начисления: возврат заказа", oid)
+    revoke_earned_points(order, earned_for(order), "Отмена начисления: возврат заказа")
 
 
 def refund_redeemed_points(order) -> None:
-    """Вернуть баллы, списанные при оформлении, если оплата не состоялась.
+    """Вернуть все ещё не возвращённые баллы, списанные при оформлении.
 
     Покупатель списал баллы на чекауте, а платёж отменился — баллы обязаны
     вернуться, иначе они сгорают ни за что.
     """
-    uid, oid = order.user_id, order.order_id
-    spent = LoyaltyTransaction.objects.filter(
-        user_id=uid, order_id=oid, source="redeem"
-    ).first()
-    if not spent or _has_txn(uid, oid, "redeem_refund"):
-        return
-    add_txn(
-        uid, -spent.amount, "redeem_refund", "Возврат баллов: оплата не прошла", oid
-    )
+    return_redeemed_points(order, redeemed_for(order), "Возврат баллов: оплата не прошла")

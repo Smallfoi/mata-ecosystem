@@ -66,3 +66,44 @@ class Order(models.Model):
     def to_json(self) -> dict:
         # payload уже в точном контракте SportStore (Order.fromJson).
         return self.payload
+
+
+class OrderReturn(models.Model):
+    """Возврат по заказу — целиком или частями (D-73).
+
+    Одна запись — одно обращение в ЮKassa. По записям видно, какие вещи уже вернули:
+    вторую попытку вернуть ту же вещь сервер отклонит, а сумма всех возвратов не
+    превысит оплату.
+    """
+
+    STATUS_CHOICES = [
+        ("pending", "В обработке"),
+        ("done", "Проведён"),
+        ("failed", "Не прошёл"),
+    ]
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="returns",
+                              verbose_name="Заказ")
+    # Индексы позиций чека (receipt.allocate): единицы товара и, с последней вещью, доставка.
+    lines = models.JSONField(default=list, verbose_name="Позиции чека")
+    # В копейках: суммы частичных возвратов обязаны сходиться с оплатой до копейки.
+    amount_kop = models.PositiveIntegerField(verbose_name="Сумма, коп.")
+    points_returned = models.IntegerField(default=0, verbose_name="Возвращено баллов")
+    points_revoked = models.IntegerField(default=0, verbose_name="Снято начисленных баллов")
+    refund_id = models.CharField(max_length=80, blank=True, default="",
+                                 verbose_name="ID возврата в ЮKassa")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending",
+                              verbose_name="Статус")
+    error = models.CharField(max_length=300, blank=True, default="", verbose_name="Ошибка")
+    created_by = models.CharField(max_length=150, blank=True, default="",
+                                  verbose_name="Кто оформил")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Когда")
+
+    class Meta:
+        db_table = "store_order_returns"
+        ordering = ["-created_at"]
+        verbose_name = "Возврат"
+        verbose_name_plural = "Возвраты"
+
+    def __str__(self) -> str:
+        return f"{self.order.order_id}: {self.amount_kop / 100:.2f} ₽"
