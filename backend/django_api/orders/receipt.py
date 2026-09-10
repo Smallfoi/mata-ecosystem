@@ -110,6 +110,68 @@ def _fit(prices, target):
     return fitted
 
 
+def _lines(payload):
+    """Позиции заказа: (описание, цена в копейках, предмет расчёта, код маркировки).
+
+    Каждая единица товара — отдельная позиция: так и скидка раскладывается точно,
+    и код маркировки привязывается к конкретной вещи (он у каждой свой). Доставка —
+    последней позицией.
+    """
+    lines = []
+    for it in payload.get("items") or []:
+        qty = max(1, int(it.get("quantity") or 1))
+        unit = _kop(it.get("price"))
+        if unit <= 0:
+            continue
+        mark = str(it.get("markCode") or "").strip()
+        for _ in range(qty):
+            lines.append((_name(it), unit, "commodity", mark))
+
+    delivery = _kop(payload.get("deliveryCost"))
+    if delivery > 0:
+        lines.append(("Доставка", delivery, "service", ""))
+    return lines
+
+
+def allocate(payload, amount):
+    """Сколько из суммы платежа приходится на каждую позицию чека.
+
+    Скидка баллами раскладывается пропорционально ценам (`_fit`). По этим же суммам
+    считается возврат (D-73): чек возврата обязан совпадать с чеком оплаты. Индекс
+    позиции устойчив, пока не меняется состав заказа.
+    """
+    lines = _lines(payload or {})
+    if not lines:
+        raise ValueError("В заказе нет позиций для чека")
+    if len(lines) > 100:
+        raise ValueError("Слишком много позиций для одного чека")
+    fitted = _fit([price for _, price, _, _ in lines], _kop(amount))
+    return [
+        {"index": i, "name": name, "gross": price, "subject": subject,
+         "mark": mark, "paid": value}
+        for i, ((name, price, subject, mark), value) in enumerate(zip(lines, fitted))
+    ]
+
+
+def _positions(rows):
+    vat = _vat()
+    items = []
+    for row in rows:
+        position = {
+            "description": row["name"],
+            "quantity": "1",
+            "amount": {"value": _rub(row["paid"]), "currency": "RUB"},
+            "vat_code": vat,
+            "payment_mode": "full_payment",
+            "payment_subject": row["subject"],
+            "measure": "piece" if row["subject"] == "commodity" else "another",
+        }
+        if row["mark"]:
+            position["mark_code_info"] = {"gs_1m": row["mark"]}
+        items.append(position)
+    return items
+
+
 def build_receipt(payload, amount):
     """Состав чека для ЮKassa или None, если чек передавать не нужно.
 
@@ -121,49 +183,28 @@ def build_receipt(payload, amount):
         return None
 
     payload = payload or {}
-    checkout = payload.get("checkoutData") or {}
-    customer = _customer(checkout)
+    customer = _customer(payload.get("checkoutData") or {})
     if not customer:
         raise ValueError("Для чека нужен email или телефон покупателя")
+    rows = allocate(payload, amount)
+    return {"customer": customer, "tax_system_code": _tax_system(), "items": _positions(rows)}
 
-    vat = _vat()
-    lines = []  # (описание, цена в копейках, предмет расчёта, код маркировки)
 
-    for it in payload.get("items") or []:
-        qty = max(1, int(it.get("quantity") or 1))
-        unit = _kop(it.get("price"))
-        if unit <= 0:
-            continue
-        mark = str(it.get("markCode") or "").strip()
-        # Каждая единица — отдельная позиция: так и скидка раскладывается точно,
-        # и код маркировки привязывается к конкретной вещи (он у каждой свой).
-        for _ in range(qty):
-            lines.append((_name(it), unit, "commodity", mark))
+def refund_receipt(payload, amount, indexes):
+    """Чек возврата (D-73): только возвращаемые позиции — по суммам из чека оплаты.
 
-    delivery = _kop(payload.get("deliveryCost"))
-    if delivery > 0:
-        lines.append(("Доставка", delivery, "service", ""))
+    None — фискализация выключена. `amount` — сумма исходной оплаты: от неё
+    раскладывается скидка, ровно как в чеке прихода.
+    """
+    if not receipts_enabled():
+        return None
 
-    if not lines:
-        raise ValueError("В заказе нет позиций для чека")
-    if len(lines) > 100:
-        raise ValueError("Слишком много позиций для одного чека")
-
-    fitted = _fit([price for _, price, _, _ in lines], _kop(amount))
-
-    items = []
-    for (name, _price, subject, mark), value in zip(lines, fitted):
-        position = {
-            "description": name,
-            "quantity": "1",
-            "amount": {"value": _rub(value), "currency": "RUB"},
-            "vat_code": vat,
-            "payment_mode": "full_payment",
-            "payment_subject": subject,
-            "measure": "piece" if subject == "commodity" else "another",
-        }
-        if mark:
-            position["mark_code_info"] = {"gs_1m": mark}
-        items.append(position)
-
-    return {"customer": customer, "tax_system_code": _tax_system(), "items": items}
+    payload = payload or {}
+    customer = _customer(payload.get("checkoutData") or {})
+    if not customer:
+        raise ValueError("Для чека нужен email или телефон покупателя")
+    wanted = {int(i) for i in indexes}
+    rows = [row for row in allocate(payload, amount) if row["index"] in wanted]
+    if not rows:
+        raise ValueError("Нет позиций для чека возврата")
+    return {"customer": customer, "tax_system_code": _tax_system(), "items": _positions(rows)}

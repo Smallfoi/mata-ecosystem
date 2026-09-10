@@ -178,15 +178,22 @@ def fetch_payment(payment_id) -> dict:
     return _result(_request("GET", f"/payments/{payment_id}"))
 
 
-def create_refund(payment_id, amount, description="") -> dict:
-    """Вернуть деньги покупателю (полностью или частично)."""
+def create_refund(payment_id, amount, description="", key=None, receipt=None) -> dict:
+    """Вернуть деньги покупателю (полностью или частично).
+
+    `key` — ключ идемпотентности возврата. У частичных возвратов он обязан быть свой:
+    ключ «платёж + сумма» склеил бы два возврата на равную сумму в один (D-73).
+    `receipt` — чек возврата по 54-ФЗ, если фискализация включена.
+    """
     body = {
         "payment_id": str(payment_id),
         "amount": {"value": _money(amount), "currency": "RUB"},
     }
     if description:
         body["description"] = description
+    if receipt:
+        body["receipt"] = receipt
     data = _request(
-        "POST", "/refunds", body, _idem_key("refund", payment_id, _money(amount))
+        "POST", "/refunds", body, _idem_key("refund", payment_id, key or _money(amount))
     )
     return {"status": data.get("status") or "", "refundId": data.get("id") or ""}
