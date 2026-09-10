@@ -59,6 +59,21 @@ def payment_enabled() -> bool:
     return bool(os.environ.get("PAYMENT_PROVIDER"))
 
 
+# Оплата при получении: Store присылает `cash`, сайт — `cod`. Онлайн платить
+# нечего — деньги берёт курьер или пункт выдачи.
+ON_DELIVERY = frozenset({"cash", "cod"})
+
+
+def pays_on_delivery(payload) -> bool:
+    """Покупатель выбрал оплату при получении.
+
+    Способ не указан — считаем онлайн: безопаснее придержать заказ до оплаты,
+    чем отдать на сборку то, за что никто не заплатит.
+    """
+    checkout = (payload or {}).get("checkoutData") or {}
+    return str(checkout.get("paymentType") or "").strip().lower() in ON_DELIVERY
+
+
 def _creds():
     """(shop_id, secret_key) или None, если ключи не заданы."""
     shop = (os.environ.get("YOOKASSA_SHOP_ID") or "").strip()

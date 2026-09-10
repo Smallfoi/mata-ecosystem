@@ -68,7 +68,8 @@ class _PaymentScreenState extends State<PaymentScreen>
     try {
       final started = await orders.startPayment(widget.orderId);
       if (!mounted) return;
-      if (started.status == 'paid') {
+      // `none` — оплата при получении: онлайн платить нечего, заказ оформлен.
+      if (started.status == 'paid' || started.status == 'none') {
         _finish();
         return;
       }

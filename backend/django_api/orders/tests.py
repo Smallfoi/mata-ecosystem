@@ -92,11 +92,17 @@ class YooKassaPaymentTests(ApiTestCase):
     @mock.patch.dict(os.environ, _YK_ENV)
     @mock.patch("orders.payment._http")
     def test_provider_failure_keeps_order_unpaid(self, http):
+        """ЮKassa не ответила — заказ остаётся «ждёт оплату».
+
+        Раньше здесь проверялось «none», и тест закреплял дыру: «none» выглядит
+        как «не оплачен», а означает «оплата не требуется» — такой заказ обмен
+        с 1С забирает на сборку.
+        """
         http.side_effect = PaymentError("ЮKassa 500: internal")
         self._order("SS-Y3")
         r = self.api_post("/v1/orders/SS-Y3/pay", {})
         self.assertEqual(r.status_code, 502)
-        self.assertEqual(Order.objects.get(order_id="SS-Y3").payment_status, "none")
+        self.assertEqual(Order.objects.get(order_id="SS-Y3").payment_status, "pending")
 
     @mock.patch.dict(os.environ, _YK_ENV)
     @mock.patch("orders.payment._http")
@@ -545,3 +551,57 @@ class RefundPointsTests(ApiTestCase):
 
         revoke_purchase_points(order)  # повтор не должен снимать второй раз
         self.assertEqual(self.balance(), after)
+
+
+class PaymentStatusAtBirthTests(ApiTestCase):
+    """С каким статусом оплаты рождается заказ (найдено 10.09.2026).
+
+    Раньше каждый заказ создавался со статусом «none» — «оплата не требуется». Обмен
+    с 1С забирает такие заказы на сборку, и при включённой оплате заказ уезжал на
+    склад между оформлением и /pay, а брошенный — неоплаченным навсегда.
+    """
+    phone = "+79990002091"
+
+    def _order(self, oid, pay_type=None):
+        body = {"id": oid, "total": 500, "items": []}
+        if pay_type:
+            body["checkoutData"] = {"paymentType": pay_type}
+        self.assertEqual(self.api_post("/v1/orders", body).status_code, 200)
+        return Order.objects.get(user_id=self.uid, order_id=oid)
+
+    @mock.patch.dict(os.environ, _YK_ENV)
+    def test_online_order_waits_for_payment(self):
+        self.assertEqual(self._order("SS-B1", "sbp").payment_status, "pending")
+        self.assertEqual(self._order("SS-B2", "card").payment_status, "pending")
+
+    @mock.patch.dict(os.environ, _YK_ENV)
+    def test_order_without_payment_type_waits_for_payment(self):
+        """Способ не указан — придерживаем: безопаснее, чем отдать на сборку."""
+        self.assertEqual(self._order("SS-B3").payment_status, "pending")
+
+    @mock.patch.dict(os.environ, _YK_ENV)
+    def test_pay_on_delivery_needs_no_online_payment(self):
+        """Store шлёт `cash`, сайт — `cod`: деньги возьмут при получении."""
+        self.assertEqual(self._order("SS-B4", "cash").payment_status, "none")
+        self.assertEqual(self._order("SS-B5", "cod").payment_status, "none")
+
+    def test_dev_mode_needs_no_payment(self):
+        self.assertEqual(self._order("SS-B6", "sbp").payment_status, "none")
+
+    @mock.patch.dict(os.environ, _YK_ENV)
+    def test_resubmit_does_not_unpay_paid_order(self):
+        """Клиент повторил отправку — оплаченный заказ остаётся оплаченным."""
+        self._order("SS-B7", "sbp")
+        Order.objects.filter(user_id=self.uid, order_id="SS-B7").update(payment_status="paid")
+        self.assertEqual(self._order("SS-B7", "sbp").payment_status, "paid")
+
+    @mock.patch.dict(os.environ, _YK_ENV)
+    @mock.patch("orders.payment._http")
+    def test_pay_on_delivery_does_not_open_online_payment(self, http):
+        """Выбрал «при получении» — на страницу СБП не отправляем."""
+        self._order("SS-B8", "cash")
+        r = self.api_post("/v1/orders/SS-B8/pay", {})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["status"], "none")
+        self.assertEqual(r.json()["confirmationUrl"], "")
+        http.assert_not_called()

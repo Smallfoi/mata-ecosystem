@@ -8,8 +8,28 @@ from common.security import user_id_from_request
 from .awards import accrue_purchase_points, refund_redeemed_points
 from .models import Order
 from .pricing import total_is_acceptable
-from .payment import PaymentError, create_payment, fetch_payment, payment_enabled
+from .payment import (
+    PaymentError,
+    create_payment,
+    fetch_payment,
+    payment_enabled,
+    pays_on_delivery,
+)
 from .receipt import build_receipt
+
+
+def _initial_payment_status(payload) -> str:
+    """С каким статусом оплаты рождается заказ.
+
+    Статус должен говорить правду, потому что по нему решает склад: «none» значит
+    «оплата не требуется», и обмен с 1С сразу забирает такой заказ на сборку.
+    Раньше «none» получал КАЖДЫЙ заказ — при включённой оплате он уезжал на склад
+    ещё до /pay, а если покупатель бросил оплату или ЮKassa не ответила, то
+    неоплаченным навсегда.
+    """
+    if payment_enabled() and not pays_on_delivery(payload):
+        return "pending"  # ждёт оплату — на склад не уходит
+    return "none"  # оплата не требуется: dev-режим или оплата при получении
 
 
 @api_view(["POST"])
@@ -22,6 +42,16 @@ def pay_order(request, order_id):
     order = Order.objects.filter(user_id=uid, order_id=order_id).first()
     if not order:
         return Response({"detail": "Заказ не найден"}, status=404)
+    if pays_on_delivery(order.payload):
+        # Оплата при получении: онлайн-платёж не создаём. Иначе покупатель, выбравший
+        # «при получении», попадал бы на страницу СБП, а заказ — в «ждёт оплату»
+        # и до склада бы не доходил.
+        return Response({
+            "status": order.payment_status,
+            "paymentId": "",
+            "confirmationUrl": "",
+            "method": "on_delivery",
+        })
     try:
         receipt = build_receipt(order.payload, order.total)
     except ValueError as e:
@@ -162,15 +192,19 @@ def orders(request):
         already = Order.objects.filter(user_id=uid, order_id=oid).first()
         if already and already.payment_status == "paid" and float(already.total) != total:
             return Response({"detail": "Заказ уже оплачен"}, status=409)
+        fields = {
+            "total": total,
+            "status": (d.get("status") or "pending"),
+            "points_redeemed": int(d.get("pointsRedeemed") or 0),
+            "payload": d,
+        }
         obj, created = Order.objects.update_or_create(
             user_id=uid,
             order_id=oid,
-            defaults={
-                "total": total,
-                "status": (d.get("status") or "pending"),
-                "points_redeemed": int(d.get("pointsRedeemed") or 0),
-                "payload": d,
-            },
+            defaults=fields,
+            # Статус оплаты — только при создании: повторная отправка того же заказа
+            # (ретрай, офлайн-очередь) не должна вернуть оплаченному «ждёт оплату».
+            create_defaults={**fields, "payment_status": _initial_payment_status(d)},
         )
         # Начисление за покупку считает СЕРВЕР (анти-чит S-04 Phase 2), не клиент.
         # Когда оплата ВЫКЛЮЧЕНА (dev/CI) — заказ и есть покупка, начисляем сразу.

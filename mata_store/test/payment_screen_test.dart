@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -122,6 +123,44 @@ void main() {
     expect(find.text('ПОПРОБОВАТЬ СНОВА'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());  // dispose: снимает опрос статуса
+    orders.dispose();
+  });
+
+  testWidgets('Оплата при получении: сразу «заказ оформлен», без СБП',
+      (tester) async {
+    // Сервер отвечает `none`, когда покупатель выбрал оплату при получении.
+    // Раньше экран принимал это за «ждём оплату» и опрашивал статус вечно.
+    final repo = _PayRepo(
+      start: const PaymentStart(status: 'none', confirmationUrl: '', paymentId: ''),
+    );
+    final orders = await _provider(repo);
+    _phone(tester);
+
+    final router = GoRouter(routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, __) => const PaymentScreen(orderId: 'SS-1'),
+      ),
+      GoRoute(
+        path: '/order-success/:id',
+        builder: (_, __) => const Scaffold(body: Text('success')),
+      ),
+    ]);
+    await tester.pumpWidget(MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: orders),
+        ChangeNotifierProvider(create: (_) => RemoteContentProvider(null)),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(find.text('success'), findsOneWidget);
+    expect(find.text('ОПЛАТА ПО СБП'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    router.dispose();
     orders.dispose();
   });
 }
