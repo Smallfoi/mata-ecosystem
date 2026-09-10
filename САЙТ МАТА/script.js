@@ -53,10 +53,11 @@ function escapeHtml(s) {
 }
 
 // Добавление с группировкой одинаковых позиций (увеличиваем количество).
-function addToCart(name, price) {
-  const existing = cart.find((i) => i.name === name);
+// id товара уходит в заказ: по нему сервер сверяет цену с каталогом (D-37, D-72).
+function addToCart(name, price, id) {
+  const existing = cart.find((i) => (id ? i.id === id : i.name === name));
   if (existing) existing.qty += 1;
-  else cart.push({ name: name, price: Number(price), qty: 1 });
+  else cart.push({ id: id || "", name: name, price: Number(price), qty: 1 });
   renderCart();
 }
 
@@ -167,7 +168,7 @@ function bindAddButtons() {
   document.querySelectorAll("[data-add-cart]:not([data-bound])").forEach((button) => {
     button.setAttribute("data-bound", "1");
     button.addEventListener("click", () => {
-      addToCart(button.dataset.addCart, button.dataset.price);
+      addToCart(button.dataset.addCart, button.dataset.price, button.dataset.productId);
       if (!cartPanel.classList.contains("is-open")) {
         toggleCart();
       }
@@ -380,9 +381,8 @@ function isLoggedIn() {
 
 function availablePoints() {
   if (!isLoggedIn()) return 0;
-  let p = (window.STAW && window.STAW.ecoPoints) || 0;
-  if (!p) p = 430; // демо-значение, если бэкенд недоступен
-  return p;
+  // Только настоящий баланс: демо-значение давало скидку баллами, которых нет.
+  return (window.STAW && window.STAW.ecoPoints) || 0;
 }
 
 function coRecompute() {
@@ -392,7 +392,9 @@ function coRecompute() {
   const avail = availablePoints();
   const toggle = coModal.querySelector("[data-co-points-toggle]");
   const wantPoints = toggle && toggle.checked;
-  coPointsApplied = wantPoints ? Math.min(avail, maxByOrder) : 0;
+  // Правила списания — как на сервере (D-72): от 50 баллов, не больше 30% заказа.
+  const canApply = Math.min(avail, maxByOrder);
+  coPointsApplied = wantPoints && canApply >= 50 ? canApply : 0;
   const total = goods - coPointsApplied;
 
   coModal.querySelector("[data-co-goods]").textContent = formatPrice(goods);
@@ -466,7 +468,7 @@ if (coModal) {
     const orderId = "МАТА-" + String(Math.floor(Math.random() * 900000) + 100000);
     const goods = cartTotalValue();
     const delivery = (coModal.querySelector('input[name="co-delivery"]:checked') || {}).value || "courier";
-    const pay = (coModal.querySelector('input[name="co-pay"]:checked') || {}).value || "card";
+    const pay = "sbp"; // единственный способ оплаты (D-72)
     const address = (coModal.querySelector("[data-co-address]").value || "").trim();
     const payload = {
       id: orderId,
@@ -475,7 +477,12 @@ if (coModal) {
       deliveryCost: 0,
       pointsRedeemed: coPointsApplied,
       status: "pending",
-      items: cart.map((i) => ({ productName: i.name, price: i.price, quantity: i.qty })),
+      items: cart.map((i) => ({
+        productId: i.id,
+        productName: i.name,
+        price: i.price,
+        quantity: i.qty,
+      })),
       checkoutData: {
         name: name,
         phone: phone,
@@ -589,7 +596,13 @@ if (coModal) {
       window.STAW
         .api("/orders", { method: "POST", body: payload })
         .then((o) => startPayment((o && o.id) || orderId))
-        .catch(() => done(orderId)); // офлайн — показываем успех локально
+        .catch(() => {
+          // Заказ не дошёл до сервера — «оформлен» не показываем (D-72): человек
+          // ждал бы посылку, которой нет. Корзина цела, можно повторить.
+          err.textContent = "Не удалось оформить заказ. Проверьте соединение и попробуйте ещё раз.";
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Подтвердить заказ";
+        });
     } else {
       done(orderId); // гость (без входа) — демо-успех
     }

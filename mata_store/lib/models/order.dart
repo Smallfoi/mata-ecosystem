@@ -54,7 +54,7 @@ class CheckoutData {
         postalCode: j['postalCode'] as String?,
         paymentType: PaymentType.values.firstWhere(
             (e) => e.name == j['paymentType'],
-            orElse: () => PaymentType.card),
+            orElse: () => PaymentType.sbp),
       );
 }
 
