@@ -4,10 +4,14 @@
 когда пойдёт не так»: оборванная связь, повторный запрос, чужой заказ, статус,
 пришедший дважды.
 """
+import os
+from unittest import mock
+
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from catalog.models import Product
+from common.testutils import ApiTestCase
 from integrations.models import OneCExchange
 from notifications.models import Notification
 from orders.models import Order
@@ -182,3 +186,34 @@ class OneCOrderFlowTests(TestCase):
         ops = list(OneCExchange.objects.values_list("operation", flat=True))
         self.assertIn("orders", ops)
         self.assertIn("order-status", ops)
+
+
+@override_settings(INTEGRATION_1C_TOKEN=TOKEN)
+class UnpaidOrderStaysOffWarehouseTests(ApiTestCase):
+    """Сквозная проверка: заказ, оформленный через API при включённой оплате, не
+    уходит на склад, пока за него не заплатили (найдено 10.09.2026).
+
+    Тесты выше создают заказ сразу с нужным статусом оплаты и поэтому не видели
+    главного: API само рождало каждый заказ как «оплата не требуется».
+    """
+    phone = "+79990002092"
+
+    def _pull(self):
+        r = self.client.get(PULL, HTTP_AUTHORIZATION=f"Bearer {TOKEN}")
+        return [o["orderId"] for o in r.json()["orders"]]
+
+    def _order(self, oid, pay_type):
+        self.api_post("/v1/orders", {"id": oid, "total": 500, "items": [],
+                                     "checkoutData": {"paymentType": pay_type}})
+
+    @mock.patch.dict(os.environ, {"PAYMENT_PROVIDER": "yookassa"})
+    def test_online_order_reaches_warehouse_only_after_payment(self):
+        self._order("MATA-E1", "sbp")
+        self.assertNotIn("MATA-E1", self._pull())
+        Order.objects.filter(order_id="MATA-E1").update(payment_status="paid")
+        self.assertIn("MATA-E1", self._pull())
+
+    @mock.patch.dict(os.environ, {"PAYMENT_PROVIDER": "yookassa"})
+    def test_pay_on_delivery_goes_straight_to_warehouse(self):
+        self._order("MATA-E2", "cod")
+        self.assertIn("MATA-E2", self._pull())
