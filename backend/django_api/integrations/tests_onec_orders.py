@@ -32,10 +32,13 @@ class OneCOrderFlowTests(TestCase):
         # Чистим, чтобы считать ровно то, что породил обмен с 1С.
         Notification.objects.all().delete()
 
-    def _order(self, oid, *, payment="none", user="u1"):
+    def _order(self, oid, *, payment="paid", payment_id=None, user="u1"):
+        """По умолчанию — заказ, оплату которого подтвердила ЮKassa (D-72)."""
+        if payment_id is None:
+            payment_id = f"yk-{oid}" if payment == "paid" else ""
         return Order.objects.create(
             user_id=user, order_id=oid, total=11990, payment_status=payment,
-            points_redeemed=100,
+            payment_id=payment_id, points_redeemed=100,
             payload={
                 "id": oid,
                 "deliveryCost": 0,
@@ -90,6 +93,18 @@ class OneCOrderFlowTests(TestCase):
         self._order("MATA-3", payment="paid")
         ids = [o["orderId"] for o in self._get(PULL).json()["orders"]]
         self.assertIn("MATA-3", ids)
+
+    def test_order_needing_no_payment_is_not_handed_over(self):
+        """«Оплата не требуется» больше не пропуск на склад: путь один — СБП (D-72)."""
+        self._order("MATA-N", payment="none")
+        ids = [o["orderId"] for o in self._get(PULL).json()["orders"]]
+        self.assertNotIn("MATA-N", ids)
+
+    def test_paid_without_yookassa_payment_is_not_handed_over(self):
+        """«Оплачено» без номера платежа ЮKassa (режим разработки) — не на склад."""
+        self._order("MATA-D", payment="paid", payment_id="")
+        ids = [o["orderId"] for o in self._get(PULL).json()["orders"]]
+        self.assertNotIn("MATA-D", ids)
 
     def test_oldest_first(self):
         old = self._order("MATA-OLD")
@@ -190,30 +205,47 @@ class OneCOrderFlowTests(TestCase):
 
 @override_settings(INTEGRATION_1C_TOKEN=TOKEN)
 class UnpaidOrderStaysOffWarehouseTests(ApiTestCase):
-    """Сквозная проверка: заказ, оформленный через API при включённой оплате, не
-    уходит на склад, пока за него не заплатили (найдено 10.09.2026).
+    """Сквозная проверка через API: на склад — только оплата, подтверждённая ЮKassa (D-72).
 
     Тесты выше создают заказ сразу с нужным статусом оплаты и поэтому не видели
     главного: API само рождало каждый заказ как «оплата не требуется».
     """
     phone = "+79990002092"
 
+    def setUp(self):
+        super().setUp()
+        Product.objects.create(id="p-e2e", name="Футболка", category_id="wear", price=500)
+
     def _pull(self):
         r = self.client.get(PULL, HTTP_AUTHORIZATION=f"Bearer {TOKEN}")
         return [o["orderId"] for o in r.json()["orders"]]
 
-    def _order(self, oid, pay_type):
-        self.api_post("/v1/orders", {"id": oid, "total": 500, "items": [],
-                                     "checkoutData": {"paymentType": pay_type}})
+    def _order(self, oid, pay_type="sbp"):
+        r = self.api_post("/v1/orders", {
+            "id": oid, "total": 500,
+            "items": [{"productId": "p-e2e", "quantity": 1}],
+            "checkoutData": {"paymentType": pay_type},
+        })
+        self.assertEqual(r.status_code, 200, r.content)
 
     @mock.patch.dict(os.environ, {"PAYMENT_PROVIDER": "yookassa"})
-    def test_online_order_reaches_warehouse_only_after_payment(self):
-        self._order("MATA-E1", "sbp")
+    def test_order_reaches_warehouse_only_after_confirmed_payment(self):
+        self._order("MATA-E1")
         self.assertNotIn("MATA-E1", self._pull())
-        Order.objects.filter(order_id="MATA-E1").update(payment_status="paid")
+        Order.objects.filter(order_id="MATA-E1").update(payment_status="paid",
+                                                       payment_id="yk-e1")
         self.assertIn("MATA-E1", self._pull())
 
     @mock.patch.dict(os.environ, {"PAYMENT_PROVIDER": "yookassa"})
-    def test_pay_on_delivery_goes_straight_to_warehouse(self):
+    def test_pay_on_delivery_choice_does_not_bypass_payment(self):
+        """Старый клиент ещё шлёт «при получении» — оплату это не отменяет."""
         self._order("MATA-E2", "cod")
-        self.assertIn("MATA-E2", self._pull())
+        self.assertNotIn("MATA-E2", self._pull())
+
+    @mock.patch.dict(os.environ, {"DJANGO_DEBUG": "1"})
+    def test_dev_shortcut_paid_order_never_reaches_warehouse(self):
+        """Режим разработки «оплачивает» без ЮKassa — такой заказ на склад не идёт."""
+        self._order("MATA-E3")
+        self.api_post("/v1/orders/MATA-E3/pay", {})
+        self.assertEqual(Order.objects.get(order_id="MATA-E3").payment_status, "paid")
+        self.assertNotIn("MATA-E3", self._pull())

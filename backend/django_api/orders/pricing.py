@@ -50,6 +50,20 @@ def minimum_total(items, user_id, order_id):
     return max(0.0, goods - _redeemed_rub(user_id, order_id))
 
 
+def all_items_known(items) -> bool:
+    """Все позиции заказа есть в каталоге — значит сумму есть с чем сверить.
+
+    Нужна, когда приём оплаты включён (D-72): заказ из позиций не из каталога
+    сверить нельзя, и его оплатили бы любой суммой — хоть рублём.
+    """
+    from catalog.models import Product
+
+    ids = [str(it.get("productId") or "").strip() for it in (items or [])]
+    if not ids or not all(ids):
+        return False
+    return Product.objects.filter(pk__in=set(ids)).count() == len(set(ids))
+
+
 def total_is_acceptable(total, items, user_id, order_id) -> bool:
     """Не занижена ли присланная клиентом сумма относительно каталога."""
     minimum = minimum_total(items, user_id, order_id)
