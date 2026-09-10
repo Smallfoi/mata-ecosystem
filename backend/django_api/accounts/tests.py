@@ -298,7 +298,8 @@ class AccountDeletionTests(ApiTestCase):
         from loyalty.models import LoyaltyTransaction
         from orders.models import Order
 
-        self.api_post("/v1/orders", {"id": "o1", "total": 500, "items": []})  # заказ + баллы
+        self.api_post("/v1/orders", {"id": "o1", "total": 500, "items": []})  # заказ
+        self.api_post("/v1/orders/o1/pay", {})  # оплата (dev) — баллы за покупку
         self.assertTrue(LoyaltyTransaction.objects.filter(user_id=self.uid).exists())
         r = self.api_post("/v1/account/delete", {"confirm": True})
         self.assertEqual(r.status_code, 200)
@@ -319,7 +320,8 @@ class AccountExportTests(ApiTestCase):
         self.assertEqual(self.client.get("/v1/account/export").status_code, 401)
 
     def test_export_contains_personal_data(self):
-        self.api_post("/v1/orders", {"id": "o1", "total": 500, "items": []})  # заказ + баллы
+        self.api_post("/v1/orders", {"id": "o1", "total": 500, "items": []})  # заказ
+        self.api_post("/v1/orders/o1/pay", {})  # оплата (dev) — баллы за покупку
         r = self.api_get("/v1/account/export")
         self.assertEqual(r.status_code, 200)
         self.assertIn("attachment", r["Content-Disposition"])  # отдаётся файлом

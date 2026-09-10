@@ -9,10 +9,10 @@
 оборвалась на полпути, заказ просто придёт в следующей выборке. Отдать и сразу
 забыть — значит однажды молча потерять заказ, а это деньги покупателя.
 
-**Какие заказы отдаём.** Только те, за которые не надо ждать оплату: где оплата не
-требуется (`none`) или уже прошла (`paid`). Заказ, висящий в ожидании оплаты, в 1С
-не уходит — иначе там копятся брошенные корзины, и кладовщик собирает то, за что
-никто не заплатил.
+**Какие заказы отдаём.** Только оплату, подтверждённую ЮKassa (D-72): статус `paid`
+и номер платежа ЮKassa. Ожидание оплаты, отмена, «оплачено» в режиме разработки без
+настоящего платежа — на склад не уходят. Иначе кладовщик собирает то, за что никто
+не заплатил.
 """
 from django.utils import timezone
 
@@ -40,9 +40,6 @@ STATUS_TITLES = {
     "canceled": "Заказ отменён",
     "cancelled": "Заказ отменён",
 }
-
-# Оплата, при которой заказ можно отдавать на сборку.
-READY_PAYMENTS = ("none", "paid")
 
 MAX_ORDERS_PER_PULL = 200
 
@@ -116,9 +113,10 @@ def pending_orders(limit: int = MAX_ORDERS_PER_PULL):
     """Очередь на выдачу: не забранные и готовые к сборке, самые старые первыми."""
     limit = max(1, min(int(limit or MAX_ORDERS_PER_PULL), MAX_ORDERS_PER_PULL))
     return list(
-        Order.objects.filter(
-            onec_taken_at__isnull=True, payment_status__in=READY_PAYMENTS
-        ).order_by("created_at")[:limit]
+        Order.objects.filter(onec_taken_at__isnull=True, payment_status="paid")
+        # Номер платежа ЮKassa — доказательство, что деньги прошли через неё.
+        .exclude(payment_id="")
+        .order_by("created_at")[:limit]
     )
 
 

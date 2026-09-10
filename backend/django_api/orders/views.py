@@ -1,35 +1,17 @@
 """Заказы Store (D-13). POST — сохранить заказ пользователя (идемпотентно по id),
 GET — список заказов пользователя (новые сверху). Требуется Bearer-токен."""
+from django.db import transaction
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from common.security import user_id_from_request
 
-from .awards import accrue_purchase_points, refund_redeemed_points
+from .awards import redeem_for_order
+from .lifecycle import mark_canceled, mark_paid
 from .models import Order
-from .pricing import total_is_acceptable
-from .payment import (
-    PaymentError,
-    create_payment,
-    fetch_payment,
-    payment_enabled,
-    pays_on_delivery,
-)
+from .pricing import all_items_known, total_is_acceptable
+from .payment import PaymentError, create_payment, fetch_payment, payment_enabled
 from .receipt import build_receipt
-
-
-def _initial_payment_status(payload) -> str:
-    """С каким статусом оплаты рождается заказ.
-
-    Статус должен говорить правду, потому что по нему решает склад: «none» значит
-    «оплата не требуется», и обмен с 1С сразу забирает такой заказ на сборку.
-    Раньше «none» получал КАЖДЫЙ заказ — при включённой оплате он уезжал на склад
-    ещё до /pay, а если покупатель бросил оплату или ЮKassa не ответила, то
-    неоплаченным навсегда.
-    """
-    if payment_enabled() and not pays_on_delivery(payload):
-        return "pending"  # ждёт оплату — на склад не уходит
-    return "none"  # оплата не требуется: dev-режим или оплата при получении
 
 
 @api_view(["POST"])
@@ -42,16 +24,14 @@ def pay_order(request, order_id):
     order = Order.objects.filter(user_id=uid, order_id=order_id).first()
     if not order:
         return Response({"detail": "Заказ не найден"}, status=404)
-    if pays_on_delivery(order.payload):
-        # Оплата при получении: онлайн-платёж не создаём. Иначе покупатель, выбравший
-        # «при получении», попадал бы на страницу СБП, а заказ — в «ждёт оплату»
-        # и до склада бы не доходил.
-        return Response({
-            "status": order.payment_status,
-            "paymentId": "",
-            "confirmationUrl": "",
-            "method": "on_delivery",
-        })
+    if order.payment_status == "paid":
+        # Уже оплачен — второй платёж не создаём.
+        return Response({"status": "paid", "paymentId": order.payment_id,
+                         "confirmationUrl": ""})
+    if order.payment_status in ("canceled", "refunded"):
+        return Response(
+            {"detail": "Время на оплату истекло — оформите заказ заново"}, status=409
+        )
     try:
         receipt = build_receipt(order.payload, order.total)
     except ValueError as e:
@@ -67,7 +47,6 @@ def pay_order(request, order_id):
             # глобально уникальный — иначе два покупателя с одинаковым SS-… и равной
             # суммой получат один платёж на двоих (см. orders/payment.py).
             reference=f"{order.order_id}-{order.pk}",
-            method=request.data.get("method") or None,
             receipt=receipt,
         )
     except PaymentError as e:
@@ -79,7 +58,7 @@ def pay_order(request, order_id):
     order.save(update_fields=["payment_status", "payment_id"])
     if result["status"] == "paid":
         order.refresh_from_db()
-        _mark_paid(order)
+        mark_paid(order)
     return Response(result)
 
 
@@ -108,31 +87,15 @@ def payment_state(request, order_id):
             # Провайдер недоступен — отдаём, что знаем; это не ошибка заказа.
             info = None
         if info and info["status"] == "paid":
-            _mark_paid(order)
+            mark_paid(order)
         elif info and info["status"] == "canceled":
-            order.payment_status = "canceled"
-            order.save(update_fields=["payment_status"])
-            refund_redeemed_points(order)
+            mark_canceled(order)
     order.refresh_from_db()
     return Response({
         "orderId": order.order_id,
         "status": order.payment_status,
         "paymentId": order.payment_id,
     })
-
-
-def _mark_paid(order) -> None:
-    """Заказ оплачен: зафиксировать статус и начислить баллы (идемпотентно)."""
-    fields = []
-    if order.payment_status != "paid":
-        order.payment_status = "paid"
-        fields.append("payment_status")
-    if order.status == "pending":
-        order.status = "paid"
-        fields.append("status")
-    if fields:
-        order.save(update_fields=fields)
-    accrue_purchase_points(order)
 
 
 @api_view(["POST"])
@@ -161,12 +124,9 @@ def payment_webhook(request):
         return Response({"detail": "Заказ по платежу не найден"}, status=404)
 
     if info["status"] == "paid":
-        _mark_paid(order)
+        mark_paid(order)
     elif info["status"] == "canceled":
-        if order.payment_status != "canceled":
-            order.payment_status = "canceled"
-            order.save(update_fields=["payment_status"])
-        refund_redeemed_points(order)
+        mark_canceled(order)
     return Response({"ok": True, "status": order.payment_status})
 
 
@@ -182,36 +142,54 @@ def orders(request):
         if not oid:
             return Response({"detail": "Нет id заказа"}, status=400)
         total = float(d.get("total") or 0)
-        # Сумму присылает клиент — сверяем её с ценами каталога (D-37). Иначе корзину
-        # на 50 000 ₽ можно оформить с total: 1, заплатить рубль и получить товар.
-        if not total_is_acceptable(total, d.get("items"), uid, oid):
+        try:
+            points = max(0, int(d.get("pointsRedeemed") or 0))
+        except (TypeError, ValueError):
+            points = 0
+        items = d.get("items")
+        # Приём оплаты включён — сумму обязаны сверить с каталогом (D-37, D-72).
+        # Позиции не из каталога сверить нельзя: такой заказ оплатили бы хоть рублём.
+        if payment_enabled() and not all_items_known(items):
             return Response(
-                {"detail": "Сумма заказа не совпадает с ценами каталога"}, status=400
+                {"detail": "Не удалось сверить заказ с каталогом"}, status=400
             )
-        # Оплаченный заказ переоформить нельзя — иначе сумму меняют задним числом.
         already = Order.objects.filter(user_id=uid, order_id=oid).first()
-        if already and already.payment_status == "paid" and float(already.total) != total:
-            return Response({"detail": "Заказ уже оплачен"}, status=409)
-        fields = {
-            "total": total,
-            "status": (d.get("status") or "pending"),
-            "points_redeemed": int(d.get("pointsRedeemed") or 0),
-            "payload": d,
-        }
-        obj, created = Order.objects.update_or_create(
-            user_id=uid,
-            order_id=oid,
-            defaults=fields,
-            # Статус оплаты — только при создании: повторная отправка того же заказа
-            # (ретрай, офлайн-очередь) не должна вернуть оплаченному «ждёт оплату».
-            create_defaults={**fields, "payment_status": _initial_payment_status(d)},
-        )
-        # Начисление за покупку считает СЕРВЕР (анти-чит S-04 Phase 2), не клиент.
-        # Когда оплата ВЫКЛЮЧЕНА (dev/CI) — заказ и есть покупка, начисляем сразу.
-        # Когда оплата ВКЛЮЧЕНА — ждём подтверждения от ЮKassa (см. payment_webhook),
-        # иначе баллы капали бы за неоплаченный заказ.
-        if created and not payment_enabled():
-            accrue_purchase_points(obj)
+
+        with transaction.atomic():
+            # Баллы списывает сервер при оформлении (D-72) — до сверки суммы: скидка
+            # законно снижает порог, но только реально списанная. Не сошлось —
+            # откатываем и списание.
+            if not already:
+                problem = redeem_for_order(uid, oid, points, total + points)
+                if problem:
+                    return Response({"detail": problem}, status=400)
+            # Сумму присылает клиент — сверяем её с ценами каталога (D-37). Иначе
+            # корзину на 50 000 ₽ можно оформить с total: 1 и заплатить рубль.
+            if not total_is_acceptable(total, items, uid, oid):
+                transaction.set_rollback(True)
+                return Response(
+                    {"detail": "Сумма заказа не совпадает с ценами каталога"}, status=400
+                )
+            # Оплаченный заказ переоформить нельзя — иначе сумму меняют задним числом.
+            if already and already.payment_status == "paid" and float(already.total) != total:
+                transaction.set_rollback(True)
+                return Response({"detail": "Заказ уже оплачен"}, status=409)
+            fields = {
+                "total": total,
+                "status": (d.get("status") or "pending"),
+                "points_redeemed": points,
+                "payload": d,
+            }
+            obj, created = Order.objects.update_or_create(
+                user_id=uid,
+                order_id=oid,
+                defaults=fields,
+                # Любой заказ рождается «ждёт оплату» (D-72): «оплата не требуется»
+                # не бывает. Статус оплаты — только при создании: повторная отправка
+                # (ретрай, офлайн-очередь) не вернёт оплаченному «ждёт оплату».
+                # Баллы за покупку — только после подтверждённой оплаты (lifecycle).
+                create_defaults={**fields, "payment_status": "pending"},
+            )
         # Связка экосистемы: для каждой пары обуви в заказе заводим ресурс
         # «износа кроссовок» (Квартал затем убавляет километраж). Идемпотентно.
         from shoes.views import create_for_order
