@@ -39,7 +39,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _postalCtrl = TextEditingController();
 
   // Step 3 — Оплата
-  PaymentType _payment = PaymentType.card;
+  // Единственный способ оплаты — СБП (D-72).
+  PaymentType _payment = PaymentType.sbp;
 
   // Списание баллов лояльности
   int _pointsToRedeem = 0;
@@ -812,15 +813,7 @@ class _PaymentStep extends StatelessWidget {
         children: [
           const _StepTitle('app.checkout.title.payment', 'Способ оплаты'),
           const SizedBox(height: 20),
-          _PaymentOption(
-            type: PaymentType.card,
-            label: 'Картой онлайн',
-            subtitle: 'Visa, Mastercard, Мир',
-            icon: Icons.credit_card_outlined,
-            selected: selected == PaymentType.card,
-            onTap: () => onChanged(PaymentType.card),
-          ),
-          const SizedBox(height: 10),
+          // Путь один — СБП (D-72): карт и оплаты при получении нет.
           _PaymentOption(
             type: PaymentType.sbp,
             label: 'СБП',
@@ -828,15 +821,6 @@ class _PaymentStep extends StatelessWidget {
             icon: Icons.qr_code_outlined,
             selected: selected == PaymentType.sbp,
             onTap: () => onChanged(PaymentType.sbp),
-          ),
-          const SizedBox(height: 10),
-          _PaymentOption(
-            type: PaymentType.cash,
-            label: 'Наличными при получении',
-            subtitle: 'Только для курьера и самовывоза',
-            icon: Icons.payments_outlined,
-            selected: selected == PaymentType.cash,
-            onTap: () => onChanged(PaymentType.cash),
           ),
         ],
       ),

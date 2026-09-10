@@ -83,7 +83,8 @@
       '<span class="product-stock' + stockCls + '">' + esc(stock) + "</span>" +
       "</div>" +
       '<button class="product-add" type="button" data-add-cart="' + esc(p.name) +
-      '" data-price="' + Number(p.price) + '">В корзину</button>' +
+      '" data-price="' + Number(p.price) + '" data-product-id="' + esc(p.id) +
+      '">В корзину</button>' +
       "</div></article>"
     );
   }
