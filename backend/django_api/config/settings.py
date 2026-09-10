@@ -519,7 +519,7 @@ CELERY_BEAT_SCHEDULE = {
         "task": "core.cleanup_old_data",
         "schedule": crontab(hour=4, minute=0),
     },
-    # Неоплаченные заказы (D-72): не оплатили за 30 минут — отмена и возврат баллов.
+    # Неоплаченные заказы (D-72): не оплатили за 15 минут — отмена и возврат баллов.
     "expire-unpaid-orders": {
         "task": "orders.expire_unpaid_orders",
         "schedule": crontab(minute="*/5"),
