@@ -284,10 +284,10 @@ postalCode }`. Позиция: `{ id, article, productId, name, size, color, qty
 
 ### Order
 ```
-POST /orders     { items, checkoutData, pointsRedeemed } → Order   (создаёт заказ + ShoeAsset для обуви)
+POST /orders     { items, checkoutData, pointsRedeemed, total } → Order   (заказ «ждёт оплату»; баллы списывает сервер: от 50, ≤30% заказа с доставкой, ≤ баланса; 400 — нарушены лимиты, сумма ниже каталога или при включённой оплате заказ не сверить с каталогом; + ShoeAsset для обуви)
 GET  /orders                                             → Order[] (текущего пользователя)
 GET  /orders/:id                                         → Order
-POST /orders/:id/pay  { returnUrl? }  → { status, paymentId, confirmationUrl }  (каркас оплаты; dev — status=paid)
+POST /orders/:id/pay  { returnUrl? }  → { status, paymentId, confirmationUrl, method: "sbp" }  (только СБП, D-72; 409 — время на оплату истекло; 502 — оплата недоступна; dev без провайдера — status=paid без paymentId, на сборку не уходит)
 POST /devices/register { token, platform }               → { ok }   (токен устройства для пушей, D-25)
 ```
 

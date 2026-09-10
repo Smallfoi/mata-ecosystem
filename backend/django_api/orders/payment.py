@@ -28,18 +28,9 @@ import urllib.request
 
 _API = "https://api.yookassa.ru/v3"
 
-# Способ оплаты: только СБП (D-71, решение владельца 10.09.2026).
-#
-# Цифры — из подписываемого договора ЮKassa, а не из интерфейса кабинета: там
-# показана одна комиссия, а в договоре их две — оператора и отдельно платёжного
-# агрегатора. С НДС на комиссию оператора выходит СБП ≈ 2,0%, карта ≈ 4,4%.
-# SberPay и T-Pay стоят как карта, выгоды не дают.
-#
-# Принятый риск: покупателя без банковского приложения ведём в тупик. Если это
-# проявится в доле брошенных оплат — `PAYMENT_METHOD=any` покажет все способы,
-# правка кода не нужна.
-def _default_method() -> str:
-    return (os.environ.get("PAYMENT_METHOD") or "sbp").strip().lower()
+# Способ оплаты — только СБП (D-71, D-72). Не настраивается и не выбирается
+# клиентом: владелец закрыл все остальные пути оплаты.
+PAYMENT_METHOD = "sbp"
 _TIMEOUT = 15  # сек: ЮKassa отвечает быстро, дольше держать воркер gunicorn незачем
 
 # Статусы ЮKassa → наши (модель Order.payment_status).
@@ -59,19 +50,13 @@ def payment_enabled() -> bool:
     return bool(os.environ.get("PAYMENT_PROVIDER"))
 
 
-# Оплата при получении: Store присылает `cash`, сайт — `cod`. Онлайн платить
-# нечего — деньги берёт курьер или пункт выдачи.
-ON_DELIVERY = frozenset({"cash", "cod"})
+def dev_mode() -> bool:
+    """Режим разработки — тот же признак, что у настроек (`DJANGO_DEBUG=1` по умолчанию).
 
-
-def pays_on_delivery(payload) -> bool:
-    """Покупатель выбрал оплату при получении.
-
-    Способ не указан — считаем онлайн: безопаснее придержать заказ до оплаты,
-    чем отдать на сборку то, за что никто не заплатит.
+    Читаем окружение, а не `settings.DEBUG`: тестовый прогон Django принудительно
+    выключает DEBUG, и в тестах любой режим выглядел бы боевым.
     """
-    checkout = (payload or {}).get("checkoutData") or {}
-    return str(checkout.get("paymentType") or "").strip().lower() in ON_DELIVERY
+    return os.environ.get("DJANGO_DEBUG", "1") == "1"
 
 
 def _creds():
@@ -133,14 +118,13 @@ def _result(data) -> dict:
 
 
 def create_payment(order_id, amount, return_url="", reference=None,
-                   method=None, receipt=None) -> dict:
+                   receipt=None) -> dict:
     """Создать платёж. Возвращает {status, paymentId, confirmationUrl, method}.
 
     `reference` — глобально уникальный номер заказа для провайдера (см. модуль).
     Без него берём `order_id`, но это допустимо только там, где уникальность
     гарантирована иначе (например, в тестах с одним пользователем).
 
-    `method` — способ оплаты ("sbp", "bank_card"…); по умолчанию из `PAYMENT_METHOD`.
     `receipt` — состав чека по 54-ФЗ (`orders/receipt.py`), если фискализация включена.
 
     Dev (без провайдера) — сразу 'paid': оплата не требуется.
@@ -148,6 +132,12 @@ def create_payment(order_id, amount, return_url="", reference=None,
     чтобы заказ НЕ был помечен оплаченным по недоразумению.
     """
     if not payment_enabled():
+        # Без провайдера платить некуда. В разработке это упрощение: заказ сразу
+        # «оплачен», чтобы проходить путь целиком. На проде так нельзя — вышло бы
+        # «оплачено» без денег (D-72). Номера платежа нет, поэтому и в разработке
+        # такой заказ на сборку не уходит.
+        if not dev_mode():
+            raise PaymentError("Оплата временно недоступна")
         return {"status": "paid", "paymentId": "", "confirmationUrl": ""}
 
     # Куда ЮKassa вернёт покупателя после оплаты. Обязательное поле API.
@@ -166,17 +156,16 @@ def create_payment(order_id, amount, return_url="", reference=None,
         # сопоставляется с записью заказа, если вдруг потеряем payment_id.
         "metadata": {"order_id": str(order_id), "reference": ref},
     }
-    chosen = (method or _default_method()).strip().lower()
-    if chosen and chosen != "any":
-        # Сразу ведём покупателя в нужный способ: для СБП ЮKassa возвращает
-        # ссылку qr.nspk.ru — на телефоне она открывает банковское приложение,
-        # на компьютере её показываем QR-кодом.
-        body["payment_method_data"] = {"type": chosen}
+    # Единственный способ — СБП (D-72). Для СБП ЮKassa возвращает ссылку
+    # qr.nspk.ru: на телефоне она открывает банковское приложение, на компьютере
+    # её показываем QR-кодом. Выбор клиента не принимаем — иначе подменой запроса
+    # открывается оплата картой.
+    body["payment_method_data"] = {"type": PAYMENT_METHOD}
     if receipt:
         body["receipt"] = receipt
     data = _request("POST", "/payments", body, _idem_key("payment", ref, _money(amount)))
     result = _result(data)
-    result["method"] = chosen or "any"
+    result["method"] = PAYMENT_METHOD
     return result
 
 
