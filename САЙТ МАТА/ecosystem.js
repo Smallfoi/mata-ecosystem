@@ -610,6 +610,10 @@
     setSession(data.token, user);
     closeModal();
     refresh();
+    // Сообщить странице о входе: оформление заказа ждёт его, чтобы продолжить (D-72).
+    try {
+      window.dispatchEvent(new CustomEvent("staw-auth", { detail: { user: user } }));
+    } catch (e) {}
   }
 
   // cfg: {stage, input, errEl, btn, getPayload}

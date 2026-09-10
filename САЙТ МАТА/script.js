@@ -366,6 +366,8 @@ if (pvModal) {
 const coModal = document.querySelector("[data-co-modal]");
 const checkoutBtn = document.querySelector("[data-checkout]");
 let coPointsApplied = 0;
+// Нажали «Оформить», не войдя: после входа форма заказа откроется сама (D-72).
+let checkoutAfterLogin = false;
 
 function cartTotalValue() {
   return cart.reduce((s, i) => s + i.price * i.qty, 0);
@@ -604,7 +606,10 @@ if (coModal) {
           submitBtn.textContent = "Подтвердить заказ";
         });
     } else {
-      done(orderId); // гость (без входа) — демо-успех
+      // Без входа заказ не оформляем (D-72) — например, вышли из аккаунта, пока форма
+      // была открыта. Возвращаем ко входу; после него форма откроется снова.
+      closeCheckout();
+      requireLoginForCheckout();
     }
   });
 
@@ -623,12 +628,31 @@ if (new URLSearchParams(location.search).get("cart") === "1") {
   });
 }
 
+// Оформить заказ можно только из аккаунта (D-72): корзину собирают и без входа,
+// но перед вводом данных и оплатой — регистрация или вход по номеру телефона.
+function requireLoginForCheckout() {
+  if (!window.STAW || typeof window.STAW.openRegister !== "function") return;
+  checkoutAfterLogin = true;
+  window.STAW.openRegister();
+}
+
 if (checkoutBtn) {
   checkoutBtn.addEventListener("click", () => {
     if (cartPanel.classList.contains("is-open")) toggleCart();
+    if (!isLoggedIn()) {
+      requireLoginForCheckout();
+      return;
+    }
     openCheckout();
   });
 }
+
+// Вошли после нажатия «Оформить» — продолжаем с того же места.
+window.addEventListener("staw-auth", () => {
+  if (!checkoutAfterLogin) return;
+  checkoutAfterLogin = false;
+  openCheckout();
+});
 
 // ── Сортировка каталога ──────────────────────────────────────────────────────
 const sortSelect = document.querySelector("[data-sort]");

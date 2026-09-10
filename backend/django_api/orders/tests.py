@@ -758,7 +758,7 @@ class UnpaidOrderExpiryTests(ApiTestCase):
         return Order.objects.get(user_id=self.uid, order_id=oid)
 
     def test_abandoned_order_is_canceled_and_points_return(self):
-        self._order("SS-X1", minutes_ago=31)
+        self._order("SS-X1", minutes_ago=16)
         self.assertEqual(self.balance(), 700)
         self._expire()
         order = self._get("SS-X1")
@@ -767,7 +767,8 @@ class UnpaidOrderExpiryTests(ApiTestCase):
         self.assertEqual(self.balance(), 1000)
 
     def test_fresh_order_is_left_alone(self):
-        self._order("SS-X2", minutes_ago=5)
+        """Окно — 15 минут: на четырнадцатой минуте заказ ещё ждёт оплату."""
+        self._order("SS-X2", minutes_ago=14)
         self._expire()
         self.assertEqual(self._get("SS-X2").payment_status, "pending")
         self.assertEqual(self.balance(), 700)
@@ -776,7 +777,7 @@ class UnpaidOrderExpiryTests(ApiTestCase):
     @mock.patch("orders.payment._http")
     def test_payment_in_progress_is_decided_by_yookassa_not_by_clock(self, http):
         """Платёж создан — решает ЮKassa, а не таймер: могли заплатить в последний момент."""
-        self._order("SS-X3", minutes_ago=40, payment_id="pay_1")
+        self._order("SS-X3", minutes_ago=20, payment_id="pay_1")
         http.return_value = _yk(status="pending")
         self._expire()
         self.assertEqual(self._get("SS-X3").payment_status, "pending")
@@ -789,7 +790,7 @@ class UnpaidOrderExpiryTests(ApiTestCase):
     @mock.patch.dict(os.environ, _YK_ENV)
     @mock.patch("orders.payment._http")
     def test_payment_canceled_by_yookassa_returns_points(self, http):
-        self._order("SS-X4", minutes_ago=40, payment_id="pay_1")
+        self._order("SS-X4", minutes_ago=20, payment_id="pay_1")
         http.return_value = _yk(status="canceled")
         self._expire()
         self.assertEqual(self._get("SS-X4").payment_status, "canceled")
