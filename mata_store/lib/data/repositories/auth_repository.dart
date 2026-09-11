@@ -10,7 +10,7 @@ abstract class AuthRepository {
   Future<AuthUser> register(String name, String email, String password);
   // Вход/регистрация по ТЕЛЕФОНУ+ПАРОЛЮ (основной путь экосистемы, #8).
   Future<AuthUser> loginByPassword(String phone, String password);
-  Future<void> requestSmsCode(String phone);
+  Future<SmsCodeInfo> requestSmsCode(String phone);
   Future<AuthUser> registerByPhone(String phone, String code, String password, String name);
   Future<AuthUser> resetPasswordByPhone(String phone, String code, String password);
   Future<void> sendPasswordReset(String email);
@@ -84,8 +84,9 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> requestSmsCode(String phone) async {
+  Future<SmsCodeInfo> requestSmsCode(String phone) async {
     await Future.delayed(const Duration(milliseconds: 600));
+    return const SmsCodeInfo(); // без backend — режим разработки, код 1234
   }
 
   @override
@@ -224,8 +225,9 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> requestSmsCode(String phone) async {
-    await _client.post('/auth/phone/request', body: {'phone': phone});
+  Future<SmsCodeInfo> requestSmsCode(String phone) async {
+    final data = await _client.post('/auth/phone/request', body: {'phone': phone});
+    return data is Map ? SmsCodeInfo.fromJson(data) : const SmsCodeInfo();
   }
 
   @override
@@ -334,5 +336,27 @@ class ApiAuthRepository implements AuthRepository {
   @override
   Future<void> deleteAccount() async {
     await _client.post('/account/delete', body: {'confirm': true});
+  }
+}
+
+/// Что сервер сказал об отправке кода (POST /auth/phone/request).
+class SmsCodeInfo {
+  /// Боевой вход: код реально отправлен. Иначе режим разработки — код 1234.
+  final bool smsEnabled;
+
+  /// Канал доставки: звонок (flashcall), SMS…
+  final String channelType;
+
+  const SmsCodeInfo({this.smsEnabled = false, this.channelType = ''});
+
+  /// Код придёт звонком: это последние 4 цифры номера.
+  bool get isCall => channelType.toLowerCase().contains('call');
+
+  factory SmsCodeInfo.fromJson(Map data) {
+    final channel = data['channel'];
+    return SmsCodeInfo(
+      smsEnabled: data['smsEnabled'] == true,
+      channelType: channel is Map ? (channel['type'] ?? '').toString() : '',
+    );
   }
 }

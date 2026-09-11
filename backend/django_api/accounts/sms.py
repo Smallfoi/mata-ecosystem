@@ -339,3 +339,32 @@ def check_code(phone, code) -> bool:
         cache.delete(f"otp:{phone}")  # одноразовый
         return True
     return False
+
+
+# Что сказать человеку, когда код не подошёл (D-50).
+CODE_WRONG = "Неверный код. Попробуйте ещё раз"
+CODE_EXPIRED = "Код больше не действует — запросите новый"
+
+
+def code_error(phone) -> str:
+    """Почему код не подошёл — текст для человека.
+
+    У входа по звонку (виджет SIGMA, 10.09.2026) код живёт 90 секунд, попыток 3.
+    После этого не подойдёт и верный код, а «неверный код» по кругу только
+    запутает: человеку нужен новый. Решаем по данным провайдера, а не по часам.
+    """
+    if _is_propush():
+        rec = cache.get(f"otp:{phone}") or {}
+        request_id = rec.get("requestId")
+        if not request_id:
+            return CODE_EXPIRED
+        info = _ProPushProvider().channel(request_id)
+        # Пустой ответ — сессии у провайдера больше нет: истекла или закрыта.
+        if not info or info.get("attemptsLeft") == 0:
+            return CODE_EXPIRED
+        return CODE_WRONG
+    if sms_enabled():
+        rec = cache.get(f"otp:{phone}")
+        if not rec or rec.get("attempts", 0) >= _MAX_ATTEMPTS:
+            return CODE_EXPIRED
+    return CODE_WRONG

@@ -17,7 +17,7 @@ from common.security import (
 from loyalty.models import seed_runner_points
 
 from .models import Account
-from .sms import channel_info, check_code, request_code, sms_enabled
+from .sms import channel_info, check_code, code_error, request_code, sms_enabled
 
 
 @api_view(["POST"])
@@ -39,7 +39,7 @@ def register(request):
 
     if phone:  # регистрация по телефону — обязательное SMS-подтверждение
         if not check_code(phone, d.get("code") or ""):
-            return Response({"detail": "Неверный код подтверждения"}, status=401)
+            return Response({"detail": code_error(phone)}, status=401)
         if len(password) < 4:
             return Response({"detail": "Пароль слишком короткий (мин. 4 символа)"}, status=400)
         if Account.objects.filter(phone=phone).exists():
@@ -100,7 +100,7 @@ def password_reset(request):
     if not phone:
         return Response({"detail": "Нет телефона"}, status=400)
     if not check_code(phone, d.get("code") or ""):
-        return Response({"detail": "Неверный код подтверждения"}, status=401)
+        return Response({"detail": code_error(phone)}, status=401)
     password = d.get("password") or ""
     if len(password) < 4:
         return Response({"detail": "Пароль слишком короткий (мин. 4 символа)"}, status=400)
@@ -160,7 +160,7 @@ def phone_verify(request):
     d = request.data
     phone = normalize_phone(d.get("phone") or "")
     if not check_code(phone, d.get("code") or ""):
-        return Response({"detail": "Invalid verification code"}, status=401)
+        return Response({"detail": code_error(phone)}, status=401)
     email = synthetic_email_for_phone(phone)
     acc = Account.objects.filter(phone=phone).first()
     if not acc:

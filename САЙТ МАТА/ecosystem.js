@@ -71,6 +71,14 @@
     });
   }
 
+  // Подсказка после отправки кода: боевой ли вход и каким каналом придёт код (D-50).
+  function codeHint(data) {
+    if (!data || !data.smsEnabled) return "Тестовый режим: код 1234";
+    var type = String((data.channel && data.channel.type) || "").toLowerCase();
+    if (type.indexOf("call") >= 0) return "Сейчас позвоним — код это последние 4 цифры номера";
+    return "Код отправлен по SMS";
+  }
+
   // ── styles (инжектим, чтобы не трогать styles.css сайта) ────────────────────
   function injectStyles() {
     var css = ""
@@ -391,7 +399,7 @@
       '<input data-login-pass type="password" placeholder="Пароль" autocomplete="current-password" />' +
       // OTP-шаг — только для «Забыл пароль?» (по умолчанию скрыт).
       '<div class="eco-otp" data-login-otp style="display:none">' +
-      '<input data-login-code class="eco-otp-input" type="text" inputmode="numeric" maxlength="4" autocomplete="one-time-code" aria-label="Код из SMS" /></div>' +
+      '<input data-login-code class="eco-otp-input" type="text" inputmode="numeric" maxlength="4" autocomplete="one-time-code" aria-label="Код подтверждения" /></div>' +
       '<p class="eco-err" data-login-err></p>' +
       '<button class="eco-primary" type="button" data-login-submit data-edit="auth.loginBtn">Войти</button>' +
       '<button class="eco-link" type="button" data-login-forgot>Забыл пароль?</button>' +
@@ -399,7 +407,7 @@
       // правая половина — Регистрация (видна в исходном положении панели)
       '<div class="eco-half eco-half--reg"><div class="eco-form">' +
       '<h3 data-edit="auth.regTitle">Регистрация в МАТА</h3>' +
-      '<p class="eco-sub" data-edit="auth.regSub" data-reg-sub>Единый аккаунт экосистемы. Подтвердим телефон по SMS.</p>' +
+      '<p class="eco-sub" data-edit="auth.regSub" data-reg-sub>Единый аккаунт экосистемы. Подтвердим телефон кодом.</p>' +
       '<input data-reg-name data-edit-ph="auth.namePh" type="text" placeholder="Имя и фамилия" autocomplete="name" />' +
       '<div class="eco-phone"><span class="eco-phone-prefix">+7</span>' +
       '<span class="eco-phone-field"><input data-reg-phone data-edit-ph="auth.phonePh" type="tel" inputmode="tel" autocomplete="tel" />' +
@@ -407,9 +415,9 @@
       '<input data-reg-pass type="password" placeholder="Пароль (мин. 4 символа)" autocomplete="new-password" />' +
       // OTP-шаг регистрации — появляется после отправки SMS.
       '<div class="eco-otp" data-reg-otp style="display:none">' +
-      '<input data-reg-code class="eco-otp-input" type="text" inputmode="numeric" maxlength="4" autocomplete="one-time-code" aria-label="Код из SMS" /></div>' +
+      '<input data-reg-code class="eco-otp-input" type="text" inputmode="numeric" maxlength="4" autocomplete="one-time-code" aria-label="Код подтверждения" /></div>' +
       '<p class="eco-err" data-reg-err></p>' +
-      '<button class="eco-primary" type="button" data-reg-submit data-edit="auth.regBtn">Получить SMS-код</button>' +
+      '<button class="eco-primary" type="button" data-reg-submit data-edit="auth.regBtn">Получить код</button>' +
       "</div></div>" +
       // панель: тёмный бренд-фон вместо фото (утверждённых фото пока нет),
       // стороны A/B — параллакс ±200%
@@ -489,11 +497,11 @@
       if (p.error) { err.textContent = p.error; return; }
       btn.disabled = true;
       api("/auth/phone/request", { method: "POST", body: { phone: p.phone } })
-        .then(function () {
+        .then(function (data) {
           regSmsSent = true;
           q("[data-reg-otp]").style.display = "";
           btn.textContent = "Зарегистрироваться";
-          err.textContent = "Код отправлен на телефон (dev: 1234)";
+          err.textContent = codeHint(data);
           q("[data-reg-code]").focus();
         })
         .catch(function (e) { err.textContent = e.message || "Не удалось отправить код"; })
@@ -523,10 +531,10 @@
       if (p.error) { err.textContent = p.error; return; }
       btn.disabled = true;
       api("/auth/phone/request", { method: "POST", body: { phone: p.phone } })
-        .then(function () {
+        .then(function (data) {
           loginResetSmsSent = true;
           q("[data-login-otp]").style.display = "";
-          err.textContent = "Код отправлен (dev: 1234)";
+          err.textContent = codeHint(data);
           q("[data-login-code]").focus();
         })
         .catch(function (e) { err.textContent = e.message || "Не удалось"; })
@@ -535,10 +543,10 @@
     q("[data-login-forgot]").addEventListener("click", function () {
       loginMode = "reset";
       q("[data-login-h]").textContent = "Сброс пароля";
-      q("[data-login-sub]").textContent = "Подтвердим телефон по SMS и зададим новый пароль.";
+      q("[data-login-sub]").textContent = "Подтвердим телефон кодом и зададим новый пароль.";
       q("[data-login-pass]").placeholder = "Новый пароль (мин. 4)";
       q("[data-login-pass]").value = "";
-      q("[data-login-submit]").textContent = "Получить SMS-код";
+      q("[data-login-submit]").textContent = "Получить код";
       this.style.display = "none";
     });
     applyAuthOverrides(); // тексты/плейсхолдеры, заданные в «Конструкторе»
@@ -803,7 +811,7 @@
       cfg.errEl.textContent = "";
       if (payload.error) { cfg.errEl.textContent = payload.error; return; }
       if (input.value.length < OTP_LEN) {
-        cfg.errEl.textContent = "Введите код (dev: 1234)";
+        cfg.errEl.textContent = "Введите код из 4 цифр";
         return;
       }
       busy = true;
