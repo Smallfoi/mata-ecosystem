@@ -195,6 +195,19 @@
       + "color:#6f7278;font:inherit;font-size:13px;text-decoration:underline;cursor:pointer}"
       + ".eco-card .eco-link:hover{color:#20252b}"
       + ".eco-err{color:#c0392b;font-size:13px;min-height:18px;margin:6px 0 0}"
+      // «Глазок» в поле пароля: кнопка внутри поля справа, текст под неё не заезжает.
+      + ".eco-pass{position:relative;margin:6px 0}"
+      + ".eco-card .eco-pass input{margin:0;padding-right:48px}"
+      + ".eco-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;"
+      + "display:flex;align-items:center;justify-content:center;padding:0;background:none;border:0;"
+      + "border-radius:10px;color:#8a8d92;cursor:pointer;transition:color .2s}"
+      + ".eco-eye:hover{color:#20252b}"
+      + ".eco-eye:focus-visible{outline:2px solid #20252b;outline-offset:-2px}"
+      + ".eco-eye svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;"
+      + "stroke-linecap:round;stroke-linejoin:round}"
+      + ".eco-eye .eye-off{display:none}"
+      + ".eco-eye[aria-pressed=\"true\"] .eye-on{display:none}"
+      + ".eco-eye[aria-pressed=\"true\"] .eye-off{display:block}"
       + ".eco-card .eco-close{float:right;background:none;border:none;font-size:20px;cursor:pointer;opacity:.5}"
       // ── Ввод кода: хореография «OTP V5» (стандарт анимаций экосистемы) ──
       // Поле телефона: несъёмный «+7» виден ВСЕГДА (тем же начертанием, что
@@ -401,7 +414,11 @@
       '<div class="eco-phone"><span class="eco-phone-prefix">+7</span>' +
       '<span class="eco-phone-field"><input data-login-phone data-edit-ph="auth.phonePh" type="tel" inputmode="tel" autocomplete="tel" />' +
       '<span class="eco-phone-mask" aria-hidden="true"></span></span></div>' +
-      '<input data-login-pass type="password" placeholder="Пароль" autocomplete="current-password" />' +
+      '<div class="eco-pass"><input data-login-pass type="password" placeholder="Пароль" autocomplete="current-password" />' +
+      '<button class="eco-eye" type="button" data-eye aria-label="Показать пароль" aria-pressed="false">' +
+      '<svg class="eye-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>' +
+      '<svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.9 17.9A10.1 10.1 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.1-5.9"/><path d="M9.9 4.2A9.1 9.1 0 0 1 12 4c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.2 3.2"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/></svg>' +
+      '</button></div>' +
       // OTP-шаг — только для «Забыл пароль?» (по умолчанию скрыт).
       '<div class="eco-otp" data-login-otp style="display:none">' +
       '<input data-login-code class="eco-otp-input" type="text" inputmode="numeric" maxlength="4" autocomplete="one-time-code" aria-label="Код подтверждения" /></div>' +
@@ -417,7 +434,11 @@
       '<div class="eco-phone"><span class="eco-phone-prefix">+7</span>' +
       '<span class="eco-phone-field"><input data-reg-phone data-edit-ph="auth.phonePh" type="tel" inputmode="tel" autocomplete="tel" />' +
       '<span class="eco-phone-mask" aria-hidden="true"></span></span></div>' +
-      '<input data-reg-pass type="password" placeholder="Пароль (мин. 4 символа)" autocomplete="new-password" />' +
+      '<div class="eco-pass"><input data-reg-pass type="password" placeholder="Пароль (мин. 4 символа)" autocomplete="new-password" />' +
+      '<button class="eco-eye" type="button" data-eye aria-label="Показать пароль" aria-pressed="false">' +
+      '<svg class="eye-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>' +
+      '<svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.9 17.9A10.1 10.1 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.1-5.9"/><path d="M9.9 4.2A9.1 9.1 0 0 1 12 4c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.2 3.2"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/></svg>' +
+      '</button></div>' +
       // OTP-шаг регистрации — появляется после отправки SMS.
       '<div class="eco-otp" data-reg-otp style="display:none">' +
       '<input data-reg-code class="eco-otp-input" type="text" inputmode="numeric" maxlength="4" autocomplete="one-time-code" aria-label="Код подтверждения" /></div>' +
@@ -448,6 +469,20 @@
       if (e.target === modal) closeModal();
     });
     modal.querySelector("[data-eco-x]").addEventListener("click", closeModal);
+    // «Глазок»: показать или скрыть пароль (просьба владельца 11.09.2026).
+    function setPasswordShown(btn, shown) {
+      var input = btn.parentNode.querySelector("input");
+      input.type = shown ? "text" : "password";
+      btn.setAttribute("aria-pressed", shown ? "true" : "false");
+      btn.setAttribute("aria-label", shown ? "Скрыть пароль" : "Показать пароль");
+    }
+    modal.querySelectorAll("[data-eye]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var input = btn.parentNode.querySelector("input");
+        setPasswordShown(btn, input.type === "password");
+        input.focus();
+      });
+    });
     modal.querySelector("[data-go-login]").addEventListener("click", function () {
       setMode("login"); focusActive();
     });
@@ -583,6 +618,8 @@
       q("[data-reg-err]").textContent = "";
       q("[data-login-submit]").disabled = false;
       q("[data-reg-submit]").disabled = false;
+      // Пароли при новом открытии окна снова скрыты.
+      modal.querySelectorAll("[data-eye]").forEach(function (btn) { setPasswordShown(btn, false); });
       applyAuthOverrides(); // вернуть тексты, заданные в «Конструкторе»
     }
     modal._resetForms = resetForms;
