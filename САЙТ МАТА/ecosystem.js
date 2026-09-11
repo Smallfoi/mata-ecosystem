@@ -115,7 +115,11 @@
       // ── Карточка-слайдер «Auth Slider» (эталон: панель 600мс ease-in-out-sine,
       //    параллакс текста ±200%, формы только opacity 220мс delay 360мс) ──
       + ".eco-card--slider{--dur:600ms;--ease:cubic-bezier(.37,0,.63,1);--pad:10px;"
-      + "position:relative;width:min(94vw,760px);aspect-ratio:1089/724;padding:var(--pad);overflow:hidden}"
+      // Высота — под самый высокий шаг (регистрация с кодом ≈553px) с запасом на шрифты:
+      // раньше пропорция 1089/724 давала ≈505px, и на шаге кода появлялась прокрутка
+      // (замечание владельца 11.09.2026). На низких экранах — не выше окна браузера.
+      + "position:relative;width:min(94vw,760px);height:min(600px,calc(100vh - 24px));"
+      + "box-sizing:border-box;padding:var(--pad);overflow:hidden}"
       + ".eco-card--slider .eco-close{position:absolute;top:8px;right:12px;z-index:9;float:none;"
       + "color:#fff;mix-blend-mode:difference;opacity:.8;font-size:22px}"
       + ".eco-half{position:absolute;top:var(--pad);bottom:var(--pad);width:calc(50% - var(--pad));"
@@ -123,6 +127,7 @@
       + "transition:opacity 220ms ease 360ms}"
       + ".eco-half--login{left:var(--pad);opacity:0}"
       + ".eco-half--reg{right:var(--pad);opacity:1}"
+      + ".eco-half>.eco-form{margin-top:auto;margin-bottom:auto}"
       + ".eco-card--slider.isLogin .eco-half--login{opacity:1}"
       + ".eco-card--slider.isLogin .eco-half--reg{opacity:0}"
       + ".eco-form{width:100%;max-width:330px;padding:0 22px;text-align:center}"
@@ -162,12 +167,12 @@
       + ".eco-ghost:active{transform:scale(.97)}"
       // мобильный столбик: панель сверху, движение панели отключено (по спеке)
       + "@media(max-width:719px){"
-      + ".eco-card--slider{display:flex;flex-direction:column;aspect-ratio:auto;"
+      + ".eco-card--slider{display:flex;flex-direction:column;aspect-ratio:auto;height:auto;"
       + "width:min(92vw,380px);max-height:92vh;overflow-y:auto}"
       + ".eco-cover{position:relative;order:-1;top:0;left:0;bottom:auto;width:100%;height:118px;"
       + "flex:0 0 auto;transform:none!important;border-radius:12px}"
       + ".eco-half{position:static;width:100%;opacity:1!important;transition:none;display:none;"
-      + "padding:18px 0 8px}"
+      + "padding:18px 0 8px;flex:0 0 auto;overflow:visible}"
       + ".eco-card--slider.isLogin .eco-half--login{display:flex}"
       + ".eco-card--slider:not(.isLogin) .eco-half--reg{display:flex}"
       + ".eco-side{transform:none!important;transition:opacity 220ms ease}"
@@ -501,7 +506,9 @@
           regSmsSent = true;
           q("[data-reg-otp]").style.display = "";
           btn.textContent = "Зарегистрироваться";
-          err.textContent = codeHint(data);
+          // Подсказка — в подзаголовок, серым: красным в строке ошибок она выглядела как сбой.
+          q("[data-reg-sub]").textContent = codeHint(data);
+          err.textContent = "";
           q("[data-reg-code]").focus();
         })
         .catch(function (e) { err.textContent = e.message || "Не удалось отправить код"; })
@@ -534,7 +541,8 @@
         .then(function (data) {
           loginResetSmsSent = true;
           q("[data-login-otp]").style.display = "";
-          err.textContent = codeHint(data);
+          q("[data-login-sub]").textContent = codeHint(data);
+          err.textContent = "";
           q("[data-login-code]").focus();
         })
         .catch(function (e) { err.textContent = e.message || "Не удалось"; })
@@ -549,6 +557,36 @@
       q("[data-login-submit]").textContent = "Получить код";
       this.style.display = "none";
     });
+
+    // Каждое открытие окна — с чистого листа: обычный вход и регистрация без
+    // начатых шагов. Раньше состояние переживало закрытие: после сброса пароля,
+    // выхода и нового «Войти» окно открывалось снова на «Сбросе пароля» с
+    // введённым паролем (замечание владельца 11.09.2026). Телефон и имя не
+    // стираем — вводить их заново незачем.
+    function resetForms() {
+      loginMode = "login";
+      loginResetSmsSent = false;
+      regSmsSent = false;
+      q("[data-login-h]").textContent = "Вход в МАТА";
+      q("[data-login-sub]").textContent = "Баллы «Квартала», магазина и сайта — общие.";
+      q("[data-reg-sub]").textContent = "Единый аккаунт экосистемы. Подтвердим телефон кодом.";
+      q("[data-login-pass]").placeholder = "Пароль";
+      q("[data-login-submit]").textContent = "Войти";
+      q("[data-login-forgot]").style.display = "";
+      q("[data-reg-submit]").textContent = "Получить код";
+      ["[data-login-pass]", "[data-login-code]", "[data-reg-pass]", "[data-reg-code]"].forEach(function (s) {
+        q(s).value = "";
+      });
+      q("[data-login-otp]").style.display = "none";
+      q("[data-reg-otp]").style.display = "none";
+      q("[data-login-err]").textContent = "";
+      q("[data-reg-err]").textContent = "";
+      q("[data-login-submit]").disabled = false;
+      q("[data-reg-submit]").disabled = false;
+      applyAuthOverrides(); // вернуть тексты, заданные в «Конструкторе»
+    }
+    modal._resetForms = resetForms;
+
     applyAuthOverrides(); // тексты/плейсхолдеры, заданные в «Конструкторе»
     // Медиа панели (фото/видео Вход/Регистрация) — тоже из общего контента.
     if (window.STAW_applyBg) {
@@ -582,6 +620,7 @@
 
   function openModal(mode) {
     if (!modal) buildModal();
+    else if (modal._resetForms) modal._resetForms();
     // Класс режима ставим до показа: пока modal display:none, переходы не
     // играют — карточка сразу в нужном положении, анимация только внутри.
     setMode(mode === "register" ? "register" : "login");
