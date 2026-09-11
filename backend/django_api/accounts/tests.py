@@ -725,3 +725,53 @@ class ProPushTests(TestCase):
             cache.delete("otp:+79148278470")
             self.assertFalse(check_code("+79148278470", "1234"))
             self.assertEqual(channel_info("+79148278470"), {})
+
+
+class CodeErrorTextTests(TestCase):
+    """Код не подошёл — человек должен понять: ввести снова или запросить новый (D-50).
+
+    У входа по звонку (виджет SIGMA) код живёт 90 секунд, попыток 3. После этого
+    не подойдёт и верный код — «неверный код» по кругу только путает.
+    """
+
+    PHONE = "+79990007711"
+    ENV = {"SMS_PROVIDER": "propush", "SIGMA_TOKEN": "t0ken", "SIGMA_WIDGET": "widget-uuid"}
+
+    def setUp(self):
+        cache.clear()
+
+    def _verify(self, code="0000"):
+        return self.client.post("/v1/auth/phone/verify",
+                                data={"phone": self.PHONE, "code": code},
+                                content_type="application/json")
+
+    def _provider(self, attempts_left):
+        answers = {
+            "/req-1/checkCode": (200, {"success": False}),
+            "/req-1/channel": (200, {"type": "flashcall", "remainingCodeAttempts": attempts_left}),
+        }
+        return mock.patch("accounts.sms._propush_call",
+                          side_effect=lambda method, path, body=None, params="": answers[path])
+
+    def test_dev_wrong_code_is_plain_and_in_russian(self):
+        r = self._verify("9999")
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(r.json()["detail"], "Неверный код. Попробуйте ещё раз")
+
+    def test_attempts_left_means_try_again(self):
+        cache.set(f"otp:{self.PHONE}", {"requestId": "req-1"}, 300)
+        with mock.patch.dict(os.environ, self.ENV), self._provider(2):
+            r = self._verify()
+        self.assertEqual(r.json()["detail"], "Неверный код. Попробуйте ещё раз")
+
+    def test_no_attempts_left_asks_for_a_new_code(self):
+        cache.set(f"otp:{self.PHONE}", {"requestId": "req-1"}, 300)
+        with mock.patch.dict(os.environ, self.ENV), self._provider(0):
+            r = self._verify()
+        self.assertEqual(r.json()["detail"], "Код больше не действует — запросите новый")
+
+    def test_expired_session_asks_for_a_new_code(self):
+        with mock.patch.dict(os.environ, self.ENV), \
+                mock.patch("accounts.sms._propush_call", return_value=(404, {})):
+            r = self._verify()
+        self.assertEqual(r.json()["detail"], "Код больше не действует — запросите новый")

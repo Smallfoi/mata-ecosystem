@@ -61,6 +61,12 @@ class AuthState {
   final String? token;
   final AuthUser? user;
 
+  /// Боевой ли вход по коду (сервер: `smsEnabled`). В разработке код всегда 1234.
+  final bool smsEnabled;
+
+  /// Каким каналом придёт код (сервер: `channel.type`): звонок, SMS…
+  final String channelType;
+
   const AuthState({
     this.status = AuthStatus.unauthenticated,
     this.phone = '',
@@ -68,6 +74,8 @@ class AuthState {
     this.error,
     this.token,
     this.user,
+    this.smsEnabled = false,
+    this.channelType = '',
   });
 
   AuthState copyWith({
@@ -77,6 +85,8 @@ class AuthState {
     String? error,
     String? token,
     AuthUser? user,
+    bool? smsEnabled,
+    String? channelType,
     bool clearError = false,
     bool clearSession = false,
   }) => AuthState(
@@ -86,6 +96,8 @@ class AuthState {
     error: clearError ? null : error ?? this.error,
     token: clearSession ? null : token ?? this.token,
     user: clearSession ? null : user ?? this.user,
+    smsEnabled: smsEnabled ?? this.smsEnabled,
+    channelType: channelType ?? this.channelType,
   );
 }
 
@@ -206,24 +218,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Запросить код входа. Реально зовёт POST /auth/phone/request (в dev-режиме
-  /// сервер печатает код 1234; при включённом SMS_PROVIDER — шлёт SMS).
-  /// Если сервер недоступен, всё равно переходим к вводу кода — ошибку сети
-  /// покажет verifyCode (dev-friendly: бэкенд мог ещё не подняться).
-  Future<void> sendCode(String phone) async {
+  /// Запросить код входа: POST /auth/phone/request. Возвращает, открывать ли
+  /// экран ввода кода.
+  ///
+  /// Сервер ответил отказом (провайдер не принял отправку) — звонка или SMS не
+  /// будет: остаёмся на экране телефона с ошибкой. Сервер недоступен вовсе —
+  /// как и раньше переходим к вводу кода: ошибку сети покажет verifyCode
+  /// (dev-friendly: бэкенд мог ещё не подняться).
+  Future<bool> sendCode(String phone) async {
     state = state.copyWith(isLoading: true, error: null, clearError: true);
+    var smsEnabled = false;
+    var channelType = '';
     try {
-      await _dio.post<Map<String, dynamic>>(
+      final res = await _dio.post<Map<String, dynamic>>(
         '/auth/phone/request',
         data: {'phone': phone},
       );
+      final data = res.data ?? const <String, dynamic>{};
+      smsEnabled = data['smsEnabled'] == true;
+      final channel = data['channel'];
+      if (channel is Map) channelType = (channel['type'] ?? '').toString();
+    } on DioException catch (e) {
+      if (e.response != null) {
+        state = state.copyWith(isLoading: false, error: _authErrorText(e));
+        return false;
+      }
     } catch (_) {}
     state = state.copyWith(
       status: AuthStatus.codeSent,
       phone: phone,
       isLoading: false,
       clearError: true,
+      smsEnabled: smsEnabled,
+      channelType: channelType,
     );
+    return true;
   }
 
   /// Проверить код НА СЕРВЕРЕ (раньше сверялся локально с '1234' и на сервер

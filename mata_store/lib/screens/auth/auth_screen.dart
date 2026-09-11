@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../data/api/api_client.dart';
+import '../../data/repositories/auth_repository.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/mata_logo.dart';
@@ -513,7 +514,7 @@ class _SmsForm extends StatelessWidget {
         if (error != null) ...[const SizedBox(height: 12), _ErrorBanner(message: error!)],
         const SizedBox(height: 20),
         if (!smsSent)
-          _PrimaryButton(label: 'Получить SMS-код', busy: busy, onPressed: onRequestSms)
+          _PrimaryButton(label: 'Получить код', busy: busy, onPressed: onRequestSms)
         else ...[
           // Ввод кода — хореография «OTP V5» (стандарт анимаций экосистемы МАТА).
           OtpVerifyBoxes(
@@ -525,7 +526,8 @@ class _SmsForm extends StatelessWidget {
           const SizedBox(height: 6),
           Center(
             child: Text(
-              'Тестовый код: 1234',
+              _codeHint(context.watch<AuthProvider>().codeInfo),
+              textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: AppColors.grey400, fontFeatures: const [FontFeature.tabularFigures()]),
             ),
           ),
@@ -708,4 +710,12 @@ class _ErrorBanner extends StatelessWidget {
       ),
     ).animate().fadeIn(duration: 250.ms).shakeX(hz: 3, amount: 4);
   }
+}
+
+/// Подсказка под полем кода: боевой ли вход и каким каналом придёт код (D-50).
+/// Служебный текст, не контент витрины.
+String _codeHint(SmsCodeInfo info) {
+  if (!info.smsEnabled) return 'Тестовый код: 1234';
+  if (info.isCall) return 'Сейчас позвоним — код это последние 4 цифры номера';
+  return 'Код отправлен по SMS';
 }

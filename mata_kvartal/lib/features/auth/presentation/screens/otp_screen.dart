@@ -83,12 +83,27 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   }
 
   Future<void> _resend() async {
-    setState(() => _resending = true);
+    setState(() {
+      _resending = true;
+      _localError = null;
+    });
     final phone = ref.read(authProvider).phone;
-    await ref.read(authProvider.notifier).sendCode(phone);
+    final sent = await ref.read(authProvider.notifier).sendCode(phone);
     if (!mounted) return;
-    setState(() => _resending = false);
-    _startTimer();
+    setState(() {
+      _resending = false;
+      if (!sent) _localError = ref.read(authProvider).error;
+    });
+    if (sent) _startTimer();
+  }
+
+  /// Как придёт код: сервер говорит, боевой ли вход и каким каналом (D-50).
+  String _codeHint(AuthState auth) {
+    if (!auth.smsEnabled) return 'Код отправлен на ${auth.phone}';
+    if (auth.channelType.toLowerCase().contains('call')) {
+      return 'Сейчас позвоним на ${auth.phone}. Код — последние 4 цифры номера';
+    }
+    return 'SMS отправлено на ${auth.phone}';
   }
 
   @override
@@ -120,7 +135,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'SMS отправлено на ${auth.phone}',
+                _codeHint(auth),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -168,6 +183,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   ),
                 ),
               const Spacer(),
+              // Тестовый код — только пока вход не боевой: с настоящим звонком 1234 не пройдёт.
+              if (!auth.smsEnabled)
               Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(

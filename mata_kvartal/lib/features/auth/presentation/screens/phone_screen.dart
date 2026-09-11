@@ -77,8 +77,9 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
     if (!_phoneOk || _passCtrl.text.length < 4) return;
     if (_mode == 'register' && _nameCtrl.text.trim().isEmpty) return;
     auth.setPending(purpose: _mode, name: _nameCtrl.text.trim(), password: _passCtrl.text);
-    await auth.sendCode(_phone);
-    if (mounted) context.go('/auth/otp');
+    final sent = await auth.sendCode(_phone);
+    // Сервер отказал в отправке — остаёмся здесь: ошибка уже в состоянии, видна под формой.
+    if (sent && mounted) context.go('/auth/otp');
   }
 
   /// Оформление поля — язык сайта: белая заливка, тонкая рамка `line`, на фокусе

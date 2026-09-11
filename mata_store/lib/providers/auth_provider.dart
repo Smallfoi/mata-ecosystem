@@ -99,7 +99,7 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
     if (digits.length < 10) return 'Введите корректный номер';
-    if (code.trim().length != 4) return 'Введите код из SMS';
+    if (code.trim().length != 4) return 'Введите код из 4 цифр';
     _setLoading(true);
     try {
       _user = await _repo.loginByPhone(phone, code, name: name);
@@ -130,11 +130,17 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Отправить SMS-код на телефон (для регистрации/сброса пароля).
+  /// Что сервер сказал о последней отправке кода — от этого зависит подсказка
+  /// под полем: звонок, SMS или режим разработки с кодом 1234.
+  SmsCodeInfo _codeInfo = const SmsCodeInfo();
+  SmsCodeInfo get codeInfo => _codeInfo;
+
   Future<String?> requestSmsCode(String phone) async {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
     if (digits.length < 10) return 'Введите корректный номер';
     try {
-      await _repo.requestSmsCode(phone);
+      _codeInfo = await _repo.requestSmsCode(phone);
+      notifyListeners();
       return null;
     } catch (e) {
       return 'Не удалось отправить код';
@@ -144,7 +150,7 @@ class AuthProvider extends ChangeNotifier {
   /// Регистрация по телефону: код подтверждает телефон, аккаунт с паролем.
   Future<String?> registerByPhone(String phone, String code, String password, String name) async {
     if (name.trim().isEmpty) return 'Введите имя';
-    if (code.trim().length != 4) return 'Введите код из SMS';
+    if (code.trim().length != 4) return 'Введите код из 4 цифр';
     if (password.length < 4) return 'Пароль — минимум 4 символа';
     _setLoading(true);
     try {
@@ -160,7 +166,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Сброс пароля по SMS-коду.
   Future<String?> resetPasswordByPhone(String phone, String code, String password) async {
-    if (code.trim().length != 4) return 'Введите код из SMS';
+    if (code.trim().length != 4) return 'Введите код из 4 цифр';
     if (password.length < 4) return 'Пароль — минимум 4 символа';
     _setLoading(true);
     try {
