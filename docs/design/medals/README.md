@@ -69,7 +69,7 @@
 Ассеты Лиги выгружаются из ЭТОГО файла попиксельно: страница открывается в
 Chrome (chrome-devtools MCP), каждый `renderMedal()` собирается в standalone-SVG
 (инлайн-шрифты data:-URI, вырезанный sheen, xmlns, дедуп атрибутов через
-HTML-парсер) → canvas 768×768 → WebP q0.92 → `mata_liga/assets/medals/<id>.webp`
+HTML-парсер) → canvas 768×768 → WebP q0.92 → `mata_kvartal/assets/medals/<id>.webp`
 (44 аверса + 5 баз реверса по металлам). Скрипт конвейера — в WORKLOG 2026-09-02.
 Анимации в приложении переигрываются средствами Flutter (чеканка, блик, 3D-оборот).
 
