@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/location_provider.dart';
 import '../../data/zone_provider.dart';
+import '../../data/block_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../league/data/division_provider.dart';
 import '../../../league/data/league_provider.dart';
@@ -70,6 +71,10 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
   /// деактивированный элемент нельзя.
   late final TerritoryNotifier _territories;
 
+  /// Нотифаер кварталов (D-74), снятый один раз — как и territories, дёргается
+  /// из таймера/колбэков камеры, где искать провайдер через контекст нельзя.
+  late final BlockNotifier _blocks;
+
   void _loadTerritories() {
     if (!mounted) return;
     final LatLngBounds bounds;
@@ -84,6 +89,14 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
           maxLng: bounds.east,
           maxLat: bounds.north,
         );
+    // Городские кварталы (D-74) грузим тем же bbox и на тех же хуках, что и
+    // территории: сетка города видна и перекрашивается вместе с владением.
+    _blocks.loadBbox(
+      minLng: bounds.west,
+      minLat: bounds.south,
+      maxLng: bounds.east,
+      maxLat: bounds.north,
+    );
   }
 
   void _handleTileError() {
@@ -108,6 +121,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
   void initState() {
     super.initState();
     _territories = ref.read(territoryProvider.notifier);
+    _blocks = ref.read(blockProvider.notifier);
     _territoryRefreshTimer = Timer.periodic(_territoryRefreshInterval, (_) {
       // Карта живёт между переключениями вкладок (см. app_router), поэтому на
       // скрытой вкладке сеть не дёргаем — иначе опрос шёл бы фоном всегда.
@@ -149,6 +163,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
     final zonesAsync = ref.watch(zoneProvider);
     final zones = zonesAsync.valueOrNull ?? const <BlockZone>[];
     final territories = ref.watch(territoryProvider).territories;
+    final cityBlocks = ref.watch(blockProvider).blocks;
     final posAsync = ref.watch(positionStreamProvider);
     final runState = ref.watch(runProvider);
     final closureStatus = ref
@@ -245,6 +260,23 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                   );
                 }).toList(),
               ),
+
+              // Городские кварталы (D-74): сетка города с окраской по владению.
+              // Идёт ПОД слоем территорий — живой полигон владения рисуется
+              // поверх сетки. Free — деликатный контур, остальное — по словарю.
+              if (cityBlocks.isNotEmpty)
+                PolygonLayer(
+                  polygons: [
+                    for (final b in cityBlocks)
+                      for (final ring in b.rings)
+                        Polygon(
+                          points: ring,
+                          color: _blockFill(b.rel),
+                          borderColor: _blockBorder(b.rel),
+                          borderStrokeWidth: _blockBorderWidth(b.rel),
+                        ),
+                  ],
+                ),
 
               // Реальные территории с сервера (PostGIS, D-09): мои/клуб/чужие.
               if (territories.isNotEmpty)
@@ -774,6 +806,26 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
       TerritoryRel.enemy => AppColors.hexEnemy.withValues(alpha: 0.70 * k),
     };
   }
+
+  // ── Городские кварталы (D-74) ──────────────────────────────────────────────
+  // Словарь цвета: лайм — моё, electricBlue — клуб, тёплый — чужое; free —
+  // почти невидимая заливка с деликатным контуром (только сетка города).
+  Color _blockFill(BlockRel rel) => switch (rel) {
+    BlockRel.mine => AppColors.lime.withValues(alpha: 0.28),
+    BlockRel.club => AppColors.electricBlue.withValues(alpha: 0.20),
+    BlockRel.enemy => AppColors.warm.withValues(alpha: 0.20),
+    BlockRel.free => Colors.transparent,
+  };
+
+  Color _blockBorder(BlockRel rel) => switch (rel) {
+    BlockRel.mine => AppColors.lime.withValues(alpha: 0.90),
+    BlockRel.club => AppColors.electricBlue.withValues(alpha: 0.80),
+    BlockRel.enemy => AppColors.warm.withValues(alpha: 0.80),
+    BlockRel.free => AppColors.faint.withValues(alpha: 0.30),
+  };
+
+  double _blockBorderWidth(BlockRel rel) =>
+      rel == BlockRel.free ? 0.7 : 1.3;
 }
 
 // ── Markers ───────────────────────────────────────────────────────────────────
