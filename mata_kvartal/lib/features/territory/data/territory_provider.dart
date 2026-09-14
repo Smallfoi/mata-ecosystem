@@ -410,3 +410,27 @@ final footprintAreaProvider = FutureProvider.autoDispose<double>((ref) async {
     return 0;
   }
 });
+
+/// Кольца вечного следа (footprints) для карты режима «Исследование».
+/// GET /footprint → {areaM2, geojson(Polygon/MultiPolygon)} → внешние кольца.
+/// Тот же разбор колец, что и у территорий (ringsFromGeoJson) — один источник.
+final footprintRingsProvider =
+    FutureProvider.autoDispose<List<List<LatLng>>>((ref) async {
+  final token = ref.watch(authProvider).token;
+  if (token == null || token.isEmpty) return const [];
+  final dio = ApiClient.create(
+    headers: const {'Content-Type': 'application/json', 'Connection': 'close'},
+  );
+  try {
+    final res = await dio.get<Map<String, dynamic>>(
+      '/footprint',
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+    final geojson = res.data?['geojson'];
+    return geojson is Map<String, dynamic>
+        ? ringsFromGeoJson(geojson)
+        : const [];
+  } catch (_) {
+    return const [];
+  }
+});
