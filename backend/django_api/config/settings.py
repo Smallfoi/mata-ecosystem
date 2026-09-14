@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "clubs",
     "leaderboard",
     "territories",
+    "blocks",
     "catalog",
     "orders",
     "shoes",
