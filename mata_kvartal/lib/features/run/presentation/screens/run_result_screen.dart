@@ -10,7 +10,6 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../../../../core/theme/app_theme.dart';
 import '../../../medals/data/medals_provider.dart';
 import '../../../medals/presentation/shtamp_ceremony.dart';
-import '../../../territory/data/territory_provider.dart';
 import '../../../weather/data/weather_provider.dart';
 import '../../data/completed_runs_provider.dart';
 import '../widgets/run_share.dart';
@@ -186,13 +185,6 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
   @override
   Widget build(BuildContext context) {
     final r = widget.result;
-    // Захват по кварталам (D-74): подтверждённое сервером число «+N кварталов».
-    // Приходит асинхронно (capture() запущен без await на финише) — до ответа
-    // показываем локальную оценку r.quarters, затем цифра уточняется.
-    final blocksGained =
-        ref.watch(territoryProvider.select((s) => s.lastBlocksGained));
-    final capturedCount = blocksGained ?? r.quarters;
-    final showCapture = r.hasCapture && capturedCount > 0;
     final dateLabel =
         '${r.finishedAt.day.toString().padLeft(2, '0')}.${r.finishedAt.month.toString().padLeft(2, '0')} · ${r.finishedAt.hour.toString().padLeft(2, '0')}:${r.finishedAt.minute.toString().padLeft(2, '0')}';
 
@@ -286,19 +278,16 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
                         child: Column(
                           children: [
                             Text(
-                              !r.hasCapture
-                                  ? 'Пробежка засчитана'
-                                  : showCapture
-                                      ? '+$capturedCount '
-                                          '${_qWord(capturedCount)}'
-                                      : 'Кварталы не захвачены',
+                              r.hasCapture
+                                  ? '+${r.quarters} ${_qWord(r.quarters)}'
+                                  : 'Пробежка засчитана',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontFamily: AppTheme.fontDisplay,
-                                fontSize: showCapture ? 38 : 27,
+                                fontSize: r.hasCapture ? 38 : 27,
                                 fontWeight: FontWeight.w800,
                                 height: 1.05,
-                                color: showCapture
+                                color: r.hasCapture
                                     ? const Color(0xFFDFF45F)
                                     : _light,
                               ),
