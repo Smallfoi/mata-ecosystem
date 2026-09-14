@@ -811,21 +811,25 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
   // Словарь цвета: лайм — моё, electricBlue — клуб, тёплый — чужое; free —
   // почти невидимая заливка с деликатным контуром (только сетка города).
   Color _blockFill(BlockRel rel) => switch (rel) {
-    BlockRel.mine => AppColors.lime.withValues(alpha: 0.28),
-    BlockRel.club => AppColors.electricBlue.withValues(alpha: 0.20),
-    BlockRel.enemy => AppColors.warm.withValues(alpha: 0.20),
-    BlockRel.free => Colors.transparent,
+    BlockRel.mine => AppColors.lime.withValues(alpha: 0.34),
+    BlockRel.club => AppColors.electricBlue.withValues(alpha: 0.24),
+    BlockRel.enemy => AppColors.warm.withValues(alpha: 0.24),
+    // Свободный квартал — лёгкая бирюзовая заливка (акцент Квартала). Графит
+    // сливался с серо-бежевыми линиями подложки; бирюза читается как слой
+    // приложения, а не карта.
+    BlockRel.free => const Color(0xFF57BCD8).withValues(alpha: 0.12),
   };
 
   Color _blockBorder(BlockRel rel) => switch (rel) {
-    BlockRel.mine => AppColors.lime.withValues(alpha: 0.90),
-    BlockRel.club => AppColors.electricBlue.withValues(alpha: 0.80),
-    BlockRel.enemy => AppColors.warm.withValues(alpha: 0.80),
-    BlockRel.free => AppColors.faint.withValues(alpha: 0.30),
+    BlockRel.mine => AppColors.lime.withValues(alpha: 0.95),
+    BlockRel.club => AppColors.electricBlue.withValues(alpha: 0.85),
+    BlockRel.enemy => AppColors.warm.withValues(alpha: 0.85),
+    // Бирюзовый контур — читаемая сетка кварталов, контрастная к светлой карте.
+    BlockRel.free => const Color(0xFF2E9FC4).withValues(alpha: 0.85),
   };
 
   double _blockBorderWidth(BlockRel rel) =>
-      rel == BlockRel.free ? 0.7 : 1.3;
+      rel == BlockRel.free ? 1.8 : 1.8;
 }
 
 // ── Markers ───────────────────────────────────────────────────────────────────
