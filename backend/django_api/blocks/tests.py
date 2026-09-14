@@ -114,3 +114,65 @@ class BlockCaptureTests(ApiTestCase):
         self.assertEqual(row["rel"], "enemy")
         self.assertEqual(row["ownerId"], self.uid)
         self.assertIsNotNone(row["ownerName"])
+
+
+class BlockSeasonHomeTests(ApiTestCase):
+    """Ф3 (D-74): сезон-месяц + несгораемый домашний квартал + приватность."""
+
+    phone = "+79990002070"
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("load_blocks")
+
+    def _box(self):
+        bid, lng, lat = _central_block()
+        d = 0.0006
+        return bid, [[lat - d, lng - d], [lat + d, lng - d], [lat + d, lng + d], [lat - d, lng + d]]
+
+    def _row(self, blocks, bid):
+        return next((b for b in blocks if b["blockId"] == bid), None)
+
+    def test_set_home_marks_mine_and_home(self):
+        bid, _ = self._box()
+        r = self.api_post("/v1/blocks/home", {"blockId": bid}).json()
+        self.assertTrue(r["ok"])
+        row = self._row(self.api_get("/v1/blocks").json()["blocks"], bid)
+        self.assertEqual(row["rel"], "mine")
+        self.assertTrue(row["home"])
+
+    def test_home_not_intercepted_and_anonymous_to_others(self):
+        bid, box = self._box()
+        self.api_post("/v1/blocks/home", {"blockId": bid})
+        other = self.new_user("+79990002071")
+        self.api_post(
+            "/v1/territories/capture", {"points": box, "captureId": "h1"}, token=other
+        )
+        row = self._row(self.api_get("/v1/blocks", token=other).json()["blocks"], bid)
+        self.assertEqual(row["rel"], "enemy")   # виден как занятый
+        self.assertIsNone(row["ownerId"])       # но аноним (privacy дома)
+        self.assertIsNone(row["ownerName"])
+        mine = self._row(self.api_get("/v1/blocks").json()["blocks"], bid)
+        self.assertEqual(mine["rel"], "mine")
+        self.assertTrue(mine["home"])
+
+    def test_season_reset_frees_stale_ownership(self):
+        _bid, box = self._box()
+        self.api_post("/v1/territories/capture", {"points": box, "captureId": "s1"})
+        with connection.cursor() as cur:  # состарить владение на прошлый сезон
+            cur.execute(
+                "UPDATE block_ownership SET captured_at = "
+                "date_trunc('month', now()) - interval '5 days'"
+            )
+        blocks = self.api_get("/v1/blocks").json()["blocks"]
+        self.assertEqual([b for b in blocks if b["rel"] == "mine"], [])
+
+    def test_set_home_rejected_on_enemy_block(self):
+        bid, box = self._box()
+        other = self.new_user("+79990002072")
+        self.api_post(
+            "/v1/territories/capture", {"points": box, "captureId": "e1"}, token=other
+        )
+        self.assertEqual(
+            self.api_post("/v1/blocks/home", {"blockId": bid}).status_code, 409
+        )

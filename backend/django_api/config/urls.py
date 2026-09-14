@@ -131,6 +131,7 @@ urlpatterns = [
     path("v1/territories/capture", territories_views.capture),
     path("v1/territories", territories_views.list_territories),
     path("v1/blocks", blocks_views.list_blocks),
+    path("v1/blocks/home", blocks_views.set_home),
     # Вечный личный след (для профиля «исследовано км²»)
     path("v1/footprint", territories_views.footprint),
     # Каталог Store (D-13) — контракт как у ApiProductRepository в SportStore.
