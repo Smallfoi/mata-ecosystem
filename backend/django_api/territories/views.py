@@ -289,17 +289,30 @@ def capture(request):
             territory_points = min(
                 round(new_area_m2 / AREA_PER_POINT_M2), MAX_TERRITORY_POINTS
             )
-            # 7б) захват КВАРТАЛОВ (D-74, Ф2): кварталы, чей центр внутри контура забега,
-            #     становятся твоими. Новые (ранее не твои) — для счётчика «+N кварталов»;
-            #     чужие перехватываются (защита сезоном/домом — Ф3). Полигонный слой выше
-            #     живёт параллельно (карта/рейтинг), пока клиент не перейдёт на кварталы.
+            # 7б) захват КВАРТАЛОВ (D-74, Ф2+Ф3): кварталы, чей центр внутри петли,
+            #     становятся твоими. Ф3: владение живёт до конца сезона-месяца (старое
+            #     владение = свободно), домашний квартал НЕсгораем, а чужой домашний
+            #     квартал не перехватывается. Эффективный владелец считается в SQL:
+            #     дом → владелец навсегда; иначе — только если захвачен в этом месяце.
+            #     Полигонный слой выше живёт параллельно (карта/рейтинг).
             cur.execute(
-                "SELECT b.block_id, o.owner_id FROM city_blocks b "
+                "SELECT b.block_id, "
+                "  CASE WHEN h.owner_id IS NOT NULL THEN h.owner_id "
+                "       WHEN o.captured_at >= date_trunc('month', now()) THEN o.owner_id "
+                "       ELSE NULL END AS eff_owner, "
+                "  h.owner_id AS home_owner "
+                "FROM city_blocks b "
                 "LEFT JOIN block_ownership o ON o.block_id = b.block_id "
+                "LEFT JOIN home_block h ON h.block_id = b.block_id "
                 "WHERE ST_Contains(ST_GeomFromEWKT(%s), b.centroid)",
                 [cap_ewkt],
             )
-            new_blocks = [r[0] for r in cur.fetchall() if r[1] != uid]
+            new_blocks = []
+            for block_id, eff_owner, home_owner in cur.fetchall():
+                if home_owner is not None and home_owner != uid:
+                    continue  # чужой домашний квартал не трогаем (Ф3)
+                if eff_owner != uid:
+                    new_blocks.append(block_id)
             for bid in new_blocks:
                 cur.execute(
                     "INSERT INTO block_ownership (block_id, owner_id, club_id, captured_at) "
@@ -308,7 +321,14 @@ def capture(request):
                     [bid, uid, club_id],
                 )
             blocks_gained = len(new_blocks)
-            cur.execute("SELECT COUNT(*) FROM block_ownership WHERE owner_id=%s", [uid])
+            # Моих действующих кварталов: свежие в этом сезоне ИЛИ домашний.
+            cur.execute(
+                "SELECT COUNT(*) FROM block_ownership o "
+                "LEFT JOIN home_block h ON h.block_id = o.block_id "
+                "WHERE o.owner_id=%s AND (h.owner_id=%s "
+                "   OR o.captured_at >= date_trunc('month', now()))",
+                [uid, uid],
+            )
             blocks_total = (cur.fetchone() or [0])[0] or 0
             cur.execute(
                 "SELECT ST_AsGeoJSON(geom), ST_Area(geom::geography) "
