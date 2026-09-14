@@ -39,6 +39,7 @@ from orders import views as orders_views
 from races import views as races_views
 from shoes import views as shoes_views
 from territories import views as territories_views
+from blocks import views as blocks_views
 from analytics import views as analytics_views
 from config.errors_view import error_detail, errors_console
 from config.onec_log_view import onec_log
@@ -129,6 +130,7 @@ urlpatterns = [
     # Территории (PostGIS, D-09)
     path("v1/territories/capture", territories_views.capture),
     path("v1/territories", territories_views.list_territories),
+    path("v1/blocks", blocks_views.list_blocks),
     # Вечный личный след (для профиля «исследовано км²»)
     path("v1/footprint", territories_views.footprint),
     # Каталог Store (D-13) — контракт как у ApiProductRepository в SportStore.
