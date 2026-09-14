@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/api/api_client.dart';
 import '../data/repositories/auth_repository.dart';
 import '../models/auth_user.dart';
 import '../models/me_stats.dart';
@@ -143,6 +144,13 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return null;
     } catch (e) {
+      // Отказ сервер объясняет сам: «через 60 сек.», «лимит на сегодня» (D-76).
+      if (e is ApiException) {
+        try {
+          final detail = (jsonDecode(e.message) as Map)['detail'];
+          if (detail is String && detail.isNotEmpty) return detail;
+        } catch (_) {}
+      }
       return 'Не удалось отправить код';
     }
   }

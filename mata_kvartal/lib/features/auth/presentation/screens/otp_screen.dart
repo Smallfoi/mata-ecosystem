@@ -15,7 +15,9 @@ class OtpScreen extends ConsumerStatefulWidget {
 }
 
 class _OtpScreenState extends ConsumerState<OtpScreen> {
-  int _secondsLeft = 60;
+  // Совпадает с паузой сервера между кодами (D-76): раньше новый код не дадут.
+  static const _resendSeconds = 90;
+  int _secondsLeft = _resendSeconds;
   Timer? _timer;
   String? _localError;
   bool _resending = false;
@@ -28,7 +30,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   }
 
   void _startTimer() {
-    _secondsLeft = 60;
+    _secondsLeft = _resendSeconds;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) {

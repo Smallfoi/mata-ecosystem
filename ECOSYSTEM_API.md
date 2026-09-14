@@ -181,7 +181,11 @@
 ```
 POST /auth/register            { name, email, password } → { token, user }
 POST /auth/login               { email, password }       → { token, user }
-POST /auth/phone/request       { phone }                 → { ok, smsEnabled }   (шлёт код; dev — всегда 1234)
+POST /auth/phone/request       { phone }                 → { ok, smsEnabled, channel }   (шлёт код; dev — всегда 1234)
+                                                           429 { detail, retryAfter } + Retry-After — лимит (D-76):
+                                                           90 с между кодами на номер, 3 кода на номер в сутки,
+                                                           с адреса 30 в час и 100 в сутки; клиент показывает detail
+POST /auth/phone/channel       { phone }                 → { type, status, codeType, attemptsLeft }   (канал текущей сессии; 404 — сессии нет)
 POST /auth/phone/verify        { phone, code }           → { token, user }      (создаёт аккаунт при первом входе)
 POST /auth/password/forgot     { email }                 → 200
 POST /auth/password/reset      { password }              → 200
