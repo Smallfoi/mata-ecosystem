@@ -630,6 +630,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                     // Плита «Бег» приподнята над баром — панели нужен воздух.
                     padding: const EdgeInsets.only(bottom: 16),
                     child: _BottomPanel(
+                      mode: mode,
                       runState: runState,
                       territories: territories,
                       closureStatus: closureStatus,
@@ -1509,11 +1510,13 @@ class _IconBtn extends StatelessWidget {
 // ── Bottom panel ──────────────────────────────────────────────────────────────
 
 class _BottomPanel extends StatelessWidget {
+  final RunMode mode;
   final RunState runState;
   final List<ServerTerritory> territories;
   final LoopClosureStatus closureStatus;
 
   const _BottomPanel({
+    required this.mode,
     required this.runState,
     required this.territories,
     required this.closureStatus,
@@ -1522,6 +1525,13 @@ class _BottomPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isRunning = runState.status != RunStatus.idle;
+    // Плашка «Мои/Чужих/Клуб» — счётчики захвата. Вне режима «Захват» её
+    // не показываем (в Свободном/Тропах/Исследовании захвата нет — цифры
+    // сбивали, решение владельца 15.09.2026). Во время бега панель — это
+    // статистика забега, она нужна во всех режимах.
+    if (!isRunning && mode != RunMode.capture) {
+      return const SizedBox.shrink();
+    }
     // Счёт по СЕРВЕРНЫМ территориям — раньше панель считала демо-сетку
     // и показывала «Мои 0» при живой зоне («Идеальный маршрут», 03.09).
     final mine =
