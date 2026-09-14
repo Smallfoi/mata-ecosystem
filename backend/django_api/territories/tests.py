@@ -18,14 +18,19 @@ class TerritoryAwardTests(ApiTestCase):
             "/v1/territories/capture", {"points": _POLY, "captureId": "capA"}
         ).json()
         self.assertTrue(r["ok"])
-        self.assertEqual(self.balance(), 50)
+        # Баллы = за новый след (~площадь/100). Для ~5800 м² это ~55-60.
+        self.assertEqual(self.balance(), r["points"])
+        self.assertGreaterEqual(self.balance(), 50)
+        self.assertLessEqual(self.balance(), 62)
 
     def test_duplicate_capture_no_double(self):
         body = {"points": _POLY, "captureId": "capA"}
         self.api_post("/v1/territories/capture", body)
+        awarded = self.balance()
+        self.assertGreater(awarded, 0)
         r = self.api_post("/v1/territories/capture", body).json()
         self.assertTrue(r["duplicate"])
-        self.assertEqual(self.balance(), 50)
+        self.assertEqual(self.balance(), awarded)
 
     def test_speed_cheat_rejected(self):
         r = self.api_post(
@@ -43,6 +48,23 @@ class TerritoryAwardTests(ApiTestCase):
         )
         self.assertEqual(r.status_code, 403)
         self.assertEqual(self.balance(), 0)
+
+    def test_rerun_same_ground_awards_nothing(self):
+        # Первый захват — баллы за впервые исследованную землю.
+        self.api_post("/v1/territories/capture", {"points": _POLY, "captureId": "c1"})
+        first = self.balance()
+        self.assertGreater(first, 0)
+        # Обходим кулдаун и защиту 24ч, состарив метки времени.
+        with connection.cursor() as cur:
+            cur.execute("UPDATE territories SET captured_at = now() - interval '1 hour'")
+            cur.execute("UPDATE recent_captures SET captured_at = now() - interval '2 days'")
+        # Тот же контур снова — нового следа нет → 0 баллов (ферма закрыта).
+        r = self.api_post(
+            "/v1/territories/capture", {"points": _POLY, "captureId": "c2"}
+        ).json()
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["points"], 0)
+        self.assertEqual(self.balance(), first)
 
 
 class TerritoryViewTests(ApiTestCase):
