@@ -1,6 +1,8 @@
 import '../../../../shared/widgets/tab_visibility.dart';
 import 'dart:async' show Timer;
-import 'dart:math' show max;
+// `pi` берём из latlong2 (он его экспортирует) — иначе show из dart:math не
+// используется; остальные функции — из dart:math.
+import 'dart:math' show max, cos, pow, sqrt;
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -15,12 +17,23 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../league/data/division_provider.dart';
 import '../../../league/data/league_provider.dart';
 import '../../../weather/domain/run_window.dart';
+import '../../../run/data/run_mode_provider.dart';
 import '../../../run/data/run_provider.dart';
 import '../../../territory/data/territory_provider.dart';
+import '../../../trails/data/trails_provider.dart';
 import '../../../weather/data/weather_provider.dart';
 import '../../../weather/presentation/weather_background.dart';
 import '../../../weather/presentation/weather_view.dart';
 import '../../../../shared/widgets/kvartal_logo.dart';
+
+// Границы «тумана» режима «Исследование»: заведомо больше игровой зоны
+// (весь Якутск с округой), чтобы край затемнения не появлялся при панораме.
+const List<LatLng> _fogBounds = [
+  LatLng(58.0, 124.0),
+  LatLng(58.0, 136.0),
+  LatLng(66.0, 136.0),
+  LatLng(66.0, 124.0),
+];
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -38,6 +51,10 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
   // → OpenStreetMap, чтобы карта всё равно работала.
   static const _cartoKey = String.fromEnvironment('CARTO_API_KEY');
   bool get _hasCarto => _cartoKey.isNotEmpty;
+
+  // Цвет маршрутов-троп на карте: яркая бирюза, заведомо контрастная и к
+  // светлой, и к тёмной подложке (серые токены темы раньше сливались с картой).
+  static const Color _trailLineColor = Color(0xFF2E9FC4);
 
   bool _followUser = true;
 
@@ -72,6 +89,9 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
 
   void _loadTerritories() {
     if (!mounted) return;
+    // Территории (слой захвата) нужны только в режиме «Захват». В остальных
+    // режимах карту к бэку территорий не дёргаем.
+    if (ref.read(runModeProvider) != RunMode.capture) return;
     final LatLngBounds bounds;
     try {
       bounds = _mapController.camera.visibleBounds;
@@ -174,6 +194,27 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
       if (previousPoint == point) return;
       _mapController.move(point, _mapController.camera.zoom);
     });
+
+    // ── Режим бега перестраивает карту (утв. владельцем 14.09.2026) ──────────
+    final mode = ref.watch(runModeProvider);
+    // Тропы показываем в «Тропах» и «Захвате» (в захвате это маршруты районов).
+    final showTrails = mode == RunMode.trails || mode == RunMode.capture;
+    final trails = showTrails
+        ? (ref.watch(trailsProvider).valueOrNull ?? const <Trail>[])
+        : const <Trail>[];
+    // «Исследование»: кольца пробеганного (footprints) поверх тумана.
+    final footprintRings = mode == RunMode.explore
+        ? (ref.watch(footprintRingsProvider).valueOrNull ??
+            const <List<LatLng>>[])
+        : const <List<LatLng>>[];
+    // Вошли в «Захват» — подтягиваем территории видимой области сразу
+    // (в других режимах их не грузим, см. _loadTerritories).
+    ref.listen(runModeProvider, (prev, next) {
+      if (next == RunMode.capture && prev != RunMode.capture) {
+        _scheduleTerritoryLoad();
+      }
+    });
+
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       body: Stack(
@@ -233,41 +274,94 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
               // серверного и давал двойной контур. Источник правды один —
               // серверные territories ниже.
 
-              // City block territory polygons
-              PolygonLayer(
-                polygons: zones.map((z) {
-                  final flash = _flashing.contains(z.id);
-                  return Polygon(
-                    points: z.vertices,
-                    color: _fill(z.owner, flash: flash),
-                    borderColor: _border(z.owner, flash: flash),
-                    borderStrokeWidth: flash ? 3.5 : 1.5,
-                  );
-                }).toList(),
-              ),
-
-              // Реальные территории с сервера (PostGIS, D-09): мои/клуб/чужие.
-              if (territories.isNotEmpty)
+              // ── Слой «Захват»: кварталы и территории ─────────────────────
+              // Показываем только в режиме «Захват»; в остальных карта чистая.
+              if (mode == RunMode.capture) ...[
+                // City block territory polygons
                 PolygonLayer(
-                  polygons: [
-                    for (final t in territories)
-                      for (final ring in t.rings)
-                        Polygon(
-                          points: ring,
-                          // Видимый decay (Ф2): чем ближе конец удержания,
-                          // тем бледнее квартал — землю пора обновлять бегом.
-                          color: _territoryFill(
-                            t.rel,
-                            freshness: _freshness(t.holdHoursLeft),
+                  polygons: zones.map((z) {
+                    final flash = _flashing.contains(z.id);
+                    return Polygon(
+                      points: z.vertices,
+                      color: _fill(z.owner, flash: flash),
+                      borderColor: _border(z.owner, flash: flash),
+                      borderStrokeWidth: flash ? 3.5 : 1.5,
+                    );
+                  }).toList(),
+                ),
+
+                // Реальные территории с сервера (PostGIS, D-09): мои/клуб/чужие.
+                if (territories.isNotEmpty)
+                  PolygonLayer(
+                    polygons: [
+                      for (final t in territories)
+                        for (final ring in t.rings)
+                          Polygon(
+                            points: ring,
+                            // Видимый decay (Ф2): чем ближе конец удержания,
+                            // тем бледнее квартал — землю пора обновлять бегом.
+                            color: _territoryFill(
+                              t.rel,
+                              freshness: _freshness(t.holdHoursLeft),
+                            ),
+                            borderColor: _territoryBorder(
+                              t.rel,
+                              freshness: _freshness(t.holdHoursLeft),
+                            ),
+                            borderStrokeWidth: 1.6,
                           ),
-                          borderColor: _territoryBorder(
-                            t.rel,
-                            freshness: _freshness(t.holdHoursLeft),
-                          ),
-                          borderStrokeWidth: 1.6,
+                    ],
+                  ),
+              ],
+
+              // ── Слой «Тропы»/«Захват»: маршруты-тропы ────────────────────
+              // Данные /v1/trails. Цвет — яркая бирюза (контраст к подложке;
+              // серые токены темы сливались с картой, D-баг). Тап по линии
+              // ведёт в детали тропы (см. _onMapTap → _trailAt).
+              if (showTrails)
+                PolylineLayer(
+                  polylines: [
+                    for (final trail in trails)
+                      if (trail.points.length > 1)
+                        Polyline(
+                          points: trail.points,
+                          color: _trailLineColor,
+                          strokeWidth: 4,
+                          borderColor: const Color(0x66101418),
+                          borderStrokeWidth: 1,
                         ),
                   ],
                 ),
+
+              // ── Слой «Исследование»: туман войны ─────────────────────────
+              // Один тёмный полигон на весь регион с ВЫРЕЗАМИ (holePointsList)
+              // по кольцам footprints: где бежал — туман прорезан и видна карта,
+              // остальное затемнено (как в старых GTA). Сверху тонкая лаймовая
+              // обводка края открытого — «свет по границе исследованного».
+              if (mode == RunMode.explore) ...[
+                PolygonLayer(
+                  polygons: [
+                    Polygon(
+                      points: _fogBounds,
+                      holePointsList:
+                          footprintRings.isEmpty ? null : footprintRings,
+                      color: const Color(0xD90B0E12), // ~0.85 тёмный туман
+                    ),
+                  ],
+                ),
+                if (footprintRings.isNotEmpty)
+                  PolygonLayer(
+                    polygons: [
+                      for (final ring in footprintRings)
+                        Polygon(
+                          points: ring,
+                          color: const Color(0x00000000),
+                          borderColor: AppColors.lime.withValues(alpha: 0.9),
+                          borderStrokeWidth: 2,
+                        ),
+                    ],
+                  ),
+              ],
 
               // Run route line
               if (runState.status != RunStatus.idle &&
@@ -355,6 +449,44 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
               ),
             ),
           ),
+
+          // ── Подсказка пустого «Исследования» ─────────────────────────────
+          // Ничего ещё не открыто — карта сплошь в тумане. Без подсказки
+          // пустой тёмный экран читается как ошибка.
+          if (mode == RunMode.explore && footprintRings.isEmpty)
+            IgnorePointer(
+              child: Align(
+                alignment: const Alignment(0, -0.12),
+                child: _Glass(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 22, vertical: 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(CupertinoIcons.map,
+                          color: AppColors.lime, size: 30),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Город скрыт туманом',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Беги, чтобы открывать карту',
+                        style: TextStyle(
+                          color: AppColors.ink.withValues(alpha: 0.7),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           // ── Loading indicator ────────────────────────────────────────────
           if (zonesAsync is AsyncLoading)
@@ -512,13 +644,25 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
     );
   }
 
-  /// Тап по карте — паспорт квартала (Ф2): чей, защита, как забрать.
+  /// Тап по карте: в режимах троп/захвата — открыть тропу под пальцем;
+  /// в захвате — иначе паспорт квартала (Ф2): чей, защита, как забрать.
   void _onMapTap(LatLng point) {
     // Тап по карте сворачивает развёрнутую легенду (следующий тап — паспорт).
     if (_legendOpen) {
       setState(() => _legendOpen = false);
       return;
     }
+    final mode = ref.read(runModeProvider);
+    // Тропа под пальцем (тонкая цель) — приоритет над полигонами кварталов.
+    if (mode == RunMode.trails || mode == RunMode.capture) {
+      final trail = _trailAt(point);
+      if (trail != null) {
+        context.push('/trails/detail', extra: trail);
+        return;
+      }
+    }
+    // Паспорт квартала — только в режиме «Захват» (в других слоёв кварталов нет).
+    if (mode != RunMode.capture) return;
     final territories = ref.read(territoryProvider).territories;
     for (final t in territories) {
       for (final ring in t.rings) {
@@ -548,6 +692,50 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
         return;
       }
     }
+  }
+
+  /// Тропа под точкой тапа (или null). Допуск считаем в пикселях экрана
+  /// (≈22 px) через метры-на-пиксель текущего зума, чтобы попадание было
+  /// одинаково удобным на любом масштабе.
+  Trail? _trailAt(LatLng point) {
+    final trails = ref.read(trailsProvider).valueOrNull ?? const <Trail>[];
+    if (trails.isEmpty) return null;
+    final double zoom;
+    try {
+      zoom = _mapController.camera.zoom;
+    } catch (_) {
+      return null; // камера ещё не готова
+    }
+    final metersPerPixel =
+        156543.03392 * cos(point.latitude * pi / 180) / pow(2, zoom);
+    final threshold = 22 * metersPerPixel;
+    for (final trail in trails) {
+      final pts = trail.points;
+      for (var i = 0; i + 1 < pts.length; i++) {
+        if (_distToSegmentMeters(point, pts[i], pts[i + 1]) <= threshold) {
+          return trail;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Кратчайшее расстояние (м) от точки до отрезка a-b. Локальная планарная
+  /// проекция вокруг p (метры на градус) — точности с запасом для тапа.
+  static double _distToSegmentMeters(LatLng p, LatLng a, LatLng b) {
+    const latM = 111320.0;
+    final lonM = 111320.0 * cos(p.latitude * pi / 180);
+    final px = p.longitude * lonM, py = p.latitude * latM;
+    final ax = a.longitude * lonM, ay = a.latitude * latM;
+    final bx = b.longitude * lonM, by = b.latitude * latM;
+    final dx = bx - ax, dy = by - ay;
+    final len2 = dx * dx + dy * dy;
+    final double t = len2 == 0
+        ? 0.0
+        : (((px - ax) * dx + (py - ay) * dy) / len2).clamp(0.0, 1.0).toDouble();
+    final cx = ax + t * dx, cy = ay + t * dy;
+    final ddx = px - cx, ddy = py - cy;
+    return sqrt(ddx * ddx + ddy * ddy);
   }
 
   static String _heldLabel(int capturedAtMs) {

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
@@ -18,6 +19,10 @@ class Trail {
   final bool createdByMe;
   final bool attemptedByMe;
 
+  /// Геометрия линии тропы: точки [lat, lon], уже прорежённые сервером.
+  /// Нужна карте (режимы «Тропы»/«Захват») для отрисовки маршрута.
+  final List<LatLng> points;
+
   /// Двойная мотивация прямо в списке (Ф0): моё лучшее и «чаще всех».
   final int? myBestS;
   final int myAttempts;
@@ -31,6 +36,7 @@ class Trail {
     this.city,
     this.createdByMe = false,
     this.attemptedByMe = false,
+    this.points = const [],
     this.myBestS,
     this.myAttempts = 0,
     this.frequentLeaderName,
@@ -48,11 +54,25 @@ class Trail {
     lengthM: (j['lengthM'] as num?)?.toInt() ?? 0,
     createdByMe: j['createdByMe'] == true,
     attemptedByMe: j['attemptedByMe'] == true,
+    points: _pointsFromJson(j['points']),
     myBestS: (j['myBestS'] as num?)?.toInt(),
     myAttempts: (j['myAttempts'] as num?)?.toInt() ?? 0,
     frequentLeaderName: (j['frequentLeader'] as Map?)?['name']?.toString(),
     frequentLeaderIsMe: (j['frequentLeader'] as Map?)?['isMe'] == true,
   );
+}
+
+/// Разбор точек линии тропы из JSON: `[[lat, lon], ...]` → `List<LatLng>`.
+/// Битые/неполные точки молча пропускаем — карта нарисует остаток линии.
+List<LatLng> _pointsFromJson(dynamic raw) {
+  if (raw is! List) return const [];
+  final out = <LatLng>[];
+  for (final p in raw) {
+    if (p is List && p.length >= 2 && p[0] is num && p[1] is num) {
+      out.add(LatLng((p[0] as num).toDouble(), (p[1] as num).toDouble()));
+    }
+  }
+  return out;
 }
 
 /// Доски тропы. Ключи совпадают с параметром API.

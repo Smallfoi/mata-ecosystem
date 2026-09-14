@@ -189,9 +189,11 @@ class _RunHeader extends ConsumerWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              mode == RunMode.free
-                  ? 'Якутск · беги в своём темпе'
-                  : 'Якутск · территория ждёт',
+              // «Территория ждёт» — только про захват; остальные режимы
+              // (свободный/тропы/исследование) — про сам бег.
+              mode == RunMode.capture
+                  ? 'Якутск · территория ждёт'
+                  : 'Якутск · беги в своём темпе',
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
@@ -264,7 +266,9 @@ class _QuickStatsRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isFreeRun = ref.watch(runModeProvider) == RunMode.free;
+    // Зоны — только для захвата; свободный/тропы/исследование показывают
+    // километры недели, а не «мои зоны».
+    final isFreeRun = ref.watch(runModeProvider) != RunMode.capture;
     return Row(
       children: [
         _QuickStat(
@@ -391,9 +395,9 @@ class _StartCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        mode == RunMode.free
-                            ? 'Темп, дистанция, время. Твой бег.'
-                            : 'Замкни маршрут. Забери квартал.',
+                        mode == RunMode.capture
+                            ? 'Замкни маршрут. Забери квартал.'
+                            : 'Темп, дистанция, время. Твой бег.',
                         style: TextStyle(
                           fontSize: 14,
                           color: AppColors.onDark.withValues(alpha: 0.72),
@@ -479,20 +483,21 @@ class _StartCard extends ConsumerWidget {
   }
 }
 
-/// Переключатель режима пробежки прямо на карточке старта: один тап —
-/// и «чистый бегун» убирает игру в захват, один тап — возвращает.
-/// Выбор запоминается между сессиями (kvartal.run_mode.v1).
+/// Переключатель режима пробежки прямо на карточке старта: один тап меняет
+/// режим и перестраивает карту под него. Режимов четыре, поэтому пилюли идут
+/// через Wrap — при нехватке ширины перенос на вторую строку, без обрезки.
+/// Выбор запоминается между сессиями (kvartal.run_mode.v3).
 class _RunModeSwitch extends ConsumerWidget {
   const _RunModeSwitch();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(runModeProvider);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
-        for (final option in RunMode.values) ...[
-          if (option != RunMode.values.first) const SizedBox(width: 8),
+        for (final option in RunMode.values)
           GestureDetector(
             // Перехватывает тап раньше карточки — старт не сработает.
             onTap: () => ref.read(runModeProvider.notifier).set(option),
@@ -524,7 +529,6 @@ class _RunModeSwitch extends ConsumerWidget {
               ),
             ),
           ),
-        ],
       ],
     );
   }
@@ -540,7 +544,8 @@ class _ActiveRunView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(runProvider.notifier);
     final isActive = runState.status == RunStatus.active;
-    final isFreeRun = ref.watch(runModeProvider) == RunMode.free;
+    // Метрика «ЗОНЫ» — только в режиме захвата; остальные режимы её прячут.
+    final isFreeRun = ref.watch(runModeProvider) != RunMode.capture;
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -683,8 +688,9 @@ class _ActiveRunView extends ConsumerWidget {
       context.push('/run/result', extra: result);
     }
 
-    // Свободный режим: никакой риторики захвата — только бег и его цифры.
-    if (ref.read(runModeProvider) == RunMode.free) {
+    // Захват предлагаем только в режиме «Захват». Свободный, тропы и
+    // исследование финишируют тихо — только бег и его цифры.
+    if (ref.read(runModeProvider) != RunMode.capture) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
