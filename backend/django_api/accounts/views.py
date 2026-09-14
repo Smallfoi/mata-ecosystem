@@ -17,6 +17,7 @@ from common.security import (
 from loyalty.models import seed_runner_points
 
 from .models import Account
+from . import otp_guard
 from .sms import channel_info, check_code, code_error, request_code, sms_enabled
 
 
@@ -118,16 +119,27 @@ def password_reset(request):
 @throttle_classes([AuthEndpointThrottle])
 def phone_request(request):
     """Отправить код входа на телефон. В dev (без провайдера) ничего не шлётся —
-    код входа всегда 1234. С провайдером уходит одноразовый код (звонок или SMS)."""
+    код входа всегда 1234. С провайдером уходит одноразовый код (звонок или SMS).
+    Каждый код стоит денег — лимиты на номер и адрес в `otp_guard` (D-76)."""
     phone = normalize_phone(request.data.get("phone") or "")
     if not phone:
         return Response({"detail": "Нет телефона"}, status=400)
+    try:
+        slot = otp_guard.reserve(phone, request)
+    except otp_guard.Refused as refused:
+        return Response(
+            {"detail": refused.detail, "retryAfter": refused.retry_after},
+            status=429,
+            headers={"Retry-After": str(refused.retry_after)},
+        )
     if not request_code(phone):
+        slot.release()  # кода не было — попытку человеку возвращаем
         # Провайдер не принял отправку. Молчаливое «ok» оставило бы человека ждать
         # код, который никогда не придёт, — пусть лучше увидит ошибку и повторит.
         return Response(
             {"detail": "Не удалось отправить код. Попробуйте ещё раз."}, status=502
         )
+    slot.sent()
     # channel говорит клиенту, показывать ли поле кода: часть каналов подтверждается
     # кнопкой на телефоне, и поле там просто некуда заполнять.
     return Response(
