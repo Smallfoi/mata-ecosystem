@@ -69,7 +69,11 @@ CAPTURE_COOLDOWN_S = 30  # защита от спама захватами
 # не сумму — за сутки это 2880 захватов и 144 000 баллов, то есть деньги в Store
 # из воздуха. Живому бегуну двадцати захватов в день с запасом хватает.
 MAX_CAPTURES_PER_DAY = 20
-TERRITORY_POINTS = 50  # очки за захват (анти-чит S-04: начисляет сервер, не клиент)
+TERRITORY_POINTS = 50  # номинал для теста суточного лимита (в capture() больше не плоский)
+# Начисление за захват — по НОВОМУ следу: повтор того же места не растит footprint → 0
+# баллов (закрывает ферму «круги вокруг киоска»). Большой новый круг ≈ прежние десятки.
+AREA_PER_POINT_M2 = 100      # 1 балл за каждые 100 м² впервые исследованной земли
+MAX_TERRITORY_POINTS = 100   # потолок за один захват (≥10 000 м² нового следа)
 
 
 def _club_of(uid):
@@ -255,9 +259,16 @@ def capture(request):
                     "INSERT INTO recent_captures (owner_id, geom) VALUES (%s, ST_GeomFromEWKT(%s))",
                     [uid, eff_ewkt],
                 )
-            # 7) вечный личный след: union ПОЛНОГО контура (бежал везде, даже где не взял)
-            cur.execute("SELECT 1 FROM footprints WHERE owner_id=%s", [uid])
-            if cur.fetchone():
+            # 7) вечный личный след + расчёт НОВОЙ земли для начисления баллов.
+            #    Баллы за захват = за впервые исследованные м² (рост footprint), а не
+            #    плоские 50: повтор того же круга не добавляет следа → 0 баллов.
+            cur.execute(
+                "SELECT COALESCE(ST_Area(geom::geography),0) FROM footprints WHERE owner_id=%s",
+                [uid],
+            )
+            fp_row = cur.fetchone()
+            fp_before = (fp_row[0] if fp_row else 0) or 0
+            if fp_row:
                 cur.execute(
                     "UPDATE footprints SET geom = ST_Multi(ST_CollectionExtract("
                     "ST_Union(geom, ST_GeomFromEWKT(%s)),3)), updated_at=now() WHERE owner_id=%s",
@@ -269,6 +280,15 @@ def capture(request):
                     "VALUES (%s,ST_GeomFromEWKT(%s),now())",
                     [uid, cap_ewkt],
                 )
+            cur.execute(
+                "SELECT COALESCE(ST_Area(geom::geography),0) FROM footprints WHERE owner_id=%s",
+                [uid],
+            )
+            fp_after = (cur.fetchone() or [0])[0] or 0
+            new_area_m2 = max(0.0, float(fp_after) - float(fp_before))
+            territory_points = min(
+                round(new_area_m2 / AREA_PER_POINT_M2), MAX_TERRITORY_POINTS
+            )
             cur.execute(
                 "SELECT ST_AsGeoJSON(geom), ST_Area(geom::geography) "
                 "FROM territories WHERE owner_id=%s",
@@ -284,10 +304,10 @@ def capture(request):
         # Очки за захват начисляет СЕРВЕР (анти-чит S-04 Phase 2), идемпотентно по
         # captureId. Дубликаты захвата сюда не доходят (выходят раньше), но проверку
         # по транзакции оставляем как страховку от рассинхрона.
-        if capture_id and not LoyaltyTransaction.objects.filter(
+        if capture_id and territory_points > 0 and not LoyaltyTransaction.objects.filter(
             user_id=uid, run_id=capture_id, source="runnerTerritory"
         ).exists():
-            add_txn(uid, TERRITORY_POINTS, "runnerTerritory",
+            add_txn(uid, territory_points, "runnerTerritory",
                     "Захват территории", None, capture_id)
     # Аналитика (D-30): успешный захват территории (площадь владения после захвата).
     from analytics.models import E_TERRITORY_CAPTURED, track
@@ -297,6 +317,7 @@ def capture(request):
         {
             "ok": True,
             "areaM2": round(area or 0),
+            "points": territory_points,
             "geojson": json.loads(gj) if gj else None,
             "holdHoursLeft": HOLD_HOURS,
         }
