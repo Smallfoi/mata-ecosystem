@@ -112,6 +112,13 @@ class TerritoryState {
   /// Площадь моей территории после последнего захвата, м².
   final double? lastAreaM2;
 
+  /// Сколько городских кварталов забрал последний захват (D-74). null — до
+  /// ответа сервера/офлайн; 0 — замкнул петлю, но новых кварталов не добавил.
+  final int? lastBlocksGained;
+
+  /// Сколько кварталов всего у меня после последнего захвата (D-74).
+  final int? lastBlocksTotal;
+
   const TerritoryState({
     this.territories = const [],
     this.isLoading = false,
@@ -119,6 +126,8 @@ class TerritoryState {
     this.error,
     this.message,
     this.lastAreaM2,
+    this.lastBlocksGained,
+    this.lastBlocksTotal,
   });
 
   TerritoryState copyWith({
@@ -128,8 +137,11 @@ class TerritoryState {
     String? error,
     String? message,
     double? lastAreaM2,
+    int? lastBlocksGained,
+    int? lastBlocksTotal,
     bool clearError = false,
     bool clearMessage = false,
+    bool clearBlocks = false,
   }) => TerritoryState(
     territories: territories ?? this.territories,
     isLoading: isLoading ?? this.isLoading,
@@ -137,6 +149,10 @@ class TerritoryState {
     error: clearError ? null : error ?? this.error,
     message: clearMessage ? null : message ?? this.message,
     lastAreaM2: lastAreaM2 ?? this.lastAreaM2,
+    lastBlocksGained:
+        clearBlocks ? null : lastBlocksGained ?? this.lastBlocksGained,
+    lastBlocksTotal:
+        clearBlocks ? null : lastBlocksTotal ?? this.lastBlocksTotal,
   );
 }
 
@@ -198,7 +214,14 @@ class TerritoryNotifier extends StateNotifier<TerritoryState> {
     final cleaned = cleanRoute(route);
     if (cleaned.length < 3) return null;
     final captureId = _newCaptureId();
-    state = state.copyWith(isCapturing: true, clearError: true, clearMessage: true);
+    // clearBlocks: экран итогов покажет счётчик кварталов ТОЛЬКО за этот забег,
+    // а не оставшийся от предыдущего захвата.
+    state = state.copyWith(
+      isCapturing: true,
+      clearError: true,
+      clearMessage: true,
+      clearBlocks: true,
+    );
     final body = <String, dynamic>{
       'points': [
         for (final p in cleaned) [p.latitude, p.longitude],
@@ -237,6 +260,9 @@ class TerritoryNotifier extends StateNotifier<TerritoryState> {
   /// Применить ответ сервера на захват к состоянию (своя территория сразу видна).
   double? _applyCaptureResponse(Map<String, dynamic> data) {
     final area = (data['areaM2'] as num?)?.toDouble();
+    // Захват по кварталам (D-74): сколько забрал этот забег и сколько всего.
+    final blocksGained = (data['blocksGained'] as num?)?.toInt();
+    final blocksTotal = (data['blocksTotal'] as num?)?.toInt();
     // Сервер начислил очки за захват (анти-чит S-04 Phase 2) — обновляем баланс.
     if (area != null) {
       unawaited(ref.read(loyaltyProvider.notifier).refresh());
@@ -256,13 +282,20 @@ class TerritoryNotifier extends StateNotifier<TerritoryState> {
         territories: mine.rings.isEmpty ? others : [...others, mine],
         isCapturing: false,
         lastAreaM2: area,
+        lastBlocksGained: blocksGained,
+        lastBlocksTotal: blocksTotal,
         message: area != null
             ? 'Территория захвачена: ${formatAreaM2(area)}'
             : 'Территория захвачена',
         clearError: true,
       );
     } else {
-      state = state.copyWith(isCapturing: false, lastAreaM2: area);
+      state = state.copyWith(
+        isCapturing: false,
+        lastAreaM2: area,
+        lastBlocksGained: blocksGained,
+        lastBlocksTotal: blocksTotal,
+      );
     }
     return area;
   }
