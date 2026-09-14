@@ -289,6 +289,27 @@ def capture(request):
             territory_points = min(
                 round(new_area_m2 / AREA_PER_POINT_M2), MAX_TERRITORY_POINTS
             )
+            # 7б) захват КВАРТАЛОВ (D-74, Ф2): кварталы, чей центр внутри контура забега,
+            #     становятся твоими. Новые (ранее не твои) — для счётчика «+N кварталов»;
+            #     чужие перехватываются (защита сезоном/домом — Ф3). Полигонный слой выше
+            #     живёт параллельно (карта/рейтинг), пока клиент не перейдёт на кварталы.
+            cur.execute(
+                "SELECT b.block_id, o.owner_id FROM city_blocks b "
+                "LEFT JOIN block_ownership o ON o.block_id = b.block_id "
+                "WHERE ST_Contains(ST_GeomFromEWKT(%s), b.centroid)",
+                [cap_ewkt],
+            )
+            new_blocks = [r[0] for r in cur.fetchall() if r[1] != uid]
+            for bid in new_blocks:
+                cur.execute(
+                    "INSERT INTO block_ownership (block_id, owner_id, club_id, captured_at) "
+                    "VALUES (%s,%s,%s,now()) ON CONFLICT (block_id) DO UPDATE SET "
+                    "owner_id=EXCLUDED.owner_id, club_id=EXCLUDED.club_id, captured_at=now()",
+                    [bid, uid, club_id],
+                )
+            blocks_gained = len(new_blocks)
+            cur.execute("SELECT COUNT(*) FROM block_ownership WHERE owner_id=%s", [uid])
+            blocks_total = (cur.fetchone() or [0])[0] or 0
             cur.execute(
                 "SELECT ST_AsGeoJSON(geom), ST_Area(geom::geography) "
                 "FROM territories WHERE owner_id=%s",
@@ -318,6 +339,8 @@ def capture(request):
             "ok": True,
             "areaM2": round(area or 0),
             "points": territory_points,
+            "blocksGained": blocks_gained,
+            "blocksTotal": blocks_total,
             "geojson": json.loads(gj) if gj else None,
             "holdHoursLeft": HOLD_HOURS,
         }

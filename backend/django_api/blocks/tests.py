@@ -11,6 +11,16 @@ def _count():
         return cur.fetchone()[0]
 
 
+def _central_block():
+    """Квартал у пл. Ленина + его центр (block_id, lng, lat) — для тест-петли захвата."""
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT block_id, ST_X(centroid), ST_Y(centroid) FROM city_blocks "
+            "ORDER BY centroid <-> ST_SetSRID(ST_MakePoint(129.732, 62.027), 4326) LIMIT 1"
+        )
+        return cur.fetchone()
+
+
 class BlocksTests(ApiTestCase):
     phone = "+79990002050"
 
@@ -54,3 +64,53 @@ class BlocksTests(ApiTestCase):
 
     def test_bad_bbox_returns_400(self):
         self.assertEqual(self.api_get("/v1/blocks?bbox=abc").status_code, 400)
+
+
+class BlockCaptureTests(ApiTestCase):
+    """Захват по кварталам (D-74, Ф2): петля метит кварталы с центром внутри."""
+
+    phone = "+79990002060"
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("load_blocks")
+
+    def _box(self):
+        bid, lng, lat = _central_block()
+        d = 0.0006  # ~130x60 м вокруг центра квартала — центр гарантированно внутри
+        return bid, [[lat - d, lng - d], [lat + d, lng - d], [lat + d, lng + d], [lat - d, lng + d]]
+
+    def test_capture_marks_blocks_mine(self):
+        bid, box = self._box()
+        r = self.api_post(
+            "/v1/territories/capture", {"points": box, "captureId": "b1"}
+        ).json()
+        self.assertTrue(r["ok"])
+        self.assertGreaterEqual(r["blocksGained"], 1)
+        self.assertEqual(r["blocksTotal"], r["blocksGained"])
+        blocks = self.api_get("/v1/blocks").json()["blocks"]
+        mine = {b["blockId"] for b in blocks if b["rel"] == "mine"}
+        self.assertIn(bid, mine)
+        self.assertEqual(len(mine), r["blocksGained"])
+
+    def test_recapture_same_ground_no_new(self):
+        _, box = self._box()
+        self.api_post("/v1/territories/capture", {"points": box, "captureId": "b1"})
+        with connection.cursor() as cur:  # обойти кулдаун полигонного слоя
+            cur.execute("UPDATE territories SET captured_at = now() - interval '1 hour'")
+            cur.execute("UPDATE recent_captures SET captured_at = now() - interval '2 days'")
+        r = self.api_post(
+            "/v1/territories/capture", {"points": box, "captureId": "b2"}
+        ).json()
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["blocksGained"], 0)
+
+    def test_enemy_sees_other_owner(self):
+        bid, box = self._box()
+        self.api_post("/v1/territories/capture", {"points": box, "captureId": "b1"})
+        other = self.new_user("+79990002061")
+        blocks = self.api_get("/v1/blocks", token=other).json()["blocks"]
+        row = next(b for b in blocks if b["blockId"] == bid)
+        self.assertEqual(row["rel"], "enemy")
+        self.assertEqual(row["ownerId"], self.uid)
+        self.assertIsNotNone(row["ownerName"])
