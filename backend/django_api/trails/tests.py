@@ -6,6 +6,7 @@
 """
 from datetime import timedelta
 
+from django.db import connection
 from django.utils import timezone
 
 from common.testutils import ApiTestCase
@@ -226,3 +227,59 @@ class TrailApiTests(ApiTestCase):
 
     def test_boards_404_for_unknown_trail(self):
         self.assertEqual(self.api_get("/v1/trails/nope/boards").status_code, 404)
+
+
+class ExploreFootprintTests(ApiTestCase):
+    """Исследование карты (D-74, вариант A): любой забег растит вечный след
+    (footprints) — по нему в приложении открывается «туман». Трек не обязан
+    совпасть с тропой: свободный бег тоже открывает город."""
+
+    phone = "+79990009203"
+
+    def _footprint_area(self):
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(ST_Area(geom::geography),0) "
+                "FROM footprints WHERE owner_id=%s",
+                [self.uid],
+            )
+            row = cur.fetchone()
+        return float(row[0]) if row else 0.0
+
+    def test_free_run_grows_footprint(self):
+        """Свободный бег без единой тропы всё равно открывает карту."""
+        self.assertEqual(self._footprint_area(), 0.0)
+        r = self.api_post("/v1/runs/track", {
+            "runId": "fp_1",
+            "points": track_along(line(n=10)),
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertGreater(self._footprint_area(), 0.0)
+
+    def test_run_elsewhere_expands_footprint(self):
+        """Забег в новом районе увеличивает исследованную площадь."""
+        self.api_post("/v1/runs/track",
+                      {"runId": "fp_2", "points": track_along(line(n=10))})
+        after_first = self._footprint_area()
+        far = line(n=10, lat=BASE_LAT + 0.05, lon=BASE_LON + 0.05)
+        self.api_post("/v1/runs/track",
+                      {"runId": "fp_3", "points": track_along(far)})
+        self.assertGreater(self._footprint_area(), after_first)
+
+    def test_rerun_same_route_does_not_shrink(self):
+        """Повтор того же маршрута не уменьшает след — union монотонен."""
+        self.api_post("/v1/runs/track",
+                      {"runId": "fp_4", "points": track_along(line(n=10))})
+        area1 = self._footprint_area()
+        self.api_post("/v1/runs/track",
+                      {"runId": "fp_5", "points": track_along(line(n=10))})
+        self.assertGreaterEqual(self._footprint_area(), area1 - 1.0)
+
+    def test_trails_disabled_no_footprint(self):
+        """Выключил участие в тропах — трек не приходит, след не растёт."""
+        RunnerProfile.objects.update_or_create(
+            user_id=self.uid, defaults={"trails_enabled": False}
+        )
+        self.api_post("/v1/runs/track",
+                      {"runId": "fp_6", "points": track_along(line(n=10))})
+        self.assertEqual(self._footprint_area(), 0.0)

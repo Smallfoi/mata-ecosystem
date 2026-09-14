@@ -26,6 +26,15 @@ import '../../../weather/presentation/weather_background.dart';
 import '../../../weather/presentation/weather_view.dart';
 import '../../../../shared/widgets/kvartal_logo.dart';
 
+// Границы «тумана» режима «Исследование»: заведомо больше игровой зоны
+// (весь Якутск с округой), чтобы край затемнения не появлялся при панораме.
+const List<LatLng> _fogBounds = [
+  LatLng(58.0, 124.0),
+  LatLng(58.0, 136.0),
+  LatLng(66.0, 136.0),
+  LatLng(66.0, 124.0),
+];
+
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
@@ -324,18 +333,21 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                   ],
                 ),
 
-              // ── Слой «Исследование»: туман + пробеганное ─────────────────
-              // v1 тумана (упрощённый): тёмный полупрозрачный scrim поверх всей
-              // карты + яркая заливка footprints поверх него. Дыры в тумане по
-              // контуру следа НЕ вырезаем (для этого нужен even-odd/маска слоёв);
-              // читается как «светлое открыто, остальное затемнено». Полноценный
-              // вырез — отдельная фаза.
+              // ── Слой «Исследование»: туман войны ─────────────────────────
+              // Один тёмный полигон на весь регион с ВЫРЕЗАМИ (holePointsList)
+              // по кольцам footprints: где бежал — туман прорезан и видна карта,
+              // остальное затемнено (как в старых GTA). Сверху тонкая лаймовая
+              // обводка края открытого — «свет по границе исследованного».
               if (mode == RunMode.explore) ...[
-                const Positioned.fill(
-                  child: IgnorePointer(
-                    // ~0.55 alpha (0x8C) тёмный «туман».
-                    child: ColoredBox(color: Color(0x8C0B0E12)),
-                  ),
+                PolygonLayer(
+                  polygons: [
+                    Polygon(
+                      points: _fogBounds,
+                      holePointsList:
+                          footprintRings.isEmpty ? null : footprintRings,
+                      color: const Color(0xD90B0E12), // ~0.85 тёмный туман
+                    ),
+                  ],
                 ),
                 if (footprintRings.isNotEmpty)
                   PolygonLayer(
@@ -343,8 +355,8 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                       for (final ring in footprintRings)
                         Polygon(
                           points: ring,
-                          color: AppColors.lime.withValues(alpha: 0.30),
-                          borderColor: AppColors.lime,
+                          color: const Color(0x00000000),
+                          borderColor: AppColors.lime.withValues(alpha: 0.9),
                           borderStrokeWidth: 2,
                         ),
                     ],
@@ -437,6 +449,44 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
               ),
             ),
           ),
+
+          // ── Подсказка пустого «Исследования» ─────────────────────────────
+          // Ничего ещё не открыто — карта сплошь в тумане. Без подсказки
+          // пустой тёмный экран читается как ошибка.
+          if (mode == RunMode.explore && footprintRings.isEmpty)
+            IgnorePointer(
+              child: Align(
+                alignment: const Alignment(0, -0.12),
+                child: _Glass(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 22, vertical: 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(CupertinoIcons.map,
+                          color: AppColors.lime, size: 30),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Город скрыт туманом',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Беги, чтобы открывать карту',
+                        style: TextStyle(
+                          color: AppColors.ink.withValues(alpha: 0.7),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           // ── Loading indicator ────────────────────────────────────────────
           if (zonesAsync is AsyncLoading)

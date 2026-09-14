@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 from datetime import timezone as dt_tz
 
+from django.db import connection
 from django.db.models import Min
 from django.utils import timezone
 from rest_framework.decorators import api_view
@@ -17,6 +18,35 @@ from league.models import RunnerProfile
 from league.services import age_group, group_label
 from trails import matching
 from trails.models import PendingTrack, Trail, TrailAttempt
+
+
+def _grow_footprint(user_id, track):
+    """Растим личный «исследованный» след (D-74, вариант A): коридор ~25 м вдоль
+    трека объединяем в footprints (вечный след). По нему открывается туман в режиме
+    «Исследование». Хранит агрегат-полигон, не сырой трек (как и вся footprints)."""
+    line = "LINESTRING(" + ", ".join(f"{p[1]} {p[0]}" for p in track) + ")"
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT ST_AsEWKT(ST_Multi(ST_CollectionExtract(ST_MakeValid("
+            "ST_Buffer(ST_GeomFromText(%s,4326)::geography, 25)::geometry),3)))",
+            [line],
+        )
+        corridor = (cur.fetchone() or [None])[0]
+        if not corridor or "EMPTY" in corridor.upper():
+            return
+        cur.execute("SELECT 1 FROM footprints WHERE owner_id=%s", [user_id])
+        if cur.fetchone():
+            cur.execute(
+                "UPDATE footprints SET geom=ST_Multi(ST_CollectionExtract("
+                "ST_Union(geom, ST_GeomFromEWKT(%s)),3)), updated_at=now() WHERE owner_id=%s",
+                [corridor, user_id],
+            )
+        else:
+            cur.execute(
+                "INSERT INTO footprints (owner_id, geom, updated_at) "
+                "VALUES (%s, ST_GeomFromEWKT(%s), now())",
+                [user_id, corridor],
+            )
 
 MAX_TRACK_POINTS = 6000     # ~8 часов при точке в 5 секунд
 MAX_TRAIL_POINTS = 500
@@ -105,6 +135,14 @@ def submit_track(request):
             },
         )
         found.append({**attempt.to_json(), "trailName": trail.name})
+
+    # Исследование карты (D-74, A): растим личный след из трека для тумана.
+    # Сбой следа не должен ломать ответ по тропам.
+    if len(track) >= 2:
+        try:
+            _grow_footprint(me, track)
+        except Exception:
+            pass
 
     return Response({"attempts": found})
 
