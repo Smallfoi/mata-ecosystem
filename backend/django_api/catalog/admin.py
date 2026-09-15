@@ -28,7 +28,16 @@ class CategoryAdmin(ModelAdmin):
     search_fields = ("id", "name")
     ordering = ("sort",)
     readonly_fields = ("preview_large",)
-    fields = ("id", "name", "emoji", "image", "preview_large", "image_url", "sort")
+    fieldsets = (
+        (None, {"fields": ("id", "name", "emoji", "image", "preview_large", "image_url", "sort")}),
+        ("Типовая посылка", {
+            "fields": ("default_weight_g", "default_length_cm", "default_width_cm",
+                       "default_height_cm"),
+            "description": "Для расчёта доставки, пока у товаров категории нет своего веса и "
+            "габаритов. Пусто — возьмём значения родительской категории, а если и там "
+            "пусто — коробку 35×25×15 см, 1 кг.",
+        }),
+    )
 
     @admin.display(description="Фото")
     def preview(self, obj):
@@ -93,6 +102,13 @@ class ProductAdmin(ModelAdmin):
         }),
         ("Цена и наличие", {
             "fields": ("price", "old_price", "in_stock", "sizes", "colors"),
+        }),
+        ("Доставка: вес и габариты", {
+            "fields": ("weight_g", "length_cm", "width_cm", "height_cm"),
+            "description": "В упаковке, в граммах и сантиметрах — по ним службы доставки "
+            "считают цену. Обычно приходят из 1С и перезаписываются при обмене; вручную "
+            "заполняйте, только если 1С их не присылает. Пусто — возьмём типовую посылку "
+            "категории.",
         }),
         ("Витрина", {
             "fields": ("is_published", "is_new", "is_featured", "rating",

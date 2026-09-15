@@ -13,6 +13,12 @@ class Category(models.Model):
     # Загруженное в админке фото категории (приоритетнее image_url).
     image = models.ImageField(upload_to="uploads/categories/", null=True, blank=True, verbose_name="Фото")
     sort = models.IntegerField(default=0, verbose_name="Порядок")
+    # Типовая посылка для товаров категории, пока у самих товаров нет веса и
+    # габаритов (D-79). Граммы и сантиметры — в них считают службы доставки.
+    default_weight_g = models.PositiveIntegerField(null=True, blank=True, verbose_name="Типовой вес, г")
+    default_length_cm = models.PositiveIntegerField(null=True, blank=True, verbose_name="Типовая длина, см")
+    default_width_cm = models.PositiveIntegerField(null=True, blank=True, verbose_name="Типовая ширина, см")
+    default_height_cm = models.PositiveIntegerField(null=True, blank=True, verbose_name="Типовая высота, см")
     # Родитель из 1С (D-62). Витрина пока плоская и это поле не показывает, но
     # принимать и хранить его надо: иначе, когда дерево понадобится, придётся
     # просить 1С выгружать справочник заново.
@@ -91,6 +97,13 @@ class Product(models.Model):
     source_updated_at = models.DateTimeField(null=True, blank=True, verbose_name="Изменён в 1С")
     from_1c = models.JSONField(default=dict, blank=True, verbose_name="Значения из 1С")
     overrides = models.JSONField(default=list, blank=True, verbose_name="Переопределено владельцем")
+    # Вес и габариты в упаковке — для расчёта доставки (D-79). Ведёт 1С (склад знает
+    # точный вес); если 1С не прислала, остаётся ручной ввод в админке. На витрину
+    # не отдаются — это логистика, не контент.
+    weight_g = models.PositiveIntegerField(null=True, blank=True, verbose_name="Вес в упаковке, г")
+    length_cm = models.PositiveIntegerField(null=True, blank=True, verbose_name="Длина упаковки, см")
+    width_cm = models.PositiveIntegerField(null=True, blank=True, verbose_name="Ширина упаковки, см")
+    height_cm = models.PositiveIntegerField(null=True, blank=True, verbose_name="Высота упаковки, см")
 
     class Meta:
         db_table = "catalog_products"
