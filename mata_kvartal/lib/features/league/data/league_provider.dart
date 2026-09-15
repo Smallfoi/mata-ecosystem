@@ -180,7 +180,14 @@ final _leagueDio = Dio(
 
 /// Выбранный зачёт и период. Держим в состоянии, чтобы переключение вкладок
 /// не сбрасывало выбор.
-final leagueBoardProvider = StateProvider<LeagueBoard>((_) => LeagueBoard.absolute);
+/// Флаг «полной Лиги». На старте (D-80, 15.09.2026) Лигу сворачиваем к живому
+/// минимуму — уровень + «Постоянство» + «Мой прогресс», период только неделя:
+/// при <30 бегунах остальные доски и периоды пустуют и выглядят мёртвыми.
+/// Код досок/периодов НЕ удалён — вернуть всё = поставить true (и пересобрать).
+const bool kLeagueFullMode = false;
+
+final leagueBoardProvider = StateProvider<LeagueBoard>(
+    (_) => kLeagueFullMode ? LeagueBoard.absolute : LeagueBoard.consistency);
 final leaguePeriodProvider = StateProvider<String>((_) => 'week');
 
 final leagueBoardDataProvider = FutureProvider.autoDispose<LeagueBoardData>((ref) async {

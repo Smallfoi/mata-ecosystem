@@ -48,7 +48,15 @@ extension HubTabInfo on HubTab {
   };
 }
 
-final hubTabProvider = StateProvider<HubTab>((_) => HubTab.km);
+/// Вкладки, видимые в текущем режиме Лиги (см. [kLeagueFullMode]). В свёрнутом
+/// режиме — только живые в маленькой группе: «Постоянство» (кто чаще выходил)
+/// и «Мой прогресс» (ты против себя). Уровень/дивизион показывает шапка всегда.
+List<HubTab> get visibleHubTabs => kLeagueFullMode
+    ? HubTab.values
+    : const [HubTab.consistency, HubTab.personal];
+
+final hubTabProvider = StateProvider<HubTab>(
+    (_) => kLeagueFullMode ? HubTab.km : HubTab.consistency);
 
 class _DivisionHubScreenState extends ConsumerState<DivisionHubScreen>
     with TabVisibility {
@@ -247,7 +255,7 @@ class _DivisionHeaderDelegate extends SliverPersistentHeaderDelegate {
                                   ),
                             ),
                           ),
-                          const _PeriodToggle(),
+                          if (kLeagueFullMode) const _PeriodToggle(),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -692,10 +700,10 @@ class _HubChips extends ConsumerWidget {
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
-        itemCount: HubTab.values.length,
+        itemCount: visibleHubTabs.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
-          final tab = HubTab.values[i];
+          final tab = visibleHubTabs[i];
           final active = tab == selected;
           return GestureDetector(
             onTap: () {
