@@ -37,6 +37,7 @@ from django.core.cache import cache
 _DEV_CODE = "1234"
 _OTP_TTL = 300        # срок жизни кода — 5 минут
 _MAX_ATTEMPTS = 5     # сверок на один код
+_CHANNEL_TTL = 2      # сек: клиент спрашивает канал раз в 3 с, провайдеру хватит одного
 _TIMEOUT = 10         # сек на запрос к провайдеру
 
 _SIGMA_API = "https://online.sigmasms.ru/api/sendings"
@@ -292,6 +293,9 @@ def channel_info(phone) -> dict:
     Клиент спрашивает это, чтобы решить, показывать ли поле для кода. У обычных
     провайдеров ответ всегда один и тот же — код; у ProPush канал может смениться
     прямо посреди сессии, поэтому его надо переспрашивать.
+
+    Ответ держим пару секунд в кэше: пока человек ждёт код, клиент спрашивает канал
+    раз в 3 секунды, и бить в SIGMA на каждый такой вопрос незачем.
     """
     if not _is_propush():
         return {"codeType": "code", "type": "sms", "status": "sent"}
@@ -299,7 +303,13 @@ def channel_info(phone) -> dict:
     request_id = rec.get("requestId")
     if not request_id:
         return {}
-    return _ProPushProvider().channel(request_id)
+    key = f"otp:channel:{phone}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    info = _ProPushProvider().channel(request_id)
+    cache.set(key, info, _CHANNEL_TTL)
+    return info
 
 
 def check_code(phone, code) -> bool:
@@ -328,6 +338,7 @@ def check_code(phone, code) -> bool:
         if not provider.complete(request_id, phone):
             return False
         cache.delete(f"otp:{phone}")
+        cache.delete(f"otp:channel:{phone}")
         return True
 
     rec = cache.get(f"otp:{phone}")
@@ -344,6 +355,7 @@ def check_code(phone, code) -> bool:
 # Что сказать человеку, когда код не подошёл (D-50).
 CODE_WRONG = "Неверный код. Попробуйте ещё раз"
 CODE_EXPIRED = "Код больше не действует — запросите новый"
+CODE_CONFIRM_ON_PHONE = "Подтвердите вход на телефоне"
 
 
 def code_error(phone) -> str:
@@ -352,16 +364,17 @@ def code_error(phone) -> str:
     У входа по звонку (виджет SIGMA, 10.09.2026) код живёт 90 секунд, попыток 3.
     После этого не подойдёт и верный код, а «неверный код» по кругу только
     запутает: человеку нужен новый. Решаем по данным провайдера, а не по часам.
+
+    В каскаде (D-78) канал может смениться на бескодовый: там вводить нечего —
+    вход подтверждают на самом телефоне, и «неверный код» был бы неправдой.
     """
     if _is_propush():
-        rec = cache.get(f"otp:{phone}") or {}
-        request_id = rec.get("requestId")
-        if not request_id:
-            return CODE_EXPIRED
-        info = _ProPushProvider().channel(request_id)
+        info = channel_info(phone)
         # Пустой ответ — сессии у провайдера больше нет: истекла или закрыта.
         if not info or info.get("attemptsLeft") == 0:
             return CODE_EXPIRED
+        if info.get("codeType") == "codeless":
+            return CODE_CONFIRM_ON_PHONE
         return CODE_WRONG
     if sms_enabled():
         rec = cache.get(f"otp:{phone}")

@@ -100,7 +100,7 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
     if (digits.length < 10) return 'Введите корректный номер';
-    if (code.trim().length != 4) return 'Введите код из 4 цифр';
+    if (!_codeInfo.isCodeless && code.trim().length != 4) return 'Введите код из 4 цифр';
     _setLoading(true);
     try {
       _user = await _repo.loginByPhone(phone, code, name: name);
@@ -136,6 +136,23 @@ class AuthProvider extends ChangeNotifier {
   SmsCodeInfo _codeInfo = const SmsCodeInfo();
   SmsCodeInfo get codeInfo => _codeInfo;
 
+  /// Спросить сервер, чем подтверждается вход сейчас: SIGMA сама переводит на
+  /// SimPush, если код не ввели за 90 секунд, а тот бывает бескодовым (D-78).
+  Future<void> refreshChannel(String phone) async {
+    try {
+      final fresh = await _repo.channelInfo(phone);
+      _codeInfo = SmsCodeInfo(
+        smsEnabled: _codeInfo.smsEnabled,
+        channelType: fresh.channelType,
+        codeType: fresh.codeType,
+        status: fresh.status,
+      );
+      notifyListeners();
+    } catch (_) {
+      // Сессия закрылась или связь моргнула — экран живёт с тем, что знает.
+    }
+  }
+
   Future<String?> requestSmsCode(String phone) async {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
     if (digits.length < 10) return 'Введите корректный номер';
@@ -158,7 +175,7 @@ class AuthProvider extends ChangeNotifier {
   /// Регистрация по телефону: код подтверждает телефон, аккаунт с паролем.
   Future<String?> registerByPhone(String phone, String code, String password, String name) async {
     if (name.trim().isEmpty) return 'Введите имя';
-    if (code.trim().length != 4) return 'Введите код из 4 цифр';
+    if (!_codeInfo.isCodeless && code.trim().length != 4) return 'Введите код из 4 цифр';
     if (password.length < 4) return 'Пароль — минимум 4 символа';
     _setLoading(true);
     try {
@@ -174,7 +191,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Сброс пароля по SMS-коду.
   Future<String?> resetPasswordByPhone(String phone, String code, String password) async {
-    if (code.trim().length != 4) return 'Введите код из 4 цифр';
+    if (!_codeInfo.isCodeless && code.trim().length != 4) return 'Введите код из 4 цифр';
     if (password.length < 4) return 'Пароль — минимум 4 символа';
     _setLoading(true);
     try {

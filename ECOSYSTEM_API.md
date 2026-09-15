@@ -186,6 +186,9 @@ POST /auth/phone/request       { phone }                 → { ok, smsEnabled, c
                                                            90 с между кодами на номер, 3 кода на номер в сутки,
                                                            с адреса 30 в час и 100 в сутки; клиент показывает detail
 POST /auth/phone/channel       { phone }                 → { type, status, codeType, attemptsLeft }   (канал текущей сессии; 404 — сессии нет)
+                                                           клиент опрашивает раз в 3 с, пока ждёт код (лимит otp_poll 300/мин);
+                                                           codeType=codeless → поля кода нет: ждём status=confirmed и шлём
+                                                           verify/register/password-reset с ПУСТЫМ code (D-78)
 POST /auth/phone/verify        { phone, code }           → { token, user }      (создаёт аккаунт при первом входе)
 POST /auth/password/forgot     { email }                 → 200
 POST /auth/password/reset      { password }              → 200

@@ -18,7 +18,12 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   // Совпадает с паузой сервера между кодами (D-76): раньше новый код не дадут.
   static const _resendSeconds = 90;
   int _secondsLeft = _resendSeconds;
+  // Канал может смениться сам: если код не ввели за 90 секунд, SIGMA переводит
+  // звонок на SimPush, а он бывает бескодовым (D-78). Спрашиваем сервер, пока ждём.
+  static const _pollSeconds = 3;
   Timer? _timer;
+  Timer? _poll;
+  bool _confirming = false;
   String? _localError;
   bool _resending = false;
   bool _toConsent = false;
@@ -27,6 +32,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   void initState() {
     super.initState();
     _startTimer();
+    _startPolling();
   }
 
   void _startTimer() {
@@ -49,7 +55,44 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _poll?.cancel();
     super.dispose();
+  }
+
+  void _startPolling() {
+    // В разработке канала нет вовсе — код всегда 1234, спрашивать нечего.
+    if (!ref.read(authProvider).smsEnabled) return;
+    _poll = Timer.periodic(const Duration(seconds: _pollSeconds), (t) async {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      await ref.read(authProvider.notifier).refreshChannel();
+      if (!mounted) return;
+      final auth = ref.read(authProvider);
+      if (auth.codeType == 'codeless' && auth.channelStatus == 'confirmed') {
+        t.cancel();
+        await _confirmWithoutCode();
+      }
+    });
+  }
+
+  /// Бескодовый канал: человек подтвердил вход на самом телефоне, вводить нечего —
+  /// заканчиваем вход пустым кодом, сервер спросит результат у провайдера.
+  Future<void> _confirmWithoutCode() async {
+    if (_confirming) return;
+    setState(() => _confirming = true);
+    final ok = await _submit('');
+    if (!mounted) return;
+    if (ok) {
+      _onSuccess();
+      return;
+    }
+    setState(() {
+      _confirming = false;
+      _localError = ref.read(authProvider).error;
+    });
+    _startPolling();  // подтверждение ещё не дошло — продолжаем ждать
   }
 
   /// Проверка кода на сервере; вызывается виджетом OtpVerifyBoxes.
@@ -102,6 +145,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   /// Как придёт код: сервер говорит, боевой ли вход и каким каналом (D-50).
   String _codeHint(AuthState auth) {
     if (!auth.smsEnabled) return 'Код отправлен на ${auth.phone}';
+    if (auth.codeType == 'codeless') {
+      return 'Запрос пришёл на ${auth.phone}. Подтвердите вход на телефоне';
+    }
     if (auth.channelType.toLowerCase().contains('call')) {
       return 'Сейчас позвоним на ${auth.phone}. Код — последние 4 цифры номера';
     }
@@ -111,6 +157,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
+    final codeless = auth.codeType == 'codeless';
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -130,7 +177,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
             children: [
               const SizedBox(height: 16),
               Text(
-                'Введи код',
+                codeless ? 'Подтверди вход' : 'Введи код',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -143,12 +190,15 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              OtpVerifyBoxes(
-                hasError: _localError != null,
-                onSubmit: _submit,
-                onSuccess: _onSuccess,
-                onFailed: _onFailed,
-              ),
+              if (codeless)
+                _WaitingOnPhone(busy: _confirming)
+              else
+                OtpVerifyBoxes(
+                  hasError: _localError != null,
+                  onSubmit: _submit,
+                  onSuccess: _onSuccess,
+                  onFailed: _onFailed,
+                ),
               if (_localError != null) ...[
                 const SizedBox(height: 8),
                 Center(
@@ -212,6 +262,46 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Бескодовый канал (SimPush): подтверждение приходит на сам телефон, поля кода нет.
+class _WaitingOnPhone extends StatelessWidget {
+  const _WaitingOnPhone({required this.busy});
+
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.bgElevated),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.4,
+              color: AppColors.electricBlue,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              busy
+                  ? 'Проверяем подтверждение…'
+                  : 'Подтвердите вход на телефоне — запрос уже пришёл',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        ],
       ),
     );
   }

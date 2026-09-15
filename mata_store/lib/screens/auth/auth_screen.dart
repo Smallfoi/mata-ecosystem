@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -27,6 +29,10 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _smsSent = false;  // SMS-код отправлен (регистрация/сброс)
   bool _busy = false;
   String? _error;
+  // Канал может смениться сам: SIGMA переводит звонок на SimPush, если код не
+  // ввели за 90 секунд, а SimPush бывает бескодовым (D-78).
+  Timer? _poll;
+  bool _confirming = false;
 
   // Вход по ТЕЛЕФОН+ПАРОЛЬ; регистрация — телефон+пароль+SMS-подтверждение (#8).
   final _nameCtrl = TextEditingController();
@@ -44,6 +50,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
+    _poll?.cancel();
     _nameCtrl.dispose();
     _passCtrl.dispose();
     _phoneCtrl.dispose();
@@ -115,6 +122,44 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
     setState(() => _smsSent = true);
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _poll?.cancel();
+    // В разработке канала нет вовсе — код всегда 1234, спрашивать нечего.
+    if (!context.read<AuthProvider>().codeInfo.smsEnabled) return;
+    _poll = Timer.periodic(const Duration(seconds: 3), (t) async {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      await context.read<AuthProvider>().refreshChannel(_phone);
+      if (!mounted) return;
+      final info = context.read<AuthProvider>().codeInfo;
+      if (info.isCodeless && info.confirmed) {
+        t.cancel();
+        await _confirmWithoutCode();
+      }
+    });
+  }
+
+  /// Бескодовый канал: вход подтвердили на самом телефоне, вводить нечего —
+  /// заканчиваем пустым кодом, результат сервер спросит у провайдера.
+  Future<void> _confirmWithoutCode() async {
+    if (_confirming) return;
+    setState(() => _confirming = true);
+    final ok = await _verifyCode('');
+    if (!mounted) return;
+    if (ok) {
+      await _onPhoneVerified();
+      return;
+    }
+    setState(() {
+      _confirming = false;
+      _error = _phoneError;
+    });
+    _startPolling();  // подтверждение ещё не дошло — ждём дальше
   }
 
   /// Проверка кода (OtpVerifyBoxes) → регистрация или сброс пароля.
@@ -206,6 +251,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         error: _error,
                         busy: _busy,
                         smsSent: _smsSent,
+                        confirming: _confirming,
                         onRequestSms: _requestSms,
                         onVerify: _verifyCode,
                         onVerified: _onPhoneVerified,
@@ -469,6 +515,8 @@ class _SmsForm extends StatelessWidget {
   final String? error;
   final bool busy;
   final bool smsSent;
+  /// Бескодовое подтверждение уже отправлено на проверку — ждём ответ сервера.
+  final bool confirming;
   final Future<void> Function() onRequestSms;
   final Future<bool> Function(String code) onVerify;
   final VoidCallback onVerified;
@@ -483,6 +531,7 @@ class _SmsForm extends StatelessWidget {
     required this.error,
     required this.busy,
     required this.smsSent,
+    required this.confirming,
     required this.onRequestSms,
     required this.onVerify,
     required this.onVerified,
@@ -516,13 +565,17 @@ class _SmsForm extends StatelessWidget {
         if (!smsSent)
           _PrimaryButton(label: 'Получить код', busy: busy, onPressed: onRequestSms)
         else ...[
-          // Ввод кода — хореография «OTP V5» (стандарт анимаций экосистемы МАТА).
-          OtpVerifyBoxes(
-            hasError: error != null,
-            onSubmit: onVerify,
-            onSuccess: onVerified,
-            onFailed: onFailed,
-          ),
+          // Бескодовый канал (SimPush): подтверждение приходит на сам телефон.
+          if (context.watch<AuthProvider>().codeInfo.isCodeless)
+            _WaitingOnPhone(busy: confirming)
+          else
+            // Ввод кода — хореография «OTP V5» (стандарт анимаций экосистемы МАТА).
+            OtpVerifyBoxes(
+              hasError: error != null,
+              onSubmit: onVerify,
+              onSuccess: onVerified,
+              onFailed: onFailed,
+            ),
           const SizedBox(height: 6),
           Center(
             child: Text(
@@ -716,6 +769,45 @@ class _ErrorBanner extends StatelessWidget {
 /// Служебный текст, не контент витрины.
 String _codeHint(SmsCodeInfo info) {
   if (!info.smsEnabled) return 'Тестовый код: 1234';
+  if (info.isCodeless) return 'Запрос пришёл на телефон — подтвердите вход на нём';
   if (info.isCall) return 'Сейчас позвоним — код это последние 4 цифры номера';
   return 'Код отправлен по SMS';
+}
+
+/// Ожидание бескодового подтверждения (SimPush): поля кода нет, вход
+/// подтверждают на самом телефоне (D-78). Служебный UI, не контент витрины.
+class _WaitingOnPhone extends StatelessWidget {
+  const _WaitingOnPhone({required this.busy});
+
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.grey200),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.black),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              busy
+                  ? 'Проверяем подтверждение…'                              // staw-static
+                  : 'Подтвердите вход на телефоне — запрос уже пришёл',     // staw-static
+              style: const TextStyle(fontSize: 14, color: AppColors.black, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
