@@ -11,6 +11,9 @@ abstract class AuthRepository {
   // Вход/регистрация по ТЕЛЕФОНУ+ПАРОЛЮ (основной путь экосистемы, #8).
   Future<AuthUser> loginByPassword(String phone, String password);
   Future<SmsCodeInfo> requestSmsCode(String phone);
+
+  /// Чем подтверждается вход прямо сейчас: канал может смениться сам (D-78).
+  Future<SmsCodeInfo> channelInfo(String phone);
   Future<AuthUser> registerByPhone(String phone, String code, String password, String name);
   Future<AuthUser> resetPasswordByPhone(String phone, String code, String password);
   Future<void> sendPasswordReset(String email);
@@ -88,6 +91,10 @@ class MockAuthRepository implements AuthRepository {
     await Future.delayed(const Duration(milliseconds: 600));
     return const SmsCodeInfo(); // без backend — режим разработки, код 1234
   }
+
+  @override
+  Future<SmsCodeInfo> channelInfo(String phone) async =>
+      const SmsCodeInfo(codeType: 'code', status: 'sent');
 
   @override
   Future<AuthUser> registerByPhone(String phone, String code, String password, String name) async {
@@ -231,6 +238,12 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<SmsCodeInfo> channelInfo(String phone) async {
+    final data = await _client.post('/auth/phone/channel', body: {'phone': phone});
+    return data is Map ? SmsCodeInfo.fromChannel(data) : const SmsCodeInfo();
+  }
+
+  @override
   Future<AuthUser> registerByPhone(String phone, String code, String password, String name) async {
     final data = await _client.post(
       '/auth/register',
@@ -344,19 +357,46 @@ class SmsCodeInfo {
   /// Боевой вход: код реально отправлен. Иначе режим разработки — код 1234.
   final bool smsEnabled;
 
-  /// Канал доставки: звонок (flashcall), SMS…
+  /// Канал доставки: звонок (flashcall), SimPush, SMS…
   final String channelType;
 
-  const SmsCodeInfo({this.smsEnabled = false, this.channelType = ''});
+  /// Нужно ли вводить код (`code`) или вход подтверждают на телефоне (`codeless`).
+  final String codeType;
+
+  /// Что с каналом сейчас: wait | sent | confirmed | closed.
+  final String status;
+
+  const SmsCodeInfo({
+    this.smsEnabled = false,
+    this.channelType = '',
+    this.codeType = 'code',
+    this.status = '',
+  });
 
   /// Код придёт звонком: это последние 4 цифры номера.
   bool get isCall => channelType.toLowerCase().contains('call');
 
+  /// Бескодовый канал (SimPush): поля кода нет, вход подтверждают на телефоне (D-78).
+  bool get isCodeless => codeType == 'codeless';
+
+  /// Человек уже подтвердил вход на телефоне — можно заканчивать пустым кодом.
+  bool get confirmed => status == 'confirmed';
+
   factory SmsCodeInfo.fromJson(Map data) {
     final channel = data['channel'];
+    final map = channel is Map ? channel : const {};
     return SmsCodeInfo(
       smsEnabled: data['smsEnabled'] == true,
-      channelType: channel is Map ? (channel['type'] ?? '').toString() : '',
+      channelType: (map['type'] ?? '').toString(),
+      codeType: (map['codeType'] ?? 'code').toString(),
+      status: (map['status'] ?? '').toString(),
     );
   }
+
+  /// Ответ `POST /auth/phone/channel`: те же поля, но без обёртки `channel`.
+  factory SmsCodeInfo.fromChannel(Map data) => SmsCodeInfo(
+        channelType: (data['type'] ?? '').toString(),
+        codeType: (data['codeType'] ?? 'code').toString(),
+        status: (data['status'] ?? '').toString(),
+      );
 }

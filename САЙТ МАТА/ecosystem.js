@@ -74,7 +74,9 @@
   // Подсказка после отправки кода: боевой ли вход и каким каналом придёт код (D-50).
   function codeHint(data) {
     if (!data || !data.smsEnabled) return "Тестовый режим: код 1234";
-    var type = String((data.channel && data.channel.type) || "").toLowerCase();
+    var ch = data.channel || {};
+    if (ch.codeType === "codeless") return "Запрос пришёл на телефон — подтвердите вход на нём";
+    var type = String(ch.type || "").toLowerCase();
     if (type.indexOf("call") >= 0) return "Сейчас позвоним — код это последние 4 цифры номера";
     return "Код отправлен по SMS";
   }
@@ -336,11 +338,42 @@
   var ecoMode = "login"; // "login" | "register"
   var otpLogin = null, otpReg = null;
 
+  // Канал может смениться сам: SIGMA переводит звонок на SimPush, если код не
+  // ввели за 90 секунд, а SimPush бывает бескодовым — тогда поля кода нет (D-78).
+  var channelPoll = null;
+
+  function stopChannelPoll() {
+    if (channelPoll) { clearInterval(channelPoll); channelPoll = null; }
+  }
+
+  function startChannelPoll(phone, field, stageEl, subEl) {
+    stopChannelPoll();
+    channelPoll = setInterval(function () {
+      api("/auth/phone/channel", { method: "POST", body: { phone: phone } })
+        .then(function (ch) {
+          if (!ch) return;
+          var codeless = ch.codeType === "codeless";
+          stageEl.style.display = codeless ? "none" : "";
+          if (codeless) {
+            subEl.textContent = ch.status === "confirmed"
+              ? "Подтверждение получено — входим…"
+              : "Запрос пришёл на телефон — подтвердите вход на нём";
+            if (ch.status === "confirmed") {
+              stopChannelPoll();
+              field.confirmWithoutCode();
+            }
+          }
+        })
+        .catch(function () { stopChannelPoll(); });  // сессии больше нет или сеть моргнула
+    }, 3000);
+  }
+
   function setMode(m) {
     ecoMode = m === "register" ? "register" : "login";
     if (!card) return;
     card.classList.toggle("isLogin", ecoMode === "login");
     modal.querySelectorAll(".eco-err").forEach(function (e) { e.textContent = ""; });
+    stopChannelPoll();
     if (otpLogin) otpLogin.softReset();
     if (otpReg) otpReg.softReset();
   }
@@ -545,6 +578,9 @@
           q("[data-reg-sub]").textContent = codeHint(data);
           err.textContent = "";
           q("[data-reg-code]").focus();
+          if (data && data.smsEnabled) {
+            startChannelPoll(p.phone, otpReg, q("[data-reg-otp]"), q("[data-reg-sub]"));
+          }
         })
         .catch(function (e) { err.textContent = e.message || "Не удалось отправить код"; })
         .then(function () { btn.disabled = false; });
@@ -579,6 +615,9 @@
           q("[data-login-sub]").textContent = codeHint(data);
           err.textContent = "";
           q("[data-login-code]").focus();
+          if (data && data.smsEnabled) {
+            startChannelPoll(p.phone, otpLogin, q("[data-login-otp]"), q("[data-login-sub]"));
+          }
         })
         .catch(function (e) { err.textContent = e.message || "Не удалось"; })
         .then(function () { btn.disabled = false; });
@@ -668,6 +707,7 @@
     if (!modal) return;
     modal.classList.remove("is-open");
     // Закрыли на середине хореографии — остановить и вернуть строку.
+    stopChannelPoll();
     if (otpLogin) otpLogin.hardReset();
     if (otpReg) otpReg.hardReset();
   }
@@ -883,13 +923,23 @@
 
     function trySubmit() {
       if (busy) return;
-      var payload = cfg.getPayload();
-      cfg.errEl.textContent = "";
-      if (payload.error) { cfg.errEl.textContent = payload.error; return; }
       if (input.value.length < OTP_LEN) {
         cfg.errEl.textContent = "Введите код из 4 цифр";
         return;
       }
+      run(input.value);
+    }
+
+    // Бескодовый канал (SimPush, D-78): вводить нечего, вход подтвердили на
+    // телефоне. Поле кода к этому моменту скрыто, поэтому хореография не видна.
+    function confirmWithoutCode() {
+      if (!busy) run("");
+    }
+
+    function run(code) {
+      var payload = cfg.getPayload();
+      cfg.errEl.textContent = "";
+      if (payload.error) { cfg.errEl.textContent = payload.error; return; }
       busy = true;
       result = null;
       extra = 0;
@@ -901,8 +951,8 @@
       // /auth/register (с паролем/именем), сброс → /auth/password/reset. По
       // умолчанию — legacy phone/verify. Запрос идёт ПАРАЛЛЕЛЬНО хореографии.
       var verifyCall = cfg.verify
-        ? cfg.verify(payload, input.value)
-        : api("/auth/phone/verify", { method: "POST", body: { phone: payload.phone, code: input.value } });
+        ? cfg.verify(payload, code)
+        : api("/auth/phone/verify", { method: "POST", body: { phone: payload.phone, code: code } });
       verifyCall
         .then(function (data) {
           result = { ok: true, data: data, name: payload.name || "" };
@@ -935,6 +985,7 @@
 
     return {
       trySubmit: trySubmit,
+      confirmWithoutCode: confirmWithoutCode,
       softReset: softReset,
       hardReset: hardReset,
       isBusy: function () { return busy; }

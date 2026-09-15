@@ -2,7 +2,7 @@ from django.db import IntegrityError
 from rest_framework.decorators import api_view, throttle_classes
 from rest_framework.response import Response
 
-from common.throttling import AuthEndpointThrottle
+from common.throttling import AuthEndpointThrottle, OtpPollThrottle
 
 from common.uploads import image_extension
 from common.security import (
@@ -148,7 +148,7 @@ def phone_request(request):
 
 
 @api_view(["POST"])
-@throttle_classes([AuthEndpointThrottle])
+@throttle_classes([OtpPollThrottle])
 def phone_channel(request):
     """Чем сейчас подтверждается вход: кодом или кнопкой на телефоне.
 

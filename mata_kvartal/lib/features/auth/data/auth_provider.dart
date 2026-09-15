@@ -67,6 +67,12 @@ class AuthState {
   /// Каким каналом придёт код (сервер: `channel.type`): звонок, SMS…
   final String channelType;
 
+  /// Нужно ли вводить код (`code`) или вход подтверждают на телефоне (`codeless`).
+  final String codeType;
+
+  /// Что с каналом сейчас (сервер: `channel.status`): wait | sent | confirmed | closed.
+  final String channelStatus;
+
   const AuthState({
     this.status = AuthStatus.unauthenticated,
     this.phone = '',
@@ -76,6 +82,8 @@ class AuthState {
     this.user,
     this.smsEnabled = false,
     this.channelType = '',
+    this.codeType = 'code',
+    this.channelStatus = '',
   });
 
   AuthState copyWith({
@@ -87,6 +95,8 @@ class AuthState {
     AuthUser? user,
     bool? smsEnabled,
     String? channelType,
+    String? codeType,
+    String? channelStatus,
     bool clearError = false,
     bool clearSession = false,
   }) => AuthState(
@@ -98,6 +108,8 @@ class AuthState {
     user: clearSession ? null : user ?? this.user,
     smsEnabled: smsEnabled ?? this.smsEnabled,
     channelType: channelType ?? this.channelType,
+    codeType: codeType ?? this.codeType,
+    channelStatus: channelStatus ?? this.channelStatus,
   );
 }
 
@@ -229,6 +241,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null, clearError: true);
     var smsEnabled = false;
     var channelType = '';
+    var codeType = 'code';
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '/auth/phone/request',
@@ -237,7 +250,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final data = res.data ?? const <String, dynamic>{};
       smsEnabled = data['smsEnabled'] == true;
       final channel = data['channel'];
-      if (channel is Map) channelType = (channel['type'] ?? '').toString();
+      if (channel is Map) {
+        channelType = (channel['type'] ?? '').toString();
+        codeType = (channel['codeType'] ?? 'code').toString();
+      }
     } on DioException catch (e) {
       if (e.response != null) {
         state = state.copyWith(isLoading: false, error: _authErrorText(e));
@@ -251,8 +267,34 @@ class AuthNotifier extends StateNotifier<AuthState> {
       clearError: true,
       smsEnabled: smsEnabled,
       channelType: channelType,
+      codeType: codeType,
+      channelStatus: '',
     );
     return true;
+  }
+
+  /// Спросить сервер, чем сейчас подтверждается вход (D-78).
+  ///
+  /// SIGMA сама переводит на следующий канал, если код не ввели за 90 секунд:
+  /// звонок сменяется на SimPush, а он бывает бескодовым — тогда вводить нечего,
+  /// вход подтверждают на самом телефоне. Экран кода спрашивает это, пока ждёт.
+  Future<void> refreshChannel() async {
+    if (state.phone.isEmpty) return;
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/auth/phone/channel',
+        data: {'phone': state.phone},
+      );
+      final data = res.data ?? const <String, dynamic>{};
+      state = state.copyWith(
+        channelType: (data['type'] ?? state.channelType).toString(),
+        codeType: (data['codeType'] ?? state.codeType).toString(),
+        channelStatus: (data['status'] ?? '').toString(),
+      );
+    } catch (_) {
+      // Сессия закрылась (404) или связь моргнула: экран живёт с тем, что знает,
+      // а про истёкший код человеку скажет проверка кода.
+    }
   }
 
   /// Проверить код НА СЕРВЕРЕ (раньше сверялся локально с '1234' и на сервер

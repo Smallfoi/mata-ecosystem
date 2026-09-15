@@ -49,6 +49,20 @@ class AuthEndpointThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
+class OtpPollThrottle(SimpleRateThrottle):
+    """Опрос канала входа (`phone/channel`) — свой мягкий лимит по IP.
+
+    Жёсткий `auth` (20/мин) сюда не годится: пока человек ждёт код, клиент спрашивает
+    канал раз в 3 секунды (20 запросов в минуту на одного), и за мобильным адресом
+    оператора таких людей десятки. Запрос дешёвый: ответ провайдера кэшируется на
+    пару секунд, поэтому в SIGMA уходит не больше одного обращения на номер.
+    """
+    scope = "otp_poll"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
+
+
 # Безопасные методы: не меняют состояние, поэтому лимитируются отдельно от записи.
 _SAFE = ("GET", "HEAD", "OPTIONS")
 
