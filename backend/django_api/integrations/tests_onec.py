@@ -101,3 +101,39 @@ class OneCImportTests(TestCase):
         r = self.client.get("/v1/integrations/1c/status")
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.json()["enabled"])
+
+
+@override_settings(INTEGRATION_1C_TOKEN=TOKEN)
+class OneCParcelTests(TestCase):
+    """Вес и габариты из 1С (D-79): граммы и сантиметры для расчёта доставки."""
+
+    def _post(self, products):
+        return self.client.post(CATALOG, {"products": products}, content_type="application/json",
+                                HTTP_AUTHORIZATION=f"Bearer {TOKEN}")
+
+    def _item(self, **kw):
+        return {"id": "SS-W", "article": "W1", "name": "Кроссовки", "categoryId": "shoes", **kw}
+
+    def test_weight_and_size_are_imported(self):
+        r = self._post([self._item(weightG=850, lengthCm=33, widthCm=22, heightCm=12.4)])
+        self.assertEqual(r.status_code, 200)
+        p = Product.objects.get(external_id="SS-W")
+        self.assertEqual((p.weight_g, p.length_cm, p.width_cm, p.height_cm), (850, 33, 22, 12))
+
+    def test_missing_fields_keep_manual_values(self):
+        """1С не прислала вес — ручной ввод из админки остаётся."""
+        self._post([self._item()])
+        Product.objects.filter(external_id="SS-W").update(weight_g=700)
+        self._post([self._item(name="Кроссовки 2")])
+        self.assertEqual(Product.objects.get(external_id="SS-W").weight_g, 700)
+
+    def test_garbage_is_reported_and_not_written(self):
+        self._post([self._item(weightG=500)])
+        r = self._post([self._item(weightG="тяжёлые", lengthCm=0)])
+        errors = r.json()["errors"]
+        self.assertTrue(any("weightG не число" in e for e in errors))
+        self.assertTrue(any("lengthCm должен быть больше нуля" in e for e in errors))
+        p = Product.objects.get(external_id="SS-W")
+        self.assertEqual(p.weight_g, 500)
+        self.assertIsNone(p.length_cm)
+
