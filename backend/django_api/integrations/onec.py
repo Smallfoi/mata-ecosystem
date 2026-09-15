@@ -28,6 +28,36 @@ FIELD_MAP = {
 }
 
 
+# Вес и габариты в упаковке (D-79): граммы и сантиметры — в них считают службы
+# доставки. Владелец их не переопределяет: склад знает вес точнее.
+PARCEL_MAP = {
+    "weightG": "weight_g",
+    "lengthCm": "length_cm",
+    "widthCm": "width_cm",
+    "heightCm": "height_cm",
+}
+
+
+def _parcel_errors(product: Product, raw: dict, who: str) -> list:
+    """Записать вес и габариты, если 1С их прислала. Не прислала — не трогаем:
+    там может быть ручной ввод из админки. Мусор — в отчёт, поле без изменений."""
+    errors = []
+    for key, field in PARCEL_MAP.items():
+        value = raw.get(key)
+        if value is None or value == "":
+            continue
+        try:
+            number = round(float(value))
+        except (TypeError, ValueError):
+            errors.append(f"{who}: {key} не число")
+            continue
+        if number <= 0:
+            errors.append(f"{who}: {key} должен быть больше нуля")
+            continue
+        setattr(product, field, number)
+    return errors
+
+
 # Сколько позиций принимаем за один запрос. Выгрузка целиком тоже не редкость,
 # поэтому потолок высокий — он защищает от бессмысленного, а не от большого.
 # Всё, что приходит, разбирается пачками по CHUNK, а не построчно.
@@ -173,7 +203,7 @@ def import_categories(items) -> dict:
 CATALOG_FIELDS = [
     "external_id", "article", "name", "category_id", "brand", "is_active_1c",
     "source_updated_at", "from_1c", "price", "old_price", "description",
-    "sizes", "colors", "image_urls",
+    "sizes", "colors", "image_urls", "weight_g", "length_cm", "width_cm", "height_cm",
 ]
 
 # Что переписывает выгрузка цен и остатков.
@@ -231,6 +261,7 @@ def import_catalog(items) -> dict:
             product.source_updated_at = parse_datetime(raw["updatedAt"]) or timezone.now()
 
         kept_fields.update(_apply(product, raw, FIELD_MAP))
+        errors.extend(_parcel_errors(product, raw, external_id or article))
         if is_new:
             index.remember(product)
             to_create[product.id] = product
