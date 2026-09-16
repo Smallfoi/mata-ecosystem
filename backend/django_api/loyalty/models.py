@@ -118,3 +118,73 @@ def level_for(balance: int) -> str:
     if balance >= 200:
         return "silver"
     return "basic"
+
+
+class LoyaltyPartner(models.Model):
+    """Партнёр программы лояльности на карте (D-81): бизнес, принимающий баллы МАТА.
+    Заводит владелец в админке. Публичный GET /v1/loyalty/partners (токен не нужен) —
+    слой «Партнёры» на «Карте» приложения (за клиентским флагом, пока не наберём базу)."""
+
+    CATEGORY_CHOICES = [
+        ("nutrition", "Спортпитание и витамины"),
+        ("coffee", "Кофе"),
+        ("gear", "Экипировка"),
+        ("food", "Здоровое питание"),
+        ("other", "Другое"),
+    ]
+
+    name = models.CharField(max_length=160, verbose_name="Название")
+    category = models.CharField(
+        max_length=20, choices=CATEGORY_CHOICES, default="nutrition",
+        db_index=True, verbose_name="Категория",
+    )
+    emoji = models.CharField(
+        max_length=8, blank=True, default="", verbose_name="Значок (эмодзи)",
+        help_text="Пока нет логотипа — эмодзи на метке, напр. 🥗 ☕ 👟",
+    )
+    logo = models.ImageField(
+        upload_to="partners/", blank=True, null=True,
+        verbose_name="Логотип (необязательно)",
+    )
+    city = models.CharField(
+        max_length=120, blank=True, default="Якутск", db_index=True, verbose_name="Город",
+    )
+    address = models.CharField(max_length=250, blank=True, default="", verbose_name="Адрес")
+    description = models.CharField(
+        max_length=250, blank=True, default="", verbose_name="Описание",
+        help_text="Коротко: «спортивное питание», «кофе с собой»",
+    )
+    lat = models.FloatField(verbose_name="Широта")
+    lng = models.FloatField(verbose_name="Долгота")
+    points_percent = models.PositiveIntegerField(
+        default=0, verbose_name="Оплата баллами, % от суммы",
+        help_text="До скольких % чека можно оплатить баллами МАТА (напр. 30)",
+    )
+    is_active = models.BooleanField(
+        default=True, db_index=True, verbose_name="Активен (показывать на карте)",
+    )
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Заведён")
+
+    class Meta:
+        db_table = "loyalty_partners"
+        verbose_name = "Партнёр на карте"
+        verbose_name_plural = "Партнёры на карте (лояльность)"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def to_json(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "category": self.category,
+            "emoji": self.emoji,
+            "logoUrl": self.logo.url if self.logo else None,
+            "city": self.city,
+            "address": self.address,
+            "description": self.description,
+            "lat": self.lat,
+            "lng": self.lng,
+            "pointsPercent": self.points_percent,
+        }

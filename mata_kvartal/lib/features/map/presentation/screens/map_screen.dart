@@ -10,6 +10,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/location_provider.dart';
 import '../../data/zone_provider.dart';
@@ -25,6 +26,7 @@ import '../../../weather/data/weather_provider.dart';
 import '../../../weather/presentation/weather_background.dart';
 import '../../../weather/presentation/weather_view.dart';
 import '../../../../shared/widgets/kvartal_logo.dart';
+import '../../../partners/data/partners_provider.dart';
 
 // Границы «тумана» режима «Исследование»: заведомо больше игровой зоны
 // (весь Якутск с округой), чтобы край затемнения не появлялся при панораме.
@@ -57,6 +59,9 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
   static const Color _trailLineColor = Color(0xFF2E9FC4);
 
   bool _followUser = true;
+
+  /// Выбранный партнёр лояльности (D-81): открытая карточка снизу; null — скрыта.
+  Partner? _selectedPartner;
 
   // Легенда карты: свёрнута по умолчанию, не закрывает карту.
 
@@ -197,6 +202,11 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
 
     // ── Режим бега перестраивает карту (утв. владельцем 14.09.2026) ──────────
     final mode = ref.watch(runModeProvider);
+    // Слой партнёров лояльности (D-81): показываем на «Карте» в ЛЮБОМ режиме
+    // (это B2B-слой карты, не про бег). Провайдер за флагом kPartnersLayer —
+    // пока выключен, отдаёт пусто, слоя нет.
+    final partners =
+        ref.watch(partnersProvider).valueOrNull ?? const <Partner>[];
     // Тропы показываем в «Тропах» и «Захвате» (в захвате это маршруты районов).
     final showTrails = mode == RunMode.trails || mode == RunMode.capture;
     final trails = showTrails
@@ -391,6 +401,26 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                         icon: CupertinoIcons.play_fill,
                       ),
                     ),
+                  ],
+                ),
+
+              // ── Слой «Партнёры» (D-81): где потратить баллы МАТА ────────
+              // Логотипы партнёров лояльности на «Карте» (любой режим). Тап
+              // по метке — карточка снизу. Пусто (флаг/нет данных) — слоя нет.
+              if (partners.isNotEmpty)
+                MarkerLayer(
+                  markers: [
+                    for (final p in partners)
+                      Marker(
+                        point: p.point,
+                        width: 46,
+                        height: 46,
+                        child: _PartnerPin(
+                          partner: p,
+                          selected: identical(p, _selectedPartner),
+                          onTap: () => setState(() => _selectedPartner = p),
+                        ),
+                      ),
                   ],
                 ),
 
@@ -640,6 +670,13 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
               ),
             ),
           ),
+          // ── Карточка партнёра (D-81) ─────────────────────────────────
+          if (_selectedPartner != null)
+            _PartnerCard(
+              partner: _selectedPartner!,
+              userPoint: posAsync.valueOrNull?.toLatLng,
+              onClose: () => setState(() => _selectedPartner = null),
+            ),
         ],
       ),
     );
@@ -648,6 +685,11 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
   /// Тап по карте: в режимах троп/захвата — открыть тропу под пальцем;
   /// в захвате — иначе паспорт квартала (Ф2): чей, защита, как забрать.
   void _onMapTap(LatLng point) {
+    // Открыта карточка партнёра — тап по карте её закрывает (D-81).
+    if (_selectedPartner != null) {
+      setState(() => _selectedPartner = null);
+      return;
+    }
     // Тап по карте сворачивает развёрнутую легенду (следующий тап — паспорт).
     if (_legendOpen) {
       setState(() => _legendOpen = false);
@@ -1777,6 +1819,247 @@ class _TodayCard extends StatelessWidget {
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+// ── Партнёры лояльности на карте (D-81) ──────────────────────────────────────
+
+Color _partnerCategoryColor(String category) => switch (category) {
+      'nutrition' => const Color(0xFF7FD07A),
+      'coffee' => const Color(0xFFE2A968),
+      'gear' => AppColors.lime,
+      'food' => const Color(0xFF59C6E4),
+      _ => AppColors.lime,
+    };
+
+/// Метка партнёра: кружок с эмодзи и обводкой цвета категории. Выбранный —
+/// крупнее и залит цветом (2ГИС-паттерн: логотип бизнеса на карте).
+class _PartnerPin extends StatelessWidget {
+  final Partner partner;
+  final bool selected;
+  final VoidCallback onTap;
+  const _PartnerPin({
+    required this.partner,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _partnerCategoryColor(partner.category);
+    final size = selected ? 42.0 : 36.0;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Center(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? c : const Color(0xFF12160F),
+            shape: BoxShape.circle,
+            border: Border.all(color: c, width: 2.2),
+            boxShadow: const [
+              BoxShadow(color: Color(0x66000000), blurRadius: 6, offset: Offset(0, 3)),
+            ],
+          ),
+          child: Text(
+            partnerGlyph(partner),
+            style: TextStyle(fontSize: selected ? 20 : 17),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Карточка партнёра снизу: логотип, название, «оплати до N% суммы баллами»,
+/// расстояние/описание и «Построить маршрут» (внешние карты).
+class _PartnerCard extends StatelessWidget {
+  final Partner partner;
+  final LatLng? userPoint;
+  final VoidCallback onClose;
+  const _PartnerCard({
+    required this.partner,
+    required this.userPoint,
+    required this.onClose,
+  });
+
+  String? get _distance {
+    final u = userPoint;
+    if (u == null) return null;
+    final m = const Distance().as(LengthUnit.Meter, u, partner.point);
+    return m < 950 ? '${m.round()} м' : '${(m / 1000).toStringAsFixed(1)} км';
+  }
+
+  Future<void> _route() async {
+    final uri = Uri.parse(
+      'https://yandex.ru/maps/?rtext=~${partner.lat},${partner.lng}&rtt=pd',
+    );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _partnerCategoryColor(partner.category);
+    final dist = _distance;
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+          child: _Glass(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.glass,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: c, width: 1.5),
+                      ),
+                      child: Text(partnerGlyph(partner),
+                          style: const TextStyle(fontSize: 24)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            partnerCategoryLabel(partner.category).toUpperCase(),
+                            style: TextStyle(
+                              color: c,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: .5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            partner.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: onClose,
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.line),
+                        ),
+                        child: Icon(CupertinoIcons.xmark,
+                            size: 14, color: AppColors.muted),
+                      ),
+                    ),
+                  ],
+                ),
+                if (partner.pointsPercent > 0) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.lime.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(12),
+                      border:
+                          Border.all(color: AppColors.lime.withValues(alpha: .4)),
+                    ),
+                    child: Row(
+                      children: [
+                        Text('${partner.pointsPercent}%',
+                            style: TextStyle(
+                                color: AppColors.lime,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text('суммы можно оплатить баллами МАТА',
+                              style: TextStyle(
+                                  color: AppColors.ink,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (dist != null) ...[
+                      Icon(CupertinoIcons.location_solid,
+                          size: 13, color: AppColors.muted),
+                      const SizedBox(width: 4),
+                      Text(dist,
+                          style: TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: Text(
+                        partner.description.isNotEmpty
+                            ? partner.description
+                            : partner.address,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: AppColors.muted, fontSize: 12.5),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _route,
+                    icon: const Icon(CupertinoIcons.location_north_line_fill,
+                        size: 16),
+                    label: const Text('Построить маршрут'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.lime,
+                      foregroundColor: const Color(0xFF141A08),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      textStyle: const TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
