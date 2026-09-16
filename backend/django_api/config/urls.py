@@ -37,6 +37,7 @@ from runs import views as runs_views
 from clubs import views as clubs_views
 from orders import views as orders_views
 from races import views as races_views
+from friends import views as friends_views
 from shoes import views as shoes_views
 from territories import views as territories_views
 from blocks import views as blocks_views
@@ -123,6 +124,16 @@ urlpatterns = [
     # Тропы: приём трека, список, доски (D-60).
     path("v1/runs/track", trails_views.submit_track),
     path("v1/trails/", include("trails.urls")),
+    # Друзья (D-82, этап 2a): граф взаимных друзей. Пути явно (без include),
+    # чтобы список жил на /v1/friends без хвостового слеша и APPEND_SLASH не редиректил.
+    path("v1/friends", friends_views.friends_list),
+    path("v1/friends/request", friends_views.friend_request),
+    path("v1/friends/search", friends_views.friend_search),
+    path("v1/friends/suggestions", friends_views.friend_suggestions),
+    path("v1/friends/match-contacts", friends_views.friend_match_contacts),
+    path("v1/friends/<str:other_id>/accept", friends_views.friend_accept),
+    path("v1/friends/<str:other_id>/reject", friends_views.friend_reject),
+    path("v1/friends/<str:other_id>", friends_views.friend_remove),
     # Подключение часов: адреса нужны в заявке к COROS до выдачи ключей.
     path("v1/integrations/", include("integrations.urls")),
     # Тренировки из внешних источников (часы, файлы).
