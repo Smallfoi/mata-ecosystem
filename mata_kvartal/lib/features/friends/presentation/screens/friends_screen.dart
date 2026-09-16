@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/friends_provider.dart';
@@ -33,6 +34,13 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         elevation: 0,
         title: const Text('Друзья',
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
+        actions: [
+          IconButton(
+            tooltip: 'Приватность',
+            icon: const Icon(CupertinoIcons.shield_lefthalf_fill),
+            onPressed: () => context.push('/profile/friends/privacy'),
+          ),
+        ],
       ),
       body: Column(
         children: [

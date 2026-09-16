@@ -13,6 +13,7 @@
 """
 import hashlib
 import re
+from datetime import timedelta
 
 from django.db.models import Q
 from django.utils import timezone
@@ -23,7 +24,14 @@ from accounts.models import Account
 from clubs.models import ClubMember
 from common.security import user_id_from_request
 
-from .models import Friendship, friends_ids, relationship
+from .models import (
+    FriendMapPrefs,
+    FriendPosition,
+    Friendship,
+    coarsen,
+    friends_ids,
+    relationship,
+)
 
 _MAX_CONTACT_HASHES = 3000
 
@@ -198,3 +206,115 @@ def friend_match_contacts(request):
         if h in hashes:
             out.append(_summary(a, relationship(uid, a.id)))
     return Response({"results": out})
+
+
+_POSITION_FRESH_MIN = 20  # позиция считается «живой» столько минут
+
+
+@api_view(["GET", "PUT"])
+def friend_prefs(request):
+    """Приватность карты друзей (D-83, 2c). По умолчанию меня не видит никто."""
+    uid = _me(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    prefs, _ = FriendMapPrefs.objects.get_or_create(user_id=uid)
+    if request.method == "PUT":
+        d = request.data if isinstance(request.data, dict) else {}
+        if "visible" in d:
+            prefs.visible = bool(d["visible"])
+        if "homeHidden" in d:
+            prefs.home_hidden = bool(d["homeHidden"])
+        if d.get("precision") in ("hex", "exact"):
+            prefs.precision = d["precision"]
+        if "hideHours" in d:  # 0/None — снять «Тень»; 2/8/24 — включить
+            h = d["hideHours"]
+            if not h:
+                prefs.hide_until = None
+            else:
+                try:
+                    prefs.hide_until = timezone.now() + timedelta(hours=float(h))
+                except (TypeError, ValueError):
+                    pass
+        if "home" in d:  # {lat,lng} — задать дом; null — очистить
+            home = d["home"]
+            if home is None:
+                prefs.home_lat = prefs.home_lng = None
+            elif isinstance(home, dict):
+                try:
+                    prefs.home_lat = float(home["lat"])
+                    prefs.home_lng = float(home["lng"])
+                except (KeyError, TypeError, ValueError):
+                    pass
+        prefs.updated_at = timezone.now()
+        prefs.save()
+        # Выключил видимость или ушёл в «Тень» — снять живую точку немедленно.
+        if not prefs.visible or prefs.in_shadow():
+            FriendPosition.objects.filter(user_id=uid).delete()
+    return Response(prefs.to_json())
+
+
+@api_view(["POST"])
+def friend_position(request):
+    """Телефон шлёт позицию, ПОКА открыта карта (батарея). Храним ОГРУБЛЁННУЮ и
+    только если человек видим и не в «Тени»; у дома — прячем (не храним)."""
+    uid = _me(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    d = request.data if isinstance(request.data, dict) else {}
+    try:
+        lat = float(d["lat"])
+        lng = float(d["lng"])
+    except (KeyError, TypeError, ValueError):
+        return Response({"detail": "Нет координат"}, status=400)
+    prefs, _ = FriendMapPrefs.objects.get_or_create(user_id=uid)
+    if not prefs.visible or prefs.in_shadow() or prefs.near_home(lat, lng):
+        FriendPosition.objects.filter(user_id=uid).delete()
+        return Response({"stored": False})
+    clat, clng = coarsen(lat, lng)
+    FriendPosition.objects.update_or_create(
+        user_id=uid,
+        defaults={
+            "lat": clat, "lng": clng,
+            "status": str(d.get("status") or "")[:20],
+            "updated_at": timezone.now(),
+        },
+    )
+    return Response({"stored": True})
+
+
+@api_view(["GET"])
+def friend_positions(request):
+    """Позиции взаимных друзей (огрублённые). Взаимность «Тени»: если Я в тени —
+    не вижу никого. Отдаём только видимых, не в тени, со свежей точкой."""
+    uid = _me(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    me_prefs = FriendMapPrefs.objects.filter(user_id=uid).first()
+    if me_prefs and me_prefs.in_shadow():
+        return Response({"positions": [], "inShadow": True})
+    fids = friends_ids(uid)
+    if not fids:
+        return Response({"positions": []})
+    fresh = timezone.now() - timedelta(minutes=_POSITION_FRESH_MIN)
+    visible_ids = {
+        p.user_id for p in FriendMapPrefs.objects.filter(user_id__in=fids, visible=True)
+        if not p.in_shadow()
+    }
+    if not visible_ids:
+        return Response({"positions": []})
+    accs = _acc_map(visible_ids)
+    out = []
+    for pos in FriendPosition.objects.filter(user_id__in=visible_ids, updated_at__gte=fresh):
+        acc = accs.get(pos.user_id)
+        if not acc:
+            continue
+        out.append({
+            "userId": pos.user_id,
+            "name": acc.name or "Бегун",
+            "avatarPath": acc.avatar_path,
+            "lat": pos.lat,
+            "lng": pos.lng,
+            "status": pos.status,
+            "updatedAt": pos.updated_at.isoformat(),
+        })
+    return Response({"positions": out})

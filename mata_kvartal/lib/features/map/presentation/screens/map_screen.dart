@@ -27,6 +27,7 @@ import '../../../weather/presentation/weather_background.dart';
 import '../../../weather/presentation/weather_view.dart';
 import '../../../../shared/widgets/kvartal_logo.dart';
 import '../../../partners/data/partners_provider.dart';
+import '../../../friends/data/friends_provider.dart';
 
 // Границы «тумана» режима «Исследование»: заведомо больше игровой зоны
 // (весь Якутск с округой), чтобы край затемнения не появлялся при панораме.
@@ -62,6 +63,10 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
 
   /// Выбранный партнёр лояльности (D-81): открытая карточка снизу; null — скрыта.
   Partner? _selectedPartner;
+
+  /// Выбранный друг на карте (D-83, 2b) — карточка снизу.
+  FriendPosition? _selectedFriend;
+  Timer? _friendPosTimer;
 
   // Легенда карты: свёрнута по умолчанию, не закрывает карту.
 
@@ -141,6 +146,18 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
       // Досылаем отложенные офлайн-захваты, когда вернулась связь (S-07).
       _territories.flushQueue();
     });
+    // Карта друзей (D-83, 2b): пока открыта карта, шлём свою позицию —
+    // батарея бережётся (только на видимой вкладке). Сервер сам огрубит до
+    // гекса и скроет по приватности (видимость/Тень/зона дома).
+    if (kFriends) {
+      _friendPosTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+        if (!isTabVisible) return;
+        final p = ref.read(positionStreamProvider).valueOrNull?.toLatLng;
+        if (p != null) {
+          ref.read(friendsActionsProvider).sendPosition(p.latitude, p.longitude);
+        }
+      });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _centerOnCurrentLocation();
       _scheduleTerritoryLoad();
@@ -158,6 +175,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
   void dispose() {
     _territoryDebounce?.cancel();
     _territoryRefreshTimer?.cancel();
+    _friendPosTimer?.cancel();
     _mapController.dispose();
     super.dispose();
   }
@@ -207,6 +225,12 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
     // пока выключен, отдаёт пусто, слоя нет.
     final partners =
         ref.watch(partnersProvider).valueOrNull ?? const <Partner>[];
+    // Друзья на карте (D-83, 2b): позиции взаимных друзей, огрублённые до
+    // гекса. За флагом kFriends; пусто → слоя нет.
+    final friendPositions = kFriends
+        ? (ref.watch(friendPositionsProvider).valueOrNull ??
+            const <FriendPosition>[])
+        : const <FriendPosition>[];
     // Тропы показываем в «Тропах» и «Захвате» (в захвате это маршруты районов).
     final showTrails = mode == RunMode.trails || mode == RunMode.capture;
     final trails = showTrails
@@ -419,6 +443,24 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                           partner: p,
                           selected: identical(p, _selectedPartner),
                           onTap: () => setState(() => _selectedPartner = p),
+                        ),
+                      ),
+                  ],
+                ),
+
+              // ── Слой «Друзья» (D-83): позиции друзей (огрублённые) ──────
+              if (friendPositions.isNotEmpty)
+                MarkerLayer(
+                  markers: [
+                    for (final f in friendPositions)
+                      Marker(
+                        point: f.point,
+                        width: 44,
+                        height: 44,
+                        child: _FriendPin(
+                          friend: f,
+                          selected: f.userId == _selectedFriend?.userId,
+                          onTap: () => setState(() => _selectedFriend = f),
                         ),
                       ),
                   ],
@@ -677,6 +719,11 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
               userPoint: posAsync.valueOrNull?.toLatLng,
               onClose: () => setState(() => _selectedPartner = null),
             ),
+          if (_selectedFriend != null)
+            _FriendMapCard(
+              friend: _selectedFriend!,
+              onClose: () => setState(() => _selectedFriend = null),
+            ),
         ],
       ),
     );
@@ -688,6 +735,10 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
     // Открыта карточка партнёра — тап по карте её закрывает (D-81).
     if (_selectedPartner != null) {
       setState(() => _selectedPartner = null);
+      return;
+    }
+    if (_selectedFriend != null) {
+      setState(() => _selectedFriend = null);
       return;
     }
     // Тап по карте сворачивает развёрнутую легенду (следующий тап — паспорт).
@@ -2056,6 +2107,124 @@ class _PartnerCard extends StatelessWidget {
                       textStyle: const TextStyle(
                           fontWeight: FontWeight.w800, fontSize: 14),
                     ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+// ── Друзья на карте (D-83, 2b) ───────────────────────────────────────────────
+
+class _FriendPin extends StatelessWidget {
+  final FriendPosition friend;
+  final bool selected;
+  final VoidCallback onTap;
+  const _FriendPin({
+    required this.friend,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final size = selected ? 42.0 : 36.0;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Center(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.lime,
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFF0E120D), width: 2.5),
+            boxShadow: const [
+              BoxShadow(color: Color(0x66000000), blurRadius: 6, offset: Offset(0, 3)),
+            ],
+          ),
+          child: Text(
+            friend.initial,
+            style: TextStyle(
+              color: const Color(0xFF141A08),
+              fontWeight: FontWeight.w800,
+              fontSize: selected ? 17 : 14,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FriendMapCard extends StatelessWidget {
+  final FriendPosition friend;
+  final VoidCallback onClose;
+  const _FriendMapCard({required this.friend, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    final status = friend.status.isNotEmpty ? friend.status : 'на карте';
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+          child: _Glass(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                      shape: BoxShape.circle, color: AppColors.lime),
+                  child: Text(friend.initial,
+                      style: const TextStyle(
+                          color: Color(0xFF141A08),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 19)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(friend.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 3),
+                      Text('$status · район ~150 м',
+                          style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                    ],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: onClose,
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.line)),
+                    child: Icon(CupertinoIcons.xmark, size: 14, color: AppColors.muted),
                   ),
                 ),
               ],
