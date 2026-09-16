@@ -4,7 +4,13 @@ from rest_framework.response import Response
 from common.cache import LOYALTY_TTL, cache_json, loyalty_key
 from common.security import user_id_from_request
 
-from .models import LoyaltyTransaction, add_txn, balance_of, level_for
+from .models import (
+    LoyaltyPartner,
+    LoyaltyTransaction,
+    add_txn,
+    balance_of,
+    level_for,
+)
 
 _TX_LIMIT = 200  # история: отдаём последние N (баланс считается по ВСЕМ через SQL)
 
@@ -142,3 +148,14 @@ def transactions(request):
         run_id,
     )
     return Response({"ok": True})
+
+
+@api_view(["GET"])
+def partners(request):
+    """Партнёры лояльности на карте (D-81). Публично, без токена: слой «Карты»
+    показывает эти точки. Отдаём только активных; можно сузить по городу."""
+    qs = LoyaltyPartner.objects.filter(is_active=True)
+    city = (request.query_params.get("city") or "").strip()
+    if city:
+        qs = qs.filter(city__iexact=city)
+    return Response({"partners": [p.to_json() for p in qs[:500]]})

@@ -3,7 +3,7 @@ from unfold.admin import ModelAdmin
 
 from common.adminutils import ExportCsvMixin, UserRefMixin
 
-from .models import LoyaltyTransaction
+from .models import LoyaltyPartner, LoyaltyTransaction
 
 
 @admin.register(LoyaltyTransaction)
@@ -36,3 +36,17 @@ class LoyaltyTransactionAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(LoyaltyPartner)
+class LoyaltyPartnerAdmin(ModelAdmin):
+    list_display = ("name", "category", "city", "points_percent", "is_active", "created_at")
+    list_filter = ("category", "is_active", "city")
+    list_editable = ("is_active",)
+    search_fields = ("name", "address", "description", "city")
+    ordering = ("name",)
+    fieldsets = (
+        ("Партнёр", {"fields": ("name", "category", "emoji", "logo", "description")}),
+        ("Где", {"fields": ("city", "address", "lat", "lng")}),
+        ("Баллы и показ", {"fields": ("points_percent", "is_active")}),
+    )
