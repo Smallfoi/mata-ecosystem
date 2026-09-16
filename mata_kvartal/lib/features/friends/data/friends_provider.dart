@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
@@ -146,4 +147,116 @@ class FriendsActions {
     await _friendsDio.delete<dynamic>('/friends/$userId', options: _auth(t));
     _refresh();
   }
+
+  /// Обновить приватность карты друзей (visible / hideHours / home / homeHidden).
+  Future<void> updatePrefs(Map<String, dynamic> patch) async {
+    final t = _token;
+    if (t == null) return;
+    await _friendsDio.put<dynamic>('/friends/prefs',
+        data: patch, options: _auth(t));
+    _ref.invalidate(friendPrefsProvider);
+    _ref.invalidate(friendPositionsProvider);
+  }
+
+  /// Отправить свою позицию (пока открыта карта). Сервер сам огрубит и решит,
+  /// хранить ли (видимость/Тень/зона дома). Ошибку глотаем — не ради этого бег.
+  Future<void> sendPosition(double lat, double lng, {String? status}) async {
+    final t = _token;
+    if (t == null) return;
+    try {
+      await _friendsDio.post<dynamic>('/friends/position',
+          data: {'lat': lat, 'lng': lng, if (status != null) 'status': status},
+          options: _auth(t));
+    } catch (_) {}
+  }
 }
+
+
+// ── Карта друзей (D-83, этап 2b/2c): приватность + позиции ────────────────────
+
+/// Настройки приватности карты друзей. По умолчанию меня не видит никто.
+class FriendMapPrefs {
+  final bool visible;
+  final String precision; // hex | exact
+  final DateTime? hideUntil;
+  final bool inShadow;
+  final bool homeSet;
+  final bool homeHidden;
+
+  const FriendMapPrefs({
+    this.visible = false,
+    this.precision = 'hex',
+    this.hideUntil,
+    this.inShadow = false,
+    this.homeSet = false,
+    this.homeHidden = true,
+  });
+
+  factory FriendMapPrefs.fromJson(Map<String, dynamic> j) => FriendMapPrefs(
+        visible: j['visible'] == true,
+        precision: j['precision']?.toString() ?? 'hex',
+        hideUntil: j['hideUntil'] != null
+            ? DateTime.tryParse(j['hideUntil'].toString())
+            : null,
+        inShadow: j['inShadow'] == true,
+        homeSet: j['homeSet'] == true,
+        homeHidden: j['homeHidden'] != false,
+      );
+}
+
+class FriendPosition {
+  final String userId;
+  final String name;
+  final String? avatarPath;
+  final double lat;
+  final double lng;
+  final String status;
+
+  const FriendPosition({
+    required this.userId,
+    required this.name,
+    required this.lat,
+    required this.lng,
+    this.avatarPath,
+    this.status = '',
+  });
+
+  LatLng get point => LatLng(lat, lng);
+  String get initial => name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+
+  factory FriendPosition.fromJson(Map<String, dynamic> j) => FriendPosition(
+        userId: j['userId']?.toString() ?? '',
+        name: (j['name']?.toString().isNotEmpty ?? false)
+            ? j['name'].toString()
+            : 'Бегун',
+        avatarPath: (j['avatarPath'] as String?)?.isNotEmpty == true
+            ? j['avatarPath'] as String
+            : null,
+        lat: (j['lat'] as num?)?.toDouble() ?? 0,
+        lng: (j['lng'] as num?)?.toDouble() ?? 0,
+        status: j['status']?.toString() ?? '',
+      );
+}
+
+/// Мои настройки приватности карты друзей.
+final friendPrefsProvider = FutureProvider.autoDispose<FriendMapPrefs>((ref) async {
+  final token = ref.watch(authProvider).token;
+  if (token == null) return const FriendMapPrefs();
+  final res = await _friendsDio.get<Map<String, dynamic>>(
+    '/friends/prefs', options: _auth(token));
+  return FriendMapPrefs.fromJson(res.data ?? const {});
+});
+
+/// Позиции взаимных друзей (огрублённые до гекса). Пусто, если я в «Тени».
+final friendPositionsProvider =
+    FutureProvider.autoDispose<List<FriendPosition>>((ref) async {
+  if (!kFriends) return const [];
+  final token = ref.watch(authProvider).token;
+  if (token == null) return const [];
+  final res = await _friendsDio.get<Map<String, dynamic>>(
+    '/friends/positions', options: _auth(token));
+  return ((res.data ?? const {})['positions'] as List? ?? const [])
+      .whereType<Map<String, dynamic>>()
+      .map(FriendPosition.fromJson)
+      .toList();
+});

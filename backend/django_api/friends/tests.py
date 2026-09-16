@@ -1,5 +1,6 @@
 """Дружба (D-82, этап 2a): заявка → подтверждение → взаимные друзья."""
 import hashlib
+import json
 
 from accounts.models import Account
 from common.testutils import ApiTestCase
@@ -71,3 +72,61 @@ class FriendsApiTests(ApiTestCase):
 
     def test_requires_token(self):
         self.assertEqual(self.client.get("/v1/friends").status_code, 401)
+
+
+class FriendsMapTests(ApiTestCase):
+    """Карта друзей (D-83): позиции только взаимным, огрубление, дом, «Тень»."""
+    phone = "+79990003200"
+
+    def setUp(self):
+        super().setUp()
+        self.t2 = self.new_user("+79990003201")
+        self.uid2 = Account.objects.get(phone="+79990003201").id
+        self.api_post("/v1/friends/request", {"userId": self.uid2})
+        self.api_post(f"/v1/friends/{self.uid}/accept", {}, token=self.t2)
+
+    def _prefs(self, body, token=None):
+        return self.client.put(
+            "/v1/friends/prefs", data=json.dumps(body),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token or self.token}",
+        )
+
+    def test_prefs_default_invisible(self):
+        self.assertFalse(self.api_get("/v1/friends/prefs").json()["visible"])
+
+    def test_position_not_stored_when_invisible(self):
+        r = self.api_post("/v1/friends/position", {"lat": 62.03, "lng": 129.73})
+        self.assertFalse(r.json()["stored"])
+
+    def test_visible_position_coarsened_and_seen_by_friend(self):
+        self._prefs({"visible": True})
+        self.api_post("/v1/friends/position", {"lat": 62.0281, "lng": 129.7325})
+        pos = self.api_get("/v1/friends/positions", token=self.t2).json()["positions"]
+        self.assertEqual([p["userId"] for p in pos], [self.uid])
+        self.assertNotEqual(pos[0]["lat"], 62.0281)   # огрублено, не точная точка
+
+    def test_non_friend_does_not_see(self):
+        self._prefs({"visible": True})
+        self.api_post("/v1/friends/position", {"lat": 62.03, "lng": 129.73})
+        t3 = self.new_user("+79990003202")
+        self.assertEqual(
+            self.api_get("/v1/friends/positions", token=t3).json()["positions"], []
+        )
+
+    def test_home_zone_hides(self):
+        self._prefs({"visible": True, "home": {"lat": 62.03, "lng": 129.73}})
+        r = self.api_post("/v1/friends/position", {"lat": 62.0301, "lng": 129.7302})
+        self.assertFalse(r.json()["stored"])
+
+    def test_shadow_reciprocity(self):
+        self._prefs({"visible": True})
+        self.api_post("/v1/friends/position", {"lat": 62.03, "lng": 129.73})
+        self._prefs({"visible": True}, token=self.t2)
+        self.api_post("/v1/friends/position", {"lat": 62.04, "lng": 129.74}, token=self.t2)
+        self._prefs({"hideHours": 2})  # я ухожу в «Тень»
+        mine = self.api_get("/v1/friends/positions").json()
+        self.assertEqual(mine["positions"], [])
+        self.assertTrue(mine.get("inShadow"))
+        seen = self.api_get("/v1/friends/positions", token=self.t2).json()["positions"]
+        self.assertEqual([p["userId"] for p in seen], [])  # меня в тени не видят
