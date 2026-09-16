@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../features/auth/data/auth_provider.dart';
+import '../../features/friends/presentation/screens/friends_screen.dart';
 import '../../features/auth/presentation/screens/phone_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/auth/presentation/screens/otp_screen.dart';
@@ -240,6 +241,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/profile',
                 builder: (_, __) => const ProfileScreen(),
+              ),
+              // Друзья (D-82, этап 2a) — за флагом kFriends, вход из профиля.
+              GoRoute(
+                path: '/profile/friends',
+                builder: (_, __) => const FriendsScreen(),
               ),
               GoRoute(
                 path: '/profile/points',

@@ -11,6 +11,7 @@ import '../../../../core/api/api_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/data/auth_provider.dart';
 import '../../../loyalty/data/loyalty_provider.dart';
+import '../../../friends/data/friends_provider.dart';
 import '../../../loyalty/presentation/widgets/loyalty_card.dart';
 import '../../../notifications/data/notifications_provider.dart';
 import '../../../run/data/completed_runs_provider.dart';
@@ -749,6 +750,13 @@ class SettingsScreen extends ConsumerWidget {
               label: '\u041c\u043e\u044f \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430',
               onTap: () => context.push('/profile/stats'),
             ),
+            // Друзья (D-82, этап 2a) — за флагом kFriends.
+            if (kFriends)
+              _SettingsTile(
+                icon: CupertinoIcons.person_2_fill,
+                label: 'Друзья',
+                onTap: () => context.push('/profile/friends'),
+              ),
             _SettingsTile(
               icon: CupertinoIcons.location_solid,
               label:
