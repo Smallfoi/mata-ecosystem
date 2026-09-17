@@ -46,6 +46,7 @@ from config.errors_view import error_detail, errors_console
 from config.onec_log_view import onec_log
 from config.runs_review_view import runs_review
 from config.order_return_view import order_return
+from config.points_view import points_client, points_clients
 from staff import views as staff_views
 
 urlpatterns = [
@@ -70,6 +71,8 @@ urlpatterns = [
     # «Проверка забегов» — разбор помеченных анти-читом (S-04 ф.2). ДО admin/.
     path("admin/runs-review/", runs_review, name="runs_review"),
     path("admin/order-return/<int:pk>/", order_return, name="order_return"),
+    path("admin/points/", points_clients, name="points_clients"),
+    path("admin/points/<str:user_id>/", points_client, name="points_client"),
     path("admin/errors/<str:issue_id>/", error_detail, name="error_detail"),
     # Сотрудники и права (S-12). Тоже ДО admin/ — иначе перехватит catch-all.
     # Свой второй фактор. НЕ под /admin/2fa/ — тот префикс пропускает мимо

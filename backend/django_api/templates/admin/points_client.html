@@ -1,0 +1,77 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# «Баллы клиента»: операции за выбранные дни с балансом после каждой. Только просмотр. #}
+<style>
+  .pt-sum{display:flex;gap:.75rem;flex-wrap:wrap;margin:0 0 1rem}
+  .pt-tile{flex:1;min-width:140px;border:1px solid #e2e6ea;border-radius:.6rem;padding:.7rem .9rem;background:#fff}
+  .dark .pt-tile{background:#1f2937;border-color:#374151}
+  .pt-tile b{display:block;font-size:1.3rem;line-height:1.25;font-variant-numeric:tabular-nums}
+  .pt-tile span{font-size:.8rem;color:#6f7278}
+  .pt-note{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin:0 0 1rem;font-size:.9rem}
+  .pt-chip{padding:.3rem .7rem;border-radius:999px;background:#20252b;color:#fff;font-size:.82rem}
+  .dark .pt-chip{background:#57bcd8;color:#0d0d0d}
+  .pt-card{border:1px solid #e2e6ea;border-radius:.7rem;background:#fff;overflow:hidden;margin:0 0 1rem}
+  .dark .pt-card{background:#1f2937;border-color:#374151}
+  .pt-wrap{overflow-x:auto}
+  table.pt{width:100%;border-collapse:collapse;min-width:760px}
+  table.pt th,table.pt td{padding:.55rem .8rem;border-bottom:1px solid #eceff1;text-align:left;font-size:.88rem;vertical-align:middle}
+  .dark table.pt th,.dark table.pt td{border-color:#374151}
+  table.pt th{font-size:.78rem;color:#6f7278;font-weight:600}
+  table.pt td.n,table.pt th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pt-plus{color:#16a34a;font-weight:600}
+  .pt-minus{color:#dc2626;font-weight:600}
+  .pt-muted{color:#6f7278}
+  .pt-empty{padding:1.6rem 1rem;text-align:center;color:#6f7278}
+</style>
+
+<div class="pt-sum">
+  <div class="pt-tile"><b>{{ name }}</b><span>{{ account.phone|default:"клиент" }}</span></div>
+  <div class="pt-tile"><b>{{ balance }}</b><span>баланс сейчас</span></div>
+  <div class="pt-tile"><b class="pt-plus">+{{ earned }}</b><span>начислено {% if period %}за {{ period.label }}{% else %}за всё время{% endif %}</span></div>
+  <div class="pt-tile"><b class="pt-minus">−{{ spent }}</b><span>списано</span></div>
+</div>
+
+<div class="pt-note">
+  {% if period %}
+    <span class="pt-chip">{{ period.label }}</span>
+    <a href="{{ all_url }}">Показать всю историю</a>
+  {% else %}
+    <span class="pt-muted">Вся история клиента</span>
+  {% endif %}
+  {% if adjust_url %}<span class="pt-muted">·</span> <a href="{{ adjust_url }}">Ручная корректировка →</a>{% endif %}
+</div>
+
+<div class="pt-card">
+  {% if rows %}
+  <div class="pt-wrap">
+    <table class="pt">
+      <thead>
+        <tr><th>Когда (якут.)</th><th class="n">Баллы</th><th>За что</th><th>Описание</th><th>Заказ / забег</th><th class="n">Баланс после</th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td class="pt-muted" style="white-space:nowrap">{{ r.when }}</td>
+          <td class="n">{% if r.amount >= 0 %}<span class="pt-plus">+{{ r.amount }}</span>{% else %}<span class="pt-minus">{{ r.amount }}</span>{% endif %}</td>
+          <td>{{ r.label }}</td>
+          <td>{{ r.description|default:"—" }}</td>
+          <td class="pt-muted">
+            {% if r.order_url %}<a href="{{ r.order_url }}">заказ {{ r.order_id }}</a>
+            {% elif r.order_id %}заказ {{ r.order_id }}
+            {% elif r.run_id %}забег {{ r.run_id|truncatechars:14 }}
+            {% else %}—{% endif %}
+          </td>
+          <td class="n">{{ r.balance_after }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="pt-empty">{% if period %}За {{ period.label }} операций нет.{% else %}Операций нет.{% endif %}</div>
+  {% endif %}
+</div>
+
+<p><a href="{{ back_url }}">← ко всем клиентам</a></p>
+{% endblock %}
