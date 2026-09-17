@@ -158,6 +158,23 @@ class FriendsActions {
     _ref.invalidate(friendPositionsProvider);
   }
 
+  /// «Маяк» (D-84): точный трек 1–3 доверенным на `hours` часов.
+  Future<void> startBeacon(double hours, List<String> trusted) async {
+    final t = _token;
+    if (t == null) return;
+    await _friendsDio.post<dynamic>('/friends/beacon',
+        data: {'hours': hours, 'trusted': trusted}, options: _auth(t));
+    _ref.invalidate(friendPrefsProvider);
+  }
+
+  Future<void> stopBeacon() async {
+    final t = _token;
+    if (t == null) return;
+    await _friendsDio.post<dynamic>('/friends/beacon',
+        data: const {'off': true}, options: _auth(t));
+    _ref.invalidate(friendPrefsProvider);
+  }
+
   /// Отправить свою позицию (пока открыта карта). Сервер сам огрубит и решит,
   /// хранить ли (видимость/Тень/зона дома). Ошибку глотаем — не ради этого бег.
   Future<void> sendPosition(double lat, double lng, {String? status}) async {
@@ -182,6 +199,9 @@ class FriendMapPrefs {
   final bool inShadow;
   final bool homeSet;
   final bool homeHidden;
+  final bool beaconActive;
+  final DateTime? beaconUntil;
+  final List<String> beaconTrusted;
 
   const FriendMapPrefs({
     this.visible = false,
@@ -190,6 +210,9 @@ class FriendMapPrefs {
     this.inShadow = false,
     this.homeSet = false,
     this.homeHidden = true,
+    this.beaconActive = false,
+    this.beaconUntil,
+    this.beaconTrusted = const [],
   });
 
   factory FriendMapPrefs.fromJson(Map<String, dynamic> j) => FriendMapPrefs(
@@ -201,6 +224,13 @@ class FriendMapPrefs {
         inShadow: j['inShadow'] == true,
         homeSet: j['homeSet'] == true,
         homeHidden: j['homeHidden'] != false,
+        beaconActive: j['beaconActive'] == true,
+        beaconUntil: j['beaconUntil'] != null
+            ? DateTime.tryParse(j['beaconUntil'].toString())
+            : null,
+        beaconTrusted: ((j['beaconTrusted'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
       );
 }
 
@@ -211,6 +241,7 @@ class FriendPosition {
   final double lat;
   final double lng;
   final String status;
+  final bool beacon;
 
   const FriendPosition({
     required this.userId,
@@ -219,6 +250,7 @@ class FriendPosition {
     required this.lng,
     this.avatarPath,
     this.status = '',
+    this.beacon = false,
   });
 
   LatLng get point => LatLng(lat, lng);
@@ -235,6 +267,7 @@ class FriendPosition {
         lat: (j['lat'] as num?)?.toDouble() ?? 0,
         lng: (j['lng'] as num?)?.toDouble() ?? 0,
         status: j['status']?.toString() ?? '',
+        beacon: j['beacon'] == true,
       );
 }
 

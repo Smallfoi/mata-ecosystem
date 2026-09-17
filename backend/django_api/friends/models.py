@@ -94,6 +94,8 @@ class FriendMapPrefs(models.Model):
     home_lat = models.FloatField(null=True, blank=True, verbose_name="Дом: широта")
     home_lng = models.FloatField(null=True, blank=True, verbose_name="Дом: долгота")
     home_hidden = models.BooleanField(default=True, verbose_name="Скрывать точку у дома")
+    beacon_until = models.DateTimeField(null=True, blank=True, verbose_name="«Маяк» активен до")
+    beacon_trusted = models.JSONField(default=list, blank=True, verbose_name="Доверенные («Маяк»)")
     updated_at = models.DateTimeField(default=timezone.now, verbose_name="Обновлено")
 
     class Meta:
@@ -103,6 +105,9 @@ class FriendMapPrefs(models.Model):
 
     def in_shadow(self) -> bool:
         return bool(self.hide_until and self.hide_until > timezone.now())
+
+    def in_beacon(self) -> bool:
+        return bool(self.beacon_until and self.beacon_until > timezone.now())
 
     def near_home(self, lat, lng) -> bool:
         if not (self.home_hidden and self.home_lat is not None and self.home_lng is not None):
@@ -117,14 +122,20 @@ class FriendMapPrefs(models.Model):
             "inShadow": self.in_shadow(),
             "homeSet": self.home_lat is not None and self.home_lng is not None,
             "homeHidden": self.home_hidden,
+            "beaconUntil": self.beacon_until.isoformat() if self.beacon_until else None,
+            "beaconActive": self.in_beacon(),
+            "beaconTrusted": self.beacon_trusted or [],
         }
 
 
 class FriendPosition(models.Model):
     """Последняя ОГРУБЛЁННАЯ позиция человека для карты друзей (не сырой трек)."""
     user_id = models.CharField(primary_key=True, max_length=40, verbose_name="Пользователь (ID)")
-    lat = models.FloatField(verbose_name="Широта (огрублённая)")
-    lng = models.FloatField(verbose_name="Долгота (огрублённая)")
+    lat = models.FloatField(null=True, blank=True, verbose_name="Широта (огрублённая)")
+    lng = models.FloatField(null=True, blank=True, verbose_name="Долгота (огрублённая)")
+    exact_lat = models.FloatField(null=True, blank=True, verbose_name="Точная широта («Маяк»)")
+    exact_lng = models.FloatField(null=True, blank=True, verbose_name="Точная долгота («Маяк»)")
+    beacon = models.BooleanField(default=False, verbose_name="«Маяк» (точная точка)")
     status = models.CharField(max_length=20, blank=True, default="", verbose_name="Статус")
     updated_at = models.DateTimeField(default=timezone.now, db_index=True, verbose_name="Обновлено")
 

@@ -134,6 +134,7 @@ urlpatterns = [
     path("v1/friends/prefs", friends_views.friend_prefs),
     path("v1/friends/position", friends_views.friend_position),
     path("v1/friends/positions", friends_views.friend_positions),
+    path("v1/friends/beacon", friends_views.friend_beacon),
     path("v1/friends/<str:other_id>/accept", friends_views.friend_accept),
     path("v1/friends/<str:other_id>/reject", friends_views.friend_reject),
     path("v1/friends/<str:other_id>", friends_views.friend_remove),

@@ -118,6 +118,8 @@ class FriendsPrivacyScreen extends ConsumerWidget {
               ],
             ]),
           ]),
+          const SizedBox(height: 12),
+          const _BeaconCard(),
           const SizedBox(height: 16),
 
           Text(
@@ -216,4 +218,107 @@ class _Btn extends StatelessWidget {
                   fontWeight: FontWeight.w800)),
         ),
       );
+}
+
+
+/// «Маяк» (D-84): точный трек 1–3 доверенным друзьям на время (safety).
+class _BeaconCard extends ConsumerStatefulWidget {
+  const _BeaconCard();
+  @override
+  ConsumerState<_BeaconCard> createState() => _BeaconCardState();
+}
+
+class _BeaconCardState extends ConsumerState<_BeaconCard> {
+  final Set<String> _sel = {};
+  bool _init = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = ref.watch(friendPrefsProvider).valueOrNull ?? const FriendMapPrefs();
+    final friends = ref.watch(friendsProvider).valueOrNull?.friends ?? const [];
+    final act = ref.read(friendsActionsProvider);
+    if (!_init && prefs.beaconTrusted.isNotEmpty) {
+      _sel.addAll(prefs.beaconTrusted);
+      _init = true;
+    }
+
+    return _Card(children: [
+      Row(children: [
+        Icon(CupertinoIcons.dot_radiowaves_left_right, size: 18, color: AppColors.lime),
+        const SizedBox(width: 8),
+        Text('МАЯК',
+            style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: .6)),
+      ]),
+      const SizedBox(height: 6),
+      Text('Точный трек 1–3 доверенным на время — на случай безопасности.',
+          style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.4)),
+      const SizedBox(height: 12),
+      if (prefs.beaconActive)
+        Row(children: [
+          Icon(CupertinoIcons.location_north_fill, size: 16, color: AppColors.lime),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+                'Активен до ${FriendsPrivacyScreen._hhmm(prefs.beaconUntil)} · '
+                '${prefs.beaconTrusted.length} доверенных',
+                style: TextStyle(
+                    color: AppColors.ink, fontSize: 13.5, fontWeight: FontWeight.w700)),
+          ),
+          _Btn('Выключить', primary: true, onTap: () => act.stopBeacon()),
+        ])
+      else if (friends.isEmpty)
+        Text('Сначала добавь друзей — из них выберешь доверенных.',
+            style: TextStyle(color: AppColors.faint, fontSize: 12.5))
+      else ...[
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final f in friends)
+              GestureDetector(
+                onTap: () => setState(() {
+                  if (_sel.contains(f.userId)) {
+                    _sel.remove(f.userId);
+                  } else if (_sel.length < 3) {
+                    _sel.add(f.userId);
+                  }
+                }),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _sel.contains(f.userId) ? AppColors.lime : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: _sel.contains(f.userId) ? AppColors.lime : AppColors.line),
+                  ),
+                  child: Text(f.name,
+                      style: TextStyle(
+                          color: _sel.contains(f.userId)
+                              ? const Color(0xFF141A08)
+                              : AppColors.ink,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700)),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: _Btn(
+            _sel.isEmpty ? 'Выбери доверенных (до 3)' : 'Включить «Маяк» на 2 ч',
+            primary: _sel.isNotEmpty,
+            onTap: () {
+              if (_sel.isEmpty) return;
+              act.startBeacon(2, _sel.toList());
+            },
+          ),
+        ),
+      ],
+    ]);
+  }
 }
