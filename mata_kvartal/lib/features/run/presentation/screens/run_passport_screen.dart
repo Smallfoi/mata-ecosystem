@@ -281,11 +281,14 @@ class _TrackHero extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Маршрут остался на телефоне, где записана пробежка, — '
-                  'сервер сырой GPS не хранит',
+                  'Трек этой пробежки не сохранён на этом устройстве.\n'
+                  'Ради приватности сырой GPS хранится только на телефоне, '
+                  'где записана пробежка, и не переносится на сервер — '
+                  'при переустановке или смене телефона трек не восстановить.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12.5,
+                    height: 1.4,
                     color: AppColors.textTertiary,
                   ),
                 ),
