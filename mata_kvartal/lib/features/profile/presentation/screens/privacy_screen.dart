@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/data/auth_provider.dart';
+import '../../../league/data/league_provider.dart';
 import '../../data/account_provider.dart';
 
 /// Приватность и данные (LAUNCH_READINESS §2/§13): видимость + удаление аккаунта.
@@ -105,6 +106,18 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
               value: privacy.realtimePublic,
               onChanged: (v) =>
                   ref.read(accountProvider.notifier).setPrivacy(realtimePublic: v),
+            ),
+            const SizedBox(height: 24),
+            const _SectionTitle('Резервная копия'),
+            const _Hint('По умолчанию маршрут пробежки хранится только на телефоне '
+                '(сырой GPS — персональные данные, 152-ФЗ). Включите, чтобы треки '
+                'сохранялись на сервере и переживали переустановку и смену телефона.'),
+            _PrivacyToggle(
+              icon: CupertinoIcons.cloud_upload,
+              label: 'Резервная копия треков',
+              subtitle: 'Маршруты пробежек хранятся на сервере',
+              value: ref.watch(runnerProfileProvider).valueOrNull?.trackBackup ?? false,
+              onChanged: (v) => saveRunnerProfile(ref, trackBackup: v),
             ),
             const SizedBox(height: 24),
             const _SectionTitle('Данные'),

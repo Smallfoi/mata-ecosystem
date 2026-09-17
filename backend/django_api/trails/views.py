@@ -89,8 +89,10 @@ def submit_track(request):
         return Response({"detail": "Нет токена"}, status=401)
 
     profile = RunnerProfile.objects.filter(user_id=me).first()
-    if profile and not profile.trails_enabled:
-        # Человек выключил участие в тропах — трек не храним даже временно.
+    trails_on = (profile is None) or profile.trails_enabled
+    backup_on = bool(profile and profile.track_backup)
+    if not trails_on and not backup_on:
+        # Тропы выключены и резервная копия не нужна — трек не храним вовсе.
         return Response({"attempts": [], "skipped": "trailsDisabled"})
 
     data = request.data if isinstance(request.data, dict) else {}
@@ -108,6 +110,11 @@ def submit_track(request):
         run_id=run_id,
         defaults={"user_id": me, "points": track, "received_at": timezone.now()},
     )
+
+    if not trails_on:
+        # Тропы выключены, но включён бэкап (D-86): трек сохранили только для личной
+        # резервной копии владельца; со тропами не сверяем и след не растим.
+        return Response({"attempts": [], "skipped": "trailsDisabledBackup"})
 
     min_lat, max_lat, min_lon, max_lon = matching.bbox([[p[0], p[1]] for p in track])
     candidates = Trail.objects.filter(
@@ -145,6 +152,20 @@ def submit_track(request):
             pass
 
     return Response({"attempts": found})
+
+
+@api_view(["GET"])
+def get_track(request, run_id):
+    """Резервная копия трека забега (D-86): владелец забирает свой трек обратно —
+    маршрут пережил переустановку/смену телефона. Только свой (по user_id).
+    Точки как сохранены: [lat, lng, ts]. Нет копии — пустой список.
+    """
+    me = user_id_from_request(request)
+    if not me:
+        return Response({"detail": "Нет токена"}, status=401)
+    run_id = str(run_id or "").strip()[:40]
+    t = PendingTrack.objects.filter(run_id=run_id, user_id=me).first()
+    return Response({"points": t.points if t else []})
 
 
 @api_view(["GET", "POST"])

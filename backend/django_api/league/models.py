@@ -48,6 +48,10 @@ class RunnerProfile(models.Model):
     # Участие в тропах: выключено — трек забега не уходит на сервер вовсе (D-60).
     # По умолчанию включено, иначе функция мертва; выключатель виден в настройках.
     trails_enabled = models.BooleanField(default=True, verbose_name="Участвовать в тропах")
+    # Резервная копия треков на сервере (D-86): включено — трек забега хранится
+    # долговременно, чтобы маршрут пережил переустановку/смену телефона. По умолчанию
+    # ВЫКЛ и только по согласию (сырой GPS — ПДн, 152-ФЗ). Разворот приватности §2/D-60.
+    track_backup = models.BooleanField(default=False, verbose_name="Резервная копия треков")
     updated_at = models.DateTimeField(default=timezone.now, verbose_name="Обновлён")
 
     class Meta:
@@ -63,6 +67,7 @@ class RunnerProfile(models.Model):
             "focus": self.focus or None,
             "weeklyGoalKm": self.weekly_goal_km,
             "trailsEnabled": self.trails_enabled,
+            "trackBackup": self.track_backup,
         }
 
 

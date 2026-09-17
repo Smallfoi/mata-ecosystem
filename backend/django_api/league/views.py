@@ -106,6 +106,9 @@ def profile(request):
     if "trailsEnabled" in data:
         obj.trails_enabled = bool(data.get("trailsEnabled"))
 
+    if "trackBackup" in data:
+        obj.track_backup = bool(data.get("trackBackup"))
+
     obj.updated_at = timezone.now()
     obj.save()
     return Response({**obj.to_json(), "group": _group_of(obj)})

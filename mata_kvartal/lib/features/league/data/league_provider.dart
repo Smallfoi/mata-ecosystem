@@ -143,6 +143,11 @@ class RunnerProfile {
   /// 'skip' — вопрос показали, человек пропустил: больше не спрашиваем.
   final String? focus;
 
+  /// Резервная копия треков на сервере (D-86, opt-in). По умолчанию ВЫКЛ:
+  /// сырой GPS хранится только с согласия (152-ФЗ), чтобы маршрут пережил
+  /// переустановку/смену телефона.
+  final bool trackBackup;
+
   const RunnerProfile({
     this.birthYear,
     this.gender,
@@ -150,6 +155,7 @@ class RunnerProfile {
     this.weeklyGoalKm,
     this.groupLabel,
     this.focus,
+    this.trackBackup = false,
   });
 
   /// Спрашивать ли о цели: только если человек ещё не отвечал и не пропускал.
@@ -164,6 +170,7 @@ class RunnerProfile {
     weeklyGoalKm: (j['weeklyGoalKm'] as num?)?.toDouble(),
     groupLabel: (j['group'] as Map<String, dynamic>?)?['label']?.toString(),
     focus: j['focus']?.toString(),
+    trackBackup: j['trackBackup'] == true,
   );
 }
 
@@ -242,6 +249,7 @@ Future<RunnerProfile> saveRunnerProfile(
   String? level,
   double? weeklyGoalKm,
   String? focus,
+  bool? trackBackup,
 }) async {
   final token = ref.read(authProvider).token;
   if (token == null || token.isEmpty) return const RunnerProfile();
@@ -251,6 +259,7 @@ Future<RunnerProfile> saveRunnerProfile(
   if (level != null) body['level'] = level;
   if (weeklyGoalKm != null) body['weeklyGoalKm'] = weeklyGoalKm;
   if (focus != null) body['focus'] = focus;
+  if (trackBackup != null) body['trackBackup'] = trackBackup;
 
   final res = await _leagueDio.post<Map<String, dynamic>>(
     '/runner/profile',

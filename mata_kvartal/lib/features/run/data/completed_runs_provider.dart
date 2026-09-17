@@ -313,6 +313,28 @@ class CompletedRunsNotifier extends StateNotifier<List<CompletedRun>> {
       // офлайн/ошибка — покажем локальную историю
     }
   }
+
+  /// Резервная копия трека (D-86): тянем маршрут забега с сервера, когда локально
+  /// его нет (переустановка/смена телефона). Работает, если у владельца включён
+  /// бэкап треков. Пусто — трека на сервере нет. Точки приходят как [lat,lng,ts].
+  Future<List<LatLng>> fetchTrack(String runId) async {
+    final token = _token;
+    if (token == null || runId.isEmpty) return const [];
+    try {
+      final r = await _dio.get<Map<String, dynamic>>(
+        '/runs/$runId/track',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      final pts = (r.data ?? const {})['points'] as List? ?? const [];
+      return pts
+          .whereType<List>()
+          .where((p) => p.length >= 2)
+          .map((p) => LatLng((p[0] as num).toDouble(), (p[1] as num).toDouble()))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
 }
 
 final completedRunsProvider =
