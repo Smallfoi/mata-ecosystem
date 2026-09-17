@@ -59,16 +59,31 @@ class CategoryAdmin(ModelAdmin):
         return "Нет фото"
 
 
+# Порядок размеров одежды: по алфавиту вышло бы «L, M, S, XL».
+_SIZE_ORDER = {"XXS": 0, "XS": 1, "S": 2, "M": 3, "L": 4, "XL": 5, "XXL": 6, "XXXL": 7, "3XL": 7}
+
+
+def _size_key(item):
+    size = str(item[0]).strip()
+    if size.upper() in _SIZE_ORDER:
+        return (0, _SIZE_ORDER[size.upper()], size)
+    try:
+        return (1, float(size.replace(",", ".")), size)
+    except ValueError:
+        return (2, 0, size)
+
+
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
+    # ID в списке — служебный шум: товар открывается по названию, найти по ID можно поиском.
     list_display = (
         "preview",
-        "id",
         "name",
         "brand",
         "category_name",
         "price",
         "old_price",
+        "stock",
         "in_stock",
         "is_published",
         "is_featured",
@@ -76,7 +91,7 @@ class ProductAdmin(ModelAdmin):
         "sort_site",
         "sort_app",
     )
-    list_display_links = ("id", "name")
+    list_display_links = ("name",)
     list_editable = (
         "price",
         "old_price",
@@ -120,6 +135,24 @@ class ProductAdmin(ModelAdmin):
         }),
     )
     readonly_fields = ("preview_large",)
+
+    @admin.display(description="Остаток", ordering="stock_count")
+    def stock(self, obj):
+        """Остаток из 1С: всего и по размерам. Прочерк — 1С остаток ещё не присылала."""
+        if obj.stock_count is None:
+            return format_html('<span style="color:#9ca3af" title="{}">—</span>',
+                               "1С ещё не присылала остаток")
+        color = "#dc2626" if obj.stock_count <= 0 else "inherit"
+        total = format_html('<b style="color:{};white-space:nowrap">{} шт</b>', color, obj.stock_count)
+        sizes = sorted((obj.stock_by_size or {}).items(), key=_size_key)
+        if not sizes:
+            return total
+        parts = [f"{size}: {count}" for size, count in sizes]
+        shown = " · ".join(parts[:8]) + (" · …" if len(parts) > 8 else "")
+        return format_html(
+            '{}<div style="font-size:11px;color:#6b7280;white-space:nowrap" title="{}">{}</div>',
+            total, " · ".join(parts), shown,
+        )
 
     @admin.display(description="Категория")
     def category_name(self, obj):
