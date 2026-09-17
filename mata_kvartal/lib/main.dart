@@ -8,6 +8,7 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/races/data/race_reminders.dart';
+import 'features/run/data/completed_runs_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -80,6 +81,19 @@ class _KvartalAppState extends ConsumerState<KvartalApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Вернулись из фона — досылаем накопленные офлайн-забеги (цель запуска: 0
+    // потерянных, D-75) и подтягиваем серверные (кросс-девайс). Раньше досылка
+    // была только при старте и входе: забег, записанный на улице без сети и
+    // свёрнутый в фон, висел неотправленным до следующего перезапуска.
+    if (state == AppLifecycleState.resumed) {
+      final runs = ref.read(completedRunsProvider.notifier);
+      runs.syncPending();
+      runs.pullFromServer();
+    }
   }
 
   @override
