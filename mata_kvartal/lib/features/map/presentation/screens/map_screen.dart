@@ -2134,6 +2134,8 @@ class _FriendPin extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = selected ? 42.0 : 36.0;
+    // «Маяк» (D-84): точная точка доверенным — выделяем синим свечением-кольцом.
+    final beacon = friend.beacon;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -2146,9 +2148,15 @@ class _FriendPin extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.lime,
             shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFF0E120D), width: 2.5),
-            boxShadow: const [
-              BoxShadow(color: Color(0x66000000), blurRadius: 6, offset: Offset(0, 3)),
+            border: Border.all(
+              color: beacon ? AppColors.electricBlue : const Color(0xFF0E120D),
+              width: beacon ? 3 : 2.5,
+            ),
+            boxShadow: [
+              const BoxShadow(color: Color(0x66000000), blurRadius: 6, offset: Offset(0, 3)),
+              if (beacon)
+                BoxShadow(
+                    color: AppColors.electricBlue.withValues(alpha: 0.6), blurRadius: 10),
             ],
           ),
           child: Text(

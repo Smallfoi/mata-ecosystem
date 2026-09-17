@@ -130,3 +130,38 @@ class FriendsMapTests(ApiTestCase):
         self.assertTrue(mine.get("inShadow"))
         seen = self.api_get("/v1/friends/positions", token=self.t2).json()["positions"]
         self.assertEqual([p["userId"] for p in seen], [])  # меня в тени не видят
+
+
+    # ── «Маяк» (D-84): точная точка доверенным ──
+    def test_beacon_gives_exact_to_trusted(self):
+        self.api_post("/v1/friends/beacon", {"hours": 2, "trusted": [self.uid2]})
+        self.api_post("/v1/friends/position", {"lat": 62.0281, "lng": 129.7325})
+        pos = self.api_get("/v1/friends/positions", token=self.t2).json()["positions"]
+        self.assertEqual(len(pos), 1)
+        self.assertTrue(pos[0]["beacon"])
+        self.assertEqual(pos[0]["lat"], 62.0281)  # точная, не огрублённая
+
+    def test_beacon_not_leaked_to_non_trusted(self):
+        t3 = self.new_user("+79990003203")
+        uid3 = Account.objects.get(phone="+79990003203").id
+        self.api_post("/v1/friends/request", {"userId": uid3})
+        self.api_post(f"/v1/friends/{self.uid}/accept", {}, token=t3)
+        self.api_post("/v1/friends/beacon", {"hours": 2, "trusted": [self.uid2]})
+        self.api_post("/v1/friends/position", {"lat": 62.0281, "lng": 129.7325})
+        self.assertEqual(
+            self.api_get("/v1/friends/positions", token=t3).json()["positions"], [])
+        self.assertTrue(
+            self.api_get("/v1/friends/positions", token=self.t2).json()["positions"][0]["beacon"])
+
+    def test_beacon_off_clears_exact(self):
+        self.api_post("/v1/friends/beacon", {"hours": 2, "trusted": [self.uid2]})
+        self.api_post("/v1/friends/position", {"lat": 62.0281, "lng": 129.7325})
+        self.api_post("/v1/friends/beacon", {"off": True})
+        self.assertEqual(
+            self.api_get("/v1/friends/positions", token=self.t2).json()["positions"], [])
+
+    def test_beacon_trusted_must_be_friends(self):
+        t3 = self.new_user("+79990003204")
+        uid3 = Account.objects.get(phone="+79990003204").id
+        r = self.api_post("/v1/friends/beacon", {"hours": 2, "trusted": [uid3]}).json()
+        self.assertEqual(r["beaconTrusted"], [])

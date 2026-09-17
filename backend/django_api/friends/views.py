@@ -255,8 +255,9 @@ def friend_prefs(request):
 
 @api_view(["POST"])
 def friend_position(request):
-    """Телефон шлёт позицию, ПОКА открыта карта (батарея). Храним ОГРУБЛЁННУЮ и
-    только если человек видим и не в «Тени»; у дома — прячем (не храним)."""
+    """Телефон шлёт позицию, ПОКА открыта карта (батарея). Огрублённую храним для
+    друзей (видим/не в Тени/не у дома); ТОЧНУЮ — только для «Маяка» (доверенным),
+    пока маяк активен. Ни для кого — строку удаляем."""
     uid = _me(request)
     if not uid:
         return Response({"detail": "Нет токена"}, status=401)
@@ -267,19 +268,24 @@ def friend_position(request):
     except (KeyError, TypeError, ValueError):
         return Response({"detail": "Нет координат"}, status=400)
     prefs, _ = FriendMapPrefs.objects.get_or_create(user_id=uid)
-    if not prefs.visible or prefs.in_shadow() or prefs.near_home(lat, lng):
+    coarse_ok = prefs.visible and not prefs.in_shadow() and not prefs.near_home(lat, lng)
+    beacon_on = prefs.in_beacon()
+    if not coarse_ok and not beacon_on:
         FriendPosition.objects.filter(user_id=uid).delete()
         return Response({"stored": False})
-    clat, clng = coarsen(lat, lng)
+    clat, clng = coarsen(lat, lng) if coarse_ok else (None, None)
     FriendPosition.objects.update_or_create(
         user_id=uid,
         defaults={
             "lat": clat, "lng": clng,
+            "exact_lat": lat if beacon_on else None,
+            "exact_lng": lng if beacon_on else None,
+            "beacon": beacon_on,
             "status": str(d.get("status") or "")[:20],
             "updated_at": timezone.now(),
         },
     )
-    return Response({"stored": True})
+    return Response({"stored": True, "beacon": beacon_on})
 
 
 @api_view(["GET"])
@@ -296,25 +302,65 @@ def friend_positions(request):
     if not fids:
         return Response({"positions": []})
     fresh = timezone.now() - timedelta(minutes=_POSITION_FRESH_MIN)
-    visible_ids = {
-        p.user_id for p in FriendMapPrefs.objects.filter(user_id__in=fids, visible=True)
-        if not p.in_shadow()
+    prefs_map = {
+        p.user_id: p for p in FriendMapPrefs.objects.filter(user_id__in=fids)
     }
-    if not visible_ids:
-        return Response({"positions": []})
-    accs = _acc_map(visible_ids)
+    accs = _acc_map(fids)
     out = []
-    for pos in FriendPosition.objects.filter(user_id__in=visible_ids, updated_at__gte=fresh):
+    for pos in FriendPosition.objects.filter(user_id__in=fids, updated_at__gte=fresh):
+        pr = prefs_map.get(pos.user_id)
         acc = accs.get(pos.user_id)
-        if not acc:
+        if not pr or not acc:
+            continue
+        beacon_to_me = (
+            pos.beacon and pr.in_beacon() and pos.exact_lat is not None
+            and uid in (pr.beacon_trusted or [])
+        )
+        if beacon_to_me:
+            lat, lng, is_beacon = pos.exact_lat, pos.exact_lng, True
+        elif pos.lat is not None and pr.visible and not pr.in_shadow():
+            lat, lng, is_beacon = pos.lat, pos.lng, False
+        else:
             continue
         out.append({
             "userId": pos.user_id,
             "name": acc.name or "Бегун",
             "avatarPath": acc.avatar_path,
-            "lat": pos.lat,
-            "lng": pos.lng,
+            "lat": lat,
+            "lng": lng,
             "status": pos.status,
+            "beacon": is_beacon,
             "updatedAt": pos.updated_at.isoformat(),
         })
     return Response({"positions": out})
+
+
+@api_view(["POST"])
+def friend_beacon(request):
+    """«Маяк» (D-84): точный трек 1–3 ДОВЕРЕННЫМ друзьям на время (safety-фича).
+    {hours, trusted:[id,...]} — включить; {off:true} — выключить и стереть точную точку.
+    Доверенные обязаны быть взаимными друзьями; их не больше 3."""
+    uid = _me(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    d = request.data if isinstance(request.data, dict) else {}
+    prefs, _ = FriendMapPrefs.objects.get_or_create(user_id=uid)
+    if d.get("off"):
+        prefs.beacon_until = None
+        prefs.updated_at = timezone.now()
+        prefs.save()
+        FriendPosition.objects.filter(user_id=uid).update(
+            exact_lat=None, exact_lng=None, beacon=False)
+        return Response(prefs.to_json())
+    fids = friends_ids(uid)
+    trusted = [str(t) for t in (d.get("trusted") or []) if str(t) in fids][:3]
+    try:
+        hours = float(d.get("hours") or 2)
+    except (TypeError, ValueError):
+        hours = 2.0
+    hours = max(0.25, min(hours, 12.0))
+    prefs.beacon_trusted = trusted
+    prefs.beacon_until = timezone.now() + timedelta(hours=hours)
+    prefs.updated_at = timezone.now()
+    prefs.save()
+    return Response(prefs.to_json())
