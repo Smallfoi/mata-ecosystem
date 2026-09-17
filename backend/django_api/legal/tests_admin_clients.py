@@ -71,6 +71,19 @@ class ConsentClientsTests(TestCase):
         self.assertTrue(r.context["rows"][0]["outdated"])
         self.assertContains(r, "Не хватает обязательных")
 
+    def test_link_from_the_list_opens_the_client(self):
+        """Ссылка из списка кодирует ID («u_anna» → «u_5Fanna») — страница должна открыться.
+
+        Первая версия искала клиента по закодированному ID и уводила на дашборд с ошибкой
+        «не существует»: тест открывал страницу по готовому адресу, а не по ссылке списка.
+        """
+        from django.contrib.admin.utils import quote
+
+        r = self.client.get(f"{LIST}{quote('u_anna')}/change/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["client"].id, "u_anna")
+        self.assertIn(f"{LIST}{quote('u_anna')}/change/", self.client.get(LIST).content.decode())
+
     def test_client_page_is_read_only(self):
         r = self.client.post(f"{LIST}u_anna/change/", {"name": "Взлом"})
         self.assertNotEqual(Account.objects.get(id="u_anna").name, "Взлом")

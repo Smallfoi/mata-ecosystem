@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.admin.utils import unquote
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
@@ -144,7 +145,9 @@ class ConsentClientAdmin(ModelAdmin):
         return False
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
-        client = self.get_object(request, object_id)
+        # Админка кодирует ID в ссылках («_» → «_5F»); штатный change_view раскодирует сам,
+        # а свой — обязан тоже, иначе «u_f28f…» ищется как «u_5Ff28f…» и не находится.
+        client = self.get_object(request, unquote(object_id))
         if client is None:
             return self._get_obj_does_not_exist_redirect(request, self.opts, object_id)
         if not self.has_view_permission(request, client):
