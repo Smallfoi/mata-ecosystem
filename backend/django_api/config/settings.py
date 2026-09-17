@@ -428,7 +428,8 @@ UNFOLD = {
                      "link": reverse_lazy("admin:legal_legaldocument_changelist"),
                      "permission": _tab("legal")},
                     {"title": "Согласия", "icon": "fact_check",
-                     "link": reverse_lazy("admin:legal_userconsent_changelist"),
+                     # Список клиентов (каждый один раз), согласия — на странице клиента.
+                     "link": reverse_lazy("admin:legal_consentclient_changelist"),
                      "permission": _tab("legal")},
                 ],
             },

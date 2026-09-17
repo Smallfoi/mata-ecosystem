@@ -1,0 +1,97 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# «Согласия клиента»: что он принял и чего не хватает. Только просмотр — согласие не правят. #}
+<style>
+  .cs-sum{display:flex;gap:.75rem;flex-wrap:wrap;margin:0 0 1rem}
+  .cs-tile{flex:1;min-width:150px;border:1px solid #e2e6ea;border-radius:.6rem;padding:.7rem .9rem;background:#fff}
+  .dark .cs-tile{background:#1f2937;border-color:#374151}
+  .cs-tile b{display:block;font-size:1.15rem;line-height:1.25;font-variant-numeric:tabular-nums}
+  .cs-tile span{font-size:.8rem;color:#6f7278}
+  .cs-card{border:1px solid #e2e6ea;border-radius:.7rem;background:#fff;margin:0 0 1rem;overflow:hidden}
+  .dark .cs-card{background:#1f2937;border-color:#374151}
+  .cs-card h3{margin:0;padding:.85rem 1rem;font-size:1rem;border-bottom:1px solid #eceff1}
+  .dark .cs-card h3{border-color:#374151}
+  .cs-wrap{overflow-x:auto}
+  table.cs{width:100%;border-collapse:collapse;min-width:620px}
+  table.cs th,table.cs td{padding:.5rem .8rem;border-bottom:1px solid #eceff1;text-align:left;font-size:.86rem;vertical-align:middle}
+  .dark table.cs th,.dark table.cs td{border-color:#374151}
+  table.cs tr.revoked td{opacity:.55}
+  .cs-tag{display:inline-block;padding:.05rem .45rem;border-radius:.35rem;font-size:.72rem;font-weight:600;margin-left:.35rem;vertical-align:middle}
+  .cs-req{background:#eef2ff;color:#3730a3}
+  .dark .cs-req{background:#312e81;color:#c7d2fe}
+  .cs-old{background:#fff6e5;color:#7a5b12}
+  .dark .cs-old{background:#3a2f12;color:#f0d9a0}
+  .cs-ok{color:#16a34a;font-weight:600}
+  .cs-bad{color:#dc2626;font-weight:600}
+  .cs-list{margin:0;padding:.7rem 1rem .8rem 2rem;font-size:.9rem;line-height:1.7}
+  .cs-empty{padding:1rem;color:#6f7278;font-size:.9rem}
+  .cs-muted{color:#6f7278;font-size:.8rem}
+</style>
+
+<div class="cs-sum">
+  <div class="cs-tile"><b>{{ client.name|default:"Без имени" }}</b><span>клиент</span></div>
+  <div class="cs-tile"><b>{{ client.phone|default:"—" }}</b><span>телефон</span></div>
+  <div class="cs-tile"><b>{{ client.email|default:"—" }}</b><span>почта</span></div>
+  <div class="cs-tile">
+    {% if missing_required %}
+      <b class="cs-bad">Нет {{ missing_required|length }} из {{ required_total }}</b>
+    {% else %}
+      <b class="cs-ok">Все {{ required_total }}</b>
+    {% endif %}
+    <span>обязательные согласия</span>
+  </div>
+</div>
+
+{% if missing_required %}
+<div class="cs-card">
+  <h3>Не хватает обязательных</h3>
+  <ul class="cs-list">
+    {% for d in missing_required %}
+      <li>{{ d.title }} <span class="cs-muted">v{{ d.version }}</span>
+        {% if d.old_version %}<span class="cs-tag cs-old">принята старая версия</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="cs-card">
+  <h3>Согласия клиента</h3>
+  {% if rows %}
+  <div class="cs-wrap">
+    <table class="cs">
+      <thead>
+        <tr><th>Документ</th><th>Версия</th><th>Принято (якут.)</th><th>Откуда</th><th>Статус</th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr class="{% if r.revoked_at %}revoked{% endif %}">
+          <td>{{ r.title }}{% if r.required %}<span class="cs-tag cs-req">обязательное</span>{% endif %}</td>
+          <td>v{{ r.version }}{% if r.outdated %}<span class="cs-tag cs-old">устарела</span>{% endif %}</td>
+          <td>{{ r.accepted_at|date:"d.m.Y H:i" }}</td>
+          <td>{{ r.source }}</td>
+          <td>{% if r.revoked_at %}отозвано {{ r.revoked_at|date:"d.m.Y H:i" }}{% else %}действует{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="cs-empty">Клиент ещё не давал согласий.</div>
+  {% endif %}
+</div>
+
+{% if missing_optional %}
+<div class="cs-card">
+  <h3>Необязательные — не давал</h3>
+  <ul class="cs-list">
+    {% for d in missing_optional %}
+      <li>{{ d.title }} <span class="cs-muted">v{{ d.version }}</span></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<p><a href="{{ journal_url }}">Записи этого клиента в журнале согласий →</a></p>
+<p><a href="../../">← ко всем клиентам</a></p>
+{% endblock %}

@@ -49,7 +49,7 @@ TABS = (
         hint="Разбор подозрительных забегов."),
 
     Tab("legal", "Документы и согласия", "Право и согласия",
-        ("legal.legaldocument", "legal.userconsent"),
+        ("legal.legaldocument", "legal.userconsent", "legal.consentclient"),
         hint="Оферта, политика, согласия пользователей."),
 
     Tab("merch", "Конструктор", "Витрина",
