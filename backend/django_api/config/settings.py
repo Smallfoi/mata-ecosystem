@@ -376,7 +376,8 @@ UNFOLD = {
                      "link": reverse_lazy("admin:orders_order_changelist"),
                      "permission": _tab("orders")},
                     {"title": "Баллы", "icon": "loyalty",
-                     "link": reverse_lazy("admin:loyalty_loyaltytransaction_changelist"),
+                     # Клиенты с операциями за выбранные дни; журнал — ссылкой со страницы.
+                     "link": reverse_lazy("points_clients"),
                      "permission": _tab("loyalty")},
                     {"title": "Кроссовки", "icon": "directions_run",
                      "link": reverse_lazy("admin:shoes_shoeasset_changelist"),
