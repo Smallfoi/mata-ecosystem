@@ -83,8 +83,13 @@ jobs:
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           flutter pub get
           # Только arm64 (все современные телефоны) — APK ~вдвое легче универсального.
+          # SENTRY_DSN — из секрета: пуст → крэш-репортинг no-op (D-32), появится
+          # секрет → включится без правок кода. SENTRY_RELEASE привязывает крэши к
+          # конкретной сборке (app@version+build).
           flutter build apk --release --target-platform android-arm64 --build-number="$BUILD_NUMBER" \
-            --dart-define=CARTO_API_KEY="${{ secrets.CARTO_API_KEY }}"
+            --dart-define=CARTO_API_KEY="${{ secrets.CARTO_API_KEY }}" \
+            --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}" \
+            --dart-define=SENTRY_RELEASE="${{ matrix.app }}@$VERSION_NAME+$BUILD_NUMBER"
 
       - name: Publish to S3
         if: steps.detect.outputs.changed == 'true'
