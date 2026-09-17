@@ -16,6 +16,11 @@ class FriendsScreen extends ConsumerStatefulWidget {
   ConsumerState<FriendsScreen> createState() => _FriendsScreenState();
 }
 
+/// Результаты поиска по контактам (D-85): null — ещё не искали, [] — не нашли.
+final _contactsResultsProvider =
+    StateProvider.autoDispose<List<FriendSummary>?>((_) => null);
+final _contactsLoadingProvider = StateProvider.autoDispose<bool>((_) => false);
+
 enum _Tab { friends, requests, add }
 
 class _FriendsScreenState extends ConsumerState<FriendsScreen> {
@@ -345,6 +350,8 @@ class _AddPanel extends ConsumerWidget {
         : const <FriendSummary>[];
     final suggestions =
         ref.watch(friendSuggestionsProvider).valueOrNull ?? const <FriendSummary>[];
+    final contacts = ref.watch(_contactsResultsProvider);
+    final contactsLoading = ref.watch(_contactsLoadingProvider);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -396,7 +403,58 @@ class _AddPanel extends ConsumerWidget {
             ]),
           ),
         ),
+        const SizedBox(height: 10),
+        // Найти по контактам (D-85): читаем контакты, хешируем номера, сверяем.
+        GestureDetector(
+          onTap: contactsLoading
+              ? null
+              : () async {
+                  ref.read(_contactsLoadingProvider.notifier).state = true;
+                  final r = await ref.read(friendsActionsProvider).matchContacts();
+                  ref.read(_contactsLoadingProvider.notifier).state = false;
+                  if (!r.granted) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Нет доступа к контактам')));
+                    }
+                    return;
+                  }
+                  ref.read(_contactsResultsProvider.notifier).state = r.results;
+                },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Row(children: [
+              Icon(CupertinoIcons.phone, size: 17, color: AppColors.lime),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('Найти по контактам',
+                    style: TextStyle(
+                        color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700)),
+              ),
+              if (contactsLoading)
+                const SizedBox(
+                    width: 16, height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+              else
+                Icon(CupertinoIcons.chevron_right, size: 16, color: AppColors.muted),
+            ]),
+          ),
+        ),
         const SizedBox(height: 18),
+
+        if (contacts != null) ...[
+          _hdr('Из контактов'),
+          if (contacts.isEmpty)
+            _muted('Из контактов пока никто не в «Квартале».')
+          else
+            for (final f in contacts) _Row(f: f, trailing: _addTrailing(ref, f)),
+          const SizedBox(height: 18),
+        ],
 
         if (query.trim().length >= 2) ...[
           _hdr('Результаты'),

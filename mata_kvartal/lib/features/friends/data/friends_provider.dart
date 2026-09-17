@@ -1,4 +1,8 @@
 import 'package:dio/dio.dart';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -60,6 +64,13 @@ List<FriendSummary> _parse(dynamic list) =>
         .toList();
 
 Options _auth(String token) => Options(headers: {'Authorization': 'Bearer $token'});
+
+/// Нормализация телефона как на сервере: цифры, 8→7 (РФ). Хеш — sha256('+'+норм).
+String _normPhone(String raw) {
+  var d = raw.replaceAll(RegExp(r'\D'), '');
+  if (d.length == 11 && d.startsWith('8')) d = '7${d.substring(1)}';
+  return d;
+}
 
 /// Мои друзья + входящие/исходящие заявки.
 final friendsProvider = FutureProvider.autoDispose<FriendsData>((ref) async {
@@ -156,6 +167,30 @@ class FriendsActions {
         data: patch, options: _auth(t));
     _ref.invalidate(friendPrefsProvider);
     _ref.invalidate(friendPositionsProvider);
+  }
+
+  /// Поиск друзей по контактам (D-85). Читаем контакты, нормализуем и ХЕШИРУЕМ
+  /// номера (сырые не шлём), сверяем на сервере. granted=false — нет разрешения.
+  Future<({bool granted, List<FriendSummary> results})> matchContacts() async {
+    final t = _token;
+    if (t == null) return (granted: true, results: const <FriendSummary>[]);
+    final ok = await FlutterContacts.requestPermission(readonly: true);
+    if (!ok) return (granted: false, results: const <FriendSummary>[]);
+    final contacts = await FlutterContacts.getContacts(withProperties: true);
+    final hashes = <String>{};
+    for (final c in contacts) {
+      for (final ph in c.phones) {
+        final norm = _normPhone(ph.number);
+        if (norm.length >= 10) {
+          hashes.add(sha256.convert(utf8.encode('+$norm')).toString());
+        }
+      }
+    }
+    if (hashes.isEmpty) return (granted: true, results: const <FriendSummary>[]);
+    final res = await _friendsDio.post<Map<String, dynamic>>(
+        '/friends/match-contacts',
+        data: {'hashes': hashes.toList()}, options: _auth(t));
+    return (granted: true, results: _parse((res.data ?? const {})['results']));
   }
 
   /// «Маяк» (D-84): точный трек 1–3 доверенным на `hours` часов.
