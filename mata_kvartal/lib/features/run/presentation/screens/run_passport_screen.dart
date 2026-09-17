@@ -75,6 +75,38 @@ class RunPassportScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
+            // Анти-чит (S-04): забег помечен — объясняем, почему баллы придержаны.
+            if (run.pendingReview) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: AppColors.warning.withValues(alpha: .4)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(CupertinoIcons.time,
+                        size: 16, color: AppColors.warning),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Забег на проверке — баллы придержаны до разбора. Обычно это быстро.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             FilledButton.icon(
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.lime,

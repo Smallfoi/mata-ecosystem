@@ -60,4 +60,8 @@ class Run(models.Model):
             "capturedTerritory": self.captured_territory,
             "capturedZones": self.captured_zones,
             "finishedAtMs": int(self.finished_at.timestamp() * 1000),
+            # Анти-чит (S-04): забег помечен и баллы придержаны до разбора модератором.
+            # Клиент показывает на карточке истории метку «на проверке».
+            "flagged": self.flagged,
+            "pendingReview": self.pending_review,
         }

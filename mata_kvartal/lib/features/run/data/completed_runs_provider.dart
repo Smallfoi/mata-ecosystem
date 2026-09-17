@@ -29,6 +29,10 @@ class CompletedRun {
   final bool capturedTerritory;
   final bool mockDetected; // подделка геолокации (Android mock-GPS) — анти-чит S-04
 
+  /// Забег помечен анти-читом (S-04) и баллы придержаны до разбора модератором.
+  /// Приходит с сервера (POST /runs → `flagged`, GET /runs → `pendingReview`).
+  final bool pendingReview;
+
   const CompletedRun({
     required this.id,
     required this.finishedAt,
@@ -39,7 +43,21 @@ class CompletedRun {
     required this.capturedZones,
     required this.capturedTerritory,
     this.mockDetected = false,
+    this.pendingReview = false,
   });
+
+  CompletedRun copyWith({bool? pendingReview}) => CompletedRun(
+    id: id,
+    finishedAt: finishedAt,
+    route: route,
+    routeTimes: routeTimes,
+    elapsed: elapsed,
+    distanceMeters: distanceMeters,
+    capturedZones: capturedZones,
+    capturedTerritory: capturedTerritory,
+    mockDetected: mockDetected,
+    pendingReview: pendingReview ?? this.pendingReview,
+  );
 
   double get distanceKm => distanceMeters / 1000;
 
@@ -83,6 +101,7 @@ class CompletedRun {
     'capturedZones': capturedZones,
     'capturedTerritory': capturedTerritory,
     'mockDetected': mockDetected,
+    'pendingReview': pendingReview,
     'routeTimes': routeTimes,
     'route': [
       for (final p in route) [p.latitude, p.longitude],
@@ -115,6 +134,7 @@ class CompletedRun {
       capturedZones: (json['capturedZones'] as num? ?? 0).toInt(),
       capturedTerritory: json['capturedTerritory'] as bool? ?? false,
       mockDetected: json['mockDetected'] as bool? ?? false,
+      pendingReview: json['pendingReview'] as bool? ?? false,
     );
   }
 }
@@ -201,6 +221,16 @@ class CompletedRunsNotifier extends StateNotifier<List<CompletedRun>> {
           points: (body['pointsAwarded'] as num).toInt(),
         );
       }
+      // Анти-чит (S-04): сервер придержал баллы до разбора — помечаем забег,
+      // чтобы карточка истории показала «на проверке» (и после перезапуска —
+      // сохраняем флаг локально).
+      if (body is Map && (body['flagged'] == true || body['pendingReview'] == true)) {
+        state = [
+          for (final r in state)
+            r.id == run.id ? r.copyWith(pendingReview: true) : r,
+        ];
+        unawaited(_save());
+      }
       unawaited(ref.read(loyaltyProvider.notifier).refresh());
       // Сервер мог сказать что-то про этот забег: придержал баллы до проверки,
       // засчитал веху или итоги дивизиона. Тянем ленту сразу, иначе колокольчик
@@ -272,6 +302,7 @@ class CompletedRunsNotifier extends StateNotifier<List<CompletedRun>> {
           distanceMeters: (m['distanceMeters'] as num? ?? 0).toDouble(),
           capturedZones: (m['capturedZones'] as num? ?? 0).toInt(),
           capturedTerritory: m['capturedTerritory'] as bool? ?? false,
+          pendingReview: m['pendingReview'] as bool? ?? false,
         ));
       }
       if (serverOnly.isEmpty) return;

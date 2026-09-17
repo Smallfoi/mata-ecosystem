@@ -97,6 +97,25 @@ class RunAntiCheatTests(ApiTestCase):
         self.api_post("/v1/runs", {"id": "rmk_5", "mockDetected": True, **_OK})
         self.assertTrue(Account.objects.get(id=self.uid).needs_review)   # 5 → ревью
 
+    def test_runs_list_exposes_pending_review(self):
+        # Карточка истории показывает «на проверке»: GET /runs отдаёт pendingReview.
+        self.api_post("/v1/runs", {"id": "r_ok", **_OK})
+        self.api_post("/v1/runs", {
+            "id": "r_flag", "distanceMeters": 5000, "elapsedSeconds": 10,
+            "finishedAtMs": _NOW_MS,
+        })
+        rows = {r["id"]: r for r in self.api_get("/v1/runs").json()}
+        self.assertFalse(rows["r_ok"]["flagged"])
+        self.assertFalse(rows["r_ok"]["pendingReview"])
+        self.assertTrue(rows["r_flag"]["flagged"])
+        self.assertTrue(rows["r_flag"]["pendingReview"])
+        # После разбора модератором метка снимается.
+        from runs.models import Run
+        from runs.views import approve_run
+        approve_run(Run.objects.get(id="r_flag"))
+        rows = {r["id"]: r for r in self.api_get("/v1/runs").json()}
+        self.assertFalse(rows["r_flag"]["pendingReview"])
+
     def test_client_cannot_mint_runner_run(self):
         r = self.api_post(
             "/v1/loyalty/transactions",
