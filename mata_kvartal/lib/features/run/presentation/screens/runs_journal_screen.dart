@@ -215,6 +215,37 @@ class RunTileCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                  // Анти-чит (S-04): забег помечен, баллы придержаны до разбора.
+                  if (run.pendingReview) ...[
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: .16),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: AppColors.warning.withValues(alpha: .5)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(CupertinoIcons.time,
+                              size: 9, color: AppColors.warning),
+                          const SizedBox(width: 3),
+                          Text(
+                            'НА ПРОВЕРКЕ',
+                            style: TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: .3,
+                              color: AppColors.warning,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
