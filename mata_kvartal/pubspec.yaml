@@ -30,6 +30,10 @@ dependencies:
   geolocator: ^13.0.2
   permission_handler: ^11.3.1
 
+  # Поиск друзей по контактам телефона (D-85): читаем контакты, хешируем номера.
+  flutter_contacts: ^1.1.9+2
+  crypto: ^3.0.6
+
   # Charts
   fl_chart: ^0.70.2
 

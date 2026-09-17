@@ -43,6 +43,8 @@
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>КВАРТАЛ использует GPS для отслеживания твоей пробежки и захвата территорий на карте Якутска.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Чтобы найти друзей из ваших контактов в «Квартале». Номера не покидают телефон в открытом виде — сверяем по защищённому отпечатку.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>КВАРТАЛ использует GPS в фоновом режиме, чтобы продолжать трекинг при заблокированном экране.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
