@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:latlong2/latlong.dart' show Distance, LengthUnit;
+import 'package:latlong2/latlong.dart' show Distance, LatLng, LengthUnit;
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -232,6 +232,70 @@ List<int> computeKmSplits(CompletedRun run) {
   return splits.where((s) => s > 0).toList();
 }
 
+/// Резервная копия трека (D-86): локального маршрута нет — тянем его с сервера и
+/// рисуем; иначе честно говорим, что трек не сохранён, и зовём включить бэкап.
+class _BackupTrackHero extends ConsumerStatefulWidget {
+  final CompletedRun run;
+  final bool captured;
+  const _BackupTrackHero({required this.run, required this.captured});
+  @override
+  ConsumerState<_BackupTrackHero> createState() => _BackupTrackHeroState();
+}
+
+class _BackupTrackHeroState extends ConsumerState<_BackupTrackHero> {
+  late final Future<List<LatLng>> _future =
+      ref.read(completedRunsProvider.notifier).fetchTrack(widget.run.id);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<LatLng>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.textTertiary),
+            ),
+          );
+        }
+        final pts = snap.data ?? const <LatLng>[];
+        if (pts.length >= 2) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+            child: CustomPaint(
+              painter: RoutePainter(
+                route: pts,
+                progress: 1,
+                fill: widget.captured ? 1 : 0,
+                fitFactor: 1,
+                topInset: 6,
+              ),
+              child: const SizedBox.expand(),
+            ),
+          );
+        }
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Трек этой пробежки не сохранён на этом устройстве.\n'
+              'Ради приватности сырой GPS хранится только на телефоне, где записана '
+              'пробежка. Включите «Резервную копию треков» в разделе «Приватность и '
+              'данные», чтобы новые маршруты переживали переустановку и смену телефона.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 12.5, height: 1.4, color: AppColors.textTertiary),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _TrackHero extends StatelessWidget {
   final CompletedRun run;
   final bool captured;
@@ -277,22 +341,10 @@ class _TrackHero extends StatelessWidget {
               ),
             )
           else
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Трек этой пробежки не сохранён на этом устройстве.\n'
-                  'Ради приватности сырой GPS хранится только на телефоне, '
-                  'где записана пробежка, и не переносится на сервер — '
-                  'при переустановке или смене телефона трек не восстановить.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.4,
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ),
+            // Локального трека нет (переустановка/смена телефона). Пробуем достать
+            // резервную копию с сервера (D-86), иначе — честная надпись.
+            Positioned.fill(
+              child: _BackupTrackHero(run: run, captured: captured),
             ),
           Positioned(
             top: 10,

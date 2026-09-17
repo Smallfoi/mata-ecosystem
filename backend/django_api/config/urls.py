@@ -123,6 +123,8 @@ urlpatterns = [
     path("v1/runner/profile", league_views.profile),
     # Тропы: приём трека, список, доски (D-60).
     path("v1/runs/track", trails_views.submit_track),
+    # Резервная копия трека забега — владелец забирает свой маршрут обратно (D-86).
+    path("v1/runs/<str:run_id>/track", trails_views.get_track),
     path("v1/trails/", include("trails.urls")),
     # Друзья (D-82, этап 2a): граф взаимных друзей. Пути явно (без include),
     # чтобы список жил на /v1/friends без хвостового слеша и APPEND_SLASH не редиректил.

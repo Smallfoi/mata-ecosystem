@@ -157,6 +157,53 @@ class TrailApiTests(ApiTestCase):
     def test_track_requires_auth(self):
         self.assertEqual(self.client.post("/v1/runs/track").status_code, 401)
 
+    # ── резервная копия треков (D-86) ───────────────────────────────────────
+
+    def test_backup_keeps_track_past_retention(self):
+        """Включён бэкап — трек не удаляется по 14-дневному правилу (D-86)."""
+        RunnerProfile.objects.update_or_create(
+            user_id=self.uid, defaults={"track_backup": True}
+        )
+        trail = self._trail()
+        self.api_post("/v1/runs/track", {"runId": "run_bk1", "points": track_along(trail.points)})
+        kept = PendingTrack.objects.get(run_id="run_bk1")
+        kept.received_at = timezone.now() - timedelta(days=40)
+        kept.save()
+        cleanup_tracks()
+        self.assertTrue(PendingTrack.objects.filter(run_id="run_bk1").exists())
+
+    def test_backup_stores_track_even_when_trails_disabled(self):
+        """Тропы выключены, но бэкап включён — трек хранится (только для владельца),
+        со тропами не сверяется."""
+        RunnerProfile.objects.update_or_create(
+            user_id=self.uid,
+            defaults={"trails_enabled": False, "track_backup": True},
+        )
+        trail = self._trail()
+        r = self.api_post("/v1/runs/track", {"runId": "run_bk2", "points": track_along(trail.points)})
+        self.assertEqual(r.json()["skipped"], "trailsDisabledBackup")
+        self.assertTrue(PendingTrack.objects.filter(run_id="run_bk2").exists())
+        self.assertEqual(TrailAttempt.objects.count(), 0)  # сверки нет
+
+    def test_get_track_returns_own_track_only(self):
+        """Владелец забирает свой трек обратно; чужой не отдаётся (D-86)."""
+        trail = self._trail()
+        self.api_post("/v1/runs/track", {"runId": "run_bk3", "points": track_along(trail.points)})
+        r = self.api_get("/v1/runs/run_bk3/track")
+        self.assertEqual(r.status_code, 200)
+        self.assertGreaterEqual(len(r.json()["points"]), 2)
+        # Чужой трек не виден: тот же run_id у другого пользователя не отдаём.
+        PendingTrack.objects.create(
+            run_id="run_alien", user_id="u_someone_else", points=[[1, 2, 0], [3, 4, 1]]
+        )
+        self.assertEqual(self.api_get("/v1/runs/run_alien/track").json()["points"], [])
+
+    def test_get_track_empty_when_none(self):
+        self.assertEqual(self.api_get("/v1/runs/run_missing/track").json()["points"], [])
+
+    def test_get_track_requires_auth(self):
+        self.assertEqual(self.client.get("/v1/runs/run_x/track").status_code, 401)
+
     # ── создание троп ───────────────────────────────────────────────────────
 
     def test_create_trail(self):
