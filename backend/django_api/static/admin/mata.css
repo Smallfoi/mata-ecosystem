@@ -1,0 +1,267 @@
+/* Единый стиль страниц админки МАТА.
+ *
+ * Раньше каждая своя страница несла собственную копию правил со своей приставкой
+ * (rv-, st-, ex-, cs-, pt-): страницы выглядели похоже, но расходились в мелочах, а
+ * правка означала обход всех файлов. Здесь один набор блоков; страницы только
+ * расставляют классы. За образец взято оформление раздела «Баллы».
+ *
+ * Как верстать новую страницу (решение владельца 18.09.2026, D-87):
+ *   {% extends "admin/base_site.html" %}{% block content %}
+ *   <div class="m-sum"><div class="m-tile"><b>12</b><span>подпись</span></div></div>
+ *   <div class="m-card"><h3>Заголовок</h3>
+ *     <div class="m-wrap"><table class="m">…<td class="n">число</td>…</table></div>
+ *     <div class="m-acts"><button class="m-btn">Действие</button></div>
+ *   </div>
+ * Свой <style> в шаблоне не заводить — за этим следит tools/check_admin_styles.py.
+ * Не хватает блока — добавить его СЮДА, и он появится у всех страниц сразу.
+ */
+
+:root {
+  --m-card: #fff;
+  --m-border: #e2e6ea;
+  --m-line: #eceff1;
+  --m-muted: #6f7278;
+  --m-dim: #9ca3af;
+  --m-text: #20252b;
+  --m-accent: #20252b;
+  --m-accent-text: #fff;
+  --m-soft: #fafbfc;
+  --m-control: #cbd2d6;
+  --m-ok: #16a34a;
+  --m-warn: #b45309;
+  --m-bad: #dc2626;
+  --m-danger: #e5484d;
+  --m-radius: .7rem;
+  --m-radius-sm: .45rem;
+}
+
+.dark {
+  --m-card: #1f2937;
+  --m-border: #374151;
+  --m-line: #374151;
+  --m-muted: #9ca3af;
+  --m-dim: #6b7280;
+  --m-text: #e5e7eb;
+  --m-accent: #57bcd8;
+  --m-accent-text: #0d0d0d;
+  --m-soft: #111827;
+  --m-control: #4b5563;
+  --m-ok: #34d399;
+  --m-warn: #fbbf24;
+  --m-bad: #f87171;
+}
+
+/* ── Плитки с итогами ───────────────────────────────────────────────────── */
+.m-sum { display: flex; gap: .75rem; flex-wrap: wrap; margin: 0 0 1rem; }
+.m-tile {
+  flex: 1; min-width: 140px; padding: .7rem .9rem;
+  border: 1px solid var(--m-border); border-radius: .6rem; background: var(--m-card);
+}
+.m-tile b { display: block; font-size: 1.4rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.m-tile span { font-size: .8rem; color: var(--m-muted); }
+
+/* ── Карточка: заголовок, содержимое, полоса действий ───────────────────── */
+.m-card {
+  border: 1px solid var(--m-border); border-radius: var(--m-radius);
+  background: var(--m-card); margin: 0 0 1rem; overflow: hidden;
+}
+.m-card > h2, .m-card > h3 {
+  margin: 0; padding: .85rem 1rem; font-size: 1rem; font-weight: 700;
+  border-bottom: 1px solid var(--m-line);
+}
+.m-head {
+  display: flex; gap: .9rem; align-items: flex-start; flex-wrap: wrap;
+  padding: .9rem 1rem; border-bottom: 1px solid var(--m-line);
+}
+.m-head h3 { margin: 0 0 .2rem; font-size: 1.05rem; }
+.m-who { flex: 1; min-width: 220px; }
+.m-meta { font-size: .8rem; color: var(--m-muted); }
+.m-nums { display: flex; gap: 1.1rem; flex-wrap: wrap; align-items: center; }
+.m-num { text-align: right; }
+.m-num b { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.m-num span { font-size: .72rem; color: var(--m-muted); }
+.m-body { padding: .9rem 1rem; }
+.m-acts {
+  display: flex; gap: .45rem; flex-wrap: wrap; align-items: center;
+  padding: .7rem 1rem; background: var(--m-soft);
+}
+
+/* ── Таблица ────────────────────────────────────────────────────────────── */
+.m-wrap { overflow-x: auto; }
+table.m { width: 100%; border-collapse: collapse; }
+table.m th, table.m td {
+  padding: .55rem .8rem; border-bottom: 1px solid var(--m-line);
+  text-align: left; font-size: .88rem; vertical-align: middle;
+}
+table.m th { font-size: .78rem; color: var(--m-muted); font-weight: 600; }
+table.m td.n, table.m th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.m td.c, table.m th.c { text-align: center; }
+table.m tr:hover td { background: var(--m-soft); }
+table.m tr.done td { opacity: .55; }
+table.m tr.m-off td { opacity: .55; }
+
+/* ── Переключатели и быстрые фильтры ────────────────────────────────────── */
+.m-tabs { display: flex; gap: .4rem; margin: 0 0 1rem; flex-wrap: wrap; align-items: center; }
+.m-tab, .m-chip {
+  padding: .4rem .85rem; border: 1px solid var(--m-control); border-radius: .5rem;
+  text-decoration: none; color: inherit; font-size: .88rem;
+}
+.m-chip { border-radius: 999px; padding: .3rem .7rem; font-size: .82rem; }
+.m-tab.on, .m-chip.on {
+  background: var(--m-accent); color: var(--m-accent-text); border-color: var(--m-accent);
+}
+
+/* ── Кнопки ─────────────────────────────────────────────────────────────── */
+.m-btn {
+  padding: .4rem .85rem; border: 1px solid var(--m-control); border-radius: var(--m-radius-sm);
+  background: var(--m-card); color: var(--m-text); font-size: .85rem; font-weight: 600; cursor: pointer;
+}
+.m-btn:disabled { opacity: .45; cursor: not-allowed; }
+.m-btn.primary { background: var(--m-accent); border-color: var(--m-accent); color: var(--m-accent-text); }
+.m-btn.ok { background: var(--m-ok); border-color: var(--m-ok); color: #fff; }
+.m-btn.bad { background: var(--m-danger); border-color: var(--m-danger); color: #fff; }
+.m-btn.quiet { background: transparent; }
+form.m-inline { display: inline; }
+
+/* ── Поля ввода ─────────────────────────────────────────────────────────── */
+.m-form { display: flex; gap: .6rem; flex-wrap: wrap; align-items: flex-end; margin: 0 0 .8rem; }
+.m-field { display: flex; flex-direction: column; gap: .2rem; font-size: .78rem; color: var(--m-muted); }
+.m-input, .m-form select, .m-form input[type="text"], .m-form input[type="date"],
+.m-form input[type="search"], .m-form input[type="email"] {
+  padding: .45rem .6rem; border: 1px solid var(--m-control); border-radius: var(--m-radius-sm);
+  background: var(--m-card); color: var(--m-text); font-size: .9rem; min-height: 38px;
+}
+.dark .m-input, .dark .m-form select, .dark .m-form input { color-scheme: dark; }
+.m-input.wide { width: 100%; }
+
+/* ── Цветные метки ──────────────────────────────────────────────────────── */
+.m-tag {
+  display: inline-block; padding: .12rem .55rem; border-radius: 1rem;
+  font-size: .72rem; font-weight: 700; color: #fff; white-space: nowrap;
+}
+.m-tag.ok { background: #16a34a; }
+.m-tag.warn { background: #f5a623; color: #2b2b2b; }
+.m-tag.bad { background: #e5484d; }
+.m-tag.info { background: #57bcd8; color: #0b2a33; }
+.m-tag.off { background: #9ca3af; }
+.m-tag.soft { background: #eef2ff; color: #3730a3; }
+.dark .m-tag.soft { background: #312e81; color: #c7d2fe; }
+
+/* ── Плашки-сообщения ───────────────────────────────────────────────────── */
+.m-note, .m-hint, .m-err, .m-good {
+  padding: .8rem 1rem; border-radius: .5rem; margin: 0 0 1rem;
+  font-size: .88rem; line-height: 1.55;
+}
+.m-note { background: #eef7ff; border: 1px solid #b8dcf5; color: #14567a; }
+.dark .m-note { background: #14283a; border-color: #2b5878; color: #bfe2f7; }
+.m-hint { background: #fff6e5; border: 1px solid #f5d99a; color: #7a5b12; }
+.dark .m-hint { background: #3a2f12; border-color: #6b551f; color: #f0d9a0; }
+.m-err { background: #fdf2f2; border: 1px solid #f5c6c6; color: #93262e; }
+.dark .m-err { background: #3a1d1f; border-color: #6b2f33; color: #f3b8bc; }
+.m-good { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+.dark .m-good { background: #052e24; border-color: #0f5132; color: #6ee7b7; }
+
+/* ── Мелочи ─────────────────────────────────────────────────────────────── */
+.m-lead { font-size: .88rem; color: var(--m-muted); margin: 0 0 1.1rem; max-width: 74ch; line-height: 1.6; }
+.m-muted { color: var(--m-muted); }
+.m-dim { color: var(--m-dim); }
+.m-plus { color: var(--m-ok); font-weight: 600; }
+.m-minus { color: var(--m-bad); font-weight: 600; }
+.m-warn { color: var(--m-warn); font-weight: 600; }
+.m-empty { padding: 1.6rem 1rem; text-align: center; color: var(--m-muted); }
+.m-list { margin: .3rem 0 0; padding-left: 1.1rem; font-size: .88rem; line-height: 1.7; }
+.m-pages {
+  display: flex; gap: .8rem; align-items: center; justify-content: space-between;
+  padding: .7rem 1rem; font-size: .85rem;
+}
+.m-pill {
+  display: inline-flex; align-items: baseline; gap: 6px; padding: .4rem .8rem;
+  border-radius: 999px; background: var(--m-soft); font-size: .8rem; color: var(--m-muted);
+}
+.m-pill b { font-size: .85rem; color: var(--m-text); font-weight: 700; }
+.m-grid { display: grid; gap: .75rem; }
+@media (min-width: 760px) { .m-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr auto; align-items: end; } }
+.m-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; }
+.m-page { max-width: 1040px; }
+
+/* ── Дополнительные блоки страниц ───────────────────────────────────────── */
+.m-page { max-width: 1040px; }
+.m-title { font-size: 1.5rem; font-weight: 700; margin: 0 0 .4rem; }
+.m-top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 1.1rem; flex-wrap: wrap; margin: 0 0 1rem;
+}
+.m-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.m-tags { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .35rem; }
+.m-card.pad { padding: 1rem 1.15rem; }
+.m-card.pad > h2, .m-card.pad > h3 { padding: 0 0 .7rem; border: 0; }
+.m-strip { margin: 0; padding: .6rem 1rem; border-bottom: 1px solid var(--m-line); font-size: .84rem; }
+.m-strip.bad { background: #fdf2f2; border-color: #f5c6c6; color: #93262e; }
+.dark .m-strip.bad { background: #3a1d1f; border-color: #6b2f33; color: #f3b8bc; }
+.m-strip a { color: inherit; font-weight: 700; }
+.m-small { font-size: .78rem; }
+.m-strong { font-weight: 600; }
+.m-group { margin: 0 0 1.1rem; }
+.m-group-title {
+  font-size: .72rem; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--m-dim); font-weight: 700; margin: 0 0 .35rem;
+}
+.m-log { font-size: .8rem; color: var(--m-muted); }
+.m-log div { padding: .3rem 0; border-bottom: 1px solid var(--m-line); }
+.m-tag.review { background: #8b5cf6; }
+.m-link-on { font-weight: 600; color: var(--m-text); text-decoration: none; }
+.m-card.narrow { max-width: 680px; }
+table.m.top td, table.m.top th { vertical-align: top; }
+.m-page.narrow { max-width: 640px; }
+.m-card p { margin: 0 0 .6rem; font-size: .9rem; line-height: 1.55; color: var(--m-muted); }
+.m-nums.left .m-num { text-align: left; }
+.m-grid label { font-size: .75rem; font-weight: 600; display: block; }
+.m-grid input { width: 100%; margin-top: 4px; }
+.m-input.code {
+  width: 9.5rem; text-align: center; letter-spacing: .2em; font-size: 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.m-codes {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .35rem 1.2rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem;
+}
+.m-good .m-input { background: #fff; color: #111; border-color: #a7f3d0; }
+/* Статусы сотрудника приходят из данных: active | invited | expired | off. */
+.m-tag.b-active { background: #16a34a; }
+.m-tag.b-invited { background: #57bcd8; color: #0b2a33; }
+.m-tag.b-expired { background: #f5a623; color: #2b2b2b; }
+.m-tag.b-off { background: #9ca3af; }
+/* Уровни ошибок трекера приходят из данных. */
+.m-tag.lvl-error, .m-tag.lvl-fatal { background: #e5484d; }
+.m-tag.lvl-warning { background: #f5a623; color: #2b2b2b; }
+.m-tag.lvl-info { background: #57bcd8; color: #0b2a33; }
+.m-tag.lvl-debug, .m-tag.lvl-sample { background: #8b93a1; }
+table.m.compact td, table.m.compact th { padding: .35rem .6rem; font-size: .85rem; }
+.m-inapp { background: #fff8e1; }
+.dark .m-inapp { background: #3a3117; }
+.m-h3 { margin: 1.3rem 0 .5rem; font-size: 1rem; font-weight: 700; }
+.m-bar { background: #3b82f6; }
+.dark .m-bar { background: #60a5fa; }
+.m-blue { color: #2563eb; font-weight: 600; }
+.dark .m-blue { color: #60a5fa; }
+.grid .m-card { margin: 0; }
+.m-meter { height: 14px; border-radius: 8px; background: var(--m-line); overflow: hidden; margin: .75rem 0 .5rem; }
+.m-meter i { display: block; height: 100%; border-radius: 8px; background: var(--m-ok); transition: width .3s; }
+.m-meter i.warn { background: #f59e0b; }
+.m-meter i.bad { background: #dc2626; }
+.m-between { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap; align-items: baseline; }
+
+/* Подсказка «что в 1С» под полем товара в Конструкторе (D-62). */
+.merch-1c-hint {
+  display: none; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 11.5px; color: #64748b; margin-top: 5px;
+}
+.merch-1c-hint.own { color: var(--m-warn); }
+.merch-1c-hint button {
+  border: 1px solid var(--m-control); background: var(--m-card); color: var(--m-text);
+  border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 600; cursor: pointer; line-height: 1.6;
+}
+/* Статус обмена с 1С приходит из данных: ok | partial | error. */
+.m-tag.m-st-ok { background: #16a34a; }
+.m-tag.m-st-partial { background: #f5a623; color: #2b2b2b; }
+.m-tag.m-st-error { background: #e5484d; }

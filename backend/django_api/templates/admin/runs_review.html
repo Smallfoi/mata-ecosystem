@@ -3,78 +3,23 @@
 
 {% block content %}
 {# «Проверка забегов» (S-04 ф.2): очередь помеченных забегов, сгруппированная по бегуну. #}
-<style>
-  .rv-sum{display:flex;gap:.75rem;flex-wrap:wrap;margin:0 0 1rem}
-  .rv-tile{flex:1;min-width:150px;border:1px solid #e2e6ea;border-radius:.6rem;padding:.7rem .9rem;background:#fff}
-  .dark .rv-tile{background:#1f2937;border-color:#374151}
-  .rv-tile b{display:block;font-size:1.5rem;line-height:1.2;font-variant-numeric:tabular-nums}
-  .rv-tile span{font-size:.8rem;color:#6f7278}
-  .rv-tabs{display:flex;gap:.4rem;margin:0 0 1rem;flex-wrap:wrap;align-items:center}
-  .rv-tab{padding:.4rem .85rem;border:1px solid #cbd2d6;border-radius:.5rem;text-decoration:none;color:#334;font-size:.88rem}
-  .dark .rv-tab{border-color:#374151;color:#cbd5e1}
-  .rv-tab.on{background:#20252b;color:#fff;border-color:#20252b}
-  .dark .rv-tab.on{background:#57bcd8;color:#0d0d0d;border-color:#57bcd8}
-  .rv-note{padding:.8rem 1rem;border-radius:.5rem;background:#eef7ff;border:1px solid #b8dcf5;color:#14567a;margin:0 0 1rem}
-  .dark .rv-note{background:#14283a;border-color:#2b5878;color:#bfe2f7}
-  .rv-hint{padding:.8rem 1rem;border-radius:.5rem;background:#fff6e5;border:1px solid #f5d99a;color:#7a5b12;margin:0 0 1rem;font-size:.88rem;line-height:1.5}
-  .dark .rv-hint{background:#3a2f12;border-color:#6b551f;color:#f0d9a0}
 
-  .rv-card{border:1px solid #e2e6ea;border-radius:.7rem;background:#fff;margin:0 0 1rem;overflow:hidden}
-  .dark .rv-card{background:#1f2937;border-color:#374151}
-  .rv-head{display:flex;gap:.9rem;align-items:flex-start;flex-wrap:wrap;padding:.9rem 1rem;border-bottom:1px solid #eceff1}
-  .dark .rv-head{border-color:#374151}
-  .rv-who{flex:1;min-width:220px}
-  .rv-who h3{margin:0 0 .2rem;font-size:1.05rem}
-  .rv-who .rv-meta{font-size:.8rem;color:#6f7278}
-  .rv-badges{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.35rem}
-  .tag{display:inline-block;padding:.1rem .5rem;border-radius:1rem;font-size:.72rem;font-weight:700;color:#fff;white-space:nowrap}
-  .t-wait{background:#f5a623}.t-block{background:#e5484d}.t-review{background:#8b5cf6}.t-ok{background:#16a34a}
-  .rv-nums{display:flex;gap:1.1rem;flex-wrap:wrap;align-items:center}
-  .rv-num{text-align:right}
-  .rv-num b{display:block;font-size:1.05rem;font-variant-numeric:tabular-nums}
-  .rv-num span{font-size:.72rem;color:#6f7278}
+{% if note %}<div class="m-note">{{ note }}</div>{% endif %}
 
-  .rv-linked{margin:0;padding:.6rem 1rem;background:#fdf2f2;border-bottom:1px solid #f5c6c6;font-size:.84rem;color:#93262e}
-  .dark .rv-linked{background:#3a1d1f;border-color:#6b2f33;color:#f3b8bc}
-  .rv-linked a{color:inherit;font-weight:700}
-
-  .rv-wrap{overflow-x:auto}
-  table.rv{width:100%;border-collapse:collapse;min-width:820px}
-  table.rv th,table.rv td{padding:.5rem .6rem;border-bottom:1px solid #eceff1;text-align:left;font-size:.86rem;vertical-align:middle}
-  .dark table.rv th,.dark table.rv td{border-color:#374151}
-  table.rv td.n,table.rv th.n{text-align:right;font-variant-numeric:tabular-nums}
-  table.rv tr.done td{opacity:.55}
-  .rv-reason{color:#b45309;font-size:.82rem}
-  .dark .rv-reason{color:#fbbf24}
-  .rv-fast{color:#b91c1c;font-weight:700}
-
-  .rv-acts{display:flex;gap:.4rem;flex-wrap:wrap;padding:.7rem 1rem;background:#fafbfc}
-  .dark .rv-acts{background:#111827}
-  .rv-btn{padding:.35rem .75rem;border-radius:.45rem;border:1px solid #cbd2d6;background:#fff;cursor:pointer;font-size:.82rem;font-weight:600;color:#20252b}
-  .dark .rv-btn{background:#1f2937;border-color:#4b5563;color:#e5e7eb}
-  .rv-btn.ok{background:#16a34a;border-color:#16a34a;color:#fff}
-  .rv-btn.bad{background:#e5484d;border-color:#e5484d;color:#fff}
-  .rv-btn:disabled{opacity:.45;cursor:not-allowed}
-  form.inline{display:inline}
-  .rv-empty{padding:2.2rem 1rem;text-align:center;color:#6f7278}
-</style>
-
-{% if note %}<div class="rv-note">{{ note }}</div>{% endif %}
-
-<div class="rv-sum">
-  <div class="rv-tile"><b>{{ summary.pending }}</b><span>забегов ждут решения</span></div>
-  <div class="rv-tile"><b>{{ summary.accounts }}</b><span>аккаунтов на проверке</span></div>
-  <div class="rv-tile"><b>{{ summary.week_flags }}</b><span>помечено за {{ window_days }} дней</span></div>
-  <div class="rv-tile"><b>{{ summary.week_done }}</b><span>разобрано за {{ window_days }} дней</span></div>
+<div class="m-sum">
+  <div class="m-tile"><b>{{ summary.pending }}</b><span>забегов ждут решения</span></div>
+  <div class="m-tile"><b>{{ summary.accounts }}</b><span>аккаунтов на проверке</span></div>
+  <div class="m-tile"><b>{{ summary.week_flags }}</b><span>помечено за {{ window_days }} дней</span></div>
+  <div class="m-tile"><b>{{ summary.week_done }}</b><span>разобрано за {{ window_days }} дней</span></div>
 </div>
 
-<div class="rv-tabs">
-  <a class="rv-tab {% if mode == 'pending' %}on{% endif %}" href="?mode=pending">Ждут решения</a>
-  <a class="rv-tab {% if mode == 'all' %}on{% endif %}" href="?mode=all">Все помеченные</a>
-  <a class="rv-tab {% if mode == 'review' %}on{% endif %}" href="?mode=review">Аккаунты на проверке</a>
+<div class="m-tabs">
+  <a class="m-tab {% if mode == 'pending' %}on{% endif %}" href="?mode=pending">Ждут решения</a>
+  <a class="m-tab {% if mode == 'all' %}on{% endif %}" href="?mode=all">Все помеченные</a>
+  <a class="m-tab {% if mode == 'review' %}on{% endif %}" href="?mode=review">Аккаунты на проверке</a>
 </div>
 
-<div class="rv-hint">
+<div class="m-hint">
   Помеченный забег <b>не приносит баллы, пока его не разобрали</b> — это не бан, а пауза.
   «Одобрить» снимает пометку и начисляет баллы, «Нарушение» оставляет забег помеченным
   и списывает баллы, если их успели начислить. Аккаунт получает метку «на проверке»
@@ -83,7 +28,7 @@
 </div>
 
 {% if not runners %}
-  <div class="rv-card"><div class="rv-empty">
+  <div class="m-card"><div class="m-empty">
     {% if mode == 'pending' %}Очередь пуста — все помеченные забеги разобраны.
     {% elif mode == 'review' %}Аккаунтов на проверке нет.
     {% else %}Помеченных забегов нет.{% endif %}
@@ -91,39 +36,39 @@
 {% endif %}
 
 {% for r in runners %}
-<div class="rv-card">
-  <div class="rv-head">
-    <div class="rv-who">
+<div class="m-card">
+  <div class="m-head">
+    <div class="m-who">
       <h3>{{ r.name }}</h3>
-      <div class="rv-meta">
+      <div class="m-meta">
         id {{ r.id }}{% if r.phone %} · {{ r.phone }}{% endif %}{% if r.city %} · {{ r.city }}{% endif %}
         {% if not r.exists %} · <b>аккаунт удалён</b>{% endif %}
       </div>
-      <div class="rv-badges">
-        {% if r.pending_here %}<span class="tag t-wait">ждут решения: {{ r.pending_here }}</span>{% endif %}
-        {% if r.needs_review %}<span class="tag t-review">на проверке</span>{% endif %}
-        {% if r.blocked %}<span class="tag t-block">заблокирован</span>{% endif %}
-        {% if not r.pending_here and not r.blocked and not r.needs_review %}<span class="tag t-ok">разобран</span>{% endif %}
+      <div class="m-tags">
+        {% if r.pending_here %}<span class="m-tag warn">ждут решения: {{ r.pending_here }}</span>{% endif %}
+        {% if r.needs_review %}<span class="m-tag review">на проверке</span>{% endif %}
+        {% if r.blocked %}<span class="m-tag bad">заблокирован</span>{% endif %}
+        {% if not r.pending_here and not r.blocked and not r.needs_review %}<span class="m-tag ok">разобран</span>{% endif %}
       </div>
     </div>
-    <div class="rv-nums">
-      <div class="rv-num"><b>{{ r.km_valid }}</b><span>км засчитано</span></div>
-      <div class="rv-num"><b>{{ r.runs_valid }}/{{ r.runs_total }}</b><span>чистых забегов</span></div>
-      <div class="rv-num"><b>{{ r.flags_recent }}</b><span>флагов за {{ window_days }} дн.</span></div>
-      <div class="rv-num"><b>{{ r.balance }}</b><span>баллов на счету</span></div>
+    <div class="m-nums">
+      <div class="m-num"><b>{{ r.km_valid }}</b><span>км засчитано</span></div>
+      <div class="m-num"><b>{{ r.runs_valid }}/{{ r.runs_total }}</b><span>чистых забегов</span></div>
+      <div class="m-num"><b>{{ r.flags_recent }}</b><span>флагов за {{ window_days }} дн.</span></div>
+      <div class="m-num"><b>{{ r.balance }}</b><span>баллов на счету</span></div>
     </div>
   </div>
 
   {% if r.linked %}
-  <div class="rv-linked">
+  <div class="m-strip bad">
     Похоже на второй аккаунт того же человека:
     {% for l in r.linked %}<a href="?mode=all">{{ l.name }}</a> ({{ l.why }}{% if l.blocked %}, заблокирован{% endif %}){% if not forloop.last %}, {% endif %}{% endfor %}.
     Совпадение — повод посмотреть, а не приговор: телефоном делятся, номера меняют.
   </div>
   {% endif %}
 
-  <div class="rv-wrap">
-  <table class="rv">
+  <div class="m-wrap">
+  <table class="m">
     <thead>
       <tr>
         <th>Завершён (якут.)</th>
@@ -141,26 +86,26 @@
         <td>{{ run.when }}</td>
         <td class="n">{{ run.km }}</td>
         <td class="n">{{ run.minutes }}</td>
-        <td class="n {% if run.speed > 20 %}rv-fast{% endif %}">{{ run.speed }}</td>
-        <td class="rv-reason">{{ run.reason|default:"—" }}</td>
+        <td class="n {% if run.speed > 20 %}m-minus{% endif %}">{{ run.speed }}</td>
+        <td class="m-warn m-small">{{ run.reason|default:"—" }}</td>
         <td class="n">{{ run.points }}</td>
         <td>
           {% if run.pending %}
             {% if may_edit %}
-              <form class="inline" method="post">{% csrf_token %}
+              <form class="m-inline" method="post">{% csrf_token %}
                 <input type="hidden" name="action" value="approve">
                 <input type="hidden" name="run" value="{{ run.id }}">
                 <input type="hidden" name="mode" value="{{ mode }}">
-                <button class="rv-btn ok" type="submit">Одобрить</button>
+                <button class="m-btn ok" type="submit">Одобрить</button>
               </form>
-              <form class="inline" method="post">{% csrf_token %}
+              <form class="m-inline" method="post">{% csrf_token %}
                 <input type="hidden" name="action" value="reject">
                 <input type="hidden" name="run" value="{{ run.id }}">
                 <input type="hidden" name="mode" value="{{ mode }}">
-                <button class="rv-btn bad" type="submit">Нарушение</button>
+                <button class="m-btn bad" type="submit">Нарушение</button>
               </form>
             {% else %}
-              <span class="rv-reason">ждёт решения</span>
+              <span class="m-warn m-small">ждёт решения</span>
             {% endif %}
           {% else %}
             {{ run.verdict }} · {{ run.reviewed }}{% if run.reviewed_by %} · {{ run.reviewed_by }}{% endif %}
@@ -173,37 +118,37 @@
   </div>
 
   {% if may_edit %}
-  <div class="rv-acts">
-    <form class="inline" method="post">{% csrf_token %}
+  <div class="m-acts">
+    <form class="m-inline" method="post">{% csrf_token %}
       <input type="hidden" name="action" value="recalc">
       <input type="hidden" name="uid" value="{{ r.id }}">
       <input type="hidden" name="mode" value="{{ mode }}">
-      <button class="rv-btn" type="submit" title="Сверить баллы за все чистые забеги и доначислить недостающее">Пересчитать баллы</button>
+      <button class="m-btn" type="submit" title="Сверить баллы за все чистые забеги и доначислить недостающее">Пересчитать баллы</button>
     </form>
     {% if r.needs_review %}
-    <form class="inline" method="post">{% csrf_token %}
+    <form class="m-inline" method="post">{% csrf_token %}
       <input type="hidden" name="action" value="clear_review">
       <input type="hidden" name="uid" value="{{ r.id }}">
       <input type="hidden" name="mode" value="{{ mode }}">
-      <button class="rv-btn" type="submit">Снять метку «на проверке»</button>
+      <button class="m-btn" type="submit">Снять метку «на проверке»</button>
     </form>
     {% endif %}
     {% if may_block %}
       {% if r.blocked %}
-      <form class="inline" method="post">{% csrf_token %}
+      <form class="m-inline" method="post">{% csrf_token %}
         <input type="hidden" name="action" value="unblock">
         <input type="hidden" name="uid" value="{{ r.id }}">
         <input type="hidden" name="mode" value="{{ mode }}">
-        <button class="rv-btn" type="submit">Разблокировать</button>
+        <button class="m-btn" type="submit">Разблокировать</button>
       </form>
       {% else %}
-      <form class="inline" method="post"
+      <form class="m-inline" method="post"
             onsubmit="return confirm('Заблокировать {{ r.name|escapejs }}? Человек потеряет вход в приложение.')">
         {% csrf_token %}
         <input type="hidden" name="action" value="block">
         <input type="hidden" name="uid" value="{{ r.id }}">
         <input type="hidden" name="mode" value="{{ mode }}">
-        <button class="rv-btn bad" type="submit">Заблокировать аккаунт</button>
+        <button class="m-btn bad" type="submit">Заблокировать аккаунт</button>
       </form>
       {% endif %}
     {% endif %}

@@ -3,30 +3,19 @@
 {% block content %}
 {# Подтверждение массового удаления товаров: скрытых полей столько же, сколько пришло
    из списка, поэтому «выбрать все» работает и на тысячах карточек. #}
-<style>
-  .dp-card{max-width:680px;border:1px solid #e2e6ea;border-radius:.7rem;background:#fff;padding:1.1rem 1.2rem}
-  .dp-card.dark,.dark .dp-card{background:#1f2937;border-color:#374151}
-  .dp-count{font-size:1.6rem;font-weight:700;margin:0 0 .4rem}
-  .dp-warn{padding:.8rem 1rem;border-radius:.5rem;background:#fff6e5;border:1px solid #f5d99a;color:#7a5b12;margin:1rem 0;font-size:.88rem;line-height:1.6}
-  .dark .dp-warn{background:#3a2f12;border-color:#6b551f;color:#f0d9a0}
-  .dp-list{margin:.3rem 0 0;padding-left:1.1rem;font-size:.88rem;color:#6f7278}
-  .dp-acts{display:flex;gap:.9rem;align-items:center;margin-top:1.1rem}
-  .dp-btn{padding:.55rem 1.1rem;border-radius:.5rem;border:1px solid #e5484d;background:#e5484d;color:#fff;font-weight:600;cursor:pointer}
-  .dp-cancel{color:#6f7278}
-</style>
 
-<div class="dp-card">
-  <p class="dp-count">Удалить {{ count }} товаров?</p>
+<div class="m-card pad narrow">
+  <p class="m-title">Удалить {{ count }} товаров?</p>
   <p style="margin:0;color:#6f7278;font-size:.9rem">Действие необратимо: карточки удаляются из базы.</p>
 
   {% if sample %}
-  <ul class="dp-list">
+  <ul class="m-list">
     {% for name in sample %}<li>{{ name }}</li>{% endfor %}
     {% if count > sample|length %}<li>…и ещё {{ count|add:"-8" }}</li>{% endif %}
   </ul>
   {% endif %}
 
-  <div class="dp-warn">
+  <div class="m-hint">
     <b>Что останется:</b>
     <ul style="margin:.4rem 0 0;padding-left:1.1rem">
       <li>Товары <b>вернутся при следующем обмене с 1С</b>, если они есть в 1С. Чтобы не возвращались, уберите их в 1С или отключите обмен.</li>
@@ -45,9 +34,9 @@
     {% for pk in selected %}
       <input type="hidden" name="{{ action_checkbox_name }}" value="{{ pk }}">
     {% endfor %}
-    <div class="dp-acts">
-      <button class="dp-btn" type="submit">Удалить {{ count }}</button>
-      <a class="dp-cancel" href="{% url 'admin:catalog_product_changelist' %}">Отмена</a>
+    <div class="m-row">
+      <button class="m-btn bad" type="submit">Удалить {{ count }}</button>
+      <a class="m-muted" href="{% url 'admin:catalog_product_changelist' %}">Отмена</a>
     </div>
   </form>
 </div>
