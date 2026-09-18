@@ -102,6 +102,16 @@ table.m tbody tr:hover > * { background: var(--m-hover); }
 table.m tr.done td { opacity: .55; }
 table.m tr.m-off td { opacity: .55; }
 
+/* Форма прав сотрудника (S-12): у КАЖДОЙ группы своя таблица, поэтому без общей
+   геометрии переключатели «гуляют» по горизонтали между группами. Фиксируем
+   одинаковые колонки — первый столбец «Вкладка» гибкий, четыре столбца уровней
+   равной ширины и по центру, — тогда кнопки во всех группах стоят строго в столбик. */
+table.m.perms { table-layout: fixed; }
+table.m.perms th:first-child, table.m.perms td:first-child { width: 34%; }
+table.m.perms th:not(:first-child), table.m.perms td:not(:first-child) {
+  width: 16.5%; text-align: center;
+}
+
 /* ── Переключатели и быстрые фильтры ────────────────────────────────────── */
 .m-tabs { display: flex; gap: .4rem; margin: 0 0 1rem; flex-wrap: wrap; align-items: center; }
 .m-tab, .m-chip {
