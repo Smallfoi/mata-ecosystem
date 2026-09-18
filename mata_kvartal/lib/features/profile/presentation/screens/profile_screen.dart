@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/api/api_config.dart';
+import '../../../../core/config/app_config_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/data/auth_provider.dart';
 import '../../../loyalty/data/loyalty_provider.dart';
@@ -730,6 +731,7 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(appConfigProvider).valueOrNull ?? const AppConfig();
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: AppBar(
@@ -763,11 +765,13 @@ class SettingsScreen extends ConsumerWidget {
                   '\u0413\u0435\u043e\u043b\u043e\u043a\u0430\u0446\u0438\u044f \u0438 \u0444\u043e\u043d\u043e\u0432\u044b\u0439 \u0440\u0435\u0436\u0438\u043c',
               onTap: () => context.push('/run/location-access'),
             ),
-            _SettingsTile(
-              icon: CupertinoIcons.time,
-              label: 'Часы и приложения',
-              onTap: () => context.push('/profile/watch'),
-            ),
+            // «Часы» скрыты до готовности (D-89, флаг showWatch) — включаются в админке.
+            if (config.showWatch)
+              _SettingsTile(
+                icon: CupertinoIcons.time,
+                label: 'Часы и приложения',
+                onTap: () => context.push('/profile/watch'),
+              ),
             _SettingsTile(
               icon: CupertinoIcons.moon_fill,
               label: 'Тема',

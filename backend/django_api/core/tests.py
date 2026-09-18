@@ -87,6 +87,39 @@ class HealthTests(TestCase):
         self.assertFalse(r.json()["db"])
 
 
+class AppConfigTests(TestCase):
+    """Серверные флаги /v1/config (D-87): по умолчанию периферия скрыта; админ включает."""
+
+    def test_config_defaults_hide_periphery(self):
+        d = self.client.get("/v1/config").json()
+        # На старте (D-75) периферия скрыта — все флаги False по умолчанию.
+        for key in ("showTrails", "showWatch", "showRaces", "showLeagueFull",
+                    "showSleepingMedals"):
+            self.assertIn(key, d)
+            self.assertFalse(d[key], f"{key} должен быть скрыт по умолчанию")
+
+    def test_config_reflects_admin_change(self):
+        from core.models import AppConfig
+
+        cfg = AppConfig.load()
+        cfg.show_trails = True
+        cfg.save()
+        self.assertTrue(self.client.get("/v1/config").json()["showTrails"])
+
+    def test_config_is_singleton(self):
+        from core.models import AppConfig
+
+        obj = AppConfig.load()
+        obj.id = 7  # попытка сменить id
+        obj.save()  # save() принудительно нормализует id к 1 → та же строка
+        self.assertEqual(AppConfig.objects.count(), 1)
+        self.assertEqual(AppConfig.objects.first().id, 1)
+
+    def test_config_public_no_auth(self):
+        # UI-конфиг — без токена (это не персональные данные).
+        self.assertEqual(self.client.get("/v1/config").status_code, 200)
+
+
 class ErrorsConsoleTests(TestCase):
     """Страница «Ошибки» в админке (D-32): staff-only, отрисовывается даже без GlitchTip."""
 

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../../core/config/app_config_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/club_provider.dart';
 import '../widgets/club_style.dart';
@@ -78,9 +79,12 @@ class _ClubScreenState extends ConsumerState<ClubScreen> with TabVisibility {
                   // «Старты» — не часть клуба, а самостоятельный раздел (D-45).
                   // Держим его здесь, а не внутри тел «клуб есть»/«клуба нет»:
                   // так он виден в любом состоянии экрана и не зависит от того,
-                  // как эти тела устроены внутри.
-                  const _RacesEntryCard(),
-                  const SizedBox(height: 14),
+                  // как эти тела устроены внутри. Скрыт до готовности (D-89,
+                  // флаг showRaces) — включается в админке.
+                  if (ref.watch(appConfigProvider).valueOrNull?.showRaces ?? false) ...[
+                    const _RacesEntryCard(),
+                    const SizedBox(height: 14),
+                  ],
                   if (state.error != null) ...[
                     _StatusCard(
                       icon: CupertinoIcons.exclamationmark_triangle_fill,

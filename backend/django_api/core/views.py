@@ -43,6 +43,17 @@ def health(_request):
 
 
 @api_view(["GET"])
+@throttle_classes([])  # конфиг тянут на старте/резюме — не троттлим
+def app_config(_request):
+    """Серверные флаги видимости (D-89): что показывать в приложении. Публично,
+    без токена — это UI-конфиг, не персональные данные. Клиент кэширует ответ и
+    имеет свои дефолты на случай недоступности сети."""
+    from core.models import AppConfig
+
+    return Response(AppConfig.load().to_json())
+
+
+@api_view(["GET"])
 @throttle_classes([])
 def readiness(_request):
     """Readiness: готов ли инстанс принимать трафик (БД И кэш живы). Для балансировщика/
