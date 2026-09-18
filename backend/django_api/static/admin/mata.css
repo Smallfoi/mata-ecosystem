@@ -267,3 +267,35 @@ table.m.compact td, table.m.compact th { padding: .35rem .6rem; font-size: .85re
 .m-tag.m-st-error { background: #e5484d; }
 details summary { cursor: pointer; }
 pre.m-mono { white-space: pre-wrap; margin: .4rem 0 0; max-height: 320px; overflow: auto; }
+
+/* ── Стандартные списки темы: «Товары», «Категории», «Баннеры» и прочие ─────
+ * Их разметку строит тема админки, а не наши шаблоны, поэтому вид задаётся её
+ * утилитарными классами. Приводим к общему виду то, что видно глазом: рамку и
+ * скругление вокруг таблицы, толщину и цвет линий, плотность строк, заголовки,
+ * подсветку под курсором и выравнивание цифр.
+ *
+ * Внутренности темы — панель фильтров, верхнюю строку действий, формы карточек —
+ * намеренно не трогаем: подменять её шаблоны значит ломать вёрстку на каждом
+ * обновлении темы. `!important` здесь оправдан: утилитарные классы висят прямо на
+ * ячейках, и без него тема перебивает отступы и цвет линий.
+ */
+#result_list {
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-radius);
+  background: var(--m-card);
+  overflow: hidden;
+}
+#result_list th, #result_list td {
+  border-color: var(--m-line) !important;
+  padding: .55rem .8rem !important;
+  font-size: .88rem;
+  vertical-align: middle;
+}
+#result_list th {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--m-muted);
+}
+#result_list td { font-variant-numeric: tabular-nums; }
+#result_list tbody tr:hover td { background: var(--m-soft); }
+
