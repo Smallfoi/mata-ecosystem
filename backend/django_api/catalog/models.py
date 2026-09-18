@@ -52,6 +52,11 @@ class Category(models.Model):
 class Product(models.Model):
     id = models.CharField(primary_key=True, max_length=40, verbose_name="ID")
     name = models.CharField(max_length=200, verbose_name="Название")
+    # Общее (родовое) название модели из 1С: в `name` у них лежит конкретная
+    # позиция — «BMAI PURE 2.0 черный 36р.», а общее название одно на все размеры
+    # и цвета. Нужно, чтобы на витрине собирать карточку модели, а не 30 карточек.
+    global_name = models.CharField(max_length=200, blank=True, default="",
+                                   verbose_name="Общее название (1С)")
     brand = models.CharField(max_length=120, blank=True, default="", verbose_name="Бренд")
     category_id = models.CharField(max_length=40, db_index=True, verbose_name="Категория")
     price = models.FloatField(verbose_name="Цена")

@@ -1,0 +1,38 @@
+{% extends "admin/change_list.html" %}
+{% comment %}
+Список с настройкой столбцов (ColumnPickerMixin): шестерёнка над таблицей, в ней
+галочки — что показывать. Выбор личный и запоминается. Своего оформления здесь
+нет: всё на общих классах m-* из static/admin/mata.css (D-87).
+{% endcomment %}
+
+{% block result_list %}
+    {% if column_choices %}
+        <details class="m-cols">
+            <summary class="m-cols-head">
+                <span class="material-symbols-outlined">settings</span>
+                <span>Столбцы</span>
+                {% if columns_hidden_count %}<span class="m-chip">скрыто: {{ columns_hidden_count }}</span>{% endif %}
+            </summary>
+            <form method="post" action="{{ column_form_url }}" class="m-cols-body">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <div class="m-cols-grid">
+                    {% for c in column_choices %}
+                        <label class="m-cols-item{% if c.locked %} is-locked{% endif %}">
+                            <input type="checkbox" name="show" value="{{ c.name }}"
+                                   {% if c.visible %}checked{% endif %}
+                                   {% if c.locked %}checked disabled{% endif %}>
+                            <span>{{ c.label }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+                <div class="m-cols-actions">
+                    <button type="submit" class="m-btn">Применить</button>
+                    <button type="submit" class="m-btn" name="reset" value="1">Вернуть как было</button>
+                    <span class="m-hint">Настройка своя у каждого сотрудника и сохраняется между заходами.</span>
+                </div>
+            </form>
+        </details>
+    {% endif %}
+    {{ block.super }}
+{% endblock %}

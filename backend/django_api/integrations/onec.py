@@ -19,6 +19,10 @@ from catalog.models import Category, Product
 
 # Поле в JSON от 1С → поле модели. Ключи совпадают с Product.OVERRIDABLE.
 FIELD_MAP = {
+    # 1С шлёт ключ строчными буквами (`globalname`), в договорённости был
+    # `globalName` — принимаем оба написания, чтобы не зависеть от их правки.
+    "globalName": "global_name",
+    "globalname": "global_name",
     "price": "price",
     "oldPrice": "old_price",
     "description": "description",
@@ -60,7 +64,8 @@ def _parcel_errors(product: Product, raw: dict, who: str) -> list:
 
 # Поля, которые мы читаем в каждом потоке. Всё остальное 1С присылает зря — и это
 # должно быть видно, а не теряться молча.
-CATALOG_KEYS = {"id", "article", "name", "categoryId", "brand", "active", "updatedAt",
+CATALOG_KEYS = {"id", "article", "name", "globalName", "globalname", "categoryId",
+                "brand", "active", "updatedAt",
                 "price", "oldPrice", "description", "sizes", "colors", "images",
                 "weightG", "lengthCm", "widthCm", "heightCm"}
 PRICE_KEYS = {"id", "article", "price", "oldPrice", "stock", "variants"}
@@ -179,6 +184,9 @@ class _Index:
 # пока большинство карточек не заполнено — приходит [null]. Пустое должно оставаться
 # пустым: [null] на витрине превращается в пустую «плашку» размера.
 LIST_FIELDS = {"sizes", "colors", "images"}
+# Текстовые поля: 1С присылает незаполненное как null, а в базе у них NOT NULL —
+# без приведения к пустой строке выгрузка падала бы на первой пустой карточке.
+TEXT_FIELDS = {"globalName", "globalname", "description"}
 _EMPTY = {"", "none", "null", "не указан", "не указано", "-", "—"}
 
 
@@ -214,6 +222,8 @@ def _apply(product: Product, payload: dict, fields: dict) -> list:
             continue
         if json_field in LIST_FIELDS:
             value = _clean_list(value)
+        elif json_field in TEXT_FIELDS:
+            value = str(value).strip() if value is not None else ""
         setattr(product, model_field, value)
     product.from_1c = src
     return kept
@@ -281,7 +291,7 @@ def import_categories(items) -> dict:
 # Что переписывает выгрузка карточек. Поля витрины (публикация, новинка,
 # рекомендуемое, порядок, рейтинг) в списке отсутствуют намеренно — это зона МАТА.
 CATALOG_FIELDS = [
-    "external_id", "article", "name", "category_id", "brand", "is_active_1c",
+    "external_id", "article", "name", "global_name", "category_id", "brand", "is_active_1c",
     "source_updated_at", "from_1c", "price", "old_price", "description",
     "sizes", "colors", "image_urls", "weight_g", "length_cm", "width_cm", "height_cm",
 ]
