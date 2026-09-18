@@ -381,3 +381,30 @@ class InviteSessionTests(Base):
         self.assertContains(r, "Заказы")
         self.assertContains(r, "Журнал обмена")
         self.assertEqual(len(r.context["granted"]), 2)
+
+
+class SidebarTabRegistryTests(TestCase):
+    """Страж S-12: каждая вкладка меню, раздаваемая по праву (`_tab`), обязана быть
+    в реестре `TABS` — иначе новую вкладку не выдать сотруднику (её не будет в форме
+    прав). Так «вновь добавляемые вкладки» автоматически попадают в экран доступа."""
+
+    @staticmethod
+    def _sidebar_tab_keys():
+        from django.conf import settings
+        keys = []
+        for section in settings.UNFOLD["SIDEBAR"]["navigation"]:
+            for item in section.get("items", []):
+                key = getattr(item.get("permission"), "_tab_key", None)
+                if key:
+                    keys.append(key)
+        return keys
+
+    def test_every_menu_tab_is_registered(self):
+        from staff.tabs import BY_KEY
+        missing = [k for k in self._sidebar_tab_keys() if k not in BY_KEY]
+        self.assertEqual(missing, [], f"вкладки меню без записи в TABS: {missing}")
+
+    def test_app_flags_tab_is_grantable(self):
+        from staff.tabs import BY_KEY
+        self.assertIn("app_flags", BY_KEY)
+        self.assertIn("app_flags", self._sidebar_tab_keys())

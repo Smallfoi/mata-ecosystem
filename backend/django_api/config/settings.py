@@ -87,6 +87,7 @@ def _tab(key):
     def allowed(request):
         from staff.access import can
         return can(getattr(request, "user", None), key)
+    allowed._tab_key = key  # для сверки «меню ↔ реестр вкладок» (страж S-12)
     return allowed
 
 
@@ -472,10 +473,11 @@ UNFOLD = {
                      "link": reverse_lazy("onec_log"),
                      "permission": _tab("onec_log")},
                     # Флаги видимости приложения (D-89): что показывать в «Квартале»
-                    # без пересборки. Управляет только владелец.
+                    # без пересборки. Раздаётся как вкладка (S-12) — доступ можно
+                    # выдать сотруднику в «Сотрудники».
                     {"title": "Флаги приложения", "icon": "toggle_on",
                      "link": reverse_lazy("admin:core_featureflag_changelist"),
-                     "permission": _owner_only},
+                     "permission": _tab("app_flags")},
                 ],
             },
             {
