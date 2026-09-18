@@ -6,48 +6,34 @@
    prebuilt Tailwind НЕ содержит части dark:bg-* утилит, из-за чего в тёмной теме
    карточки оставались белыми → белые цифры на белом фоне. Структурные классы
    (grid/rounded/padding/размер шрифта) Unfold содержит — их оставляем. #}
-<style>
-  .eco-card  { background:#ffffff; border-color:#e5e7eb; }
-  .dark .eco-card  { background:#18181b; border-color:#27272a; }
-  .eco-title { color:#111827; }
-  .dark .eco-title { color:#ffffff; }
-  .eco-label { color:#6b7280; }
-  .dark .eco-label { color:#9ca3af; }
-  .eco-value { color:#111827; }
-  .dark .eco-value { color:#ffffff; }
-  .eco-sub   { color:#2563eb; }
-  .dark .eco-sub   { color:#60a5fa; }
-  .eco-bar   { background:#3b82f6; }
-  .dark .eco-bar   { background:#60a5fa; }
-</style>
 <div class="space-y-6">
   <div>
-    <h1 class="text-xl font-semibold eco-title">Обзор экосистемы</h1>
-    <p class="text-sm eco-label">Сводка по магазину, баллам и сообществу</p>
+    <h1 class="text-xl font-semibold">Обзор экосистемы</h1>
+    <p class="text-sm m-muted">Сводка по магазину, баллам и сообществу</p>
   </div>
 
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
     {% for k in kpis %}
-    <div class="rounded-lg border p-5 eco-card">
-      <div class="text-sm font-medium eco-label">{{ k.title }}</div>
-      <div class="mt-2 text-3xl font-bold eco-value">{{ k.value }}</div>
-      <div class="mt-1 text-xs font-medium eco-sub">{{ k.sub }}</div>
+    <div class="m-card pad">
+      <div class="text-sm font-medium m-muted">{{ k.title }}</div>
+      <div class="mt-2 text-3xl font-bold">{{ k.value }}</div>
+      <div class="mt-1 text-xs font-medium m-blue">{{ k.sub }}</div>
     </div>
     {% endfor %}
   </div>
 
   <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-    <div class="rounded-lg border p-5 eco-card lg:col-span-2">
-      <div class="mb-4 text-sm font-medium eco-label">Заказы за 7 дней</div>
+    <div class="m-card pad lg:col-span-2">
+      <div class="mb-4 text-sm font-medium m-muted">Заказы за 7 дней</div>
       <div class="flex h-40 items-end gap-3">
         {% for d in orders_daily %}
         <div class="flex flex-1 flex-col items-center gap-2">
           <div class="flex w-full flex-1 items-end">
-            <div class="w-full rounded-t eco-bar"
+            <div class="w-full rounded-t m-bar"
                  style="height: {{ d.pct }}%; min-height: 3px;" title="{{ d.value }}"></div>
           </div>
-          <div class="text-[11px] eco-label">{{ d.label }}</div>
-          <div class="text-xs font-semibold eco-value">{{ d.value }}</div>
+          <div class="text-[11px] m-muted">{{ d.label }}</div>
+          <div class="text-xs font-semibold">{{ d.value }}</div>
         </div>
         {% endfor %}
       </div>
@@ -55,9 +41,9 @@
 
     <div class="space-y-4">
       {% for s in extra_stats %}
-      <div class="flex items-center justify-between rounded-lg border p-4 eco-card">
-        <span class="text-sm eco-label">{{ s.title }}</span>
-        <span class="text-xl font-bold eco-value">{{ s.value }}</span>
+      <div class="m-card pad flex items-center justify-between">
+        <span class="text-sm m-muted">{{ s.title }}</span>
+        <span class="text-xl font-bold">{{ s.value }}</span>
       </div>
       {% endfor %}
     </div>

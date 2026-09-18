@@ -152,3 +152,8 @@ jobs:
       # tools/check_editable_text.py.
       - name: Editable-text guard (RemoteText / staw-static)
         run: python tools/check_editable_text.py
+
+      # Единый стиль админки (D-87): страницы не заводят свой <style>, а берут блоки
+      # из static/admin/mata.css. Иначе разделы снова начнут расходиться в мелочах.
+      - name: Admin-style guard (один стиль на всю админку)
+        run: python tools/check_admin_styles.py

@@ -3,8 +3,8 @@
 
 {% block content %}
 {# Промежуточная форма массовой рассылки (админ-действие send_notification на AccountAdmin). #}
-<div style="max-width:640px">
-  <p style="margin:0 0 1rem;font-size:.95rem;color:#6f7278">
+<div class="m-page narrow">
+  <p class="m-lead">
     Уведомление уйдёт в общую ленту <b>{{ count }}</b> выбранным пользователям
     (и пуш, если провайдер настроен). Отменить рассылку после отправки нельзя.
   </p>
@@ -16,26 +16,17 @@
     {% endfor %}
     <input type="hidden" name="action" value="send_notification">
 
-    <p style="margin:0 0 1rem">
-      <label>
-        <span style="display:block;margin-bottom:.25rem;font-weight:600">Заголовок *</span>
-        <input type="text" name="title" required maxlength="200"
-               style="width:100%;padding:.5rem;border:1px solid #cbd2d6;border-radius:.4rem">
-      </label>
-    </p>
+    <label class="m-field" style="margin-bottom:1rem">Заголовок *
+      <input class="m-input wide" type="text" name="title" required maxlength="200">
+    </label>
 
-    <p style="margin:0 0 1.25rem">
-      <label>
-        <span style="display:block;margin-bottom:.25rem;font-weight:600">Текст</span>
-        <textarea name="body" rows="5" maxlength="1000"
-                  style="width:100%;padding:.5rem;border:1px solid #cbd2d6;border-radius:.4rem"></textarea>
-      </label>
-    </p>
+    <label class="m-field" style="margin-bottom:1.25rem">Текст
+      <textarea class="m-input wide" name="body" rows="5" maxlength="1000"></textarea>
+    </label>
 
-    <div style="display:flex;gap:.75rem;align-items:center">
-      <input type="submit" name="apply" value="Отправить {{ count }} получателям" class="default">
-      <a href="{% url 'admin:accounts_account_changelist' %}"
-         style="color:#6f7278">Отмена</a>
+    <div class="m-row">
+      <button class="m-btn primary" type="submit" name="apply">Отправить {{ count }} получателям</button>
+      <a class="m-muted" href="{% url 'admin:accounts_account_changelist' %}">Отмена</a>
     </div>
   </form>
 </div>

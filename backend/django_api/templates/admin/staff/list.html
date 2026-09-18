@@ -3,87 +3,51 @@
 
 {% block content %}
 {# Вкладка «Сотрудники» (S-12). Видна только владельцу — и в меню, и на сервере. #}
-<style>
-  .st-wrap{max-width:1040px}
-  .st-lead{font-size:13.5px;color:#6b7280;margin:0 0 22px;max-width:70ch}
-  .st-card{border:1px solid #e5e7eb;border-radius:14px;background:#fff;padding:18px 20px;margin-bottom:18px}
-  .dark .st-card{background:#1f2937;border-color:#374151}
-  .st-card h2{font-size:15px;font-weight:700;margin:0 0 12px}
-  table.st{width:100%;border-collapse:collapse}
-  table.st th,table.st td{padding:.6rem .55rem;border-bottom:1px solid #eceff1;text-align:left;font-size:.88rem;vertical-align:middle}
-  .dark table.st th,.dark table.st td{border-color:#374151}
-  table.st th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;font-weight:700}
-  .st-name{font-weight:600}
-  .st-name a{text-decoration:none;color:inherit}
-  .st-name a:hover{text-decoration:underline}
-  .st-sub{font-size:11.5px;color:#9ca3af}
-  .badge{display:inline-block;padding:.12rem .55rem;border-radius:1rem;font-size:.72rem;font-weight:700;color:#fff;white-space:nowrap}
-  .b-active{background:#16a34a}.b-invited{background:#57bcd8;color:#0b2a33}.b-expired{background:#f5a623}.b-off{background:#9ca3af}
-  .warn{color:#b45309;font-weight:600}
-  .ok{color:#15803d;font-weight:600}
-  .st-form{display:grid;grid-template-columns:1fr;gap:12px}
-  @media(min-width:760px){.st-form{grid-template-columns:1fr 1fr 1fr auto;align-items:end}}
-  .st-form label{font-size:12px;font-weight:600;color:#374151;display:block}
-  .dark .st-form label{color:#cbd5e1}
-  .st-form input{width:100%;margin-top:4px;padding:9px 11px;border:1px solid #d1d5db;border-radius:9px;font-size:14px}
-  .st-btn{padding:10px 18px;border:0;border-radius:9px;background:#111;color:#fff;font-weight:600;cursor:pointer;font-size:14px}
-  .st-link{margin:0 0 18px;padding:14px 16px;border-radius:12px;background:#ecfdf5;border:1px solid #a7f3d0}
-  .dark .st-link{background:#052e24;border-color:#0f5132}
-  .st-link .t{font-size:12.5px;font-weight:700;color:#065f46;margin-bottom:8px}
-  .dark .st-link .t{color:#6ee7b7}
-  .st-link .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .st-link input{flex:1;min-width:280px;padding:9px 11px;border:1px solid #a7f3d0;border-radius:9px;font-size:12.5px;background:#fff;color:#111}
-  .st-link button{padding:9px 15px;border:0;border-radius:9px;background:#065f46;color:#fff;font-weight:600;cursor:pointer;font-size:13px}
-  .st-note{font-size:11.5px;color:#6b7280;margin-top:8px}
-  .st-audit{font-size:12.5px;color:#6b7280}
-  .st-audit div{padding:5px 0;border-bottom:1px solid #f1f2f4}
-  .dark .st-audit div{border-color:#2b3240}
-</style>
 
-<div class="st-wrap">
+<div class="m-page">
   <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">Сотрудники</h1>
-  <p class="st-lead">
+  <p class="m-lead">
     Здесь вы заводите людей, которым нужен доступ в админку, и решаете, какие вкладки
     им видны и что в них можно менять. Раздел виден только вам: правом раздавать права
     поделиться нельзя.
   </p>
 
   {% if invite_link %}
-  <div class="st-link">
+  <div class="m-good">
     <div class="t">Ссылка-приглашение для «{{ invite_for }}» — действует 48 часов, сработает один раз</div>
     <div class="row">
-      <input id="st-invite" type="text" readonly value="{{ invite_link }}">
-      <button type="button" onclick="var f=document.getElementById('st-invite');f.select();document.execCommand('copy');this.textContent='Скопировано';">Скопировать</button>
+      <input id="st-invite" class="m-input wide" type="text" readonly value="{{ invite_link }}">
+      <button type="button" onclick="var f=document.getElementById('st-invite');f.select();document.execCommand('copy');this.textContent='Скопировано';" class="m-btn ok">Скопировать</button>
     </div>
-    <div class="st-note">
+    <div class="m-small m-muted">
       Передайте её лично — в мессенджере. По ссылке человек задаст себе пароль;
       вам он остаётся неизвестен. Больше эта ссылка не покажется.
     </div>
   </div>
   {% endif %}
 
-  <div class="st-card">
+  <div class="m-card pad">
     <h2>Добавить сотрудника</h2>
-    <form class="st-form" method="post" action="{% url 'staff_create' %}">
+    <form class="m-grid cols-3" method="post" action="{% url 'staff_create' %}">
       {% csrf_token %}
       <label>Имя
-        <input type="text" name="full_name" maxlength="120" required placeholder="Иван Петров"></label>
+        <input class="m-input" type="text" name="full_name" maxlength="120" required placeholder="Иван Петров"></label>
       <label>Рабочая почта
-        <input type="email" name="email" maxlength="150" required placeholder="ivan@mata-club.ru"></label>
+        <input class="m-input" type="email" name="email" maxlength="150" required placeholder="ivan@mata-club.ru"></label>
       <label>Должность (необязательно)
-        <input type="text" name="position" maxlength="120" placeholder="Менеджер магазина"></label>
-      <button class="st-btn" type="submit">Создать и выдать ссылку</button>
+        <input class="m-input" type="text" name="position" maxlength="120" placeholder="Менеджер магазина"></label>
+      <button class="m-btn primary" type="submit">Создать и выдать ссылку</button>
     </form>
-    <div class="st-note">
+    <div class="m-small m-muted">
       Права выдаются на следующем шаге — сразу после создания. Пока вы их не выдали,
       человек войдёт и увидит пустую админку.
     </div>
   </div>
 
-  <div class="st-card">
+  <div class="m-card pad">
     <h2>Кто есть сейчас</h2>
     {% if rows %}
-    <table class="st">
+    <table class="m">
       <thead>
         <tr>
           <th>Сотрудник</th><th>Почта</th><th>Статус</th>
@@ -93,15 +57,15 @@
       <tbody>
         {% for r in rows %}
         <tr>
-          <td class="st-name">
+          <td class="m-strong">
             <a href="{% url 'staff_member' r.profile.pk %}">{{ r.profile.full_name }}</a>
-            {% if r.profile.position %}<div class="st-sub">{{ r.profile.position }}</div>{% endif %}
+            {% if r.profile.position %}<div class="m-small m-dim">{{ r.profile.position }}</div>{% endif %}
           </td>
           <td>{{ r.email }}</td>
-          <td><span class="badge b-{{ r.profile.status }}">{{ r.profile.status_ru }}</span></td>
+          <td><span class="m-tag b-{{ r.profile.status }}">{{ r.profile.status_ru }}</span></td>
           <td>{{ r.opened }}</td>
-          <td>{% if r.has_2fa %}<span class="ok">подключён</span>{% else %}<span class="warn">нет</span>{% endif %}</td>
-          <td class="st-sub">{% if r.last_login %}{{ r.last_login|date:"d.m.Y H:i" }}{% else %}не входил{% endif %}</td>
+          <td>{% if r.has_2fa %}<span class="m-plus">подключён</span>{% else %}<span class="m-warn">нет</span>{% endif %}</td>
+          <td class="m-small m-dim">{% if r.last_login %}{{ r.last_login|date:"d.m.Y H:i" }}{% else %}не входил{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -114,9 +78,9 @@
   </div>
 
   {% if audit %}
-  <div class="st-card">
+  <div class="m-card pad">
     <h2>Последние действия с доступами</h2>
-    <div class="st-audit">
+    <div class="m-log">
       {% for a in audit %}
       <div>{{ a.at|date:"d.m.Y H:i" }} — {{ a.actor_name|default:"—" }}: {{ a.action }}{% if a.ip %} <span style="color:#c3c7cd">({{ a.ip }})</span>{% endif %}</div>
       {% endfor %}

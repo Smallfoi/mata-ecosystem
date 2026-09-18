@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from celery.schedules import crontab  # расписание beat (D-07)
+from django.templatetags.static import static
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -251,6 +252,8 @@ USE_TZ = True
 STATIC_URL = "static/"
 # Прод: `collectstatic` собирает статику админки сюда, nginx раздаёт (см. docker-compose.prod).
 STATIC_ROOT = os.environ.get("DJANGO_STATIC_ROOT", "/app/staticfiles")
+# Свой стиль админки: static/admin/mata.css — единый набор блоков для всех наших страниц.
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Медиа: фото товаров для экосистемы (Квартал тянет мини-фото кроссовок по сети).
 # В dev файлы примонтированы из mata_store/assets (см. docker-compose: web → /srv/media).
@@ -307,6 +310,9 @@ UNFOLD = {
     "SITE_URL": SITE_PUBLIC_URL,
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
+    # Единый стиль наших страниц (D-87): один файл на всю админку, подключается ко
+    # всем страницам темы — и к спискам, и к своим экранам.
+    "STYLES": [lambda request: static("admin/mata.css")],
     "DASHBOARD_CALLBACK": "config.dashboard.dashboard_callback",
     # Нижнее меню пользователя (кнопка «admin» внизу слева, рядом с выбором темы):
     # «Настройки» → свой аккаунт (почта, имя, смена пароля). Профиль/пароль — тут, не отдельно.

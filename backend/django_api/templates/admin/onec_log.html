@@ -3,65 +3,37 @@
 
 {% block content %}
 {# «Журнал обмена» (D-62): что и когда прислала 1С. Стиль — как на вкладке «Ошибки». #}
-<style>
-  .ex-sum{display:flex;gap:.75rem;flex-wrap:wrap;margin:0 0 1rem}
-  .ex-tile{flex:1;min-width:140px;border:1px solid #e2e6ea;border-radius:.6rem;padding:.7rem .9rem;background:#fff}
-  .dark .ex-tile{background:#1f2937;border-color:#374151}
-  .ex-tile b{display:block;font-size:1.5rem;line-height:1.2;font-variant-numeric:tabular-nums}
-  .ex-tile span{font-size:.8rem;color:#6f7278}
-  .ex-tabs{display:flex;gap:.4rem;margin:0 0 1rem;flex-wrap:wrap;align-items:center}
-  .ex-tab{padding:.4rem .85rem;border:1px solid #cbd2d6;border-radius:.5rem;text-decoration:none;color:#334;font-size:.88rem}
-  .dark .ex-tab{border-color:#374151;color:#cbd5e1}
-  .ex-tab.on{background:#20252b;color:#fff;border-color:#20252b}
-  .dark .ex-tab.on{background:#57bcd8;color:#0d0d0d;border-color:#57bcd8}
-  .ex-form{display:flex;gap:.5rem;align-items:center;margin:0 0 1rem;flex-wrap:wrap}
-  .ex-form select{padding:.45rem .6rem;border:1px solid #cbd2d6;border-radius:.4rem}
-  .ex-wrap{overflow-x:auto}
-  table.ex{width:100%;border-collapse:collapse;min-width:900px}
-  table.ex th,table.ex td{padding:.55rem .6rem;border-bottom:1px solid #eceff1;text-align:left;font-size:.88rem;vertical-align:top}
-  table.ex td.n{text-align:right;font-variant-numeric:tabular-nums}
-  table.ex th.n{text-align:right}
-  .dark table.ex th,.dark table.ex td{border-color:#374151}
-  .st{display:inline-block;padding:.1rem .5rem;border-radius:1rem;font-size:.72rem;font-weight:700;color:#fff;white-space:nowrap}
-  .st-ok{background:#16a34a}.st-partial{background:#f5a623}.st-error{background:#e5484d}
-  .ex-note{padding:.8rem 1rem;border-radius:.5rem;background:#fff6e5;border:1px solid #f5d99a;color:#7a5b12;margin:0 0 1rem}
-  .dark .ex-note{background:#3a2f12;border-color:#6b551f;color:#f0d9a0}
-  .ex-kept{font-size:.78rem;color:#b45309}
-  .ex-err{font-size:.78rem;color:#b91c1c}
-  .ex-plus{color:#15803d;font-weight:700}
-  .ex-dim{color:#9ca3af}
-</style>
 
 {% if not enabled %}
-  <div class="ex-note">
+  <div class="m-hint">
     Приём из 1С <b>выключен</b>: не задан <code>INTEGRATION_1C_TOKEN</code> в окружении бэкенда.
     Пока он пуст, любые запросы 1С получают отказ.
   </div>
 {% elif never %}
-  <div class="ex-note">Обменов ещё не было — 1С ни разу не присылала данные.</div>
+  <div class="m-hint">Обменов ещё не было — 1С ни разу не присылала данные.</div>
 {% elif silent %}
-  <div class="ex-note">
+  <div class="m-hint">
     Последняя удачная выгрузка была <b>{{ silent_hours }} ч назад</b> ({{ last_ok }}).
     Обычно каталог приходит раз в час, цены — раз в 5–15 минут. Стоит проверить сторону 1С.
   </div>
 {% endif %}
 
-<div class="ex-sum">
-  <div class="ex-tile"><b>{{ summary.runs }}</b><span>обменов за сутки</span></div>
-  <div class="ex-tile"><b>{{ summary.created }}</b><span>товаров добавлено</span></div>
-  <div class="ex-tile"><b>{{ summary.updated }}</b><span>товаров обновлено</span></div>
-  <div class="ex-tile"><b>{{ summary.errors }}</b><span>отказов за сутки</span></div>
+<div class="m-sum">
+  <div class="m-tile"><b>{{ summary.runs }}</b><span>обменов за сутки</span></div>
+  <div class="m-tile"><b>{{ summary.created }}</b><span>товаров добавлено</span></div>
+  <div class="m-tile"><b>{{ summary.updated }}</b><span>товаров обновлено</span></div>
+  <div class="m-tile"><b>{{ summary.errors }}</b><span>отказов за сутки</span></div>
 </div>
 
-<div class="ex-tabs">
-  <a class="ex-tab {% if op == 'all' %}on{% endif %}" href="?op=all&status={{ status }}">Все операции</a>
-  <a class="ex-tab {% if op == 'categories' %}on{% endif %}" href="?op=categories&status={{ status }}">Категории ({{ n_categories }})</a>
-  <a class="ex-tab {% if op == 'catalog' %}on{% endif %}" href="?op=catalog&status={{ status }}">Каталог ({{ n_catalog }})</a>
-  <a class="ex-tab {% if op == 'prices' %}on{% endif %}" href="?op=prices&status={{ status }}">Цены и остатки ({{ n_prices }})</a>
-  <a class="ex-tab {% if op == 'orders' %}on{% endif %}" href="?op=orders&status={{ status }}">Заказы в 1С ({{ n_orders }})</a>
+<div class="m-tabs">
+  <a class="m-tab {% if op == 'all' %}on{% endif %}" href="?op=all&status={{ status }}">Все операции</a>
+  <a class="m-tab {% if op == 'categories' %}on{% endif %}" href="?op=categories&status={{ status }}">Категории ({{ n_categories }})</a>
+  <a class="m-tab {% if op == 'catalog' %}on{% endif %}" href="?op=catalog&status={{ status }}">Каталог ({{ n_catalog }})</a>
+  <a class="m-tab {% if op == 'prices' %}on{% endif %}" href="?op=prices&status={{ status }}">Цены и остатки ({{ n_prices }})</a>
+  <a class="m-tab {% if op == 'orders' %}on{% endif %}" href="?op=orders&status={{ status }}">Заказы в 1С ({{ n_orders }})</a>
 </div>
 
-<form class="ex-form" method="get">
+<form class="m-form" method="get">
   <input type="hidden" name="op" value="{{ op }}">
   <select name="status">
     <option value="all"{% if status == "all" %} selected{% endif %}>Любой статус</option>
@@ -74,8 +46,8 @@
 </form>
 
 {% if rows %}
-<div class="ex-wrap">
-<table class="ex">
+<div class="m-wrap">
+<table class="m top">
   <thead>
     <tr>
       <th>Дата и время (якут.)</th>
@@ -94,19 +66,19 @@
     <tr>
       <td style="white-space:nowrap">{{ r.when }}</td>
       <td>{{ r.operation }}</td>
-      <td><span class="st st-{{ r.status_code }}">{{ r.status }}</span></td>
+      <td><span class="m-tag m-st-{{ r.status_code }}">{{ r.status }}</span></td>
       <td class="n">{{ r.received }}</td>
-      <td class="n">{% if r.created %}<span class="ex-plus">+{{ r.created }}</span>{% else %}<span class="ex-dim">0</span>{% endif %}</td>
-      <td class="n">{% if r.updated %}{{ r.updated }}{% else %}<span class="ex-dim">0</span>{% endif %}</td>
-      <td class="n">{% if r.skipped %}{{ r.skipped }}{% else %}<span class="ex-dim">0</span>{% endif %}</td>
+      <td class="n">{% if r.created %}<span class="m-plus">+{{ r.created }}</span>{% else %}<span class="m-dim">0</span>{% endif %}</td>
+      <td class="n">{% if r.updated %}{{ r.updated }}{% else %}<span class="m-dim">0</span>{% endif %}</td>
+      <td class="n">{% if r.skipped %}{{ r.skipped }}{% else %}<span class="m-dim">0</span>{% endif %}</td>
       <td>
-        {% if r.detail %}<div class="ex-err">{{ r.detail }}</div>{% endif %}
-        {% if r.kept %}<div class="ex-kept">Оставлено за владельцем: {{ r.kept|join:", " }}</div>{% endif %}
-        {% for e in r.errors %}<div class="ex-err">{{ e }}</div>{% endfor %}
-        {% if r.errors_more %}<div class="ex-err">…и ещё {{ r.errors_more }}</div>{% endif %}
-        {% if not r.detail and not r.kept and not r.errors %}<span class="ex-dim">—</span>{% endif %}
+        {% if r.detail %}<div class="m-minus m-small">{{ r.detail }}</div>{% endif %}
+        {% if r.kept %}<div class="m-warn m-small">Оставлено за владельцем: {{ r.kept|join:", " }}</div>{% endif %}
+        {% for e in r.errors %}<div class="m-minus m-small">{{ e }}</div>{% endfor %}
+        {% if r.errors_more %}<div class="m-minus m-small">…и ещё {{ r.errors_more }}</div>{% endif %}
+        {% if not r.detail and not r.kept and not r.errors %}<span class="m-dim">—</span>{% endif %}
       </td>
-      <td class="n ex-dim" style="white-space:nowrap">{{ r.duration }}</td>
+      <td class="n m-dim" style="white-space:nowrap">{{ r.duration }}</td>
     </tr>
     {% endfor %}
   </tbody>

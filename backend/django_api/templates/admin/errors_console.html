@@ -3,55 +3,33 @@
 
 {% block content %}
 {# «Вкладка Ошибки» внутри нашей админки (D-32): данные из GlitchTip по API. #}
-<style>
-  .errs-sum{display:flex;gap:.75rem;flex-wrap:wrap;margin:0 0 1rem}
-  .errs-tile{flex:1;min-width:130px;border:1px solid #e2e6ea;border-radius:.6rem;padding:.7rem .9rem;background:#fff}
-  .dark .errs-tile{background:#1f2937;border-color:#374151}
-  .errs-tile b{display:block;font-size:1.5rem;line-height:1.2}
-  .errs-tile span{font-size:.8rem;color:#6f7278}
-  .errs-form{display:flex;gap:.5rem;align-items:center;margin:0 0 1rem;flex-wrap:wrap}
-  .errs-form input,.errs-form select{padding:.45rem .6rem;border:1px solid #cbd2d6;border-radius:.4rem}
-  table.errs{width:100%;border-collapse:collapse}
-  table.errs th,table.errs td{padding:.55rem .6rem;border-bottom:1px solid #eceff1;text-align:left;font-size:.9rem;vertical-align:top}
-  .dark table.errs th,.dark table.errs td{border-color:#374151}
-  .lvl{display:inline-block;padding:.1rem .5rem;border-radius:1rem;font-size:.72rem;font-weight:700;color:#fff}
-  .lvl-error,.lvl-fatal{background:#e5484d}.lvl-warning{background:#f5a623}.lvl-info{background:#57bcd8}.lvl-debug{background:#8b93a1}
-  .errs-note{padding:.8rem 1rem;border-radius:.5rem;background:#fff6e5;border:1px solid #f5d99a;color:#7a5b12;margin:0 0 1rem}
-  .dark .errs-note{background:#3a2f12;border-color:#6b551f;color:#f0d9a0}
-  .errs-title a{font-weight:600;text-decoration:none}
-  .errs-tabs{display:flex;gap:.4rem;margin:0 0 1rem;flex-wrap:wrap}
-  .errs-tab{padding:.4rem .85rem;border:1px solid #cbd2d6;border-radius:.5rem;text-decoration:none;color:#334;font-size:.88rem}
-  .dark .errs-tab{border-color:#374151;color:#cbd5e1}
-  .errs-tab.on{background:#20252b;color:#fff;border-color:#20252b}
-  .dark .errs-tab.on{background:#57bcd8;color:#0d0d0d;border-color:#57bcd8}
-</style>
 
 {% if not configured %}
-  <div class="errs-note">
+  <div class="m-hint">
     Трекер ошибок не настроен. Задай переменные окружения бэкенда:
     <code>GLITCHTIP_API_URL</code>, <code>GLITCHTIP_API_TOKEN</code>, <code>GLITCHTIP_ORG</code>
     (см. <code>docs/OBSERVABILITY.md</code>). Локально — в <code>backend/docker-compose.override.yml</code>.
   </div>
 {% elif error %}
-  <div class="errs-note">{{ error }}</div>
+  <div class="m-hint">{{ error }}</div>
 {% endif %}
 
-<div class="errs-tabs">
-  <a class="errs-tab {% if level == 'err' %}on{% endif %}"
+<div class="m-tabs">
+  <a class="m-tab {% if level == 'err' %}on{% endif %}"
      href="?level=err&status={{ status }}{% if q %}&q={{ q|urlencode }}{% endif %}">🐞 Ошибки ({{ n_err }})</a>
-  <a class="errs-tab {% if level == 'info' %}on{% endif %}"
+  <a class="m-tab {% if level == 'info' %}on{% endif %}"
      href="?level=info&status={{ status }}{% if q %}&q={{ q|urlencode }}{% endif %}">ℹ️ Информационные ({{ n_info }})</a>
-  <a class="errs-tab {% if level == 'all' %}on{% endif %}"
+  <a class="m-tab {% if level == 'all' %}on{% endif %}"
      href="?level=all&status={{ status }}{% if q %}&q={{ q|urlencode }}{% endif %}">Все</a>
 </div>
 
-<div class="errs-sum">
-  <div class="errs-tile"><b>{{ summary.total }}</b><span>показано</span></div>
-  <div class="errs-tile"><b>{{ summary.unresolved }}</b><span>не решено</span></div>
-  <div class="errs-tile"><b>{{ summary.events }}</b><span>событий</span></div>
+<div class="m-sum">
+  <div class="m-tile"><b>{{ summary.total }}</b><span>показано</span></div>
+  <div class="m-tile"><b>{{ summary.unresolved }}</b><span>не решено</span></div>
+  <div class="m-tile"><b>{{ summary.events }}</b><span>событий</span></div>
 </div>
 
-<form class="errs-form" method="get">
+<form class="m-form" method="get">
   <input type="hidden" name="level" value="{{ level }}">
   <input type="search" name="q" value="{{ q }}" placeholder="Поиск по тексту…">
   <select name="status">
@@ -60,29 +38,29 @@
     <option value="ignored"{% if status == "ignored" %} selected{% endif %}>Игнор</option>
     <option value=""{% if status == "" %} selected{% endif %}>Все</option>
   </select>
-  <input type="submit" value="Фильтр" class="default">
-  {% if web_url %}<a href="{{ web_url }}" target="_blank" style="margin-left:auto;color:#6f7278">Полный трекер ↗</a>{% endif %}
+  <button class="m-btn primary" type="submit">Фильтр</button>
+  {% if web_url %}<a href="{{ web_url }}" target="_blank" class="m-muted" style="margin-left:auto">Полный трекер ↗</a>{% endif %}
 </form>
 
 {% if issues %}
-<table class="errs">
+<table class="m top">
   <thead><tr><th>Уровень</th><th>Ошибка</th><th>Событий</th><th>Статус</th><th>Зафиксирована (якут.)</th></tr></thead>
   <tbody>
     {% for i in issues %}
     <tr>
-      <td><span class="lvl lvl-{{ i.level|default:'error' }}">{{ i.level_ru }}</span></td>
-      <td class="errs-title">
+      <td><span class="m-tag lvl-{{ i.level|default:'error' }}">{{ i.level_ru }}</span></td>
+      <td class="m-strong">
         <a href="{% url 'error_detail' i.id %}">{{ i.title|default:'(без заголовка)' }}</a>
-        {% if i.culprit %}<div style="color:#6f7278;font-size:.8rem">{{ i.culprit }}</div>{% endif %}
+        {% if i.culprit %}<div class="m-small m-muted">{{ i.culprit }}</div>{% endif %}
       </td>
       <td>{{ i.count|default:'—' }}</td>
       <td>{{ i.status_ru }}</td>
-      <td style="color:#6f7278;font-size:.82rem">{{ i.last_local }}</td>
+      <td class="m-small m-muted">{{ i.last_local }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 {% elif configured and not error %}
-  <p style="color:#6f7278">{% if level == 'info' %}Нет информационных сообщений{% else %}Ошибок нет 🎉{% endif %} (по текущему фильтру).</p>
+  <p class="m-muted">{% if level == 'info' %}Нет информационных сообщений{% else %}Ошибок нет 🎉{% endif %} (по текущему фильтру).</p>
 {% endif %}
 {% endblock %}
