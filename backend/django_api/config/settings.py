@@ -474,7 +474,7 @@ UNFOLD = {
                     # Флаги видимости приложения (D-89): что показывать в «Квартале»
                     # без пересборки. Управляет только владелец.
                     {"title": "Флаги приложения", "icon": "toggle_on",
-                     "link": reverse_lazy("admin:core_appconfig_changelist"),
+                     "link": reverse_lazy("admin:core_featureflag_changelist"),
                      "permission": _owner_only},
                 ],
             },

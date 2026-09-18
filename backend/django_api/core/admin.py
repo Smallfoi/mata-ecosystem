@@ -1,39 +1,27 @@
 from django.contrib import admin
-from django.shortcuts import redirect
-from django.urls import reverse
 
-from core.models import AppConfig
+from core.models import FeatureFlag
 
 
-@admin.register(AppConfig)
-class AppConfigAdmin(admin.ModelAdmin):
-    """Флаги приложения (D-89): один экран с галочками — что показывать в «Квартале».
-    Меняется без пересборки; приложение подхватывает через GET /v1/config.
-
-    Это синглтон-настройка, а не список записей: пункт меню ведёт сразу на форму
-    с галочками (Тропы / Часы / Старты / …), без промежуточной таблицы из одной
-    строки. Добавлять/удалять нечего.
+@admin.register(FeatureFlag)
+class FeatureFlagAdmin(admin.ModelAdmin):
+    """Флаги приложения (D-89): список направлений, в каждое можно провалиться и
+    увидеть детально — что это, на каком этапе, что сделано и что осталось —
+    плюс переключатель «Показывать в приложении». Приложение читает только
+    `enabled` через GET /v1/config (без пересборки). Набор направлений фиксирован
+    (заводится миграцией вместе с поддержкой в клиенте), поэтому add/delete закрыты.
     """
 
-    readonly_fields = ("updated_at",)
+    list_display = ("title", "enabled", "stage", "updated_at")
+    list_editable = ("enabled",)  # быстрый тумблер прямо в списке
+    list_display_links = ("title",)  # клик по названию → детальная карточка
+    ordering = ("order", "title")
 
-    fields = (
-        "show_trails",
-        "show_watch",
-        "show_races",
-        "show_league_full",
-        "show_sleeping_medals",
-        "updated_at",
-    )
+    readonly_fields = ("key", "updated_at")
+    fields = ("title", "key", "stage", "enabled", "summary", "done", "todo", "updated_at")
 
     def has_add_permission(self, request):
         return False
 
     def has_delete_permission(self, request, obj=None):
         return False
-
-    def changelist_view(self, request, extra_context=None):
-        # Синглтон: не показываем таблицу-список, сразу открываем единственную
-        # запись на редактирование (создаём, если её ещё нет).
-        obj = AppConfig.load()
-        return redirect(reverse("admin:core_appconfig_change", args=[obj.pk]))

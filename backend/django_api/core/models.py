@@ -2,60 +2,68 @@ from django.conf import settings
 from django.db import models
 
 
-class AppConfig(models.Model):
-    """Серверные флаги видимости приложения (D-89): что показывать в «Квартале».
+class FeatureFlag(models.Model):
+    """Направление приложения и его видимость (D-89): одна строка на функцию.
 
-    Одна строка (singleton), меняется в админке — приложение подхватывает через
-    GET /v1/config без пересборки. По умолчанию периферия СКРЫТА (D-75: на старте
-    только ядро, недоделанное не показываем «дверями в никуда»). Возвращаем всё
-    флагом, когда готово, не собирая новый APK.
+    Это не просто галочка «показать/скрыть», а карточка направления: что это,
+    на каком этапе, что сделано и что осталось. Владелец открывает список
+    направлений, проваливается в любое и видит по нему всю картину + переключатель.
+    Приложение читает только `enabled` через GET /v1/config (без пересборки, D-89).
+    По умолчанию всё скрыто (D-75: на старте только ядро).
     """
 
-    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    STAGE_CHOICES = [
+        ("not_started", "Не начато"),
+        ("draft", "Черновик"),
+        ("beta", "Бета — не проверено вживую"),
+        ("waiting_content", "Готово технически, ждёт контент"),
+        ("waiting_owner", "Ждёт решения владельца"),
+        ("collapsed", "Свёрнуто до запуска"),
+        ("ready", "Готово — можно включать"),
+    ]
 
-    show_trails = models.BooleanField(
-        default=False, verbose_name="Показывать «Тропы»"
+    # Ключ = суффикс для JSON: trails → showTrails, league_full → showLeagueFull.
+    key = models.CharField(primary_key=True, max_length=40, verbose_name="Ключ")
+    title = models.CharField(max_length=80, verbose_name="Направление")
+    enabled = models.BooleanField(default=False, verbose_name="Показывать в приложении")
+    stage = models.CharField(
+        max_length=20, choices=STAGE_CHOICES, default="draft", verbose_name="Этап"
     )
-    show_watch = models.BooleanField(
-        default=False, verbose_name="Показывать «Часы» (Health Connect)"
-    )
-    show_races = models.BooleanField(
-        default=False, verbose_name="Показывать «Старты» (календарь забегов)"
-    )
-    show_league_full = models.BooleanField(
-        default=False, verbose_name="Полная «Лига» (дивизионы, все доски и периоды)"
-    )
-    show_sleeping_medals = models.BooleanField(
-        default=False, verbose_name="Показывать «спящие» медали (без критерия)"
-    )
-
+    summary = models.TextField(blank=True, verbose_name="Что это")
+    done = models.TextField(blank=True, verbose_name="Что сделано")
+    todo = models.TextField(blank=True, verbose_name="Что осталось")
+    order = models.IntegerField(default=0, verbose_name="Порядок")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлён")
 
     class Meta:
-        db_table = "app_config"
-        verbose_name = "Флаги приложения"
+        db_table = "feature_flag"
+        ordering = ["order", "title"]
+        verbose_name = "Направление приложения"
         verbose_name_plural = "Флаги приложения"
 
     def __str__(self):
-        return "Флаги приложения"
+        return self.title
 
-    def save(self, *args, **kwargs):
-        self.id = 1  # singleton: всегда одна строка
-        super().save(*args, **kwargs)
+    @property
+    def config_key(self) -> str:
+        """JSON-ключ для /v1/config: show + CamelCase(key)."""
+        return "show" + "".join(w.capitalize() for w in self.key.split("_"))
+
+    # Клиент ждёт именно эти ключи; дефолт — скрыто, если строка ещё не засеяна.
+    DEFAULTS = {
+        "showTrails": False,
+        "showWatch": False,
+        "showRaces": False,
+        "showLeagueFull": False,
+        "showSleepingMedals": False,
+    }
 
     @classmethod
-    def load(cls):
-        obj, _ = cls.objects.get_or_create(id=1)
-        return obj
-
-    def to_json(self) -> dict:
-        return {
-            "showTrails": self.show_trails,
-            "showWatch": self.show_watch,
-            "showRaces": self.show_races,
-            "showLeagueFull": self.show_league_full,
-            "showSleepingMedals": self.show_sleeping_medals,
-        }
+    def as_config(cls) -> dict:
+        cfg = dict(cls.DEFAULTS)
+        for f in cls.objects.all():
+            cfg[f.config_key] = f.enabled
+        return cfg
 
 
 class AdminColumns(models.Model):
