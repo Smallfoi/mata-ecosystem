@@ -69,15 +69,16 @@ class AdminPagesRenderTests(TestCase):
         for url in pages:
             self._open(url)
 
-    def test_app_config_opens_edit_form_directly(self):
-        """Флаги приложения (D-89) — синглтон: пункт меню (changelist) сразу
-        редиректит на форму с галочками, без таблицы из одной строки."""
-        from core.models import AppConfig
-
-        r = self.client.get(reverse("admin:core_appconfig_changelist"), follow=True)
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(AppConfig.objects.count(), 1)
-        self.assertContains(r, "show_trails")  # галочки флагов на форме
+    def test_feature_flags_list_and_detail_open(self):
+        """Флаги приложения (D-89): список направлений открывается, и в каждое можно
+        провалиться — детальная карточка со статусом (что сделано / что осталось)."""
+        # Список направлений (засеяны миграцией 0003).
+        lst = self._open(reverse("admin:core_featureflag_changelist"))
+        self.assertIn("Тропы", lst)
+        # Проваливаемся в «Тропы» — видим детальную информацию.
+        detail = self._open(reverse("admin:core_featureflag_change", args=["trails"]))
+        self.assertIn("Что сделано", detail)  # поле статуса на карточке
+        self.assertIn("Что осталось", detail)
 
     def test_pages_use_the_shared_stylesheet(self):
         """Единый стиль подключён темой — значит, классы m-* на страницах работают."""

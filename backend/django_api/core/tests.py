@@ -87,33 +87,36 @@ class HealthTests(TestCase):
         self.assertFalse(r.json()["db"])
 
 
-class AppConfigTests(TestCase):
-    """Серверные флаги /v1/config (D-87): по умолчанию периферия скрыта; админ включает."""
+class FeatureFlagConfigTests(TestCase):
+    """Серверные флаги /v1/config (D-89): направления-строки; периферия скрыта по
+    умолчанию, включается флагом в админке. Строки засеяны миграцией 0003."""
 
     def test_config_defaults_hide_periphery(self):
         d = self.client.get("/v1/config").json()
-        # На старте (D-75) периферия скрыта — все флаги False по умолчанию.
+        # На старте (D-75) периферия скрыта — все флаги False (enabled=False в сиде).
         for key in ("showTrails", "showWatch", "showRaces", "showLeagueFull",
                     "showSleepingMedals"):
             self.assertIn(key, d)
             self.assertFalse(d[key], f"{key} должен быть скрыт по умолчанию")
 
     def test_config_reflects_admin_change(self):
-        from core.models import AppConfig
+        from core.models import FeatureFlag
 
-        cfg = AppConfig.load()
-        cfg.show_trails = True
-        cfg.save()
+        FeatureFlag.objects.filter(key="trails").update(enabled=True)
         self.assertTrue(self.client.get("/v1/config").json()["showTrails"])
 
-    def test_config_is_singleton(self):
-        from core.models import AppConfig
+    def test_config_key_mapping(self):
+        # league_full → showLeagueFull (snake → show+Camel).
+        from core.models import FeatureFlag
 
-        obj = AppConfig.load()
-        obj.id = 7  # попытка сменить id
-        obj.save()  # save() принудительно нормализует id к 1 → та же строка
-        self.assertEqual(AppConfig.objects.count(), 1)
-        self.assertEqual(AppConfig.objects.first().id, 1)
+        self.assertEqual(FeatureFlag(key="league_full").config_key, "showLeagueFull")
+
+    def test_directions_seeded_with_info(self):
+        from core.models import FeatureFlag
+
+        trails = FeatureFlag.objects.get(key="trails")
+        self.assertTrue(trails.summary and trails.done and trails.todo)  # карточка заполнена
+        self.assertEqual(FeatureFlag.objects.count(), 5)
 
     def test_config_public_no_auth(self):
         # UI-конфиг — без токена (это не персональные данные).

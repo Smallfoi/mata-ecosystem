@@ -48,9 +48,9 @@ def app_config(_request):
     """Серверные флаги видимости (D-89): что показывать в приложении. Публично,
     без токена — это UI-конфиг, не персональные данные. Клиент кэширует ответ и
     имеет свои дефолты на случай недоступности сети."""
-    from core.models import AppConfig
+    from core.models import FeatureFlag
 
-    return Response(AppConfig.load().to_json())
+    return Response(FeatureFlag.as_config())
 
 
 @api_view(["GET"])
