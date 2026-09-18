@@ -4,6 +4,7 @@
 своё оформление, и опечатка в вёрстке всплывала только у владельца. Тест дешёвый —
 это защита от «сломал шаблон и не заметил».
 """
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -90,3 +91,15 @@ class AdminPagesRenderTests(TestCase):
         })
         self.assertEqual(r.status_code, 200)
         self.assertIn("m-btn", r.content.decode())
+
+    def test_no_technical_id_columns_in_lists(self):
+        """ID — служебный шум: в списках его не показываем (решение владельца 18.09).
+
+        Найти запись по ID по-прежнему можно поиском, а открывается она по имени.
+        """
+        offenders = sorted(
+            model._meta.label for model, ma in admin.site._registry.items()
+            if "id" in tuple(getattr(ma, "list_display", ()) or ())
+        )
+        self.assertEqual(offenders, [])
+

@@ -15,9 +15,10 @@ from .models import Account
 
 @admin.register(Account)
 class AccountAdmin(ExportCsvMixin, ModelAdmin):
-    list_display = ("id", "name", "phone", "email", "city", "provider",
+    # ID — служебный: в списке не показываем (открывается по имени, ищется поиском).
+    list_display = ("who", "phone", "email", "city", "provider",
                     "is_blocked", "needs_review", "created_at")
-    list_display_links = ("id", "name")  # имя кликабельно → открыть/редактировать
+    list_display_links = ("who",)
     list_filter = ("provider", "city", "is_blocked", "needs_review")
     search_fields = ("id", "name", "phone", "email")
     ordering = ("-created_at",)
@@ -43,6 +44,11 @@ class AccountAdmin(ExportCsvMixin, ModelAdmin):
             "при накоплении флагнутых забегов (S-04); снимается действием в списке.",
         }),
     )
+
+    @admin.display(description="Клиент", ordering="name")
+    def who(self, obj):
+        """Имя, а если его нет — телефон или почта: пустая ссылка некликабельна."""
+        return obj.name or obj.phone or obj.email or obj.id
 
     @admin.action(description="✉ Отправить уведомление выбранным")
     def send_notification(self, request, queryset):

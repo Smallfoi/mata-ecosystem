@@ -27,6 +27,7 @@
   --m-accent-text: #fff;
   --m-soft: #fafbfc;
   --m-control: #cbd2d6;
+  --m-hover: #f2f5f7;
   --m-ok: #16a34a;
   --m-warn: #b45309;
   --m-bad: #dc2626;
@@ -46,6 +47,7 @@
   --m-accent-text: #0d0d0d;
   --m-soft: #111827;
   --m-control: #4b5563;
+  --m-hover: #2a3645;
   --m-ok: #34d399;
   --m-warn: #fbbf24;
   --m-bad: #f87171;
@@ -96,7 +98,7 @@ table.m th, table.m td {
 table.m th { font-size: .78rem; color: var(--m-muted); font-weight: 600; }
 table.m td.n, table.m th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 table.m td.c, table.m th.c { text-align: center; }
-table.m tr:hover td { background: var(--m-soft); }
+table.m tbody tr:hover > * { background: var(--m-hover); }
 table.m tr.done td { opacity: .55; }
 table.m tr.m-off td { opacity: .55; }
 
@@ -297,5 +299,7 @@ pre.m-mono { white-space: pre-wrap; margin: .4rem 0 0; max-height: 320px; overfl
   color: var(--m-muted);
 }
 #result_list td { font-variant-numeric: tabular-nums; }
-#result_list tbody tr:hover td { background: var(--m-soft); }
+/* Строка целиком: первая колонка-ссылка рисуется как <th>, а у части ячеек темы
+   свой фон — поэтому `> *` и `!important`, иначе подсветка «рвётся» по столбцам. */
+#result_list tbody tr:hover > * { background: var(--m-hover) !important; }
 

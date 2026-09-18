@@ -9,7 +9,6 @@ from .models import ShoeAsset
 @admin.register(ShoeAsset)
 class ShoeAssetAdmin(UserRefMixin, ModelAdmin):
     list_display = (
-        "id",
         "user_ref",
         "model",
         "status",
@@ -19,6 +18,7 @@ class ShoeAssetAdmin(UserRefMixin, ModelAdmin):
         "order_id",
         "created_at",
     )
+    list_display_links = ("model",)
     list_filter = ("status", "retired")
     search_fields = ("user_id", "model", "order_id", "product_id")
     date_hierarchy = "created_at"

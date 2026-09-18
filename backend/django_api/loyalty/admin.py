@@ -9,7 +9,6 @@ from .models import LoyaltyPartner, LoyaltyTransaction
 @admin.register(LoyaltyTransaction)
 class LoyaltyTransactionAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
     list_display = (
-        "id",
         "user_ref",
         "amount",
         "source",
@@ -17,8 +16,9 @@ class LoyaltyTransactionAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
         "order_id",
         "created_at",
     )
+    list_display_links = ("user_ref",)
     list_filter = ("source",)
-    search_fields = ("user_id", "description", "order_id", "run_id")
+    search_fields = ("id", "user_id", "description", "order_id", "run_id")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
     readonly_fields = ("id",)
