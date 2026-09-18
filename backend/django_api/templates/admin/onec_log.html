@@ -79,13 +79,16 @@
         {% if r.unknown_keys %}
           <div class="m-warn m-small">1С прислала, а мы не читаем: {{ r.unknown_keys|join:", " }}</div>
         {% endif %}
+        {% if r.fields %}
+          <div class="m-small m-muted">Заполнено: {{ r.fields }}</div>
+        {% endif %}
         {% if r.sample %}
           <details class="m-small">
             <summary class="m-muted">Пример присланной позиции</summary>
             <pre class="m-mono">{{ r.sample }}</pre>
           </details>
         {% endif %}
-        {% if not r.detail and not r.kept and not r.errors and not r.unknown_keys and not r.sample %}
+        {% if not r.detail and not r.kept and not r.errors and not r.unknown_keys and not r.sample and not r.fields %}
           <span class="m-dim">—</span>
         {% endif %}
       </td>
