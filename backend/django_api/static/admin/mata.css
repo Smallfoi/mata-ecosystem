@@ -184,10 +184,13 @@ form.m-inline { display: inline; }
 .m-grid { display: grid; gap: .75rem; }
 @media (min-width: 760px) { .m-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr auto; align-items: end; } }
 .m-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; }
-.m-page { max-width: 1040px; }
+/* Страница админки тянется на ВСЮ ширину области контента (адаптивно: и десктоп во
+   весь экран, и телефон во всю ширину — поля даёт сама тема). Длинные строки текста
+   не растягиваются за счёт локальных ограничителей (`.m-lead` и т.п.). Узкие экраны
+   входа/кода используют `.m-page.narrow` ниже. */
+.m-page { width: 100%; max-width: 100%; }
 
 /* ── Дополнительные блоки страниц ───────────────────────────────────────── */
-.m-page { max-width: 1040px; }
 .m-title { font-size: 1.5rem; font-weight: 700; margin: 0 0 .4rem; }
 .m-top {
   display: flex; justify-content: space-between; align-items: flex-start;
