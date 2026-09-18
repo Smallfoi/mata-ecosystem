@@ -37,7 +37,8 @@ class LegalDocumentAdmin(ModelAdmin):
 
 @admin.register(UserConsent)
 class UserConsentAdmin(UserRefMixin, ModelAdmin):
-    list_display = ("id", "user_ref", "document", "source", "accepted_at", "revoked_at")
+    list_display = ("user_ref", "document", "source", "accepted_at", "revoked_at")
+    list_display_links = ("user_ref",)
     list_filter = ("source", "document__doc_type")
     search_fields = ("user_id",)
     date_hierarchy = "accepted_at"

@@ -35,9 +35,10 @@ def reject_runs(modeladmin, request, queryset):
 @admin.register(Run)
 class RunAdmin(UserRefMixin, ModelAdmin):
     list_display = (
-        "id", "user_ref", "distance_m", "duration_s", "points_awarded",
+        "user_ref", "distance_m", "duration_s", "points_awarded",
         "flagged", "review_state", "flag_reason", "captured_territory", "finished_at",
     )
+    list_display_links = ("user_ref",)
     list_filter = ("flagged", "captured_territory")
     search_fields = ("id", "user_id", "flag_reason")
     date_hierarchy = "finished_at"
