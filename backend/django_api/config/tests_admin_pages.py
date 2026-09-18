@@ -64,6 +64,7 @@ class AdminPagesRenderTests(TestCase):
             "/admin/legal/consentclient/",
             "/admin/legal/consentclient/u_5Fpage/change/",
             "/admin/catalog/product/",
+            reverse("admin:core_appconfig_changelist"),  # флаги приложения (D-89)
         ]
         for url in pages:
             self._open(url)

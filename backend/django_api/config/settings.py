@@ -467,6 +467,11 @@ UNFOLD = {
                     {"title": "Журнал обмена", "icon": "sync_alt",
                      "link": reverse_lazy("onec_log"),
                      "permission": _tab("onec_log")},
+                    # Флаги видимости приложения (D-89): что показывать в «Квартале»
+                    # без пересборки. Управляет только владелец.
+                    {"title": "Флаги приложения", "icon": "toggle_on",
+                     "link": reverse_lazy("admin:core_appconfig_changelist"),
+                     "permission": _owner_only},
                 ],
             },
             {
