@@ -69,6 +69,13 @@ class AdminPagesRenderTests(TestCase):
         for url in pages:
             self._open(url)
 
+    def test_dashboard_has_no_leaked_template_comment(self):
+        """Многострочный {# … #} в Django протекает в текст — на дашборде такое уже
+        было видно владельцу. Комментарии должны быть {% comment %}, не текстом."""
+        html = self._open(reverse("admin:index"))
+        self.assertNotIn("Цвета задаём", html)
+        self.assertNotIn("prebuilt", html)
+
     def test_feature_flags_list_and_detail_open(self):
         """Флаги приложения (D-89): список направлений открывается, и в каждое можно
         провалиться — детальная карточка со статусом (что сделано / что осталось)."""

@@ -192,6 +192,10 @@ form.m-inline { display: inline; }
 }
 .m-pill b { font-size: .85rem; color: var(--m-text); font-weight: 700; }
 .m-grid { display: grid; gap: .75rem; }
+/* Вертикальная стопка карточек с гарантированным отступом. Замена Tailwind
+   `space-y-*`, которого нет в prebuilt-сборке Unfold (карточки слипались). */
+.m-vstack { display: flex; flex-direction: column; gap: 1rem; }
+.m-vstack.lg { gap: 1.5rem; }
 @media (min-width: 760px) { .m-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr auto; align-items: end; } }
 .m-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; }
 /* Страница админки тянется на ВСЮ ширину области контента (адаптивно: и десктоп во
