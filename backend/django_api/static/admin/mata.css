@@ -397,3 +397,37 @@ pre.m-mono { white-space: pre-wrap; margin: .4rem 0 0; max-height: 320px; overfl
     box-shadow: inset 0 -1px 0 var(--m-border);
   }
 }
+
+/* ── Компактный список товаров ──────────────────────────────────────────────
+   Колонок много, и половину ширины съедали поля ввода: цена и старая цена
+   растягивались на треть экрана. Здесь всё ужато — строки ниже, поля по размеру
+   содержимого, — но название НЕ режется: оно переносится и видно целиком. */
+#result_list th, #result_list td {
+  padding: .35rem .5rem !important;
+  height: auto !important;
+  font-size: .82rem;
+}
+#result_list input[type="text"], #result_list input[type="number"],
+#result_list input[type="url"], #result_list select {
+  padding: .2rem .4rem !important;
+  font-size: .82rem;
+  min-width: 0;
+  width: 5.2rem;
+}
+#result_list .field-sort_site input, #result_list .field-sort_app input { width: 3.2rem; }
+/* Цена целиком: при 4.8rem «18900,0» обрезалось на последнем знаке. */
+#result_list .field-price input, #result_list .field-old_price input { width: 5.6rem; }
+/* Название — главное: показываем целиком, в несколько строк, без обрезки. */
+#result_list th.field-name {
+  white-space: normal !important;
+  overflow: visible !important;
+  min-width: 14rem;
+  max-width: 21rem;
+  line-height: 1.3;
+}
+#result_list td.field-global_name { white-space: normal; max-width: 10rem; line-height: 1.3; }
+#result_list td.field-sizes_list, #result_list td.field-colors_list { max-width: 8rem; }
+#result_list td.field-brand, #result_list td.field-article,
+#result_list td.field-category_name { white-space: nowrap; }
+#result_list td.field-preview, #result_list th.field-preview { width: 42px; }
+#result_list .field-stock b { font-weight: 600; }

@@ -115,24 +115,27 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     # Полный набор колонок: всё, что ведёт 1С, и всё, что ведём мы. Показывать всё
     # сразу тесно, поэтому набор настраивается шестерёнкой «Столбцы» — у каждого свой.
     # ID в списке нет: товар открывается по названию, найти по ID можно поиском.
+    # Порядок — по важности для работы: фото, название целиком, общее название,
+    # бренд, цена, размеры и цвета. Остальное правее и частью скрыто — включается
+    # шестерёнкой «Столбцы».
     list_display = (
         "preview",
         "name",
         "global_name",
         "brand",
-        "article",
-        "category_name",
         "price",
         "old_price",
+        "sizes_list",
+        "colors_list",
         "stock",
         "in_stock",
         "is_published",
         "is_featured",
         "is_new",
+        "article",
+        "category_name",
         "sort_site",
         "sort_app",
-        "sizes_list",
-        "colors_list",
         "is_active_1c",
         "source_updated_at",
         "parcel",
@@ -141,7 +144,9 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     )
     list_display_links = ("name",)
     columns_locked = ("name",)          # по названию открывается карточка — скрывать нечего
-    columns_hidden_default = ("description_short", "onec_code")
+    # По умолчанию — компактный набор. Остальное не потеряно: включается шестерёнкой.
+    columns_hidden_default = ("description_short", "onec_code", "source_updated_at",
+                              "parcel", "category_name")
     columns_editable = (
         "price",
         "old_price",
@@ -264,8 +269,8 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
         url = obj.network_image_url()
         if url:
             return format_html(
-                '<img src="{}" style="height:38px;width:38px;'
-                'object-fit:cover;border-radius:6px"/>',
+                '<img src="{}" style="height:30px;width:30px;'
+                'object-fit:cover;border-radius:5px"/>',
                 url,
             )
         return "—"
