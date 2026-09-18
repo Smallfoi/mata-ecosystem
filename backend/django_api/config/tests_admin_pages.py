@@ -65,10 +65,19 @@ class AdminPagesRenderTests(TestCase):
             "/admin/legal/consentclient/",
             "/admin/legal/consentclient/u_5Fpage/change/",
             "/admin/catalog/product/",
-            reverse("admin:core_appconfig_changelist"),  # флаги приложения (D-89)
         ]
         for url in pages:
             self._open(url)
+
+    def test_app_config_opens_edit_form_directly(self):
+        """Флаги приложения (D-89) — синглтон: пункт меню (changelist) сразу
+        редиректит на форму с галочками, без таблицы из одной строки."""
+        from core.models import AppConfig
+
+        r = self.client.get(reverse("admin:core_appconfig_changelist"), follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(AppConfig.objects.count(), 1)
+        self.assertContains(r, "show_trails")  # галочки флагов на форме
 
     def test_pages_use_the_shared_stylesheet(self):
         """Единый стиль подключён темой — значит, классы m-* на страницах работают."""
