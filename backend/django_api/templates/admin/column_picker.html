@@ -1,0 +1,34 @@
+{% comment %}
+Шестерёнка «Столбцы» (ColumnPickerMixin): галочки — что показывать. Выбор личный
+и запоминается. Вставляется крючком темы list_before_template, то есть ДО формы
+списка: форма в форме запрещена в HTML. Своего оформления нет — общие классы m-*.
+{% endcomment %}
+
+{% if column_choices %}
+    <details class="m-cols">
+        <summary class="m-cols-head">
+            <span class="material-symbols-outlined">settings</span>
+            <span>Столбцы</span>
+            {% if columns_hidden_count %}<span class="m-chip">скрыто: {{ columns_hidden_count }}</span>{% endif %}
+        </summary>
+        <form method="post" action="{{ column_form_url }}" class="m-cols-body">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="m-cols-grid">
+                {% for c in column_choices %}
+                    <label class="m-cols-item{% if c.locked %} is-locked{% endif %}">
+                        <input type="checkbox" name="show" value="{{ c.name }}"
+                               {% if c.visible %}checked{% endif %}
+                               {% if c.locked %}checked disabled{% endif %}>
+                        <span>{{ c.label }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+            <div class="m-cols-actions">
+                <button type="submit" class="m-btn">Применить</button>
+                <button type="submit" class="m-btn" name="reset" value="1">Вернуть как было</button>
+                <span class="m-hint">Настройка своя у каждого сотрудника и сохраняется между заходами.</span>
+            </div>
+        </form>
+    </details>
+{% endif %}

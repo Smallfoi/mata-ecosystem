@@ -46,6 +46,22 @@ class ColumnPickerTests(TestCase):
                       "В продаже (1С)", "Изменён в 1С", "Остаток"):
             self.assertIn(label, html, f"нет колонки «{label}»")
 
+    def test_panel_is_outside_the_list_form(self):
+        """Форма в форме запрещена в HTML: браузер выбрасывает внутреннюю, и кнопка
+        «Применить» уходит не туда. Панель обязана стоять ДО формы списка."""
+        html = self.client.get(LIST).content.decode()
+        self.assertLess(html.index('class="m-cols"'), html.index('id="changelist-form"'))
+
+    def test_table_is_not_clipped(self):
+        """Обрезка таблицы убивает боковую прокрутку: полоса внизу есть, а двигать нечего.
+        Реальный случай 18.09.2026 — `overflow: clip` ради скруглённых углов."""
+        from django.conf import settings
+
+        css = (settings.BASE_DIR / "static" / "admin" / "mata.css").read_text(encoding="utf-8")
+        block = css.split("#result_list {", 1)[1].split("}", 1)[0]
+        self.assertNotIn("overflow: hidden", block)
+        self.assertNotIn("overflow: clip", block)
+
     def test_hidden_column_disappears(self):
         self.client.post(COLUMNS, {"show": ALL_BUT_OLD_PRICE, "next": LIST})
         html = self.client.get(LIST).content.decode()

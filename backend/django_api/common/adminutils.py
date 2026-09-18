@@ -76,7 +76,10 @@ class ColumnPickerMixin:
     columns_locked = ()          # эти скрыть нельзя (колонка-ссылка на карточку)
     columns_hidden_default = ()  # скрыто у того, кто ещё ничего не выбирал
     columns_editable = ()        # правится прямо в списке (бывший list_editable)
-    change_list_template = "admin/change_list_columns.html"
+    # Панель ставим штатным крючком темы — ДО формы списка. Внутри формы её быть не
+    # может: форма в форме запрещена в HTML, браузер выбрасывает внутреннюю и кнопка
+    # «Применить» уходит не туда (тесты этого не ловят — они шлют запрос напрямую).
+    list_before_template = "admin/column_picker.html"
 
     @property
     def list_editable(self):
