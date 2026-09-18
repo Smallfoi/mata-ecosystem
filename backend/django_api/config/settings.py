@@ -9,6 +9,8 @@ from pathlib import Path
 from celery.schedules import crontab  # расписание beat (D-07)
 from django.templatetags.static import static
 
+from config.assets import versioned  # метка версии у своих стилей админки
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-secret-change-in-prod")
@@ -312,7 +314,9 @@ UNFOLD = {
     "SHOW_VIEW_ON_SITE": False,
     # Единый стиль наших страниц (D-87): один файл на всю админку, подключается ко
     # всем страницам темы — и к спискам, и к своим экранам.
-    "STYLES": [lambda request: static("admin/mata.css")],
+    # Метка версии в адресе обязательна: nginx кэширует /static/ на неделю,
+    # и без неё правка стиля доезжает до людей только после Ctrl+F5 (config/assets.py).
+    "STYLES": [lambda request: versioned("admin/mata.css")],
     "DASHBOARD_CALLBACK": "config.dashboard.dashboard_callback",
     # Нижнее меню пользователя (кнопка «admin» внизу слева, рядом с выбором темы):
     # «Настройки» → свой аккаунт (почта, имя, смена пароля). Профиль/пароль — тут, не отдельно.
