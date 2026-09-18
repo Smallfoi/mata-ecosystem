@@ -82,9 +82,19 @@ class AdminPagesRenderTests(TestCase):
     def test_pages_use_the_shared_stylesheet(self):
         """Единый стиль подключён темой — значит, классы m-* на страницах работают."""
         html = self._open(reverse("points_clients"))
-        self.assertIn("admin/mata.css", html)
+        self.assertRegex(html, r"admin/mata\.css\?v=[0-9a-f]{6,}",
+                         "нет метки версии — правка стиля неделю не дойдёт до браузера")
         self.assertIn('class="m-card"', html)
         self.assertNotIn("<style>", html.split("</head>")[-1], "своё оформление в теле страницы")
+
+    def test_style_version_follows_the_file(self):
+        """Метка версии считается от содержимого: поменяли файл — поменялся адрес."""
+        from config.assets import _fingerprint, versioned
+
+        first = versioned("admin/mata.css")
+        self.assertIn("?v=", first)
+        _fingerprint.cache_clear()
+        self.assertEqual(versioned("admin/mata.css"), first, "метка скачет без правок файла")
 
     def test_delete_products_confirmation_opens(self):
         r = self.client.post("/admin/catalog/product/", {
