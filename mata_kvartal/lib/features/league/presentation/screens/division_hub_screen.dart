@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/config/app_config_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/tab_visibility.dart';
@@ -48,12 +49,19 @@ extension HubTabInfo on HubTab {
   };
 }
 
-/// Вкладки, видимые в текущем режиме Лиги (см. [kLeagueFullMode]). В свёрнутом
-/// режиме — только живые в маленькой группе: «Постоянство» (кто чаще выходил)
-/// и «Мой прогресс» (ты против себя). Уровень/дивизион показывает шапка всегда.
-List<HubTab> get visibleHubTabs => kLeagueFullMode
+/// Вкладки, видимые в текущем режиме Лиги. Полный режим — [kLeagueFullMode] (const)
+/// ИЛИ серверный флаг showLeagueFull (D-87): включается в админке без пересборки.
+/// В свёрнутом режиме — только живые в маленькой группе: «Постоянство» (кто чаще
+/// выходил) и «Мой прогресс» (ты против себя). Уровень/дивизион показывает шапка всегда.
+List<HubTab> visibleHubTabs(bool leagueFull) => leagueFull
     ? HubTab.values
     : const [HubTab.consistency, HubTab.personal];
+
+/// Полный режим Лиги: compile-time [kLeagueFullMode] ИЛИ серверный флаг
+/// showLeagueFull (D-87, включается в админке без пересборки).
+bool leagueFullEnabled(WidgetRef ref) =>
+    kLeagueFullMode ||
+    (ref.watch(appConfigProvider).valueOrNull?.showLeagueFull ?? false);
 
 final hubTabProvider = StateProvider<HubTab>(
     (_) => kLeagueFullMode ? HubTab.km : HubTab.consistency);
@@ -154,6 +162,7 @@ class _DivisionHubScreenState extends ConsumerState<DivisionHubScreen>
                     duration: AppTheme.durFast,
                     curve: AppTheme.ease,
                   ),
+                  leagueFull: leagueFullEnabled(ref),
                 ),
               ),
               const SliverToBoxAdapter(child: _HubChips()),
@@ -187,6 +196,7 @@ class _DivisionHeaderDelegate extends SliverPersistentHeaderDelegate {
   final bool showLadder;
   final String noLadderText;
   final VoidCallback onCompactTap;
+  final bool leagueFull;
 
   const _DivisionHeaderDelegate({
     required this.level,
@@ -200,6 +210,7 @@ class _DivisionHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.showLadder,
     required this.noLadderText,
     required this.onCompactTap,
+    this.leagueFull = false,
   });
 
   @override
@@ -219,7 +230,8 @@ class _DivisionHeaderDelegate extends SliverPersistentHeaderDelegate {
       old.period != period ||
       old.form.join() != form.join() ||
       old.showLadder != showLadder ||
-      old.noLadderText != noLadderText;
+      old.noLadderText != noLadderText ||
+      old.leagueFull != leagueFull;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlaps) {
@@ -255,7 +267,7 @@ class _DivisionHeaderDelegate extends SliverPersistentHeaderDelegate {
                                   ),
                             ),
                           ),
-                          if (kLeagueFullMode) const _PeriodToggle(),
+                          if (leagueFull) const _PeriodToggle(),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -694,16 +706,17 @@ class _HubChips extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(hubTabProvider);
+    final tabs = visibleHubTabs(leagueFullEnabled(ref));
     return SizedBox(
       height: 54,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
-        itemCount: visibleHubTabs.length,
+        itemCount: tabs.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
-          final tab = visibleHubTabs[i];
+          final tab = tabs[i];
           final active = tab == selected;
           return GestureDetector(
             onTap: () {

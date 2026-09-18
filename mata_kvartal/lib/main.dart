@@ -7,6 +7,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'core/config/app_config_provider.dart';
 import 'features/races/data/race_reminders.dart';
 import 'features/run/data/completed_runs_provider.dart';
 
@@ -93,6 +94,9 @@ class _KvartalAppState extends ConsumerState<KvartalApp>
       final runs = ref.read(completedRunsProvider.notifier);
       runs.syncPending();
       runs.pullFromServer();
+      // Обновляем серверные флаги (D-87): изменения в админке подхватываются при
+      // возврате в приложение, без перезапуска.
+      ref.invalidate(appConfigProvider);
     }
   }
 

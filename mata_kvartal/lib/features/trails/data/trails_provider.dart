@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/config/app_config_provider.dart';
 import '../../auth/data/auth_provider.dart';
 
 /// Тропы: участки маршрута, по которым бегают регулярно (D-60).
@@ -164,6 +165,11 @@ final _trailsDio = ApiClient.create(headers: {'Content-Type': 'application/json'
 final trailsProvider = FutureProvider.autoDispose<List<Trail>>((ref) async {
   final token = ref.watch(authProvider).token;
   if (token == null || token.isEmpty) return const [];
+  // Тропы скрыты до готовности (D-87, showTrails) — пустой список гасит слой троп
+  // на карте и тело раздела разом. Включается в админке.
+  final showTrails =
+      ref.watch(appConfigProvider).valueOrNull?.showTrails ?? false;
+  if (!showTrails) return const [];
   final res = await _trailsDio.get<Map<String, dynamic>>(
     '/trails/',
     options: Options(headers: {'Authorization': 'Bearer $token'}),

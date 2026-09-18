@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/config/app_config_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../map/data/zone_provider.dart';
@@ -493,11 +494,19 @@ class _RunModeSwitch extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(runModeProvider);
+    // «Тропы» как режим бега скрыты до готовности (D-87, showTrails) — в Якутске
+    // троп пока нет. Остальные режимы — вопрос §4, здесь их не трогаем.
+    final showTrails =
+        ref.watch(appConfigProvider).valueOrNull?.showTrails ?? false;
+    final modes = [
+      for (final m in RunMode.values)
+        if (m != RunMode.trails || showTrails) m,
+    ];
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final option in RunMode.values)
+        for (final option in modes)
           GestureDetector(
             // Перехватывает тап раньше карточки — старт не сработает.
             onTap: () => ref.read(runModeProvider.notifier).set(option),

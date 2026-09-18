@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/config/app_config_provider.dart';
 import '../../auth/data/auth_provider.dart';
 import 'medal_defs.dart';
 
@@ -68,11 +69,17 @@ final _medalsDio = ApiClient.create(headers: {'Content-Type': 'application/json'
 
 final medalsProvider = FutureProvider.autoDispose<List<MedalFull>>((ref) async {
   final token = ref.watch(authProvider).token;
+  // «Спящие» медали (без критерия на сервере) скрыты до готовности (D-87,
+  // showSleepingMedals). Уже заработанную не прячем — так не отберём достижение.
+  final showSleeping =
+      ref.watch(appConfigProvider).valueOrNull?.showSleepingMedals ?? false;
+  bool visible(MedalFull m) =>
+      showSleeping || m.def.waitNote == null || m.earned;
   if (token == null || token.isEmpty) {
     return [
       for (final d in kMedals)
         MedalFull(d, MedalState(id: d.id, available: d.waitNote == null)),
-    ];
+    ].where(visible).toList();
   }
   final res = await _medalsDio.get<Map<String, dynamic>>(
     '/me/medals',
@@ -87,7 +94,7 @@ final medalsProvider = FutureProvider.autoDispose<List<MedalFull>>((ref) async {
         d,
         byId[d.id] ?? MedalState(id: d.id, available: d.waitNote == null),
       ),
-  ];
+  ].where(visible).toList();
   // Первый запуск на устройстве: всё уже заработанное считаем «показанным»,
   // чтобы церемония не выстрелила очередью по старым медалям.
   await MedalCeremonyLedger.seedIfNeeded(list);
