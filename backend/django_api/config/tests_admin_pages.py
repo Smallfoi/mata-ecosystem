@@ -86,6 +86,9 @@ class AdminPagesRenderTests(TestCase):
         self.assertRegex(html, r"admin/mata\.css\?v=[0-9a-f]{6,}",
                          "нет метки версии — правка стиля неделю не дойдёт до браузера")
         self.assertIn('class="m-card"', html)
+        self.assertRegex(html, r"admin/mata\.js\?v=[0-9a-f]{6,}",
+                         "нет скрипта подгонки высоты таблицы — полоса прокрутки уедет "
+                         "под нижнюю панель, и по ней нельзя будет попасть мышью")
         self.assertNotIn("<style>", html.split("</head>")[-1], "своё оформление в теле страницы")
 
     def test_style_version_follows_the_file(self):
