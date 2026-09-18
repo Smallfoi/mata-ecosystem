@@ -153,6 +153,30 @@ class _Index:
         self.taken.add(product.id)
 
 
+# Списочные поля карточки: размеры, цвета, фото. 1С заводит их у каждой позиции, но
+# пока большинство карточек не заполнено — приходит [null]. Пустое должно оставаться
+# пустым: [null] на витрине превращается в пустую «плашку» размера.
+LIST_FIELDS = {"sizes", "colors", "images"}
+_EMPTY = {"", "none", "null", "не указан", "не указано", "-", "—"}
+
+
+def _clean_list(value) -> list:
+    """Значения из 1С: без пустот и повторов, обрезанные по краям, порядок сохранён."""
+    if not isinstance(value, list):
+        value = [value]
+    out: list = []
+    for item in value:
+        if item is None:
+            continue
+        text = str(item).strip()
+        if not text or text.lower() in _EMPTY:
+            continue
+        text = text[:80]
+        if text not in out:
+            out.append(text)
+    return out
+
+
 def _apply(product: Product, payload: dict, fields: dict) -> list:
     """Записать пришедшие поля: эффективное значение — только если не переопределено.
     Возвращает список полей, которые владелец удержал за собой (для отчёта)."""
@@ -162,10 +186,12 @@ def _apply(product: Product, payload: dict, fields: dict) -> list:
         if json_field not in payload:
             continue
         value = payload[json_field]
-        src[json_field] = value
+        src[json_field] = value                      # в from_1c кладём как прислали
         if product.is_overridden(json_field):
             kept.append(json_field)
             continue
+        if json_field in LIST_FIELDS:
+            value = _clean_list(value)
         setattr(product, model_field, value)
     product.from_1c = src
     return kept
