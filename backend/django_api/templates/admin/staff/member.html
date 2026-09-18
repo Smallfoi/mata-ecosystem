@@ -87,11 +87,11 @@
       {% for block in blocks %}
       <div class="m-group">
         <p class="m-group-title">{{ block.title }}</p>
-        <table class="m">
+        <table class="m perms">
           <thead>
             <tr>
               <th class="l">Вкладка</th>
-              {% for code, name in levels %}<th>{{ name }}</th>{% endfor %}
+              {% for code, name in levels %}<th class="c">{{ name }}</th>{% endfor %}
             </tr>
           </thead>
           <tbody>
