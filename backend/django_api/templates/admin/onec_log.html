@@ -18,6 +18,8 @@
   </div>
 {% endif %}
 
+{% if note %}<div class="m-good">{{ note }}</div>{% endif %}
+
 <div class="m-sum">
   <div class="m-tile"><b>{{ summary.runs }}</b><span>обменов за сутки</span></div>
   <div class="m-tile"><b>{{ summary.created }}</b><span>товаров добавлено</span></div>
@@ -47,9 +49,16 @@
 
 {% if rows %}
 <div class="m-wrap">
+{% if can_clear %}<form method="post" id="log-form">{% csrf_token %}{% endif %}
 <table class="m top">
   <thead>
     <tr>
+      {% if can_clear %}
+      <th style="width:28px">
+        <input type="checkbox" title="Выделить все"
+               onclick="document.querySelectorAll('#log-form input[name=id]').forEach(function(c){c.checked=this.checked}.bind(this))">
+      </th>
+      {% endif %}
       <th>Дата и время (якут.)</th>
       <th>Операция</th>
       <th>Статус</th>
@@ -64,6 +73,7 @@
   <tbody>
     {% for r in rows %}
     <tr>
+      {% if can_clear %}<td><input type="checkbox" name="id" value="{{ r.id }}"></td>{% endif %}
       <td style="white-space:nowrap">{{ r.when }}</td>
       <td>{{ r.operation }}</td>
       <td><span class="m-tag m-st-{{ r.status_code }}">{{ r.status }}</span></td>
@@ -97,6 +107,15 @@
     {% endfor %}
   </tbody>
 </table>
+{% if can_clear %}
+<div class="m-acts">
+  <button class="m-btn bad" type="submit" name="action" value="delete"
+          onclick="return confirm('Удалить выбранные записи журнала?')">Удалить выбранные</button>
+  <span class="m-small m-muted">Отметьте записи галочками (или все сразу — галочкой в шапке).
+    Чистить журнал может только владелец.</span>
+</div>
+{% endif %}
+{% if can_clear %}</form>{% endif %}
 </div>
 <p style="font-size:.8rem;color:#9ca3af;margin-top:1rem">
   Показано {{ rows|length }} из {{ total }} записей по фильтру. Журнал хранит последние 90 дней.

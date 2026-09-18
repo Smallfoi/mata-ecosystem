@@ -10,12 +10,16 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.exceptions import PermissionDenied
 from django.db.models import Sum
+from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.utils import timezone
 
 from integrations.models import OneCExchange
 from staff.access import tab_required
+from staff.models import StaffAudit
+from staff.owner import is_owner
 
 PAGE_SIZE = 200
 
@@ -44,11 +48,34 @@ def _fields_line(report: dict) -> str:
     return " · ".join(parts)
 
 
+def _clear(request) -> str:
+    """Очистка журнала — только владелец (D-88).
+
+    Это стирание истории обмена: по ней разбирают, что и когда прислала 1С. Правом
+    на вкладку такое не выдаётся — сотрудник с доступом «редактировать и удалять»
+    смотрит журнал, но не переписывает прошлое.
+    """
+    if not is_owner(request.user):
+        raise PermissionDenied("Очистить журнал обмена может только владелец")
+
+    ids = [int(x) for x in request.POST.getlist("id") if x.isdigit()][:PAGE_SIZE]
+    deleted = OneCExchange.objects.filter(id__in=ids).delete()[0] if ids else 0
+    if deleted:
+        StaffAudit.write(request, f"удалены записи журнала обмена: {deleted}")
+        return f"Удалено записей: {deleted}."
+    return "Ничего не выбрано."
+
+
 @staff_member_required
 @tab_required("onec_log")
 def onec_log(request):
     op = (request.GET.get("op") or "all").strip()
     status = (request.GET.get("status") or "all").strip()
+
+    if request.method == "POST":
+        request.session["onec_log_note"] = _clear(request)
+        # POST → redirect → GET: обновление страницы не повторит удаление.
+        return redirect(f"{request.path}?op={op}&status={status}")
 
     qs = OneCExchange.objects.all()
     if op in ("catalog", "prices"):
@@ -59,6 +86,7 @@ def onec_log(request):
     rows = []
     for r in qs[:PAGE_SIZE]:
         rows.append({
+            "id": r.id,
             "when": _local(r.created_at),
             "operation": r.get_operation_display(),
             "op_code": r.operation,
@@ -92,6 +120,8 @@ def onec_log(request):
         "status": status,
         "total": qs.count(),
         "page_size": PAGE_SIZE,
+        "can_clear": is_owner(request.user),
+        "note": request.session.pop("onec_log_note", ""),
         "summary": {
             "runs": d.count(),
             "created": agg["c"] or 0,
