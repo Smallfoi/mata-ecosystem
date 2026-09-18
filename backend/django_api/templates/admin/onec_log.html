@@ -76,7 +76,18 @@
         {% if r.kept %}<div class="m-warn m-small">Оставлено за владельцем: {{ r.kept|join:", " }}</div>{% endif %}
         {% for e in r.errors %}<div class="m-minus m-small">{{ e }}</div>{% endfor %}
         {% if r.errors_more %}<div class="m-minus m-small">…и ещё {{ r.errors_more }}</div>{% endif %}
-        {% if not r.detail and not r.kept and not r.errors %}<span class="m-dim">—</span>{% endif %}
+        {% if r.unknown_keys %}
+          <div class="m-warn m-small">1С прислала, а мы не читаем: {{ r.unknown_keys|join:", " }}</div>
+        {% endif %}
+        {% if r.sample %}
+          <details class="m-small">
+            <summary class="m-muted">Пример присланной позиции</summary>
+            <pre class="m-mono">{{ r.sample }}</pre>
+          </details>
+        {% endif %}
+        {% if not r.detail and not r.kept and not r.errors and not r.unknown_keys and not r.sample %}
+          <span class="m-dim">—</span>
+        {% endif %}
       </td>
       <td class="n m-dim" style="white-space:nowrap">{{ r.duration }}</td>
     </tr>

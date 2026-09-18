@@ -58,6 +58,37 @@ def _parcel_errors(product: Product, raw: dict, who: str) -> list:
     return errors
 
 
+# Поля, которые мы читаем в каждом потоке. Всё остальное 1С присылает зря — и это
+# должно быть видно, а не теряться молча.
+CATALOG_KEYS = {"id", "article", "name", "categoryId", "brand", "active", "updatedAt",
+                "price", "oldPrice", "description", "sizes", "colors", "images",
+                "weightG", "lengthCm", "widthCm", "heightCm"}
+PRICE_KEYS = {"id", "article", "price", "oldPrice", "stock", "variants"}
+CATEGORY_KEYS = {"id", "name", "parentId", "sort"}
+
+SAMPLE_SCAN = 200      # по скольким позициям ищем пример и незнакомые поля
+SAMPLE_VALUE = 200     # длина строкового значения в примере
+
+
+def _diagnostics(items, known: set) -> tuple:
+    """Одна позиция как пример + имена полей, которых нет в обмене.
+
+    Пример берём самый «полный» из первых позиций: у бедной строки половина полей
+    отсутствует, и по ней не понять, что 1С умеет присылать.
+    """
+    best, unknown = {}, set()
+    for raw in items[:SAMPLE_SCAN]:
+        if not isinstance(raw, dict):
+            continue
+        unknown.update(k for k in raw if k not in known)
+        if len(raw) > len(best):
+            best = raw
+    sample = {}
+    for key, value in list(best.items())[:40]:
+        sample[key] = value[:SAMPLE_VALUE] if isinstance(value, str) else value
+    return sample, sorted(unknown)
+
+
 # Сколько позиций принимаем за один запрос. Выгрузка целиком тоже не редкость,
 # поэтому потолок высокий — он защищает от бессмысленного, а не от большого.
 # Всё, что приходит, разбирается пачками по CHUNK, а не построчно.
@@ -194,8 +225,9 @@ def import_categories(items) -> dict:
             Category.objects.bulk_update(to_update, ["name", "parent_id", "sort"],
                                          batch_size=CHUNK)
 
+    sample, unknown = _diagnostics(items, CATEGORY_KEYS)
     return {"received": len(items), "created": len(to_create), "updated": len(to_update),
-            "errors": errors[:20]}
+            "errors": errors[:20], "sample": sample, "unknownKeys": unknown}
 
 
 # Что переписывает выгрузка карточек. Поля витрины (публикация, новинка,
@@ -278,10 +310,12 @@ def import_catalog(items) -> dict:
     for cid in sorted(unknown):
         errors.append(f"категория «{cid}» не заведена — товары не попадут в раздел")
 
+    sample, unknown_keys = _diagnostics(items, CATALOG_KEYS)
     return {
         "received": len(items), "created": created, "updated": updated,
         "skipped": skipped, "keptByOwner": sorted(kept_fields),
         "unknownCategories": sorted(unknown), "errors": errors[:20],
+        "sample": sample, "unknownKeys": unknown_keys,
     }
 
 
@@ -346,5 +380,7 @@ def import_prices(items) -> dict:
     with transaction.atomic():
         Product.objects.bulk_update(list(touched.values()), PRICE_FIELDS, batch_size=CHUNK)
 
+    sample, unknown = _diagnostics(items, PRICE_KEYS)
     return {"received": len(items), "updated": len(touched),
-            "keptByOwner": sorted(kept_fields), "errors": errors[:20]}
+            "keptByOwner": sorted(kept_fields), "errors": errors[:20],
+            "sample": sample, "unknownKeys": unknown}
