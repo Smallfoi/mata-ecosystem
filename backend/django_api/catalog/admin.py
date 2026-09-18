@@ -59,8 +59,8 @@ def delete_products(modeladmin, request, queryset):
 
 @admin.register(Category)
 class CategoryAdmin(ModelAdmin):
-    list_display = ("preview", "id", "name", "emoji", "sort")
-    list_display_links = ("id", "name")  # имя кликабельно → открыть/редактировать
+    list_display = ("preview", "name", "emoji", "sort")
+    list_display_links = ("name",)
     list_editable = ("sort",)
     search_fields = ("id", "name")
     ordering = ("sort",)
@@ -226,9 +226,9 @@ class ProductAdmin(ModelAdmin):
 
 @admin.register(Banner)
 class BannerAdmin(ModelAdmin):
-    list_display = ("preview", "id", "title", "subtitle", "action", "is_published",
+    list_display = ("preview", "title", "subtitle", "action", "is_published",
                     "sort_site", "sort_app")
-    list_display_links = ("id", "title")  # заголовок кликабелен → открыть/редактировать
+    list_display_links = ("title",)
     list_editable = ("is_published", "sort_site", "sort_app")
     list_filter = ("is_published",)
     search_fields = ("title", "subtitle")
@@ -290,10 +290,10 @@ def show_reviews(modeladmin, request, queryset):
 @admin.register(Review)
 class ReviewAdmin(UserRefMixin, ModelAdmin):
     list_display = (
-        "id", "product_ref", "user_ref", "rating", "short_text",
+        "product_ref", "user_ref", "rating", "short_text",
         "photos_count", "hidden", "created_at",
     )
-    list_display_links = ("id",)
+    list_display_links = ("short_text",)
     list_editable = ("hidden",)
     list_filter = ("hidden", "rating", "created_at")
     search_fields = ("id", "product_id", "user_id", "text")
