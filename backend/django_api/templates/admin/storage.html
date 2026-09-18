@@ -2,44 +2,43 @@
 {% load i18n %}
 
 {% block content %}
-<div style="max-width:820px">
-  <h1 style="font-size:20px;font-weight:800;margin:0 0 4px">Диски и хранилище</h1>
-  <p style="font-size:13px;color:#6b7280;margin:0 0 20px">Свободное место на дисках, размер базы данных и вес загруженных через Конструктор файлов.</p>
+{# «Диски и хранилище»: сколько места осталось, размер базы и вес загрузок Конструктора. #}
+<div class="m-page">
+  <h1 class="m-title">Диски и хранилище</h1>
+  <p class="m-lead">
+    Свободное место на дисках, размер базы данных и вес загруженных через Конструктор файлов.
+  </p>
 
   {% for d in disks %}
-  <div style="border:1px solid #e5e7eb;border-radius:14px;padding:16px 18px;margin-bottom:14px;background:#fff">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
-      <div style="font-size:15px;font-weight:700;color:#111">{{ d.name }}</div>
-      <div style="font-size:12px;color:#9ca3af;font-variant-numeric:tabular-nums">{{ d.path }}</div>
+  <div class="m-card pad">
+    <div class="m-between">
+      <div class="m-strong">{{ d.name }}</div>
+      <div class="m-small m-dim">{{ d.path }}</div>
     </div>
-    <div style="height:14px;border-radius:8px;background:#eef1f4;overflow:hidden;margin:12px 0 8px">
-      <div style="height:100%;width:{{ d.pct }}%;border-radius:8px;transition:width .3s;
-        background:{% if d.level == 'danger' %}#dc2626{% elif d.level == 'warn' %}#f59e0b{% else %}#16a34a{% endif %}"></div>
+    <div class="m-meter">
+      <i class="{% if d.level == 'danger' %}bad{% elif d.level == 'warn' %}warn{% endif %}"
+         style="width: {{ d.pct }}%"></i>
     </div>
-    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px">
-      <span style="color:#374151"><b style="font-size:15px;color:{% if d.level == 'danger' %}#dc2626{% elif d.level == 'warn' %}#b45309{% else %}#15803d{% endif %}">Свободно {{ d.free }}</b></span>
-      <span style="color:#6b7280">Занято {{ d.used }} из {{ d.total }} · {{ d.pct }}%</span>
+    <div class="m-between m-small">
+      <span>
+        <b class="{% if d.level == 'danger' %}m-minus{% elif d.level == 'warn' %}m-warn{% else %}m-plus{% endif %}">Свободно {{ d.free }}</b>
+      </span>
+      <span class="m-muted">Занято {{ d.used }} из {{ d.total }} · {{ d.pct }}%</span>
     </div>
   </div>
   {% empty %}
-  <p style="color:#6b7280">Не удалось получить сведения о дисках.</p>
+  <p class="m-muted">Не удалось получить сведения о дисках.</p>
   {% endfor %}
 
-  <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px">
+  <div class="m-sum">
     {% if db %}
-    <div style="flex:1;min-width:220px;border:1px solid #e5e7eb;border-radius:14px;padding:16px 18px;background:#fff">
-      <div style="font-size:12px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em">База данных</div>
-      <div style="font-size:26px;font-weight:800;color:#111;margin-top:6px">{{ db.size }}</div>
-      <div style="font-size:12px;color:#6b7280;margin-top:2px">{{ db.name }} (PostgreSQL)</div>
-    </div>
+    <div class="m-tile"><b>{{ db.size }}</b><span>база данных · {{ db.name }} (PostgreSQL)</span></div>
     {% endif %}
-    <div style="flex:1;min-width:220px;border:1px solid #e5e7eb;border-radius:14px;padding:16px 18px;background:#fff">
-      <div style="font-size:12px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Загрузки Конструктора</div>
-      <div style="font-size:26px;font-weight:800;color:#111;margin-top:6px">{{ uploads_size }}</div>
-      <div style="font-size:12px;color:#6b7280;margin-top:2px">Фото и видео (uploads/*)</div>
-    </div>
+    <div class="m-tile"><b>{{ uploads_size }}</b><span>загрузки Конструктора — фото и видео</span></div>
   </div>
 
-  <p style="font-size:12px;color:#9ca3af;margin-top:18px">Обновляется при открытии страницы. Уборка «сирот»: <code>manage.py cleanup_orphan_media</code>.</p>
+  <p class="m-small m-muted">
+    Обновляется при открытии страницы. Уборка «сирот»: <code>manage.py cleanup_orphan_media</code>.
+  </p>
 </div>
 {% endblock %}

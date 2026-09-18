@@ -94,7 +94,7 @@ class _KvartalAppState extends ConsumerState<KvartalApp>
       final runs = ref.read(completedRunsProvider.notifier);
       runs.syncPending();
       runs.pullFromServer();
-      // Обновляем серверные флаги (D-87): изменения в админке подхватываются при
+      // Обновляем серверные флаги (D-89): изменения в админке подхватываются при
       // возврате в приложение, без перезапуска.
       ref.invalidate(appConfigProvider);
     }

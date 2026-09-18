@@ -1,0 +1,71 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# «Согласия клиента»: что он принял и чего не хватает. Только просмотр — согласие не правят. #}
+
+<div class="m-sum">
+  <div class="m-tile"><b>{{ client.name|default:"Без имени" }}</b><span>клиент</span></div>
+  <div class="m-tile"><b>{{ client.phone|default:"—" }}</b><span>телефон</span></div>
+  <div class="m-tile"><b>{{ client.email|default:"—" }}</b><span>почта</span></div>
+  <div class="m-tile">
+    {% if missing_required %}
+      <b class="m-minus">Нет {{ missing_required|length }} из {{ required_total }}</b>
+    {% else %}
+      <b class="m-plus">Все {{ required_total }}</b>
+    {% endif %}
+    <span>обязательные согласия</span>
+  </div>
+</div>
+
+{% if missing_required %}
+<div class="m-card">
+  <h3>Не хватает обязательных</h3>
+  <ul class="m-list">
+    {% for d in missing_required %}
+      <li>{{ d.title }} <span class="m-muted">v{{ d.version }}</span>
+        {% if d.old_version %}<span class="m-tag warn">принята старая версия</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="m-card">
+  <h3>Согласия клиента</h3>
+  {% if rows %}
+  <div class="m-wrap">
+    <table class="m">
+      <thead>
+        <tr><th>Документ</th><th>Версия</th><th>Принято (якут.)</th><th>Откуда</th><th>Статус</th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr class="{% if r.revoked_at %}m-off{% endif %}">
+          <td>{{ r.title }}{% if r.required %}<span class="m-tag soft">обязательное</span>{% endif %}</td>
+          <td>v{{ r.version }}{% if r.outdated %}<span class="m-tag warn">устарела</span>{% endif %}</td>
+          <td>{{ r.accepted_at|date:"d.m.Y H:i" }}</td>
+          <td>{{ r.source }}</td>
+          <td>{% if r.revoked_at %}отозвано {{ r.revoked_at|date:"d.m.Y H:i" }}{% else %}действует{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="m-empty">Клиент ещё не давал согласий.</div>
+  {% endif %}
+</div>
+
+{% if missing_optional %}
+<div class="m-card">
+  <h3>Необязательные — не давал</h3>
+  <ul class="m-list">
+    {% for d in missing_optional %}
+      <li>{{ d.title }} <span class="m-muted">v{{ d.version }}</span></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<p><a href="{{ journal_url }}">Записи этого клиента в журнале согласий →</a></p>
+<p><a href="../../">← ко всем клиентам</a></p>
+{% endblock %}

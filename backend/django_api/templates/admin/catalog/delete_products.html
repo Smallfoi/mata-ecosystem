@@ -1,0 +1,43 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# Подтверждение массового удаления товаров: скрытых полей столько же, сколько пришло
+   из списка, поэтому «выбрать все» работает и на тысячах карточек. #}
+
+<div class="m-card pad narrow">
+  <p class="m-title">Удалить {{ count }} товаров?</p>
+  <p style="margin:0;color:#6f7278;font-size:.9rem">Действие необратимо: карточки удаляются из базы.</p>
+
+  {% if sample %}
+  <ul class="m-list">
+    {% for name in sample %}<li>{{ name }}</li>{% endfor %}
+    {% if count > sample|length %}<li>…и ещё {{ count|add:"-8" }}</li>{% endif %}
+  </ul>
+  {% endif %}
+
+  <div class="m-hint">
+    <b>Что останется:</b>
+    <ul style="margin:.4rem 0 0;padding-left:1.1rem">
+      <li>Товары <b>вернутся при следующем обмене с 1С</b>, если они есть в 1С. Чтобы не возвращались, уберите их в 1С или отключите обмен.</li>
+      <li>Отзывы и привязки кроссовок ссылаются на товар по номеру — записи останутся, но товара у них уже не будет.</li>
+      <li>Фото остаются в хранилище; ненужные чистит команда <code>cleanup_orphan_media</code>.</li>
+      <li>Заказы не пострадают: в них состав сохранён копией.</li>
+    </ul>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="delete_products">
+    <input type="hidden" name="confirm" value="yes">
+    <input type="hidden" name="index" value="0">
+    <input type="hidden" name="select_across" value="{{ select_across }}">
+    {% for pk in selected %}
+      <input type="hidden" name="{{ action_checkbox_name }}" value="{{ pk }}">
+    {% endfor %}
+    <div class="m-row">
+      <button class="m-btn bad" type="submit">Удалить {{ count }}</button>
+      <a class="m-muted" href="{% url 'admin:catalog_product_changelist' %}">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

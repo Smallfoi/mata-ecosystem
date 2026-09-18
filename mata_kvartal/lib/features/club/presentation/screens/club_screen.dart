@@ -79,7 +79,7 @@ class _ClubScreenState extends ConsumerState<ClubScreen> with TabVisibility {
                   // «Старты» — не часть клуба, а самостоятельный раздел (D-45).
                   // Держим его здесь, а не внутри тел «клуб есть»/«клуба нет»:
                   // так он виден в любом состоянии экрана и не зависит от того,
-                  // как эти тела устроены внутри. Скрыт до готовности (D-87,
+                  // как эти тела устроены внутри. Скрыт до готовности (D-89,
                   // флаг showRaces) — включается в админке.
                   if (ref.watch(appConfigProvider).valueOrNull?.showRaces ?? false) ...[
                     const _RacesEntryCard(),

@@ -165,7 +165,7 @@ final _trailsDio = ApiClient.create(headers: {'Content-Type': 'application/json'
 final trailsProvider = FutureProvider.autoDispose<List<Trail>>((ref) async {
   final token = ref.watch(authProvider).token;
   if (token == null || token.isEmpty) return const [];
-  // Тропы скрыты до готовности (D-87, showTrails) — пустой список гасит слой троп
+  // Тропы скрыты до готовности (D-89, showTrails) — пустой список гасит слой троп
   // на карте и тело раздела разом. Включается в админке.
   final showTrails =
       ref.watch(appConfigProvider).valueOrNull?.showTrails ?? false;

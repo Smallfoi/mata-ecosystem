@@ -1,0 +1,79 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# «Баллы»: клиенты с операциями за выбранные дни (календарь), клик — начисления клиента. #}
+
+<form method="get" class="m-form">
+  <label class="m-field">С даты
+    <input class="m-input" type="date" name="date_from" value="{{ date_from }}">
+  </label>
+  <label class="m-field">По дату
+    <input class="m-input" type="date" name="date_to" value="{{ date_to }}">
+  </label>
+  <label class="m-field" style="flex:1;min-width:200px">Клиент
+    <input class="m-input" type="search" name="q" value="{{ q }}" placeholder="Имя, телефон или почта">
+  </label>
+  {% if sort != "last" %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+  <button class="m-btn primary" type="submit">Показать</button>
+</form>
+
+<div class="m-tabs">
+  <a class="m-chip {% if not period %}on{% endif %}" href="?{% if q %}q={{ q|urlencode }}{% endif %}">Всё время</a>
+  {% for label, query in quick %}
+    <a class="m-chip {% if period and period.query == query %}on{% endif %}" href="?{{ query }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<div class="m-sum">
+  <div class="m-tile"><b>{{ totals.clients }}</b><span>клиентов {% if period %}за {{ period.label }}{% else %}за всё время{% endif %}</span></div>
+  <div class="m-tile"><b class="m-plus">+{{ totals.earned }}</b><span>начислено</span></div>
+  <div class="m-tile"><b class="m-minus">−{{ totals.spent }}</b><span>списано</span></div>
+  <div class="m-tile"><b>{{ totals.ops }}</b><span>операций</span></div>
+</div>
+
+<div class="m-small m-muted">Сортировать:
+  <a href="?{{ keep }}" class="{% if sort == 'last' %}m-link-on{% endif %}">по последней операции</a> ·
+  <a href="?{{ keep }}{% if keep %}&amp;{% endif %}sort=earned" class="{% if sort == 'earned' %}m-link-on{% endif %}">по начисленному</a> ·
+  <a href="?{{ keep }}{% if keep %}&amp;{% endif %}sort=ops" class="{% if sort == 'ops' %}m-link-on{% endif %}">по числу операций</a>
+</div>
+
+<div class="m-card">
+  {% if rows %}
+  <div class="m-wrap">
+    <table class="m">
+      <thead>
+        <tr>
+          <th>Клиент</th><th>Телефон</th>
+          <th class="n">Начислено</th><th class="n">Списано</th><th class="n">Операций</th>
+          <th>Последняя операция</th><th class="n">Баланс сейчас</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><a href="{{ r.url }}"><b>{{ r.name }}</b></a></td>
+          <td class="m-muted">{{ r.phone }}</td>
+          <td class="n">{% if r.earned %}<span class="m-plus">+{{ r.earned }}</span>{% else %}<span class="m-muted">0</span>{% endif %}</td>
+          <td class="n">{% if r.spent %}<span class="m-minus">−{{ r.spent }}</span>{% else %}<span class="m-muted">0</span>{% endif %}</td>
+          <td class="n">{{ r.ops }}</td>
+          <td class="m-muted">{{ r.last }}</td>
+          <td class="n"><b>{{ r.balance }}</b></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page.paginator.num_pages > 1 %}
+  <div class="m-pages">
+    <span>{% if page.has_previous %}<a href="?{{ keep_sort }}&amp;page={{ page.previous_page_number }}">← назад</a>{% endif %}</span>
+    <span class="m-muted">страница {{ page.number }} из {{ page.paginator.num_pages }}</span>
+    <span>{% if page.has_next %}<a href="?{{ keep_sort }}&amp;page={{ page.next_page_number }}">дальше →</a>{% endif %}</span>
+  </div>
+  {% endif %}
+  {% else %}
+    <div class="m-empty">{% if period %}За {{ period.label }} операций с баллами нет.{% else %}Операций с баллами пока нет.{% endif %}</div>
+  {% endif %}
+</div>
+
+<p class="m-muted"><a href="{{ journal_url }}">Журнал всех операций</a> — ручные корректировки и выгрузка в CSV.</p>
+{% endblock %}

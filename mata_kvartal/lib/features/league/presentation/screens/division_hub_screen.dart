@@ -50,7 +50,7 @@ extension HubTabInfo on HubTab {
 }
 
 /// Вкладки, видимые в текущем режиме Лиги. Полный режим — [kLeagueFullMode] (const)
-/// ИЛИ серверный флаг showLeagueFull (D-87): включается в админке без пересборки.
+/// ИЛИ серверный флаг showLeagueFull (D-89): включается в админке без пересборки.
 /// В свёрнутом режиме — только живые в маленькой группе: «Постоянство» (кто чаще
 /// выходил) и «Мой прогресс» (ты против себя). Уровень/дивизион показывает шапка всегда.
 List<HubTab> visibleHubTabs(bool leagueFull) => leagueFull
@@ -58,7 +58,7 @@ List<HubTab> visibleHubTabs(bool leagueFull) => leagueFull
     : const [HubTab.consistency, HubTab.personal];
 
 /// Полный режим Лиги: compile-time [kLeagueFullMode] ИЛИ серверный флаг
-/// showLeagueFull (D-87, включается в админке без пересборки).
+/// showLeagueFull (D-89, включается в админке без пересборки).
 bool leagueFullEnabled(WidgetRef ref) =>
     kLeagueFullMode ||
     (ref.watch(appConfigProvider).valueOrNull?.showLeagueFull ?? false);

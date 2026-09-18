@@ -3,72 +3,27 @@
 
 {% block content %}
 {# Карточка сотрудника: права по вкладкам + управление доступом (S-12). #}
-<style>
-  .sm-wrap{max-width:1040px}
-  .sm-top{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-bottom:18px}
-  .sm-top h1{font-size:20px;font-weight:800;margin:0 0 4px}
-  .sm-meta{font-size:13px;color:#6b7280}
-  .badge{display:inline-block;padding:.12rem .55rem;border-radius:1rem;font-size:.72rem;font-weight:700;color:#fff}
-  .b-active{background:#16a34a}.b-invited{background:#57bcd8;color:#0b2a33}.b-expired{background:#f5a623}.b-off{background:#9ca3af}
-  .sm-acts{display:flex;gap:8px;flex-wrap:wrap}
-  .sm-acts button{padding:9px 15px;border:1px solid #d1d5db;border-radius:9px;background:#fff;font-weight:600;cursor:pointer;font-size:13px;color:#111}
-  .sm-acts button.danger{border-color:#fca5a5;color:#b91c1c}
-  .sm-card{border:1px solid #e5e7eb;border-radius:14px;background:#fff;padding:18px 20px;margin-bottom:18px}
-  .dark .sm-card{background:#1f2937;border-color:#374151}
-  .sm-card h2{font-size:15px;font-weight:700;margin:0 0 6px}
-  .sm-hint{font-size:12.5px;color:#6b7280;margin:0 0 16px;max-width:74ch}
-  .grp{margin-bottom:18px}
-  .grp-t{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;font-weight:700;margin:0 0 6px}
-  table.rt{width:100%;border-collapse:collapse}
-  table.rt th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:#9ca3af;font-weight:700;padding:0 .5rem .4rem;text-align:center}
-  table.rt th.l{text-align:left}
-  table.rt td{padding:.5rem;border-bottom:1px solid #f1f2f4;font-size:.88rem;vertical-align:middle}
-  .dark table.rt td{border-color:#2b3240}
-  table.rt td.c{text-align:center;width:120px}
-  .tab-n{font-weight:600}
-  .tab-h{font-size:11.5px;color:#9ca3af;margin-top:2px;max-width:52ch}
-  .save{padding:11px 22px;border:0;border-radius:9px;background:#111;color:#fff;font-weight:700;cursor:pointer;font-size:14px}
-  .warn{color:#b45309;font-weight:600}
-  .ok{color:#15803d;font-weight:600}
-  .sm-link{margin:0 0 18px;padding:14px 16px;border-radius:12px;background:#ecfdf5;border:1px solid #a7f3d0}
-  .dark .sm-link{background:#052e24;border-color:#0f5132}
-  .sm-link .t{font-size:12.5px;font-weight:700;color:#065f46;margin-bottom:8px}
-  .dark .sm-link .t{color:#6ee7b7}
-  .sm-link .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .sm-link input{flex:1;min-width:280px;padding:9px 11px;border:1px solid #a7f3d0;border-radius:9px;font-size:12.5px;background:#fff;color:#111}
-  .sm-link button{padding:9px 15px;border:0;border-radius:9px;background:#065f46;color:#fff;font-weight:600;cursor:pointer;font-size:13px}
-  .sm-note{font-size:11.5px;color:#6b7280;margin-top:8px}
-  .sm-audit{font-size:12.5px;color:#6b7280}
-  .seen{display:flex;gap:8px;flex-wrap:wrap}
-  .seen-i{display:inline-flex;align-items:baseline;gap:6px;padding:7px 13px;border-radius:999px;
-    background:#f1f5f9;font-size:12.5px;color:#475569}
-  .dark .seen-i{background:#0f172a;color:#cbd5e1}
-  .seen-i b{font-size:13px;color:#111;font-weight:700}
-  .dark .seen-i b{color:#e2e8f0}
-  .sm-audit div{padding:5px 0;border-bottom:1px solid #f1f2f4}
-  .dark .sm-audit div{border-color:#2b3240}
-</style>
 
-<div class="sm-wrap">
+<div class="m-page">
   <p style="margin:0 0 12px"><a href="{% url 'staff_list' %}" style="font-size:13px;color:#6b7280;text-decoration:none">← Все сотрудники</a></p>
 
-  <div class="sm-top">
+  <div class="m-top">
     <div>
       <h1>{{ profile.full_name }}</h1>
-      <div class="sm-meta">
+      <div class="m-meta">
         {{ profile.user.email }}
         {% if profile.position %} · {{ profile.position }}{% endif %}
-        · <span class="badge b-{{ profile.status }}">{{ profile.status_ru }}</span>
-        · второй фактор: {% if has_2fa %}<span class="ok">подключён</span>{% else %}<span class="warn">не подключён</span>{% endif %}
+        · <span class="m-tag b-{{ profile.status }}">{{ profile.status_ru }}</span>
+        · второй фактор: {% if has_2fa %}<span class="m-plus">подключён</span>{% else %}<span class="m-warn">не подключён</span>{% endif %}
       </div>
     </div>
-    <form class="sm-acts" method="post" action="{% url 'staff_action' profile.pk %}">
+    <form class="m-row" method="post" action="{% url 'staff_action' profile.pk %}">
       {% csrf_token %}
-      <button type="submit" name="action" value="invite">Новая ссылка-приглашение</button>
-      <button type="submit" name="action" value="toggle">
+      <button class="m-btn" type="submit" name="action" value="invite">Новая ссылка-приглашение</button>
+      <button class="m-btn" type="submit" name="action" value="toggle">
         {% if profile.user.is_active %}Отключить доступ{% else %}Включить доступ{% endif %}
       </button>
-      <button type="submit" name="action" value="delete" class="danger"
+      <button type="submit" name="action" value="delete" class="m-btn bad"
               onclick="return confirm('Удалить сотрудника «{{ profile.full_name|escapejs }}» навсегда? Его учётная запись и права будут стёрты.');">
         Удалить
       </button>
@@ -76,32 +31,32 @@
   </div>
 
   {% if invite_link %}
-  <div class="sm-link">
+  <div class="m-good">
     <div class="t">Ссылка-приглашение — действует 48 часов, сработает один раз</div>
     <div class="row">
-      <input id="sm-invite" type="text" readonly value="{{ invite_link }}">
-      <button type="button" onclick="var f=document.getElementById('sm-invite');f.select();document.execCommand('copy');this.textContent='Скопировано';">Скопировать</button>
+      <input id="sm-invite" class="m-input wide" type="text" readonly value="{{ invite_link }}">
+      <button type="button" onclick="var f=document.getElementById('sm-invite');f.select();document.execCommand('copy');this.textContent='Скопировано';" class="m-btn ok">Скопировать</button>
     </div>
-    <div class="sm-note">Передайте лично. Пароль сотрудник задаст себе сам — вам он не виден.</div>
+    <div class="m-small m-muted">Передайте лично. Пароль сотрудник задаст себе сам — вам он не виден.</div>
   </div>
   {% endif %}
 
-  <div class="sm-card">
+  <div class="m-card pad">
     <h2>Что ему видно</h2>
     {% if granted %}
-    <p class="sm-hint" style="margin-bottom:12px">
+    <p class="m-lead" style="margin-bottom:12px">
       Ровно это и ничего сверх: остальные разделы не появятся в меню и не откроются
       по прямой ссылке.
     </p>
-    <div class="seen">
-      {% for g in granted %}<span class="seen-i"><b>{{ g.title }}</b>{{ g.level|lower }}</span>{% endfor %}
+    <div class="m-row">
+      {% for g in granted %}<span class="m-pill"><b>{{ g.title }}</b>{{ g.level|lower }}</span>{% endfor %}
     </div>
     {% else %}
-    <p class="sm-hint" style="margin:0">
+    <p class="m-lead" style="margin:0">
       Пока ничего: войдёт и увидит страницу «доступ не настроен». Выдайте вкладки ниже.
     </p>
     {% endif %}
-    <p class="sm-hint" style="margin:14px 0 0">
+    <p class="m-lead" style="margin:14px 0 0">
       <b>Проверять — только в отдельном окне («инкогнито»).</b> Если открыть вход в этом же
       браузере, вы уже вошли как владелец, и админка покажет ВАШИ права, а не его —
       будет казаться, что ограничения не работают.
@@ -109,9 +64,9 @@
   </div>
 
   {% if not has_2fa %}
-  <div class="sm-card" style="border-color:#f5d99a;background:#fff6e5">
+  <div class="m-card pad" style="border-color:#f5d99a;background:#fff6e5">
     <h2 style="color:#7a5b12">Второй фактор ещё не подключён</h2>
-    <p class="sm-hint" style="color:#7a5b12;margin:0">
+    <p class="m-lead" style="color:#7a5b12;margin:0">
       Пока телефон не привязан, админка сотруднику не откроется: при первом входе
       его отправит на страницу привязки. Отдельно ничего делать не нужно.
     </p>
@@ -120,9 +75,9 @@
 
   <form method="post" action="{% url 'staff_rights' profile.pk %}">
     {% csrf_token %}
-    <div class="sm-card">
+    <div class="m-card pad">
       <h2>Доступ к вкладкам</h2>
-      <p class="sm-hint">
+      <p class="m-lead">
         «Смотреть» — вкладка видна, но кнопки правки в ней не работают. «Редактировать» —
         можно менять и добавлять. «Редактировать и удалять» — плюс удаление записей
         насовсем; давайте его точечно. Чего не выдали, того человек не увидит в меню
@@ -130,9 +85,9 @@
       </p>
 
       {% for block in blocks %}
-      <div class="grp">
-        <p class="grp-t">{{ block.title }}</p>
-        <table class="rt">
+      <div class="m-group">
+        <p class="m-group-title">{{ block.title }}</p>
+        <table class="m">
           <thead>
             <tr>
               <th class="l">Вкладка</th>
@@ -143,8 +98,8 @@
             {% for row in block.tabs %}
             <tr>
               <td>
-                <div class="tab-n">{{ row.tab.title }}</div>
-                {% if row.tab.hint %}<div class="tab-h">{{ row.tab.hint }}</div>{% endif %}
+                <div class="m-strong">{{ row.tab.title }}</div>
+                {% if row.tab.hint %}<div class="m-small m-dim">{{ row.tab.hint }}</div>{% endif %}
               </td>
               {% for code, name in levels %}
               <td class="c">
@@ -160,14 +115,14 @@
       </div>
       {% endfor %}
 
-      <button class="save" type="submit">Сохранить права</button>
+      <button class="m-btn primary" type="submit">Сохранить права</button>
     </div>
   </form>
 
   {% if audit %}
-  <div class="sm-card">
+  <div class="m-card pad">
     <h2>Что менялось по этому сотруднику</h2>
-    <div class="sm-audit">
+    <div class="m-log">
       {% for a in audit %}
       <div>{{ a.at|date:"d.m.Y H:i" }} — {{ a.actor_name|default:"—" }}: {{ a.action }}</div>
       {% endfor %}

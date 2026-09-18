@@ -5,7 +5,7 @@ from core.models import AppConfig
 
 @admin.register(AppConfig)
 class AppConfigAdmin(admin.ModelAdmin):
-    """Флаги приложения (D-87): одна строка, галочки — что показывать в «Квартале».
+    """Флаги приложения (D-89): одна строка, галочки — что показывать в «Квартале».
     Меняется без пересборки; приложение подхватывает через GET /v1/config."""
 
     list_display = (

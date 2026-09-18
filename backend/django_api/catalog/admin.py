@@ -1,9 +1,12 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.db.models import Avg, Count
+from django.template.response import TemplateResponse
 from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin
 
 from common.adminutils import UserRefMixin
+from staff.models import StaffAudit
 
 from .models import Banner, Category, Product, Review
 
@@ -18,6 +21,40 @@ def make_published(modeladmin, request, queryset):
 def make_draft(modeladmin, request, queryset):
     n = queryset.update(is_published=False)
     modeladmin.message_user(request, f"В черновик: {n}")
+
+
+DELETE_CHUNK = 500  # пачка удаления: один SQL на 500 карточек
+
+
+@admin.action(description="Удалить выбранные товары", permissions=["delete"])
+def delete_products(modeladmin, request, queryset):
+    """Удаление любого числа товаров.
+
+    У штатного «Удалить выбранные» страница подтверждения кладёт скрытое поле на
+    КАЖДЫЙ товар: на 3309 карточках запрос упирается в `DATA_UPLOAD_MAX_NUMBER_FIELDS`
+    (1000 полей) и возвращается 400 — удалять получалось только по сотне, страницами.
+    Здесь подтверждение не зависит от числа товаров: пересылаем ровно то, что пришло из
+    списка (строки текущей страницы и флаг «выбрано всё»), а удаляем пачками.
+    """
+    if request.POST.get("confirm") == "yes":
+        ids = list(queryset.values_list("pk", flat=True))
+        deleted = 0
+        for start in range(0, len(ids), DELETE_CHUNK):
+            deleted += Product.objects.filter(pk__in=ids[start:start + DELETE_CHUNK]).delete()[0]
+        StaffAudit.write(request, f"удалено товаров: {deleted}")
+        modeladmin.message_user(request, f"Удалено товаров: {deleted}", messages.SUCCESS)
+        return None
+
+    return TemplateResponse(request, "admin/catalog/delete_products.html", {
+        **modeladmin.admin_site.each_context(request),
+        "title": "Удалить товары",
+        "opts": modeladmin.model._meta,
+        "count": queryset.count(),
+        "sample": list(queryset.values_list("name", flat=True)[:8]),
+        "action_checkbox_name": ACTION_CHECKBOX_NAME,
+        "selected": request.POST.getlist(ACTION_CHECKBOX_NAME),
+        "select_across": request.POST.get("select_across", "0"),
+    })
 
 
 @admin.register(Category)
@@ -105,7 +142,7 @@ class ProductAdmin(ModelAdmin):
     list_filter = ("category_id", "brand", "in_stock", "is_published", "is_featured", "is_new")
     search_fields = ("id", "name", "brand", "description")
     ordering = ("sort",)
-    actions = [make_published, make_draft]
+    actions = [make_published, make_draft, delete_products]
     fieldsets = (
         ("Основное", {
             "fields": ("id", "name", "brand", "category_id", "description"),
@@ -135,6 +172,13 @@ class ProductAdmin(ModelAdmin):
         }),
     )
     readonly_fields = ("preview_large",)
+
+    def get_actions(self, request):
+        # Штатное «Удалить выбранные» на тысячах товаров упиралось в лимит полей
+        # запроса — оставляем один путь удаления, свой.
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
 
     @admin.display(description="Остаток", ordering="stock_count")
     def stock(self, obj):

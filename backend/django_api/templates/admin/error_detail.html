@@ -3,66 +3,42 @@
 
 {% block content %}
 {# Карточка ошибки прямо в админке (D-32): стек-трейс, крошки, теги — без ухода на GlitchTip. #}
-<style>
-  .ed-back{display:inline-block;margin:0 0 1rem;color:#6f7278;text-decoration:none}
-  .ed-head{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:0 0 .4rem}
-  .lvl{display:inline-block;padding:.12rem .55rem;border-radius:1rem;font-size:.72rem;font-weight:700;color:#fff}
-  .lvl-error,.lvl-fatal{background:#e5484d}.lvl-warning{background:#f5a623}.lvl-info{background:#57bcd8}.lvl-debug,.lvl-sample{background:#8b93a1}
-  .ed-culprit{color:#6f7278;font-size:.85rem;margin:0 0 1rem}
-  .ed-meta{display:flex;gap:.75rem;flex-wrap:wrap;margin:0 0 1.2rem}
-  .ed-meta div{border:1px solid #e2e6ea;border-radius:.5rem;padding:.5rem .8rem;font-size:.85rem}
-  .dark .ed-meta div{border-color:#374151}
-  .ed-meta b{display:block;font-size:1.05rem}
-  h3.ed{margin:1.3rem 0 .5rem;font-size:1rem}
-  .ed-exc{border:1px solid #f0c8c9;border-radius:.5rem;overflow:hidden;margin:0 0 1rem}
-  .dark .ed-exc{border-color:#5b2e30}
-  .ed-exc-h{background:#fdecec;padding:.5rem .8rem;font-weight:600}
-  .dark .ed-exc-h{background:#3a2224}
-  table.ed-fr,table.ed-tags,table.ed-bc{width:100%;border-collapse:collapse;font-size:.85rem}
-  table.ed-fr td,table.ed-tags td,table.ed-tags th,table.ed-bc td{padding:.35rem .6rem;border-bottom:1px solid #eceff1;vertical-align:top}
-  .dark table.ed-fr td,.dark table.ed-tags td,.dark table.ed-tags th,.dark table.ed-bc td{border-color:#2b3441}
-  .ed-fr .code{font-family:ui-monospace,Consolas,monospace;color:#334}
-  .dark .ed-fr .code{color:#cbd5e1}
-  .ed-fr .inapp{background:#fff8e1}.dark .ed-fr .inapp{background:#3a3117}
-  .ed-note{padding:.8rem 1rem;border-radius:.5rem;background:#fff6e5;border:1px solid #f5d99a;color:#7a5b12;margin:0 0 1rem}
-  .dark .ed-note{background:#3a2f12;border-color:#6b551f;color:#f0d9a0}
-</style>
 
-<a class="ed-back" href="{% url 'errors_console' %}">← Все ошибки</a>
+<a class="m-muted" href="{% url 'errors_console' %}">← Все ошибки</a>
 
-{% if error %}<div class="ed-note">{{ error }}</div>{% endif %}
+{% if error %}<div class="m-hint">{{ error }}</div>{% endif %}
 
-<div class="ed-head">
-  <span class="lvl lvl-{{ issue.level|default:'error' }}">{{ level_ru }}</span>
+<div class="m-row">
+  <span class="m-tag lvl-{{ issue.level|default:'error' }}">{{ level_ru }}</span>
   <h2 style="margin:0;font-size:1.15rem">{{ title }}</h2>
 </div>
-{% if issue.culprit %}<div class="ed-culprit">{{ issue.culprit }}</div>{% endif %}
+{% if issue.culprit %}<div class="m-small m-muted">{{ issue.culprit }}</div>{% endif %}
 
-<div class="ed-meta">
-  <div><b>{{ issue.count|default:'—' }}</b>событий</div>
-  <div><b>{{ issue.userCount|default:'0' }}</b>пользователей</div>
-  <div><b>{{ status_ru }}</b>статус</div>
-  <div><b>{{ first_local|default:'—' }}</b>первая</div>
-  <div><b>{{ last_local|default:'—' }}</b>последняя</div>
+<div class="m-sum">
+  <div class="m-tile"><b>{{ issue.count|default:'—' }}</b><span>событий</span></div>
+  <div class="m-tile"><b>{{ issue.userCount|default:'0' }}</b><span>пользователей</span></div>
+  <div class="m-tile"><b>{{ status_ru }}</b><span>статус</span></div>
+  <div class="m-tile"><b>{{ first_local|default:'—' }}</b><span>первая</span></div>
+  <div class="m-tile"><b>{{ last_local|default:'—' }}</b><span>последняя</span></div>
 </div>
 
 {% if parsed.tags %}
-<h3 class="ed">Контекст</h3>
-<table class="ed-tags">
+<h3 class="m-h3">Контекст</h3>
+<table class="m compact top">
   {% for k, v in parsed.tags.items %}<tr><th style="text-align:left;width:180px">{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}
 </table>
 {% endif %}
 
 {% if parsed.exceptions %}
-<h3 class="ed">Стек-трейс</h3>
+<h3 class="m-h3">Стек-трейс</h3>
 {% for e in parsed.exceptions %}
-<div class="ed-exc">
-  <div class="ed-exc-h">{{ e.type }}{% if e.value %}: {{ e.value }}{% endif %}</div>
-  <table class="ed-fr">
+<div class="m-card">
+  <div class="m-strip bad">{{ e.type }}{% if e.value %}: {{ e.value }}{% endif %}</div>
+  <table class="m compact top">
     {% for f in e.frames %}
-    <tr class="{% if f.in_app %}inapp{% endif %}">
-      <td style="white-space:nowrap;color:#6f7278">{{ f.file }}{% if f.line %}:{{ f.line }}{% endif %}</td>
-      <td>{{ f.func }}{% if f.code %}<div class="code">{{ f.code }}</div>{% endif %}</td>
+    <tr class="{% if f.in_app %}m-inapp{% endif %}">
+      <td class="m-muted" style="white-space:nowrap">{{ f.file }}{% if f.line %}:{{ f.line }}{% endif %}</td>
+      <td>{{ f.func }}{% if f.code %}<div class="m-mono">{{ f.code }}</div>{% endif %}</td>
     </tr>
     {% endfor %}
   </table>
@@ -71,12 +47,12 @@
 {% endif %}
 
 {% if parsed.breadcrumbs %}
-<h3 class="ed">Что было до ошибки (крошки)</h3>
-<table class="ed-bc">
+<h3 class="m-h3">Что было до ошибки (крошки)</h3>
+<table class="m compact top">
   {% for b in parsed.breadcrumbs %}
   <tr>
-    <td style="white-space:nowrap;color:#6f7278">{{ b.time }}</td>
-    <td style="color:#6f7278">{{ b.category }}</td>
+    <td class="m-muted" style="white-space:nowrap">{{ b.time }}</td>
+    <td class="m-muted">{{ b.category }}</td>
     <td>{{ b.message }}</td>
   </tr>
   {% endfor %}
@@ -84,10 +60,10 @@
 {% endif %}
 
 {% if not parsed and not error %}
-  <p style="color:#6f7278">Нет данных события для этой ошибки.</p>
+  <p class="m-muted">Нет данных события для этой ошибки.</p>
 {% endif %}
 
 {% if gt_url %}
-<p style="margin-top:1.5rem"><a href="{{ gt_url }}" target="_blank" style="color:#6f7278;font-size:.85rem">Открыть в GlitchTip (полный разбор) ↗</a></p>
+<p style="margin-top:1.5rem"><a href="{{ gt_url }}" target="_blank" class="m-small m-muted">Открыть в GlitchTip (полный разбор) ↗</a></p>
 {% endif %}
 {% endblock %}

@@ -6,6 +6,8 @@ docs/LAUNCH_READINESS.md). Документы версионируются (ти
 from django.db import models
 from django.utils import timezone
 
+from accounts.models import Account
+
 
 class LegalDocument(models.Model):
     TERMS = "terms"            # Пользовательское соглашение
@@ -133,3 +135,16 @@ def record_consent(user_id, document, source=""):
         defaults={"source": source},
     )
     return consent
+
+
+class ConsentClient(Account):
+    """Клиент глазами юриста: один раз в списке, согласия — внутри (админка «Согласия»).
+
+    Отдельной таблицы нет — это тот же аккаунт. Прокси нужен, чтобы у списка клиентов
+    с согласиями был свой раздел и свои права во вкладке «Документы и согласия».
+    """
+
+    class Meta:
+        proxy = True
+        verbose_name = "Согласия клиента"
+        verbose_name_plural = "Согласия клиентов"

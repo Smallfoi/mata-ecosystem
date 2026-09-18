@@ -494,7 +494,7 @@ class _RunModeSwitch extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(runModeProvider);
-    // «Тропы» как режим бега скрыты до готовности (D-87, showTrails) — в Якутске
+    // «Тропы» как режим бега скрыты до готовности (D-89, showTrails) — в Якутске
     // троп пока нет. Остальные режимы — вопрос §4, здесь их не трогаем.
     final showTrails =
         ref.watch(appConfigProvider).valueOrNull?.showTrails ?? false;

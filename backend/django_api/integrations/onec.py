@@ -58,6 +58,59 @@ def _parcel_errors(product: Product, raw: dict, who: str) -> list:
     return errors
 
 
+# Поля, которые мы читаем в каждом потоке. Всё остальное 1С присылает зря — и это
+# должно быть видно, а не теряться молча.
+CATALOG_KEYS = {"id", "article", "name", "categoryId", "brand", "active", "updatedAt",
+                "price", "oldPrice", "description", "sizes", "colors", "images",
+                "weightG", "lengthCm", "widthCm", "heightCm"}
+PRICE_KEYS = {"id", "article", "price", "oldPrice", "stock", "variants"}
+CATEGORY_KEYS = {"id", "name", "parentId", "sort"}
+
+SAMPLE_VALUE = 200     # длина строкового значения в примере
+MAX_REPORTED = 40      # сколько полей показываем в отчёте
+
+
+def _is_filled(value) -> bool:
+    """Значение непустое: пустая строка, null и список из пустот не считаются."""
+    if value is None or value == "" or value == [] or value == {}:
+        return False
+    if isinstance(value, list):
+        return any(_is_filled(v) for v in value)
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "none", "null", "не указан", "не указано"}
+    return True
+
+
+def _diagnostics(items, known: set) -> tuple:
+    """Что пришло: пример позиции, незнакомые поля и заполненность каждого поля.
+
+    Смотрим ВСЮ пачку, а не первые позиции: новое поле в 1С сначала заполняют у
+    нескольких карточек, и они запросто окажутся в конце выгрузки. Пример берём
+    самый «полный»: у бедной строки половины полей нет, и по ней не понять, что 1С
+    умеет присылать. Заполненность («непусто у N из M») показывает, как идёт
+    заполнение карточек в 1С, — без неё «мы уже завели поле» не проверить.
+    """
+    best, unknown, filled, total = {}, set(), {}, 0
+    for raw in items:
+        if not isinstance(raw, dict):
+            continue
+        total += 1
+        for key, value in raw.items():
+            if key not in known:
+                unknown.add(key)
+            if _is_filled(value):
+                filled[key] = filled.get(key, 0) + 1
+        if len(raw) > len(best):
+            best = raw
+
+    sample = {}
+    for key, value in list(best.items())[:MAX_REPORTED]:
+        sample[key] = value[:SAMPLE_VALUE] if isinstance(value, str) else value
+    report = {key: {"filled": filled.get(key, 0), "of": total, "known": key in known}
+              for key in sorted(set(list(best.keys()) + list(filled.keys()) + list(unknown)))[:MAX_REPORTED]}
+    return sample, sorted(unknown), report
+
+
 # Сколько позиций принимаем за один запрос. Выгрузка целиком тоже не редкость,
 # поэтому потолок высокий — он защищает от бессмысленного, а не от большого.
 # Всё, что приходит, разбирается пачками по CHUNK, а не построчно.
@@ -122,6 +175,30 @@ class _Index:
         self.taken.add(product.id)
 
 
+# Списочные поля карточки: размеры, цвета, фото. 1С заводит их у каждой позиции, но
+# пока большинство карточек не заполнено — приходит [null]. Пустое должно оставаться
+# пустым: [null] на витрине превращается в пустую «плашку» размера.
+LIST_FIELDS = {"sizes", "colors", "images"}
+_EMPTY = {"", "none", "null", "не указан", "не указано", "-", "—"}
+
+
+def _clean_list(value) -> list:
+    """Значения из 1С: без пустот и повторов, обрезанные по краям, порядок сохранён."""
+    if not isinstance(value, list):
+        value = [value]
+    out: list = []
+    for item in value:
+        if item is None:
+            continue
+        text = str(item).strip()
+        if not text or text.lower() in _EMPTY:
+            continue
+        text = text[:80]
+        if text not in out:
+            out.append(text)
+    return out
+
+
 def _apply(product: Product, payload: dict, fields: dict) -> list:
     """Записать пришедшие поля: эффективное значение — только если не переопределено.
     Возвращает список полей, которые владелец удержал за собой (для отчёта)."""
@@ -131,10 +208,12 @@ def _apply(product: Product, payload: dict, fields: dict) -> list:
         if json_field not in payload:
             continue
         value = payload[json_field]
-        src[json_field] = value
+        src[json_field] = value                      # в from_1c кладём как прислали
         if product.is_overridden(json_field):
             kept.append(json_field)
             continue
+        if json_field in LIST_FIELDS:
+            value = _clean_list(value)
         setattr(product, model_field, value)
     product.from_1c = src
     return kept
@@ -194,8 +273,9 @@ def import_categories(items) -> dict:
             Category.objects.bulk_update(to_update, ["name", "parent_id", "sort"],
                                          batch_size=CHUNK)
 
+    sample, unknown, report = _diagnostics(items, CATEGORY_KEYS)
     return {"received": len(items), "created": len(to_create), "updated": len(to_update),
-            "errors": errors[:20]}
+            "errors": errors[:20], "sample": sample, "unknownKeys": unknown, "fields": report}
 
 
 # Что переписывает выгрузка карточек. Поля витрины (публикация, новинка,
@@ -278,10 +358,12 @@ def import_catalog(items) -> dict:
     for cid in sorted(unknown):
         errors.append(f"категория «{cid}» не заведена — товары не попадут в раздел")
 
+    sample, unknown_keys, report = _diagnostics(items, CATALOG_KEYS)
     return {
         "received": len(items), "created": created, "updated": updated,
         "skipped": skipped, "keptByOwner": sorted(kept_fields),
         "unknownCategories": sorted(unknown), "errors": errors[:20],
+        "sample": sample, "unknownKeys": unknown_keys, "fields": report,
     }
 
 
@@ -346,5 +428,7 @@ def import_prices(items) -> dict:
     with transaction.atomic():
         Product.objects.bulk_update(list(touched.values()), PRICE_FIELDS, batch_size=CHUNK)
 
+    sample, unknown, report = _diagnostics(items, PRICE_KEYS)
     return {"received": len(items), "updated": len(touched),
-            "keptByOwner": sorted(kept_fields), "errors": errors[:20]}
+            "keptByOwner": sorted(kept_fields), "errors": errors[:20],
+            "sample": sample, "unknownKeys": unknown, "fields": report}

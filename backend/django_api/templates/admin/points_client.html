@@ -1,0 +1,55 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# «Баллы клиента»: операции за выбранные дни с балансом после каждой. Только просмотр. #}
+
+<div class="m-sum">
+  <div class="m-tile"><b>{{ name }}</b><span>{{ account.phone|default:"клиент" }}</span></div>
+  <div class="m-tile"><b>{{ balance }}</b><span>баланс сейчас</span></div>
+  <div class="m-tile"><b class="m-plus">+{{ earned }}</b><span>начислено {% if period %}за {{ period.label }}{% else %}за всё время{% endif %}</span></div>
+  <div class="m-tile"><b class="m-minus">−{{ spent }}</b><span>списано</span></div>
+</div>
+
+<div class="m-row">
+  {% if period %}
+    <span class="m-chip">{{ period.label }}</span>
+    <a href="{{ all_url }}">Показать всю историю</a>
+  {% else %}
+    <span class="m-muted">Вся история клиента</span>
+  {% endif %}
+  {% if adjust_url %}<span class="m-muted">·</span> <a href="{{ adjust_url }}">Ручная корректировка →</a>{% endif %}
+</div>
+
+<div class="m-card">
+  {% if rows %}
+  <div class="m-wrap">
+    <table class="m">
+      <thead>
+        <tr><th>Когда (якут.)</th><th class="n">Баллы</th><th>За что</th><th>Описание</th><th>Заказ / забег</th><th class="n">Баланс после</th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td class="m-muted" style="white-space:nowrap">{{ r.when }}</td>
+          <td class="n">{% if r.amount >= 0 %}<span class="m-plus">+{{ r.amount }}</span>{% else %}<span class="m-minus">{{ r.amount }}</span>{% endif %}</td>
+          <td>{{ r.label }}</td>
+          <td>{{ r.description|default:"—" }}</td>
+          <td class="m-muted">
+            {% if r.order_url %}<a href="{{ r.order_url }}">заказ {{ r.order_id }}</a>
+            {% elif r.order_id %}заказ {{ r.order_id }}
+            {% elif r.run_id %}забег {{ r.run_id|truncatechars:14 }}
+            {% else %}—{% endif %}
+          </td>
+          <td class="n">{{ r.balance_after }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="m-empty">{% if period %}За {{ period.label }} операций нет.{% else %}Операций нет.{% endif %}</div>
+  {% endif %}
+</div>
+
+<p><a href="{{ back_url }}">← ко всем клиентам</a></p>
+{% endblock %}
