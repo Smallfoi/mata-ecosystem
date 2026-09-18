@@ -33,6 +33,17 @@ def _hours_since(dt):
     return int((timezone.now() - dt).total_seconds() // 3600)
 
 
+def _fields_line(report: dict) -> str:
+    """«Заполнено: наименование 3373, категория 214…» — как идёт заполнение в 1С."""
+    if not report:
+        return ""
+    parts = []
+    for key, info in report.items():
+        mark = "" if info.get("known") else " ⚠"
+        parts.append(f"{key}{mark} {info.get('filled', 0)}/{info.get('of', 0)}")
+    return " · ".join(parts)
+
+
 @staff_member_required
 @tab_required("onec_log")
 def onec_log(request):
@@ -64,6 +75,7 @@ def onec_log(request):
             "detail": r.detail,
             "unknown_keys": r.unknown_keys or [],
             "sample": json.dumps(r.sample, ensure_ascii=False, indent=2) if r.sample else "",
+            "fields": _fields_line(r.fields_report),
         })
 
     day = timezone.now() - timedelta(hours=24)

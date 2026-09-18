@@ -71,3 +71,34 @@ class PayloadVisibilityTests(TestCase):
         self.assertIsNotNone(row)
         self.assertEqual(row.sample, {})
         self.assertEqual(row.unknown_keys, [])
+
+    def test_new_field_is_found_even_at_the_end_of_a_big_batch(self):
+        """Новое поле в 1С сначала заполняют у пары карточек — они могут быть в конце.
+
+        Раньше смотрели только первые 200 позиций, и такое поле оставалось незамеченным.
+        """
+        items = [{"id": f"SS-{i}", "name": f"Товар {i}"} for i in range(400)]
+        items[-1]["Размер"] = "XL"
+        r = self._post(CATALOG, {"products": items})
+        self.assertIn("Размер", r.json()["unknownKeys"])
+
+    def test_fill_report_shows_how_many_positions_are_filled(self):
+        r = self._post(CATALOG, {"products": [
+            {"id": "SS-A", "name": "Товар", "categoryId": "c", "sizes": ["XL"]},
+            {"id": "SS-B", "name": "Товар", "categoryId": "", "sizes": [None]},
+            {"id": "SS-C", "name": "Товар", "sizes": []},
+        ]})
+        report = r.json()["fields"]
+        self.assertEqual(report["name"], {"filled": 3, "of": 3, "known": True})
+        self.assertEqual(report["categoryId"]["filled"], 1, "пустая строка — не заполнено")
+        self.assertEqual(report["sizes"]["filled"], 1, "[null] и [] — не заполнено")
+
+    def test_unknown_fields_are_marked_in_the_report(self):
+        r = self._post(CATALOG, {"products": [
+            {"id": "SS-D", "name": "Товар", "Цвет": "Синий"}]})
+        report = r.json()["fields"]
+        self.assertFalse(report["Цвет"]["known"])
+        self.assertTrue(report["name"]["known"])
+        row = OneCExchange.objects.get(operation="catalog")
+        self.assertEqual(row.fields_report["Цвет"]["filled"], 1)
+

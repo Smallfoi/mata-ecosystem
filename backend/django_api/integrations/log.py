@@ -37,6 +37,7 @@ def record(operation: str, result: dict | None = None, *,
             detail=detail[:200],
             sample=result.get("sample") or {},
             unknown_keys=list(result.get("unknownKeys") or [])[:30],
+            fields_report=result.get("fields") or {},
         )
         # Чистка старых записей — раз в сутки, на первом же обмене.
         if cache.add("onec_log_pruned", 1, 24 * 3600):

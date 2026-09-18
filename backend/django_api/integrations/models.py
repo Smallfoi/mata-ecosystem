@@ -55,6 +55,8 @@ class OneCExchange(models.Model):
     sample = models.JSONField(default=dict, blank=True, verbose_name="Пример позиции")
     unknown_keys = models.JSONField(default=list, blank=True,
                                     verbose_name="Поля, которые мы не читаем")
+    fields_report = models.JSONField(default=dict, blank=True,
+                                     verbose_name="Заполненность полей")
 
     class Meta:
         ordering = ["-created_at"]

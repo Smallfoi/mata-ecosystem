@@ -66,27 +66,49 @@ CATALOG_KEYS = {"id", "article", "name", "categoryId", "brand", "active", "updat
 PRICE_KEYS = {"id", "article", "price", "oldPrice", "stock", "variants"}
 CATEGORY_KEYS = {"id", "name", "parentId", "sort"}
 
-SAMPLE_SCAN = 200      # по скольким позициям ищем пример и незнакомые поля
 SAMPLE_VALUE = 200     # длина строкового значения в примере
+MAX_REPORTED = 40      # сколько полей показываем в отчёте
+
+
+def _is_filled(value) -> bool:
+    """Значение непустое: пустая строка, null и список из пустот не считаются."""
+    if value is None or value == "" or value == [] or value == {}:
+        return False
+    if isinstance(value, list):
+        return any(_is_filled(v) for v in value)
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "none", "null", "не указан", "не указано"}
+    return True
 
 
 def _diagnostics(items, known: set) -> tuple:
-    """Одна позиция как пример + имена полей, которых нет в обмене.
+    """Что пришло: пример позиции, незнакомые поля и заполненность каждого поля.
 
-    Пример берём самый «полный» из первых позиций: у бедной строки половина полей
-    отсутствует, и по ней не понять, что 1С умеет присылать.
+    Смотрим ВСЮ пачку, а не первые позиции: новое поле в 1С сначала заполняют у
+    нескольких карточек, и они запросто окажутся в конце выгрузки. Пример берём
+    самый «полный»: у бедной строки половины полей нет, и по ней не понять, что 1С
+    умеет присылать. Заполненность («непусто у N из M») показывает, как идёт
+    заполнение карточек в 1С, — без неё «мы уже завели поле» не проверить.
     """
-    best, unknown = {}, set()
-    for raw in items[:SAMPLE_SCAN]:
+    best, unknown, filled, total = {}, set(), {}, 0
+    for raw in items:
         if not isinstance(raw, dict):
             continue
-        unknown.update(k for k in raw if k not in known)
+        total += 1
+        for key, value in raw.items():
+            if key not in known:
+                unknown.add(key)
+            if _is_filled(value):
+                filled[key] = filled.get(key, 0) + 1
         if len(raw) > len(best):
             best = raw
+
     sample = {}
-    for key, value in list(best.items())[:40]:
+    for key, value in list(best.items())[:MAX_REPORTED]:
         sample[key] = value[:SAMPLE_VALUE] if isinstance(value, str) else value
-    return sample, sorted(unknown)
+    report = {key: {"filled": filled.get(key, 0), "of": total, "known": key in known}
+              for key in sorted(set(list(best.keys()) + list(filled.keys()) + list(unknown)))[:MAX_REPORTED]}
+    return sample, sorted(unknown), report
 
 
 # Сколько позиций принимаем за один запрос. Выгрузка целиком тоже не редкость,
@@ -251,9 +273,9 @@ def import_categories(items) -> dict:
             Category.objects.bulk_update(to_update, ["name", "parent_id", "sort"],
                                          batch_size=CHUNK)
 
-    sample, unknown = _diagnostics(items, CATEGORY_KEYS)
+    sample, unknown, report = _diagnostics(items, CATEGORY_KEYS)
     return {"received": len(items), "created": len(to_create), "updated": len(to_update),
-            "errors": errors[:20], "sample": sample, "unknownKeys": unknown}
+            "errors": errors[:20], "sample": sample, "unknownKeys": unknown, "fields": report}
 
 
 # Что переписывает выгрузка карточек. Поля витрины (публикация, новинка,
@@ -336,12 +358,12 @@ def import_catalog(items) -> dict:
     for cid in sorted(unknown):
         errors.append(f"категория «{cid}» не заведена — товары не попадут в раздел")
 
-    sample, unknown_keys = _diagnostics(items, CATALOG_KEYS)
+    sample, unknown_keys, report = _diagnostics(items, CATALOG_KEYS)
     return {
         "received": len(items), "created": created, "updated": updated,
         "skipped": skipped, "keptByOwner": sorted(kept_fields),
         "unknownCategories": sorted(unknown), "errors": errors[:20],
-        "sample": sample, "unknownKeys": unknown_keys,
+        "sample": sample, "unknownKeys": unknown_keys, "fields": report,
     }
 
 
@@ -406,7 +428,7 @@ def import_prices(items) -> dict:
     with transaction.atomic():
         Product.objects.bulk_update(list(touched.values()), PRICE_FIELDS, batch_size=CHUNK)
 
-    sample, unknown = _diagnostics(items, PRICE_KEYS)
+    sample, unknown, report = _diagnostics(items, PRICE_KEYS)
     return {"received": len(items), "updated": len(touched),
             "keptByOwner": sorted(kept_fields), "errors": errors[:20],
-            "sample": sample, "unknownKeys": unknown}
+            "sample": sample, "unknownKeys": unknown, "fields": report}
