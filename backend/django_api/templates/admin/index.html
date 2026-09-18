@@ -2,11 +2,15 @@
 {% load i18n %}
 
 {% block content %}
-{# Цвета задаём явно через .dark (Unfold вешает этот класс на <html>): его
-   prebuilt Tailwind НЕ содержит части dark:bg-* утилит, из-за чего в тёмной теме
-   карточки оставались белыми → белые цифры на белом фоне. Структурные классы
-   (grid/rounded/padding/размер шрифта) Unfold содержит — их оставляем. #}
-<div class="space-y-6">
+{% comment %}
+Цвета задаём явно через .dark (Unfold вешает этот класс на <html>): его prebuilt
+Tailwind НЕ содержит части dark:bg-* утилит, из-за чего в тёмной теме карточки
+оставались белыми → белые цифры на белом фоне. Отступы между блоками тоже не берём
+из Tailwind (`space-y-*` в prebuilt отсутствует — карточки слипались): вертикальные
+стопки делаем своим `.m-vstack` (flex + gap) из mata.css. Сетки (`grid`/`gap-*`)
+Unfold содержит — их оставляем.
+{% endcomment %}
+<div class="m-vstack lg">
   <div>
     <h1 class="text-xl font-semibold">Обзор экосистемы</h1>
     <p class="text-sm m-muted">Сводка по магазину, баллам и сообществу</p>
@@ -39,7 +43,7 @@
       </div>
     </div>
 
-    <div class="space-y-4">
+    <div class="m-vstack">
       {% for s in extra_stats %}
       <div class="m-card pad flex items-center justify-between">
         <span class="text-sm m-muted">{{ s.title }}</span>
