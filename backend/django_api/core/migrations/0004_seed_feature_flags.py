@@ -115,5 +115,5 @@ def unseed(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("core", "0002_featureflag_delete_appconfig")]
+    dependencies = [("core", "0003_featureflag_delete_appconfig")]
     operations = [migrations.RunPython(seed, unseed)]

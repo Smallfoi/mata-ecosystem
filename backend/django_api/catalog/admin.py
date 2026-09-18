@@ -5,7 +5,7 @@ from django.template.response import TemplateResponse
 from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin
 
-from common.adminutils import UserRefMixin
+from common.adminutils import ColumnPickerMixin, UserRefMixin
 from staff.models import StaffAudit
 
 from .models import Banner, Category, Product, Review
@@ -111,12 +111,16 @@ def _size_key(item):
 
 
 @admin.register(Product)
-class ProductAdmin(ModelAdmin):
-    # ID в списке — служебный шум: товар открывается по названию, найти по ID можно поиском.
+class ProductAdmin(ColumnPickerMixin, ModelAdmin):
+    # Полный набор колонок: всё, что ведёт 1С, и всё, что ведём мы. Показывать всё
+    # сразу тесно, поэтому набор настраивается шестерёнкой «Столбцы» — у каждого свой.
+    # ID в списке нет: товар открывается по названию, найти по ID можно поиском.
     list_display = (
         "preview",
         "name",
+        "global_name",
         "brand",
+        "article",
         "category_name",
         "price",
         "old_price",
@@ -127,9 +131,18 @@ class ProductAdmin(ModelAdmin):
         "is_new",
         "sort_site",
         "sort_app",
+        "sizes_list",
+        "colors_list",
+        "is_active_1c",
+        "source_updated_at",
+        "parcel",
+        "description_short",
+        "onec_code",
     )
     list_display_links = ("name",)
-    list_editable = (
+    columns_locked = ("name",)          # по названию открывается карточка — скрывать нечего
+    columns_hidden_default = ("description_short", "onec_code")
+    columns_editable = (
         "price",
         "old_price",
         "in_stock",
@@ -139,13 +152,17 @@ class ProductAdmin(ModelAdmin):
         "sort_site",
         "sort_app",
     )
-    list_filter = ("category_id", "brand", "in_stock", "is_published", "is_featured", "is_new")
-    search_fields = ("id", "name", "brand", "description")
+    list_filter = ("category_id", "brand", "in_stock", "is_published", "is_featured",
+                   "is_new", "is_active_1c")
+    search_fields = ("id", "name", "global_name", "brand", "article", "description")
     ordering = ("sort",)
     actions = [make_published, make_draft, delete_products]
     fieldsets = (
         ("Основное", {
-            "fields": ("id", "name", "brand", "category_id", "description"),
+            "fields": ("id", "name", "global_name", "brand", "article", "category_id",
+                       "description"),
+            "description": "«Название» 1С шлёт по позиции — с цветом и размером "
+            "(«BMAI PURE 2.0 черный 36р.»). «Общее название» — одно на всю модель.",
         }),
         ("Фото", {
             "fields": ("image", "preview_large", "image_urls"),
@@ -197,6 +214,45 @@ class ProductAdmin(ModelAdmin):
             '{}<div style="font-size:11px;color:#6b7280;white-space:nowrap" title="{}">{}</div>',
             total, " · ".join(parts), shown,
         )
+
+    @admin.display(description="Размеры")
+    def sizes_list(self, obj):
+        return self._joined(obj.sizes)
+
+    @admin.display(description="Цвета")
+    def colors_list(self, obj):
+        return self._joined(obj.colors)
+
+    @staticmethod
+    def _joined(values):
+        """Список из 1С в строку. Пусто — прочерк: карточка ещё не заполнена."""
+        items = [str(v).strip() for v in (values or []) if str(v or "").strip()]
+        if not items:
+            return "—"
+        shown = ", ".join(items[:6]) + ("…" if len(items) > 6 else "")
+        return format_html('<span title="{}">{}</span>', ", ".join(items), shown)
+
+    @admin.display(description="Посылка", ordering="weight_g")
+    def parcel(self, obj):
+        """Вес и габариты для расчёта доставки. Прочерк — 1С ещё не прислала."""
+        if not obj.weight_g and not obj.length_cm:
+            return "—"
+        size = "×".join(str(v) for v in (obj.length_cm, obj.width_cm, obj.height_cm) if v)
+        weight = f"{obj.weight_g} г" if obj.weight_g else ""
+        return format_html('<span style="white-space:nowrap">{}</span>',
+                           " · ".join(x for x in (weight, f"{size} см" if size else "") if x))
+
+    @admin.display(description="Описание")
+    def description_short(self, obj):
+        text = (obj.description or "").strip()
+        if not text:
+            return "—"
+        short = text[:60] + ("…" if len(text) > 60 else "")
+        return format_html('<span title="{}">{}</span>', text[:400], short)
+
+    @admin.display(description="Код 1С", ordering="external_id")
+    def onec_code(self, obj):
+        return obj.external_id or obj.article or "—"
 
     @admin.display(description="Категория")
     def category_name(self, obj):

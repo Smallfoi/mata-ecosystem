@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -63,3 +64,28 @@ class FeatureFlag(models.Model):
         for f in cls.objects.all():
             cfg[f.config_key] = f.enabled
         return cfg
+
+
+class AdminColumns(models.Model):
+    """Какие столбцы сотрудник скрыл в списке админки — личная настройка.
+
+    В «Товарах» колонок много: всё, что ведёт 1С, плюс наши поля витрины. Нужны
+    они не всем и не всегда — кому-то мешает «Старая цена», кому-то размеры.
+    Выбор у каждого свой и должен пережить выход из админки, поэтому хранится
+    в базе, а не в сессии.
+    """
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name="admin_columns", verbose_name="Сотрудник")
+    model_label = models.CharField(max_length=100, verbose_name="Список")
+    hidden = models.JSONField(default=list, blank=True, verbose_name="Скрытые столбцы")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Изменено")
+
+    class Meta:
+        db_table = "admin_columns"
+        unique_together = ("user", "model_label")
+        verbose_name = "Столбцы списка"
+        verbose_name_plural = "Столбцы списков"
+
+    def __str__(self):
+        return f"{self.user_id} · {self.model_label}"
