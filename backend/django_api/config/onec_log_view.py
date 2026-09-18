@@ -4,6 +4,7 @@
 товаров она добавила и обновила, и не ругался ли приём. Всё в одной таблице по
 датам, время — якутское.
 """
+import json
 from datetime import timedelta
 
 from django.conf import settings
@@ -61,6 +62,8 @@ def onec_log(request):
             "errors_more": max(0, len(r.errors or []) - 3),
             "duration": f"{r.duration_ms} мс" if r.duration_ms else "—",
             "detail": r.detail,
+            "unknown_keys": r.unknown_keys or [],
+            "sample": json.dumps(r.sample, ensure_ascii=False, indent=2) if r.sample else "",
         })
 
     day = timezone.now() - timedelta(hours=24)

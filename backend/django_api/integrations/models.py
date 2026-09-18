@@ -49,6 +49,12 @@ class OneCExchange(models.Model):
     duration_ms = models.IntegerField(default=0, verbose_name="Длительность, мс")
     detail = models.CharField(max_length=200, blank=True, default="",
                               verbose_name="Пояснение")
+    # Что 1С прислала на самом деле: одна позиция как пример и имена полей, которые
+    # мы не читаем. Без этого разговор «мы это присылаем» — «а мы не видим» упирается
+    # в слово против слова; здесь видно пакет целиком.
+    sample = models.JSONField(default=dict, blank=True, verbose_name="Пример позиции")
+    unknown_keys = models.JSONField(default=list, blank=True,
+                                    verbose_name="Поля, которые мы не читаем")
 
     class Meta:
         ordering = ["-created_at"]

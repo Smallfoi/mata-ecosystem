@@ -265,3 +265,5 @@ table.m.compact td, table.m.compact th { padding: .35rem .6rem; font-size: .85re
 .m-tag.m-st-ok { background: #16a34a; }
 .m-tag.m-st-partial { background: #f5a623; color: #2b2b2b; }
 .m-tag.m-st-error { background: #e5484d; }
+details summary { cursor: pointer; }
+pre.m-mono { white-space: pre-wrap; margin: .4rem 0 0; max-height: 320px; overflow: auto; }
