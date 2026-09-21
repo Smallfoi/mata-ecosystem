@@ -1,0 +1,67 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# «Фото товаров» (D-91): заливка плиткой, перетаскиванием. Оформление общее, m-*. #}
+
+<div class="m-sum">
+  <div class="m-tile"><b>{{ left }}</b><span>осталось без фото</span></div>
+  <div class="m-tile"><b>{{ total }}</b><span>товаров всего</span></div>
+</div>
+
+<div class="m-tabs">
+  <a class="m-tab {% if only != 'all' %}on{% endif %}" href="?only=empty&q={{ query }}">Без фото</a>
+  <a class="m-tab {% if only == 'all' %}on{% endif %}" href="?only=all&q={{ query }}">Все товары</a>
+  <a class="m-tab" href="{{ fill_link }}">Заполненность 1С</a>
+</div>
+
+<form class="m-form" method="get">
+  <input type="hidden" name="only" value="{{ only }}">
+  <input class="m-input wide" type="search" name="q" value="{{ query }}"
+         placeholder="Название, бренд или артикул">
+  <button class="m-btn" type="submit">Найти</button>
+</form>
+
+<div class="m-hint">
+  Перетащите картинку на карточку — она сохранится сразу, заходить внутрь не нужно.
+  JPEG, PNG или WEBP до {{ max_mb }} МБ.
+</div>
+
+{% csrf_token %}
+
+{% if items %}
+  <div class="m-photos" id="photo-grid">
+    {% for it in items %}
+      <div class="m-photo" data-id="{{ it.id }}">
+        <div class="m-photo-box">
+          {% if it.url %}
+            <img src="{{ it.url }}" alt="">
+          {% else %}
+            <span class="m-photo-empty">перетащите фото</span>
+          {% endif %}
+        </div>
+        <label class="m-photo-pick">
+          <input type="file" accept="image/jpeg,image/png,image/webp" hidden>
+          Выбрать файл
+        </label>
+        <div class="m-photo-name" title="{{ it.name }}">{{ it.name }}</div>
+        <div class="m-photo-meta">{{ it.meta|default:"—" }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="m-pages">
+    {% if page.has_previous %}
+      <a class="m-btn" href="?only={{ only }}&q={{ query }}&page={{ page.previous_page_number }}">Назад</a>
+    {% endif %}
+    <span class="m-mono">страница {{ page.number }} из {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+      <a class="m-btn" href="?only={{ only }}&q={{ query }}&page={{ page.next_page_number }}">Дальше</a>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="m-good">
+    {% if query %}Ничего не нашлось по запросу «{{ query }}».
+    {% else %}Фото есть у всех товаров.{% endif %}
+  </div>
+{% endif %}
+{% endblock %}
