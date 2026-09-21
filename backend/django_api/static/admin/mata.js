@@ -76,3 +76,97 @@
   // Раскрыли/свернули панель «Столбцы» — таблица поехала вверх или вниз.
   document.addEventListener("toggle", later, true);
 })();
+
+/* Заливка фото товаров плиткой (D-91): перетащил картинку на карточку — она
+ * ушла на сервер и встала на место. Без перезагрузки страницы: иначе на каждой
+ * картинке пришлось бы ждать полной отрисовки списка. */
+(function () {
+  "use strict";
+
+  // Тема подключает наши скрипты в <head> и БЕЗ defer: на момент выполнения
+  // страницы ещё нет. Поэтому ждём разбор разметки, иначе плитка не найдётся
+  // и перетаскивание молча не заработает (проверено в браузере 22.09.2026).
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  function init() {
+  var grid = document.getElementById("photo-grid");
+  if (!grid) return;
+
+  var token = document.querySelector("input[name=csrfmiddlewaretoken]");
+  var left = document.querySelector(".m-tile b");
+
+  function send(card, file) {
+    if (!file || card.classList.contains("is-busy")) return;
+    var box = card.querySelector(".m-photo-box");
+    var had = !!box.querySelector("img");
+    card.classList.remove("is-bad", "is-done");
+    card.classList.add("is-busy");
+
+    var body = new FormData();
+    body.append("id", card.dataset.id);
+    body.append("photo", file);
+    if (token) body.append("csrfmiddlewaretoken", token.value);
+
+    fetch(window.location.pathname, {
+      method: "POST", body: body, credentials: "same-origin",
+      headers: token ? { "X-CSRFToken": token.value } : {}
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        card.classList.remove("is-busy");
+        if (!data.ok) {
+          card.classList.add("is-bad");
+          box.innerHTML = '<span class="m-photo-empty">' + (data.error || "не вышло") + "</span>";
+          return;
+        }
+        card.classList.add("is-done");
+        box.innerHTML = "";
+        var img = document.createElement("img");
+        img.src = data.url + "?t=" + Date.now();   // чтобы браузер не показал прежнюю
+        box.appendChild(img);
+        if (!had && left) {                        // счётчик «осталось без фото»
+          var n = parseInt(left.textContent, 10);
+          if (!isNaN(n) && n > 0) left.textContent = n - 1;
+        }
+      })
+      .catch(function () {
+        card.classList.remove("is-busy");
+        card.classList.add("is-bad");
+      });
+  }
+
+  grid.addEventListener("dragover", function (e) {
+    var card = e.target.closest(".m-photo");
+    if (!card) return;
+    e.preventDefault();
+    card.classList.add("is-over");
+  });
+  grid.addEventListener("dragleave", function (e) {
+    var card = e.target.closest(".m-photo");
+    if (card) card.classList.remove("is-over");
+  });
+  grid.addEventListener("drop", function (e) {
+    var card = e.target.closest(".m-photo");
+    if (!card) return;
+    e.preventDefault();
+    card.classList.remove("is-over");
+    send(card, e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
+  grid.addEventListener("change", function (e) {
+    if (e.target.type !== "file") return;
+    var card = e.target.closest(".m-photo");
+    send(card, e.target.files && e.target.files[0]);
+    e.target.value = "";
+  });
+  // Картинка, брошенная мимо плитки, иначе откроется во весь экран поверх админки.
+  document.addEventListener("dragover", function (e) { e.preventDefault(); });
+  document.addEventListener("drop", function (e) {
+    if (!e.target.closest(".m-photo")) e.preventDefault();
+  });
+  }
+})();
+

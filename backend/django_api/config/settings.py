@@ -479,6 +479,10 @@ UNFOLD = {
                     {"title": "Заполненность 1С", "icon": "fact_check",
                      "link": reverse_lazy("onec_fill"),
                      "permission": _tab("onec_fill")},
+                    # Заливка фото товаров плиткой (D-91): фото ведём мы, не 1С.
+                    {"title": "Фото товаров", "icon": "add_photo_alternate",
+                     "link": reverse_lazy("product_photos"),
+                     "permission": _tab("product_photos")},
                     # Флаги видимости приложения (D-89): что показывать в «Квартале»
                     # без пересборки. Раздаётся как вкладка (S-12) — доступ можно
                     # выдать сотруднику в «Сотрудники».
