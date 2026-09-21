@@ -6,6 +6,7 @@ from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin
 
 from common.adminutils import ColumnPickerMixin, UserRefMixin
+from config.onec_fill_view import FIELDS as MISSING_FIELDS
 from staff.models import StaffAudit
 
 from .models import Banner, Category, Product, Review
@@ -110,6 +111,26 @@ def _size_key(item):
         return (2, 0, size)
 
 
+class MissingFilter(admin.SimpleListFilter):
+    """«Не заполнено» — переход со страницы «Заполненность 1С» к нужным карточкам.
+
+    Условия берём оттуда же, чтобы список и сводка не разошлись: если на странице
+    написано «без категории 3159», то по ссылке должно открыться ровно 3159 карточек.
+    """
+
+    title = "Не заполнено"
+    parameter_name = "missing"
+
+    def lookups(self, request, model_admin):
+        return [(key, title) for key, title, _c, _r in MISSING_FIELDS]
+
+    def queryset(self, request, queryset):
+        for key, _title, cond, _risk in MISSING_FIELDS:
+            if self.value() == key:
+                return queryset.filter(cond)
+        return queryset
+
+
 @admin.register(Product)
 class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     # Полный набор колонок: всё, что ведёт 1С, и всё, что ведём мы. Показывать всё
@@ -157,8 +178,8 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
         "sort_site",
         "sort_app",
     )
-    list_filter = ("category_id", "brand", "in_stock", "is_published", "is_featured",
-                   "is_new", "is_active_1c")
+    list_filter = (MissingFilter, "category_id", "brand", "in_stock", "is_published",
+                   "is_featured", "is_new", "is_active_1c")
     search_fields = ("id", "name", "global_name", "brand", "article", "description")
     ordering = ("sort",)
     actions = [make_published, make_draft, delete_products]

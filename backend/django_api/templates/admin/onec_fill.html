@@ -1,0 +1,87 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# «Заполненность 1С»: что просить заполнить в первую очередь. Стиль общий, m-*. #}
+
+{% if not total %}
+  <div class="m-hint">Товаров пока нет — 1С ещё ничего не присылала.</div>
+{% else %}
+
+<div class="m-sum">
+  <div class="m-tile"><b>{{ total }}</b><span>товаров всего</span></div>
+  <div class="m-tile"><b>{{ ready }}</b><span>готовы к витрине ({{ ready_percent }}%)</span></div>
+  <div class="m-tile"><b>{{ categories }}</b><span>категорий из 1С</span></div>
+  <div class="m-tile"><b>{{ lost_total }}</b><span>с чужой категорией</span></div>
+</div>
+
+<div class="m-card">
+  <div class="m-head">Что не заполнено</div>
+  <div class="m-wrap">
+    <table class="m">
+      <thead>
+        <tr>
+          <th>Поле</th>
+          <th class="n">Заполнено</th>
+          <th class="n">Пусто</th>
+          <th>Готовность</th>
+          <th>Чем грозит пустота</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>
+              {{ r.title }}
+              {% if r.from_1c %}<span class="m-tag info">1С</span>{% endif %}
+            </td>
+            <td class="n">{{ r.filled }}</td>
+            <td class="n">
+              {% if r.blank %}<b>{{ r.blank }}</b>{% else %}—{% endif %}
+            </td>
+            <td>
+              <div class="m-meter"><i style="width:{{ r.percent }}%"></i></div>
+              <span class="m-mono">{{ r.percent }}%</span>
+            </td>
+            <td class="m-muted">{{ r.risk }}</td>
+            <td>
+              {% if r.blank %}<a class="m-btn" href="{{ r.link }}">Показать</a>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="m-hint">
+    Метка «1С» — поле ведёт 1С, заполнять нужно там: при следующей выгрузке оно приедет само.
+    Фото и описание можно вести и у нас в карточке товара.
+  </div>
+</div>
+
+{% if lost %}
+<div class="m-card">
+  <div class="m-head">Категории, которых у нас нет</div>
+  <p>
+    1С прислала товар с категорией, которой нет в справочнике: на витрине он потеряется
+    так же, как без категории. Обычно это значит, что категорию не выгрузили.
+  </p>
+  <div class="m-wrap">
+    <table class="m">
+      <thead><tr><th>Код категории из 1С</th><th class="n">Товаров</th></tr></thead>
+      <tbody>
+        {% for c in lost %}
+          <tr><td class="m-mono">{{ c.category_id }}</td><td class="n">{{ c.n }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="m-hint">
+  Последняя выгрузка каталога: {% if last_at %}{{ last_at }}{% else %}не было{% endif %} ·
+  <a href="{{ log_link }}">журнал обмена</a>
+</div>
+
+{% endif %}
+{% endblock %}
