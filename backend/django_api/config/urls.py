@@ -43,6 +43,7 @@ from territories import views as territories_views
 from blocks import views as blocks_views
 from analytics import views as analytics_views
 from config.errors_view import error_detail, errors_console
+from config.onec_fill_view import onec_fill
 from config.onec_log_view import onec_log
 from config.runs_review_view import runs_review
 from config.order_return_view import order_return
@@ -68,6 +69,7 @@ urlpatterns = [
     path("admin/errors/", errors_console, name="errors_console"),
     path("admin/storage/", admin_storage, name="admin_storage"),
     path("admin/1c-log/", onec_log, name="onec_log"),
+    path("admin/1c-fill/", onec_fill, name="onec_fill"),
     # «Проверка забегов» — разбор помеченных анти-читом (S-04 ф.2). ДО admin/.
     path("admin/runs-review/", runs_review, name="runs_review"),
     path("admin/order-return/<int:pk>/", order_return, name="order_return"),
