@@ -122,6 +122,20 @@ class AdminPagesRenderTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("m-btn", r.content.decode())
 
+    def test_photo_page_lives_in_the_storefront_group(self):
+        """«Фото товаров» — рядом с Конструктором: это наполнение витрины.
+        Пункт меню курируется вручную (D-63), и легко положить его не в ту группу —
+        владелец искал его в «Витрине», а он оказался в «Мониторинге»."""
+        from django.conf import settings
+
+        groups = {}
+        for section in settings.UNFOLD["SIDEBAR"]["navigation"]:
+            titles = [i["title"] for i in section["items"]]
+            groups[section.get("title", "")] = titles
+        place = [name for name, titles in groups.items() if "Фото товаров" in titles]
+        self.assertEqual(len(place), 1, "пункт «Фото товаров» потерялся или задвоился")
+        self.assertIn("Конструктор", groups[place[0]])
+
     def test_no_technical_id_columns_in_lists(self):
         """ID — служебный шум: в списках его не показываем (решение владельца 18.09).
 
