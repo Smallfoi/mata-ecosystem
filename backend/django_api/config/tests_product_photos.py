@@ -4,9 +4,12 @@
 безопасной: чужой файл под видом картинки принимать нельзя, а без права на
 вкладку страница не открывается.
 """
+import shutil
+import tempfile
+
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from catalog.models import Product
 from common.testutils import login_admin
@@ -20,7 +23,19 @@ PNG = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08
        b"\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82")
 
 
+# Свой временный каталог для загрузок: без него тест писал бы в боевую папку
+# медиа. На CI её просто нет (Permission denied: /srv/media) — и это правильно:
+# тест не должен зависеть от того, куда настроено хранилище на машине.
+_MEDIA = tempfile.mkdtemp(prefix="mata-photos-")
+
+
+@override_settings(MEDIA_ROOT=_MEDIA)
 class ProductPhotosTests(TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(_MEDIA, ignore_errors=True)
+        super().tearDownClass()
+
     def setUp(self):
         get_user_model().objects.create_superuser("owner_ph", "p@t.dev", "OwnerPass!2026")
         login_admin(self.client, "owner_ph", "OwnerPass!2026")
