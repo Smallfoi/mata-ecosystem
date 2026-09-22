@@ -446,7 +446,8 @@
         var v = document.createElement("video");
         v.muted = true; v.defaultMuted = true;
         v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("preload", "auto");
-        if (!seamless) { v.loop = true; v.setAttribute("loop", ""); }
+        // Нативный loop ВСЕГДА — страховка от «зависло на последнем кадре» (см. content.js).
+        v.loop = true; v.setAttribute("loop", "");
         layer.appendChild(v);
       }
       vs = layer.querySelectorAll("video");
@@ -473,13 +474,20 @@
           if (vv._wrap) return; vv._wrap = 1;
           vv.addEventListener("timeupdate", function () {
             if (vv !== layer._active || !vv.duration || vv.duration === Infinity) return;
-            if (vv.currentTime >= vv.duration - XF) {
+            if (vv.currentTime >= vv.duration - XF && !vv._switching) {
+              vv._switching = 1;
               var other = (vv === a) ? b : a;
-              layer._active = other;
               try { other.currentTime = 0; } catch (e) {}
-              var p = other.play(); if (p && p.catch) p.catch(function () {});
-              other.style.opacity = "1"; vv.style.opacity = "0";
-              setTimeout(function () { try { vv.pause(); } catch (e) {} }, (XF + 0.12) * 1000);
+              // Свап только после реального play() второго видео (см. content.js) — иначе
+              // не гасим текущее: оно зациклится нативным loop, «застыть» не сможет.
+              var swap = function () {
+                layer._active = other;
+                other.style.opacity = "1"; vv.style.opacity = "0";
+                setTimeout(function () { try { vv.pause(); } catch (e) {} vv._switching = 0; }, (XF + 0.12) * 1000);
+              };
+              var p = other.play();
+              if (p && p.then) p.then(swap).catch(function () { vv._switching = 0; });
+              else swap();
             }
           });
         });
