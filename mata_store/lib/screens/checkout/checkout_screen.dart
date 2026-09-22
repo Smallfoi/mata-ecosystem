@@ -636,6 +636,13 @@ class _DeliveryStep extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 6),
+          const RemoteText(
+            'app.checkout.delivery.note',
+            'Доставку по городу везём сами: свяжемся после заказа и договоримся '
+                'о времени. Стоимость доставки в оплату не входит.',
+            style: TextStyle(fontSize: 13, color: AppColors.grey600, height: 1.4),
+          ),
           if (needAddress) ...[
             const SizedBox(height: 20),
             const _StepTitle('app.checkout.title.address', 'Адрес доставки'),
@@ -694,16 +701,21 @@ class _DeliveryStep extends StatelessWidget {
     ).animate().fadeIn(duration: 300.ms);
   }
 
+  // Служб доставки пока нет (D-92) — и адрес пункта выдачи тоже не выдумываем:
+  // сообщаем его при подтверждении заказа.
   static const _options = [
     (
       DeliveryType.pickup,
       'Самовывоз',
-      'г. Москва, ул. Спортивная, 5',
+      'Адрес сообщим при подтверждении',
       'Бесплатно',
     ),
-    (DeliveryType.courier, 'Курьер', '1–2 дня', '300 ₽'),
-    (DeliveryType.cdek, 'СДЭК', '2–5 дней', '200 ₽'),
-    (DeliveryType.russianPost, 'Почта России', '5–14 дней', '150 ₽'),
+    (
+      DeliveryType.courier,
+      'Доставим сами',
+      'Свяжемся и договоримся о времени',
+      'Без оплаты онлайн',
+    ),
   ];
 }
 
@@ -946,7 +958,7 @@ class _ReviewStep extends StatelessWidget {
   });
 
   String get _address {
-    if (delivery == DeliveryType.pickup) return 'г. Москва, ул. Спортивная, 5';
+    if (delivery == DeliveryType.pickup) return 'Самовывоз: адрес сообщим при подтверждении';
     final parts = [
       cityCtrl.text,
       streetCtrl.text,

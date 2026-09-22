@@ -259,16 +259,14 @@ class OrderProvider extends ChangeNotifier {
     ));
   }
 
+  /// Доставка в оплату не входит (D-92): служб у нас пока нет, о доставке
+  /// договариваемся отдельно. Брать деньги за услугу, которой нет, нельзя.
   static double costFor(DeliveryType type) {
     switch (type) {
       case DeliveryType.pickup:
         return 0;
       case DeliveryType.courier:
-        return 300;
-      case DeliveryType.cdek:
-        return 200;
-      case DeliveryType.russianPost:
-        return 150;
+        return 0;
     }
   }
 
@@ -277,11 +275,7 @@ class OrderProvider extends ChangeNotifier {
       case DeliveryType.pickup:
         return 'Самовывоз';
       case DeliveryType.courier:
-        return 'Курьер';
-      case DeliveryType.cdek:
-        return 'СДЭК';
-      case DeliveryType.russianPost:
-        return 'Почта России';
+        return 'Доставим сами';
     }
   }
 
