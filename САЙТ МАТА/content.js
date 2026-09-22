@@ -80,6 +80,10 @@
       ".staw-bg-layer{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;border-radius:inherit}" +
       ".staw-bg-layer video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .6s ease}" +
       ".staw-bg-layer::after{content:'';position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.15),rgba(0,0,0,.5))}" +
+      // Пока видео грузится — мягкий бегущий «шиммер», чтобы место не выглядело пустым.
+      ".staw-bg-layer.staw-bg-loading::before{content:'';position:absolute;inset:0;z-index:1;background:linear-gradient(110deg,rgba(255,255,255,.03) 8%,rgba(255,255,255,.10) 18%,rgba(255,255,255,.03) 33%);background-size:220% 100%;animation:staw-bg-shimmer 1.25s linear infinite}" +
+      "@keyframes staw-bg-shimmer{0%{background-position:220% 0}100%{background-position:-120% 0}}" +
+      "@media (prefers-reduced-motion: reduce){.staw-bg-layer.staw-bg-loading::before{animation:none}}" +
       "[data-edit-bg].staw-bg-on>:not(.staw-bg-layer){position:relative;z-index:1}" +
       // Исключение: НАМЕРЕННО абсолютные декоративные слои (бегущая строка «МАТА») НЕ
       // переводим в relative — иначе они начинают занимать место в grid и высота секции
@@ -102,7 +106,9 @@
         var v = document.createElement("video");
         v.muted = true; v.defaultMuted = true;
         v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("preload", "auto");
-        if (!seamless) { v.loop = true; v.setAttribute("loop", ""); }
+        // Нативный loop ВСЕГДА — страховка от «зависло на последнем кадре и стало фото»
+        // (даже в seamless-режиме, если кроссфейд-переключение вдруг не сработает).
+        v.loop = true; v.setAttribute("loop", "");
         layer.appendChild(v);
       }
       vs = layer.querySelectorAll("video");
@@ -113,6 +119,11 @@
     [a, b].forEach(function (v) { if (v) { v.style.objectFit = fit; v.style.objectPosition = focal; } });
     if (fresh || newSrc) {
       layer._active = a;
+      // Индикатор загрузки: показываем шиммер, пока не готов первый кадр видео.
+      layer.classList.add("staw-bg-loading");
+      var clearLoading = function () { layer.classList.remove("staw-bg-loading"); };
+      if (a.readyState >= 2) clearLoading();
+      else { a.addEventListener("loadeddata", clearLoading, { once: true }); a.addEventListener("canplay", clearLoading, { once: true }); }
       a.style.transition = fade ? "opacity .6s ease" : "none";
       a.style.opacity = fade ? "0" : "1";
       if (b) { b.style.transition = fade ? "opacity .6s ease" : "none"; b.style.opacity = "0"; try { b.pause(); } catch (e) {} }
@@ -129,13 +140,21 @@
           if (v._wrap) return; v._wrap = 1;
           v.addEventListener("timeupdate", function () {
             if (v !== layer._active || !v.duration || v.duration === Infinity) return;
-            if (v.currentTime >= v.duration - XF) {
+            if (v.currentTime >= v.duration - XF && !v._switching) {
+              v._switching = 1;
               var other = (v === a) ? b : a;
-              layer._active = other;
               try { other.currentTime = 0; } catch (e) {}
-              var p = other.play(); if (p && p.catch) p.catch(function () {});
-              other.style.opacity = "1"; v.style.opacity = "0";
-              setTimeout(function () { try { v.pause(); } catch (e) {} }, (XF + 0.12) * 1000);
+              // Гасим текущее ТОЛЬКО когда второе реально заиграло. Если play() отклонён
+              // (автоплей-политика) — не свапаем: текущее видео зациклится нативным loop,
+              // и никакого «застыло в кадре» не будет. На следующем timeupdate попробуем снова.
+              var swap = function () {
+                layer._active = other;
+                other.style.opacity = "1"; v.style.opacity = "0";
+                setTimeout(function () { try { v.pause(); } catch (e) {} v._switching = 0; }, (XF + 0.12) * 1000);
+              };
+              var p = other.play();
+              if (p && p.then) p.then(swap).catch(function () { v._switching = 0; });
+              else swap();
             }
           });
         });
