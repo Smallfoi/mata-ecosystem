@@ -87,7 +87,10 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d --build db redis
 sleep 15
 ./deploy/smoke.sh || true
 docker compose -f docker-compose.prod.yml --env-file .env exec -T web python manage.py seed_catalog || true
-docker compose -f docker-compose.prod.yml --env-file .env exec -T web python manage.py createsuperuser --noinput 2>/dev/null || true
+# Учётка владельца — ТОЛЬКО на пустой системе. Раньше здесь стоял createsuperuser:
+# после смены логина владельцем имя «admin» освобождается, и очередное полное
+# развёртывание заводило лишнюю запись с паролем из .env (см. bootstrap_admin).
+docker compose -f docker-compose.prod.yml --env-file .env exec -T web python manage.py bootstrap_admin || true
 docker compose -f docker-compose.prod.yml --env-file .env exec -T web python manage.py publish_legal || true
 echo "MATA deploy done" > /opt/mata-deploy.done
 # Авто-деплой + краны. Скрипт берём из склонированного репо (переменные целостны, в отличие
