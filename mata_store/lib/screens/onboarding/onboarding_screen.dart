@@ -31,7 +31,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       icon: Icons.local_shipping_outlined,
       title: 'БЫСТРАЯ\nДОСТАВКА',
       subtitle:
-          'Курьер, СДЭК, Почта России или самовывоз — выбирайте удобный способ',
+          'Привезём сами или заберёте сами — договоримся, как вам удобно',
     ),
     _SlideData(
       keyBase: 'app.onb.s3',

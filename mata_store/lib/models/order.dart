@@ -1,4 +1,7 @@
-enum DeliveryType { pickup, courier, cdek, russianPost }
+// Пока делаем без служб доставки (D-92): договоров со СДЭК, Почтой и Яндексом нет,
+// поэтому в оформлении только самовывоз и наша доставка. Старые заказы, где стоит
+// снятый способ, читаются как `courier` — см. разбор в fromJson.
+enum DeliveryType { pickup, courier }
 enum PaymentType { card, cash, sbp }
 enum OrderStatus { pending, processing, shipped, delivered, cancelled }
 
