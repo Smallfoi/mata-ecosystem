@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, F, Q
 from django.template.response import TemplateResponse
 from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin
@@ -131,6 +131,32 @@ class MissingFilter(admin.SimpleListFilter):
         return queryset
 
 
+class ShopTitleFilter(admin.SimpleListFilter):
+    """Витринное название: что разобралось, что правили руками, что не вышло.
+
+    Автоматика закрывает почти всё; остаток правится руками — этот фильтр и есть
+    список «что проверить».
+    """
+
+    title = "Витринное название"
+    parameter_name = "shop_title"
+
+    def lookups(self, request, model_admin):
+        return [("manual", "Правлено вручную"), ("raw", "Не разобрано"),
+                ("auto", "Разобрано автоматически")]
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        raw = Q(display_name="") | Q(display_name=F("name"))
+        if value == "manual":
+            return queryset.exclude(display_name_override="")
+        if value == "raw":
+            return queryset.filter(display_name_override="").filter(raw)
+        if value == "auto":
+            return queryset.filter(display_name_override="").exclude(raw)
+        return queryset
+
+
 @admin.register(Product)
 class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     # Полный набор колонок: всё, что ведёт 1С, и всё, что ведём мы. Показывать всё
@@ -141,6 +167,7 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     # шестерёнкой «Столбцы».
     list_display = (
         "preview",
+        "shop_title",
         "name",
         "global_name",
         "brand",
@@ -164,7 +191,9 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
         "onec_code",
     )
     list_display_links = ("name",)
-    columns_locked = ("name",)          # по названию открывается карточка — скрывать нечего
+    # Скрывать нельзя: по названию открывается карточка, а витринное имя — то,
+    # что видит покупатель, и его проверяют глазами.
+    columns_locked = ("name", "shop_title")
     # По умолчанию — компактный набор. Остальное не потеряно: включается шестерёнкой.
     columns_hidden_default = ("description_short", "onec_code", "source_updated_at",
                               "parcel", "category_name")
@@ -178,17 +207,21 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
         "sort_site",
         "sort_app",
     )
-    list_filter = (MissingFilter, "category_id", "brand", "in_stock", "is_published",
-                   "is_featured", "is_new", "is_active_1c")
-    search_fields = ("id", "name", "global_name", "brand", "article", "description")
+    list_filter = (ShopTitleFilter, MissingFilter, "category_id", "brand", "in_stock",
+                   "is_published", "is_featured", "is_new", "is_active_1c")
+    search_fields = ("id", "name", "display_name", "display_name_override", "global_name",
+                     "brand", "article", "description")
     ordering = ("sort",)
     actions = [make_published, make_draft, delete_products]
     fieldsets = (
         ("Основное", {
-            "fields": ("id", "name", "global_name", "brand", "article", "category_id",
-                       "description"),
-            "description": "«Название» 1С шлёт по позиции — с цветом и размером "
-            "(«BMAI PURE 2.0 черный 36р.»). «Общее название» — одно на всю модель.",
+            "fields": ("id", "name", "display_name", "display_name_override", "global_name",
+                       "brand", "article", "category_id", "description"),
+            "description": "«Название» 1С шлёт по позиции — с артикулом, цветом и размером "
+            "(«ЖИЛЕТ Жен. BMAI арт. FRWK006-1 цвет ЧЕРНЫЙ р. XL»): так удобно на "
+            "этикетке и в офлайн-магазине. «Витринное название» считается из него "
+            "автоматически — это то, что видит покупатель. Если разобрано неверно, "
+            "впишите своё в «Витринное название вручную»: оно сильнее автоматики.",
         }),
         ("Фото", {
             "fields": ("image", "preview_large", "image_urls"),
@@ -214,7 +247,7 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
             "странице «Конструктор витрины».",
         }),
     )
-    readonly_fields = ("preview_large",)
+    readonly_fields = ("preview_large", "display_name")
 
     def get_actions(self, request):
         # Штатное «Удалить выбранные» на тысячах товаров упиралось в лимит полей
@@ -279,6 +312,18 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     @admin.display(description="Код 1С", ordering="external_id")
     def onec_code(self, obj):
         return obj.external_id or obj.article or "—"
+
+    @admin.display(description="Витринное название", ordering="display_name")
+    def shop_title(self, obj):
+        """Что увидит покупатель. Складское имя 1С остаётся в колонке «Название»:
+        оно нужно магазину для этикеток и поиска по артикулу."""
+        title = obj.shop_title
+        if obj.display_name_override:
+            return format_html('{} <span class="m-tag info">вручную</span>', title)
+        if title == obj.name:
+            return format_html('<span title="{}">{}</span> '
+                               '<span class="m-tag warn">не разобрано</span>', obj.name, title)
+        return format_html('<span title="{}">{}</span>', obj.name, title)
 
     @admin.display(description="Категория")
     def category_name(self, obj):

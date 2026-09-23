@@ -57,6 +57,14 @@ class Product(models.Model):
     # и цвета. Нужно, чтобы на витрине собирать карточку модели, а не 30 карточек.
     global_name = models.CharField(max_length=200, blank=True, default="",
                                    verbose_name="Общее название (1С)")
+    # Витринное название: складское имя 1С без артикула, цвета и размера
+    # («ЖИЛЕТ Жен. BMAI арт. FRWK006-1 цвет ЧЕРНЫЙ р. XL» → «Жилет женский BMAI»).
+    # Считается автоматически при каждой выгрузке (catalog/naming.py).
+    display_name = models.CharField(max_length=200, blank=True, default="",
+                                    verbose_name="Витринное название")
+    # Ручная правка: если заполнено — показываем её, автоматика не перебивает.
+    display_name_override = models.CharField(max_length=200, blank=True, default="",
+                                             verbose_name="Витринное название вручную")
     brand = models.CharField(max_length=120, blank=True, default="", verbose_name="Бренд")
     category_id = models.CharField(max_length=40, db_index=True, verbose_name="Категория")
     price = models.FloatField(verbose_name="Цена")
@@ -119,6 +127,18 @@ class Product(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    @property
+    def shop_title(self) -> str:
+        """Что видит покупатель: ручная правка, иначе автоматическая, иначе имя 1С."""
+        return (self.display_name_override or self.display_name or self.name).strip()
+
+    def rebuild_display_name(self) -> str:
+        """Пересчитать витринное имя из складского. Возвращает результат."""
+        from .naming import shop_name
+
+        self.display_name = shop_name(self.name, self.sizes, self.colors, self.article)[:200]
+        return self.display_name
+
     def network_image_url(self) -> str:
         """Сетевой URL фото товара (для Квартала/сайта). Приоритет — загруженное
         в админке фото; иначе первый из старых бандл-ассетов как /media/products/…"""
@@ -161,7 +181,9 @@ class Product(models.Model):
     def to_json(self) -> dict:
         return {
             "id": self.id,
-            "name": self.name,
+            # Покупателю — чистое имя модели. Складское («…арт. FRWK006-1 цвет
+            # ЧЕРНЫЙ р. XL») нужно магазину для этикеток, но не витрине.
+            "name": self.shop_title,
             "brand": self.brand,
             "categoryId": self.category_id,
             "price": self.price,

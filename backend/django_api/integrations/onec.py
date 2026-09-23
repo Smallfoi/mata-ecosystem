@@ -291,7 +291,8 @@ def import_categories(items) -> dict:
 # Что переписывает выгрузка карточек. Поля витрины (публикация, новинка,
 # рекомендуемое, порядок, рейтинг) в списке отсутствуют намеренно — это зона МАТА.
 CATALOG_FIELDS = [
-    "external_id", "article", "name", "global_name", "category_id", "brand", "is_active_1c",
+    "external_id", "article", "name", "display_name", "global_name", "category_id",
+    "brand", "is_active_1c",
     "source_updated_at", "from_1c", "price", "old_price", "description",
     "sizes", "colors", "image_urls", "weight_g", "length_cm", "width_cm", "height_cm",
 ]
@@ -352,6 +353,9 @@ def import_catalog(items) -> dict:
 
         kept_fields.update(_apply(product, raw, FIELD_MAP))
         errors.extend(_parcel_errors(product, raw, external_id or article))
+        # Витринное имя пересчитываем всегда: оно зависит от названия, цвета и
+        # размера, а они могли приехать этой же выгрузкой (catalog/naming.py).
+        product.rebuild_display_name()
         if is_new:
             index.remember(product)
             to_create[product.id] = product
