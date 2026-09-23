@@ -275,7 +275,7 @@ class OrderProvider extends ChangeNotifier {
       case DeliveryType.pickup:
         return 'Самовывоз';
       case DeliveryType.courier:
-        return 'Доставим сами';
+        return 'Курьер по Якутску';
     }
   }
 

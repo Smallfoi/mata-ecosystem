@@ -15,7 +15,7 @@ void main() {
 
   test('способов ровно два: самовывоз и наша доставка', () {
     expect(DeliveryType.values, [DeliveryType.pickup, DeliveryType.courier]);
-    expect(OrderProvider.deliveryLabel(DeliveryType.courier), 'Доставим сами');
+    expect(OrderProvider.deliveryLabel(DeliveryType.courier), 'Курьер по Якутску');
   });
 
   test('старый заказ со снятым способом читается, а не падает', () {
