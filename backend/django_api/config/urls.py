@@ -12,6 +12,7 @@ admin.site.index_title = "Управление: каталог, заказы, к
 # тема подставляет свой site_url и это поле игнорирует.
 
 from accounts import views as account_views
+from catalog import models_api
 from catalog import views as catalog_views
 from config.admin_views import (
     admin_storage,
@@ -164,6 +165,9 @@ urlpatterns = [
     path("v1/products/search", catalog_views.product_search),
     path("v1/products/price-range", catalog_views.product_price_range),
     path("v1/products", catalog_views.products),
+    # Витрина карточками моделей: один товар — много цветов и размеров (D-94).
+    path("v1/models", models_api.models_list),
+    path("v1/models/<path:key>", models_api.model_card),
     path("v1/products/<str:pid>", catalog_views.product_detail),
     path("v1/products/<str:pid>/reviews", catalog_views.product_reviews),
     path("v1/reviews/photo", catalog_views.review_photo),

@@ -167,3 +167,41 @@ def shop_name(name: str, sizes=None, colors=None, article: str = "") -> str:
     text = _gender(text)
     text = _case(text)
     return _norm(text)
+
+
+# ── Объединение карточек в модель ──────────────────────────────────────────
+# В 1С каждый размер и цвет — отдельная карточка: так ведётся склад и печатаются
+# этикетки. Покупателю нужна ОДНА карточка модели, внутри которой он выбирает
+# цвет и размер. Ключ объединения зависит от того, что прислала 1С:
+#
+# - одежда: в названии есть артикул, где суффикс — это цвет («FRWK006-1» —
+#   чёрный, «FRWK006-2» — белый). Ключ — база артикула: она различает МОДЕЛИ.
+#   По имени их склеивать нельзя: «ШОРТЫ мужские BMAI» — это FRSM007, FRSM009
+#   и FRSM013 одновременно, три разные модели;
+# - обувь: артикула в названии нет, зато есть имя модели («BMAI EXPEDITION
+#   CORDURA»). Там ключ — витринное название.
+
+_ARTICLE_IN_NAME = re.compile(r"\bарт\.?\s*([A-Za-z0-9][A-Za-z0-9\-/]*)", re.I)
+_COLOR_SUFFIX = re.compile(r"[-_]\d{1,2}$")
+
+
+def article_from_name(name: str) -> str:
+    """Артикул из складского названия: «… арт.FRSM007-1 р.S» → «FRSM007-1»."""
+    match = _ARTICLE_IN_NAME.search(name or "")
+    return match.group(1).strip(" .,;") if match else ""
+
+
+def model_base(article: str) -> str:
+    """База модели: отрезаем суффикс цвета. «FRWK006-1» → «FRWK006»."""
+    article = (article or "").strip()
+    return _COLOR_SUFFIX.sub("", article) if article else ""
+
+
+def model_key(name: str, sizes=None, colors=None, article: str = "",
+              display_name: str = "") -> str:
+    """Ключ карточки на витрине: по нему складские позиции собираются в модель."""
+    base = model_base(article or article_from_name(name))
+    if base:
+        return base.upper()
+    title = display_name or shop_name(name, sizes, colors, article)
+    return re.sub(r"\s+", " ", title).strip().upper()
