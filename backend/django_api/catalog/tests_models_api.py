@@ -7,7 +7,8 @@
 from django.test import TestCase
 
 from catalog.models import Product
-from catalog.naming import article_from_name, model_base, model_key
+from catalog.naming import (article_from_name, color_from_name, model_base,
+                            model_key, size_from_name)
 
 
 def make(pid, name, **extra):
@@ -101,3 +102,37 @@ class ModelCardTests(TestCase):
         card = self.client.get("/v1/models").json()[0]
         self.assertEqual(card["variantCount"], 2)
         self.assertEqual([c["name"] for c in card["colors"]], ["ЧЕРНЫЙ"])
+
+
+class VariantFromNameTests(TestCase):
+    """1С часто не заполняет размер и цвет — они только в названии.
+
+    Без разбора карточка собирается, но выбирать в ней нечего: у «Шорты мужские
+    BMAI» было 21 позиция, 0 размеров и 0 цветов.
+    """
+
+    def test_size_is_found(self):
+        self.assertEqual(size_from_name("ШОРТЫ мужские BMAI ЧЕРНЫЙ арт.FRSM007-1 р.S"), "S")
+        self.assertEqual(size_from_name("BMAI EXPEDITION CORDURA ЧЕРНЫЙ 42.5р."), "42.5")
+        self.assertEqual(size_from_name("Майка Anta RACING мужской Фиолетовый (2XL)"), "2XL")
+        self.assertEqual(size_from_name("Трусы ANTA CHN Серый M"), "M")
+        self.assertEqual(size_from_name("Бутылка для воды SIS черный, 750мл"), "")
+
+    def test_colour_is_found(self):
+        self.assertEqual(color_from_name("ЖИЛЕТ Жен. BMAI арт. FRWK006-1 цвет ЧЕРНЫЙ р. XL"),
+                         "ЧЕРНЫЙ")
+        self.assertEqual(color_from_name("ШОРТЫ мужские BMAI ЧЕРНЫЙ арт.FRSM007-1 р.S"),
+                         "ЧЕРНЫЙ")
+        self.assertEqual(color_from_name("BMAI EXPEDITION CORDURA ЧЕРНЫЙ-СЕРЫЙ 42.5р."),
+                         "ЧЕРНЫЙ-СЕРЫЙ")
+
+    def test_card_gets_sizes_from_names(self):
+        """Карточка одежды собирается с размерами, даже если поля 1С пустые."""
+        for size in ("S", "M", "L"):
+            make(f"pn-{size}", f"ШОРТЫ мужские BMAI ЧЕРНЫЙ арт.FRSM007-1 р.{size}",
+                 stock_count=3)
+        card = self.client.get("/v1/models/FRSM007").json()
+        self.assertEqual(card["variantCount"], 3)
+        self.assertEqual(card["sizes"], ["S", "M", "L"])
+        self.assertEqual([c["name"] for c in card["colors"]], ["ЧЕРНЫЙ"])
+        self.assertTrue(all(v["inStock"] for v in card["colors"][0]["sizes"]))

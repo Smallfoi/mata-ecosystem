@@ -45,9 +45,30 @@ def _in_stock(product: Product, size: str = "") -> bool:
 
 
 def _variant_sizes(product: Product):
-    """Размеры позиции: из поля 1С, иначе один безразмерный вариант."""
+    """Размеры позиции: из поля 1С, иначе из названия, иначе один безразмерный.
+
+    У одежды 1С часто не заполняет поле размера — он только в названии
+    («… арт.FRSM007-1 р.S»). Без этого карточка собирается, но выбирать в ней
+    нечего, а размеры есть.
+    """
     sizes = [str(s).strip() for s in (product.sizes or []) if str(s).strip()]
-    return sizes or [""]
+    if sizes:
+        return sizes
+    from .naming import size_from_name
+
+    found = size_from_name(product.name)
+    return [found] if found else [""]
+
+
+def _variant_colors(product: Product):
+    """Цвета позиции: из поля 1С, иначе из названия («… цвет ЧЕРНЫЙ р. XL»)."""
+    colors = [str(c).strip() for c in (product.colors or []) if str(c).strip()]
+    if colors:
+        return colors
+    from .naming import color_from_name
+
+    found = color_from_name(product.name)
+    return [found] if found else [""]
 
 
 def build_card(items) -> dict:
@@ -58,8 +79,7 @@ def build_card(items) -> dict:
     prices, in_stock_any = [], False
 
     for product in items:
-        names = [str(c).strip() for c in (product.colors or []) if str(c).strip()]
-        for color in names or [""]:
+        for color in _variant_colors(product):
             entry = colors.setdefault(color, {"name": color, "imageUrl": "",
                                               "sizes": [], "inStock": False})
             if not entry["imageUrl"]:
