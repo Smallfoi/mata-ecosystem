@@ -45,30 +45,22 @@ def _in_stock(product: Product, size: str = "") -> bool:
 
 
 def _variant_sizes(product: Product):
-    """Размеры позиции: из поля 1С, иначе из названия, иначе один безразмерный.
+    """Размеры позиции — ТОЛЬКО из поля 1С.
 
-    У одежды 1С часто не заполняет поле размера — он только в названии
-    («… арт.FRSM007-1 р.S»). Без этого карточка собирается, но выбирать в ней
-    нечего, а размеры есть.
+    Решение владельца (24.09.2026): размер и цвет берём строго из строк, из
+    названия не вытягиваем. Названия сейчас дублируют всё подряд, а строки в
+    1С заполняются вручную — и это единственный достоверный источник. Пока
+    строка пуста, на витрине у товара просто нет выбора размера; заполнили —
+    выбор появился сам, без правок в коде.
     """
     sizes = [str(s).strip() for s in (product.sizes or []) if str(s).strip()]
-    if sizes:
-        return sizes
-    from .naming import size_from_name
-
-    found = size_from_name(product.name)
-    return [found] if found else [""]
+    return sizes or [""]
 
 
 def _variant_colors(product: Product):
-    """Цвета позиции: из поля 1С, иначе из названия («… цвет ЧЕРНЫЙ р. XL»)."""
+    """Цвета позиции — ТОЛЬКО из поля 1С (см. `_variant_sizes`)."""
     colors = [str(c).strip() for c in (product.colors or []) if str(c).strip()]
-    if colors:
-        return colors
-    from .naming import color_from_name
-
-    found = color_from_name(product.name)
-    return [found] if found else [""]
+    return colors or [""]
 
 
 def build_card(items) -> dict:
