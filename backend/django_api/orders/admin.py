@@ -1,9 +1,12 @@
 from django.contrib import admin, messages
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 
 from common.adminutils import ExportCsvMixin, UserRefMixin
+from staff.models import StaffAudit
 
 from .models import Order, OrderReturn
 from .returns import RETURNABLE, ReturnError, make_return, return_plan
@@ -39,6 +42,7 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
         "created_at",
         # Обмен с 1С: сразу видно, ушёл ли заказ на склад и что там с ним.
         "onec_state",
+        "courier_note",
     )
     list_display_links = ("order_id",)
     list_editable = ("status",)
@@ -67,8 +71,8 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
     csv_filename = "orders"
     export_fields = ("order_id", "user_id", "total", "status", "payment_status",
                      "points_redeemed", "created_at")
-    actions = ("mark_paid", "mark_shipped", "mark_delivered", "mark_cancelled",
-               "refund_payment", "export_as_csv")
+    actions = ("hand_to_courier", "mark_paid", "mark_shipped", "mark_delivered",
+               "mark_cancelled", "refund_payment", "export_as_csv")
 
     @admin.action(description="Вернуть деньги покупателю целиком (ЮKassa)")
     def refund_payment(self, request, queryset):
@@ -100,22 +104,68 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
         for err in failed:
             self.message_user(request, f"Ошибка возврата — {err}", messages.ERROR)
 
+    def _set_status(self, request, queryset, status, label):
+        """Смена статуса по одной записи — намеренно.
+
+        `queryset.update()` идёт мимо сигналов Django, а на них висит уведомление
+        покупателю (orders/signals.py). Из админки статус менялся молча: в базе
+        «Отправлен», а человек об этом не знал.
+        """
+        n = 0
+        for order in queryset:
+            if order.status == status:
+                continue
+            order.status = status
+            order.save(update_fields=["status"])
+            n += 1
+        self.message_user(request, f"Отмечено «{label}»: {n}. Покупателям ушло уведомление.")
+
     @admin.action(description="Отметить: Оплачен")
     def mark_paid(self, request, queryset):
-        n = queryset.update(status="paid")
-        self.message_user(request, f"Отмечено «Оплачен»: {n}")
+        self._set_status(request, queryset, "paid", "Оплачен")
 
     @admin.action(description="Отметить: Отправлен")
     def mark_shipped(self, request, queryset):
-        n = queryset.update(status="shipped")
-        self.message_user(request, f"Отмечено «Отправлен»: {n}")
+        self._set_status(request, queryset, "shipped", "Отправлен")
 
     @admin.action(description="Отметить: Доставлен")
     def mark_delivered(self, request, queryset):
-        n = queryset.update(status="delivered")
-        self.message_user(request, f"Отмечено «Доставлен»: {n}")
+        self._set_status(request, queryset, "delivered", "Доставлен")
 
     @admin.action(description="Отметить: Отменён")
     def mark_cancelled(self, request, queryset):
-        n = queryset.update(status="cancelled")
-        self.message_user(request, f"Отмечено «Отменён»: {n}")
+        self._set_status(request, queryset, "cancelled", "Отменён")
+
+    @admin.action(description="🚚 Передан курьеру — написать покупателю")
+    def hand_to_courier(self, request, queryset):
+        """Доставка по городу своими силами (D-92): курьера заказывают вручную
+        (Яндекс, inDrive) или везёт свой. Здесь одним действием: записали, кто
+        везёт и когда, — покупатель получил уведомление, заказ стал «Отправлен».
+        """
+        if "apply" in request.POST:
+            note = (request.POST.get("note") or "").strip()
+            if not note:
+                self.message_user(request, "Напишите, кто везёт и когда — "
+                                  "это и увидит покупатель.", level=messages.ERROR)
+                return None
+            n = 0
+            for order in queryset:
+                order.courier_note = note[:200]
+                order.status = "shipped"
+                order.save(update_fields=["courier_note", "status"])
+                n += 1
+            StaffAudit.write(request, f"передано курьеру заказов: {n} ({note[:80]})")
+            self.message_user(request, f"Передано курьеру: {n}. Покупатели уведомлены.",
+                              messages.SUCCESS)
+            return None
+
+        return TemplateResponse(request, "admin/orders/hand_to_courier.html", {
+            **self.admin_site.each_context(request),
+            "title": "Передать курьеру",
+            "opts": self.model._meta,
+            "count": queryset.count(),
+            "orders": list(queryset.values_list("order_id", flat=True)[:10]),
+            "action_checkbox_name": ACTION_CHECKBOX_NAME,
+            "selected": request.POST.getlist(ACTION_CHECKBOX_NAME),
+            "select_across": request.POST.get("select_across", "0"),
+        })

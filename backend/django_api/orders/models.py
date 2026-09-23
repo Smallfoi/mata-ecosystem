@@ -20,6 +20,11 @@ class Order(models.Model):
         max_length=20, default="pending", choices=STATUS_CHOICES, verbose_name="Статус"
     )
     points_redeemed = models.IntegerField(default=0, verbose_name="Списано баллов")
+    # Доставка по городу своими силами (D-92): курьера заказывают вручную
+    # (Яндекс/inDrive) или везёт свой. Здесь — что сказать клиенту: кто везёт,
+    # телефон, когда ждать. Уходит ему в уведомление вместе со статусом.
+    courier_note = models.CharField(max_length=200, blank=True, default="",
+                                    verbose_name="Курьер и время")
     # Оплата (каркас, D-13): none — не требуется/dev, pending — ждёт оплаты, paid — оплачен.
     payment_status = models.CharField(max_length=20, default="none", verbose_name="Оплата")
     # db_index: по этому полю ищет вебхук на каждом уведомлении провайдера.

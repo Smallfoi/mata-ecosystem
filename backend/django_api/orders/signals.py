@@ -39,10 +39,12 @@ def _notify_order(sender, instance, created, **kwargs):
     old = getattr(instance, "_old_status", None)
     if old and old != instance.status:
         label = _STATUS_LABEL.get(instance.status, instance.status)
-        create_notification(
-            instance.user_id,
-            f"Заказ {label}",
-            f"Заказ №{instance.order_id}: статус изменён на «{label}»",
-            "order",
-            instance.order_id,
-        )
+        # «Курьер и время» важнее сухого статуса: человек ждёт не слово
+        # «отправлен», а кто и когда привезёт.
+        note = (instance.courier_note or "").strip()
+        if instance.status == "shipped" and note:
+            title, body = "Заказ в пути", f"Заказ №{instance.order_id}: {note}"
+        else:
+            title = f"Заказ {label}"
+            body = f"Заказ №{instance.order_id}: статус изменён на «{label}»"
+        create_notification(instance.user_id, title, body, "order", instance.order_id)

@@ -639,8 +639,8 @@ class _DeliveryStep extends StatelessWidget {
           const SizedBox(height: 6),
           const RemoteText(
             'app.checkout.delivery.note',
-            'Доставку по городу везём сами: свяжемся после заказа и договоримся '
-                'о времени. Стоимость доставки в оплату не входит.',
+            'Доставка по Якутску: свяжемся после заказа и договоримся о времени. '
+                'Стоимость доставки в оплату не входит.',
             style: TextStyle(fontSize: 13, color: AppColors.grey600, height: 1.4),
           ),
           if (needAddress) ...[
@@ -712,7 +712,7 @@ class _DeliveryStep extends StatelessWidget {
     ),
     (
       DeliveryType.courier,
-      'Доставим сами',
+      'Курьер по Якутску',
       'Свяжемся и договоримся о времени',
       'Без оплаты онлайн',
     ),
