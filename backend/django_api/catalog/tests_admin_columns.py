@@ -20,7 +20,7 @@ LIST = "/admin/catalog/product/"
 COLUMNS = "/admin/catalog/product/columns/"
 # Всё, кроме «Старой цены»: имитируем галочки в панели.
 ALL_BUT_OLD_PRICE = [
-    "preview", "name", "global_name", "brand", "article", "category_name", "price",
+    "preview", "name", "brand", "article", "category_name", "price",
     "stock", "in_stock", "is_published", "is_featured", "is_new", "sort_site",
     "sort_app", "sizes_list", "colors_list", "is_active_1c", "source_updated_at",
     "parcel", "description_short", "onec_code",
@@ -32,7 +32,7 @@ class ColumnPickerTests(TestCase):
         get_user_model().objects.create_superuser("owner_cols", "oc@t.dev", "OwnerPass!2026")
         login_admin(self.client, "owner_cols", "OwnerPass!2026")
         Product.objects.create(id="p_col", name="Кроссовки", category_id="c",
-                               price=5000, old_price=7000, global_name="BMAI PURE 2.0")
+                               price=5000, old_price=7000)
 
     def test_panel_is_offered(self):
         html = self.client.get(LIST).content.decode()
@@ -42,7 +42,7 @@ class ColumnPickerTests(TestCase):
     def test_all_1c_data_is_shown(self):
         """Всё, что присылает 1С, видно в таблице без настройки."""
         html = self.client.get(LIST).content.decode()
-        for label in ("Общее название (1С)", "Артикул", "Размеры", "Цвета",
+        for label in ("Артикул", "Размеры", "Цвета",
                       "В продаже (1С)", "Изменён в 1С", "Остаток"):
             self.assertIn(label, html, f"нет колонки «{label}»")
 
