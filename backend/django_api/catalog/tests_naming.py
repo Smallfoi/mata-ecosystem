@@ -121,3 +121,41 @@ class ExchangeFillsShopNameTests(TestCase):
         }]}, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {TOKEN}")
         p.refresh_from_db()
         self.assertEqual(p.shop_title, "Бельё ANTA")
+
+
+class RebuildActionTests(TestCase):
+    """Кнопка «Пересчитать витринные названия» — чтобы не ходить на сервер."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        from common.testutils import login_admin
+
+        get_user_model().objects.create_superuser("owner_rb", "rb@t.dev", "OwnerPass!2026")
+        login_admin(self.client, "owner_rb", "OwnerPass!2026")
+
+    def test_action_fills_names_and_keys(self):
+        p = Product.objects.create(id="p_rb", name="Трусы ANTA CHN Серый M",
+                                   category_id="c", price=100)
+        self.assertEqual(p.display_name, "")
+
+        self.client.post("/admin/catalog/product/", {
+            "action": "rebuild_names", "index": "0", "select_across": "0",
+            "_selected_action": ["p_rb"],
+        })
+        p.refresh_from_db()
+        self.assertEqual(p.display_name, "Трусы ANTA CHN")
+        self.assertEqual(p.model_key, "ТРУСЫ ANTA CHN")
+
+    def test_manual_edits_survive(self):
+        p = Product.objects.create(id="p_rb2", name="Трусы ANTA CHN Серый L",
+                                   category_id="c", price=100,
+                                   display_name_override="Бельё ANTA",
+                                   model_key_override="БЕЛЬЁ")
+        self.client.post("/admin/catalog/product/", {
+            "action": "rebuild_names", "index": "0", "select_across": "0",
+            "_selected_action": ["p_rb2"],
+        })
+        p.refresh_from_db()
+        self.assertEqual(p.shop_title, "Бельё ANTA")
+        self.assertEqual(p.shop_model_key, "БЕЛЬЁ")
