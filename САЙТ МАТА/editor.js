@@ -436,7 +436,7 @@
   // ── Фон блока (фото/видео/градиент) — применение черновика в превью + кнопка «Фон» ──
   // Фоновое видео. Флаги (тумблеры «Конструктора», по умолчанию ВКЛ):
   //  fade — плавное появление (opacity 0→1); seamless — бесшовная петля (кроссфейд 2 видео).
-  function setupBgVideo(layer, src, fit, focal, fade, seamless) {
+  function setupBgVideo(layer, src, fit, focal, fade, seamless, poster) {
     var need = seamless ? 2 : 1;
     var vs = layer.querySelectorAll("video");
     var fresh = vs.length !== need;
@@ -455,19 +455,28 @@
     var a = vs[0], b = vs[1] || null;
     var newSrc = a.getAttribute("src") !== src;
     if (newSrc) { a.setAttribute("src", src); if (b) b.setAttribute("src", src); }
-    [a, b].forEach(function (v) { if (v) { v.style.objectFit = fit; v.style.objectPosition = focal; } });
+    [a, b].forEach(function (v) {
+      if (!v) return;
+      v.style.objectFit = fit; v.style.objectPosition = focal;
+      if (poster) v.setAttribute("poster", poster); else v.removeAttribute("poster");
+    });
     if (fresh || newSrc) {
       layer._active = a;
-      a.style.transition = fade ? "opacity .6s ease" : "none";
-      a.style.opacity = fade ? "0" : "1";
-      if (b) { b.style.transition = fade ? "opacity .6s ease" : "none"; b.style.opacity = "0"; try { b.pause(); } catch (e) {} }
-      if (fade && !a._faded) {
-        a._faded = 1;
-        var showA = function () { a.style.opacity = "1"; };
-        // Показываем по ПЕРВОМУ КАДРУ (loadeddata) — раньше всего и не зависит от autoplay.
-        if (a.readyState >= 2) showA();
-        else { a.addEventListener("loadeddata", showA, { once: true }); a.addEventListener("canplay", showA, { once: true }); }
+      if (poster) {
+        // Постер-кадр виден мгновенно (нативный poster видео), ролик сменит по готовности.
+        a.style.transition = "none"; a.style.opacity = "1";
+      } else {
+        a.style.transition = fade ? "opacity .6s ease" : "none";
+        a.style.opacity = fade ? "0" : "1";
+        if (fade && !a._faded) {
+          a._faded = 1;
+          var showA = function () { a.style.opacity = "1"; };
+          // Показываем по ПЕРВОМУ КАДРУ (loadeddata) — раньше всего и не зависит от autoplay.
+          if (a.readyState >= 2) showA();
+          else { a.addEventListener("loadeddata", showA, { once: true }); a.addEventListener("canplay", showA, { once: true }); }
+        }
       }
+      if (b) { b.style.transition = fade ? "opacity .6s ease" : "none"; b.style.opacity = "0"; try { b.pause(); } catch (e) {} }
       if (seamless && b) {
         var XF = 0.55;
         [a, b].forEach(function (vv) {
@@ -515,7 +524,8 @@
     if (!off && vid) {
       el.style.backgroundImage = ""; el.style.backgroundSize = ""; el.style.backgroundPosition = "";
       if (!layer) { layer = document.createElement("div"); layer.className = "staw-bg-layer"; el.insertBefore(layer, el.firstChild); }
-      setupBgVideo(layer, vid, fit, focal, el._bgFade !== "0", el._bgLoop !== "0");
+      // Постер-кадр: картинка-фон блока (если задана) = мгновенный постер видео.
+      setupBgVideo(layer, vid, fit, focal, el._bgFade !== "0", el._bgLoop !== "0", img);
       el.classList.add("staw-bg-on");
     } else if (!off && img) {
       if (layer) layer.remove(); el.classList.remove("staw-bg-on");

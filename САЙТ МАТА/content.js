@@ -96,7 +96,9 @@
   // Фоновое видео. Флаги (тумблеры в «Конструкторе», по умолчанию ВКЛ):
   //  fade     — плавное появление (opacity 0→1, «свечение»); иначе мгновенно;
   //  seamless — бесшовная петля (два видео с кроссфейдом, без скачка); иначе обычный loop.
-  function setupBgVideo(layer, src, fit, focal, fade, seamless) {
+  //  poster   — URL картинки-постера (первый кадр): виден мгновенно, видео сменит его
+  //             нативно по готовности; если пусто — вместо постера шиммер-загрузка.
+  function setupBgVideo(layer, src, fit, focal, fade, seamless, poster) {
     var need = seamless ? 2 : 1;
     var vs = layer.querySelectorAll("video");
     var fresh = vs.length !== need;
@@ -116,24 +118,36 @@
     var a = vs[0], b = vs[1] || null;
     var newSrc = a.getAttribute("src") !== src;
     if (newSrc) { a.setAttribute("src", src); if (b) b.setAttribute("src", src); }
-    [a, b].forEach(function (v) { if (v) { v.style.objectFit = fit; v.style.objectPosition = focal; } });
+    [a, b].forEach(function (v) {
+      if (!v) return;
+      v.style.objectFit = fit; v.style.objectPosition = focal;
+      if (poster) v.setAttribute("poster", poster); else v.removeAttribute("poster");
+    });
     if (fresh || newSrc) {
       layer._active = a;
-      // Индикатор загрузки: показываем шиммер, пока не готов первый кадр видео.
-      layer.classList.add("staw-bg-loading");
-      var clearLoading = function () { layer.classList.remove("staw-bg-loading"); };
-      if (a.readyState >= 2) clearLoading();
-      else { a.addEventListener("loadeddata", clearLoading, { once: true }); a.addEventListener("canplay", clearLoading, { once: true }); }
-      a.style.transition = fade ? "opacity .6s ease" : "none";
-      a.style.opacity = fade ? "0" : "1";
-      if (b) { b.style.transition = fade ? "opacity .6s ease" : "none"; b.style.opacity = "0"; try { b.pause(); } catch (e) {} }
-      if (fade && !a._faded) {
-        a._faded = 1;
-        var showA = function () { a.style.opacity = "1"; };
-        // Показываем по ПЕРВОМУ КАДРУ (loadeddata) — раньше всего и не зависит от autoplay.
-        if (a.readyState >= 2) showA();
-        else { a.addEventListener("loadeddata", showA, { once: true }); a.addEventListener("canplay", showA, { once: true }); }
+      if (poster) {
+        // Вариант «постер-кадр»: картинка видна мгновенно (нативный poster видео), сам
+        // ролик сменит её по готовности. Шиммер и fade-с-нуля не нужны — без пустоты.
+        layer.classList.remove("staw-bg-loading");
+        a.style.transition = "none";
+        a.style.opacity = "1";
+      } else {
+        // Постера нет — индикатор загрузки: шиммер, пока не готов первый кадр видео.
+        layer.classList.add("staw-bg-loading");
+        var clearLoading = function () { layer.classList.remove("staw-bg-loading"); };
+        if (a.readyState >= 2) clearLoading();
+        else { a.addEventListener("loadeddata", clearLoading, { once: true }); a.addEventListener("canplay", clearLoading, { once: true }); }
+        a.style.transition = fade ? "opacity .6s ease" : "none";
+        a.style.opacity = fade ? "0" : "1";
+        if (fade && !a._faded) {
+          a._faded = 1;
+          var showA = function () { a.style.opacity = "1"; };
+          // Показываем по ПЕРВОМУ КАДРУ (loadeddata) — раньше всего и не зависит от autoplay.
+          if (a.readyState >= 2) showA();
+          else { a.addEventListener("loadeddata", showA, { once: true }); a.addEventListener("canplay", showA, { once: true }); }
+        }
       }
+      if (b) { b.style.transition = fade ? "opacity .6s ease" : "none"; b.style.opacity = "0"; try { b.pause(); } catch (e) {} }
       if (seamless && b) {
         var XF = 0.55; // сек кроссфейда у петли
         [a, b].forEach(function (v) {
@@ -189,7 +203,9 @@
     if (!off && vid) {
       el.style.backgroundImage = ""; el.style.backgroundSize = ""; el.style.backgroundPosition = "";
       if (!layer) { layer = document.createElement("div"); layer.className = "staw-bg-layer"; el.insertBefore(layer, el.firstChild); }
-      setupBgVideo(layer, vid, fit, focal, el._bgFade !== "0", el._bgLoop !== "0");
+      // Постер-кадр (вариант 1): если у блока задана и картинка-фон — используем её как
+      // мгновенный постер видео. Нет картинки → шиммер-загрузка (см. setupBgVideo).
+      setupBgVideo(layer, vid, fit, focal, el._bgFade !== "0", el._bgLoop !== "0", img);
       el.classList.add("staw-bg-on");
     } else if (!off && img) {
       if (layer) layer.remove(); el.classList.remove("staw-bg-on");
