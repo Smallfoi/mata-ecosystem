@@ -202,23 +202,19 @@ def shop_name(name: str, sizes=None, colors=None, article: str = "") -> str:
 # ── Объединение карточек в модель ──────────────────────────────────────────
 # В 1С каждый размер и цвет — отдельная карточка: так ведётся склад и печатаются
 # этикетки. Покупателю нужна ОДНА карточка модели, внутри которой он выбирает
-# цвет и размер. Ключ объединения зависит от того, что прислала 1С:
+# цвет и размер.
 #
-# - одежда: в названии есть артикул, где суффикс — это цвет («FRWK006-1» —
-#   чёрный, «FRWK006-2» — белый). Ключ — база артикула: она различает МОДЕЛИ.
-#   По имени их склеивать нельзя: «ШОРТЫ мужские BMAI» — это FRSM007, FRSM009
-#   и FRSM013 одновременно, три разные модели;
-# - обувь: артикула в названии нет, зато есть имя модели («BMAI EXPEDITION
-#   CORDURA»). Там ключ — витринное название.
+# Ключ объединения — АРТИКУЛ ИЗ ПОЛЯ, суффикс цвета отрезаем: «FRWK006-1» и
+# «FRWK006-2» — одна модель, разные цвета. Из названия артикул НЕ достаём
+# (D-95): там встречаются числа, которые артикулом не являются — «Шорты мужские
+# BMAI темно-синий 3.5», где 3.5 это длина шорт.
+#
+# Пока артикул не заполнен, ключ — витринное название. Для обуви это работает
+# точно («BMAI EXPEDITION CORDURA»), у одежды до заполнения артикулов модели с
+# одинаковым названием окажутся в одной карточке — разъедутся сами, как только
+# артикул появится.
 
-_ARTICLE_IN_NAME = re.compile(r"\bарт\.?\s*([A-Za-z0-9][A-Za-z0-9\-/]*)", re.I)
 _COLOR_SUFFIX = re.compile(r"[-_]\d{1,2}$")
-
-
-def article_from_name(name: str) -> str:
-    """Артикул из складского названия: «… арт.FRSM007-1 р.S» → «FRSM007-1»."""
-    match = _ARTICLE_IN_NAME.search(name or "")
-    return match.group(1).strip(" .,;") if match else ""
 
 
 def model_base(article: str) -> str:
@@ -230,58 +226,8 @@ def model_base(article: str) -> str:
 def model_key(name: str, sizes=None, colors=None, article: str = "",
               display_name: str = "") -> str:
     """Ключ карточки на витрине: по нему складские позиции собираются в модель."""
-    base = model_base(article or article_from_name(name))
+    base = model_base(article)
     if base:
         return base.upper()
     title = display_name or shop_name(name, sizes, colors, article)
     return re.sub(r"\s+", " ", title).strip().upper()
-
-
-# ── Вариант из названия ────────────────────────────────────────────────────
-# У одежды 1С часто не заполняет поля «размер» и «цвет» — они есть только внутри
-# названия («ШОРТЫ мужские BMAI ЧЕРНЫЙ арт.FRSM007-1 р.S»). Тогда карточка на
-# витрине собирается, но выбирать в ней нечего. Здесь достаём их из имени —
-# ровно тем же разбором, что чистит название.
-
-_SIZE_AFTER_MARK = re.compile(r"\bр\.?\s*([A-Za-zА-Яа-я0-9]{1,4}(?:[.,]5)?)\b", re.I)
-# «цвет ЧЕРНЫЙ р. XL» — берём значение ДО метки размера, иначе прилипает «р».
-_COLOR_AFTER_MARK = re.compile(r"\bцвет\s+(.+?)(?=\s+р\.|\s+р\s|$)", re.I)
-
-
-def size_from_name(name: str) -> str:
-    """Размер из названия: «… р.S» → «S», «… 42.5р.» → «42.5», «… (2XL)» → «2XL»."""
-    text = _norm(name)
-    match = _SIZE_AFTER_MARK.search(text)
-    if match:
-        size = match.group(1).upper().translate(_LOOKALIKE)
-        if _NUM_SIZE.match(size) or size in LETTER_SIZES:
-            return size
-    match = re.search(r"\((" + "|".join(sorted(LETTER_SIZES, key=len, reverse=True)) +
-                      r")\)\s*$", text, re.I)
-    if match:
-        return match.group(1).upper()
-    words = text.split()
-    if words:
-        last = words[-1].upper().rstrip(".").rstrip("РP").translate(_LOOKALIKE)
-        if _NUM_SIZE.match(last) or last in LETTER_SIZES:
-            return last
-    return ""
-
-
-def color_from_name(name: str) -> str:
-    """Цвет из названия: «… цвет ЧЕРНЫЙ р. XL» → «ЧЕРНЫЙ», иначе цветной хвост."""
-    text = _norm(name)
-    match = _COLOR_AFTER_MARK.search(text)
-    if match:
-        return match.group(1).strip(" .,;")
-
-    # Цвет стоит перед артикулом и размером: «… BMAI ЧЕРНЫЙ арт.FRSM007-1 р.S»,
-    # «BMAI EXPEDITION CORDURA ЧЕРНЫЙ-СЕРЫЙ 42.5р.», «… Фиолетовый (2XL)».
-    head = re.split(r"\bарт\.?", text, maxsplit=1, flags=re.I)[0]
-    head = re.sub(r"[\s,;]*\bр\.?\s*[A-Za-zА-Яа-я0-9.,]*$", "", head, flags=re.I)
-    head = _strip_sizes(head)
-    words = head.split()
-    picked = []
-    while words and _is_color_word(words[-1]):
-        picked.insert(0, words.pop())
-    return " ".join(picked)

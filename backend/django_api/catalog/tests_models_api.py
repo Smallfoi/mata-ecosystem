@@ -7,8 +7,7 @@
 from django.test import TestCase
 
 from catalog.models import Product
-from catalog.naming import (article_from_name, color_from_name, model_base,
-                            model_key, size_from_name)
+from catalog.naming import model_base, model_key
 
 
 def make(pid, name, **extra):
@@ -21,19 +20,21 @@ def make(pid, name, **extra):
 
 
 class ModelKeyTests(TestCase):
-    def test_article_is_taken_from_the_name(self):
-        self.assertEqual(article_from_name("ШОРТЫ мужские BMAI ЧЕРНЫЙ арт.FRSM007-1 р.S"),
-                         "FRSM007-1")
-        self.assertEqual(article_from_name("BMAI EXPEDITION CORDURA ЧЕРНЫЙ 42р."), "")
+    def test_article_comes_only_from_the_field(self):
+        """Из названия артикул не берём: «… темно-синий 3.5» — это длина шорт (D-95)."""
+        self.assertEqual(model_key("Шорты мужские BMAI темно-синий 3.5"),
+                         "ШОРТЫ МУЖСКИЕ BMAI ТЕМНО-СИНИЙ 3.5")
+        self.assertEqual(model_key("ШОРТЫ мужские BMAI ЧЕРНЫЙ арт.FRSM007-1 р.S",
+                                   article="FRSM007-1"), "FRSM007")
 
     def test_colour_suffix_is_cut(self):
         self.assertEqual(model_base("FRWK006-1"), "FRWK006")
         self.assertEqual(model_base("FRTK-003-1"), "FRTK-003")
 
-    def test_clothes_group_by_article_not_by_name(self):
-        """«ШОРТЫ мужские BMAI» — это три РАЗНЫЕ модели: FRSM007, FRSM009, FRSM013."""
-        a = model_key("ШОРТЫ мужские BMAI ЧЕРНЫЙ арт.FRSM007-1 р.S")
-        b = model_key("ШОРТЫ мужские BMAI СЕРЫЙ арт.FRSM009-2 р.M")
+    def test_filled_articles_split_the_models(self):
+        """«Шорты мужские BMAI» — три РАЗНЫЕ модели; их разводит поле артикула."""
+        a = model_key("ШОРТЫ мужские BMAI ЧЕРНЫЙ р.S", article="FRSM007-1")
+        b = model_key("ШОРТЫ мужские BMAI СЕРЫЙ р.M", article="FRSM009-2")
         self.assertEqual(a, "FRSM007")
         self.assertNotEqual(a, b, "разные модели склеились в одну карточку")
 
@@ -104,35 +105,22 @@ class ModelCardTests(TestCase):
         self.assertEqual([c["name"] for c in card["colors"]], ["ЧЕРНЫЙ"])
 
 
-class VariantFromNameTests(TestCase):
-    """1С часто не заполняет размер и цвет — они только в названии.
+class VariantsComeFromFieldsOnlyTests(TestCase):
+    """Размер и цвет — только из строк 1С (решение владельца 24.09.2026).
 
-    Без разбора карточка собирается, но выбирать в ней нечего: у «Шорты мужские
-    BMAI» было 21 позиция, 0 размеров и 0 цветов.
+    Названия дублируют всё подряд, а строки заполняются вручную и достоверны.
+    Пока строка пуста — на витрине выбора нет; заполнили — появился сам.
     """
 
-    def test_size_is_found(self):
-        self.assertEqual(size_from_name("ШОРТЫ мужские BMAI ЧЕРНЫЙ арт.FRSM007-1 р.S"), "S")
-        self.assertEqual(size_from_name("BMAI EXPEDITION CORDURA ЧЕРНЫЙ 42.5р."), "42.5")
-        self.assertEqual(size_from_name("Майка Anta RACING мужской Фиолетовый (2XL)"), "2XL")
-        self.assertEqual(size_from_name("Трусы ANTA CHN Серый M"), "M")
-        self.assertEqual(size_from_name("Бутылка для воды SIS черный, 750мл"), "")
-
-    def test_colour_is_found(self):
-        self.assertEqual(color_from_name("ЖИЛЕТ Жен. BMAI арт. FRWK006-1 цвет ЧЕРНЫЙ р. XL"),
-                         "ЧЕРНЫЙ")
-        self.assertEqual(color_from_name("ШОРТЫ мужские BMAI ЧЕРНЫЙ арт.FRSM007-1 р.S"),
-                         "ЧЕРНЫЙ")
-        self.assertEqual(color_from_name("BMAI EXPEDITION CORDURA ЧЕРНЫЙ-СЕРЫЙ 42.5р."),
-                         "ЧЕРНЫЙ-СЕРЫЙ")
-
-    def test_card_gets_sizes_from_names(self):
-        """Карточка одежды собирается с размерами, даже если поля 1С пустые."""
-        for size in ("S", "M", "L"):
-            make(f"pn-{size}", f"ШОРТЫ мужские BMAI ЧЕРНЫЙ арт.FRSM007-1 р.{size}",
-                 stock_count=3)
+    def test_empty_fields_give_no_choice(self):
+        make("pf-1", "ШОРТЫ мужские BMAI ЧЕРНЫЙ р.S", article="FRSM007-1", stock_count=3)
         card = self.client.get("/v1/models/FRSM007").json()
-        self.assertEqual(card["variantCount"], 3)
-        self.assertEqual(card["sizes"], ["S", "M", "L"])
+        self.assertEqual(card["sizes"], [], "размер вытянули из названия — так нельзя")
+        self.assertEqual([c["name"] for c in card["colors"]], [""])
+
+    def test_filled_fields_appear_on_the_storefront(self):
+        make("pf-2", "ШОРТЫ мужские BMAI ЧЕРНЫЙ р.M", article="FRSM007-1",
+             sizes=["M"], colors=["ЧЕРНЫЙ"], stock_count=3)
+        card = self.client.get("/v1/models/FRSM007").json()
+        self.assertEqual(card["sizes"], ["M"])
         self.assertEqual([c["name"] for c in card["colors"]], ["ЧЕРНЫЙ"])
-        self.assertTrue(all(v["inStock"] for v in card["colors"][0]["sizes"]))
