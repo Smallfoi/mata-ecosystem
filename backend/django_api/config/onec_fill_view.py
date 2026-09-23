@@ -29,8 +29,6 @@ FIELDS = (
      "карточка в каталоге без картинки"),
     ("price", "Цена", Q(price__lte=0),
      "нельзя продать: цена ноль"),
-    ("global_name", "Общее название (1С)", Q(global_name=""),
-     "нечем объединить размеры и цвета одной модели"),
     ("brand", "Бренд", Q(brand=""),
      "не работает фильтр по бренду"),
     ("article", "Артикул", Q(article=""),
@@ -48,7 +46,7 @@ FIELDS = (
 )
 
 # Эти поля ведёт 1С — их и просить заполнять там. Остальное можем вести сами.
-FROM_1C = {"category", "price", "global_name", "brand", "article", "sizes",
+FROM_1C = {"category", "price", "brand", "article", "sizes",
            "colors", "description", "parcel", "stock"}
 
 

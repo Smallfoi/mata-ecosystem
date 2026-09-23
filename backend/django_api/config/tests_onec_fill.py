@@ -19,8 +19,7 @@ class OnecFillTests(TestCase):
     def setUpTestData(cls):
         Category.objects.create(id="c1", name="Обувь")
         # Заполненная карточка — в «пустых» не числится нигде.
-        Product.objects.create(id="p_full", name="BMAI PURE 41р.", global_name="BMAI PURE",
-                               brand="BMAI", article="AR-1", category_id="c1", price=7990,
+        Product.objects.create(id="p_full", name="BMAI PURE 41р.", brand="BMAI", article="AR-1", category_id="c1", price=7990,
                                sizes=["41"], colors=["чёрный"], description="Кроссовки",
                                image_urls=["a.jpg"], weight_g=800, stock_count=3)
         # Пустая: ни категории, ни бренда, ни фото, ни цены.

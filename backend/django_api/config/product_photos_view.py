@@ -60,7 +60,7 @@ def product_photos(request):
         qs = qs.filter(NO_PHOTO)
     if query:
         qs = qs.filter(Q(name__icontains=query) | Q(article__icontains=query)
-                       | Q(global_name__icontains=query) | Q(brand__icontains=query))
+                       | Q(brand__icontains=query))
     qs = qs.order_by("name")
 
     page = Paginator(qs, PER_PAGE).get_page(request.GET.get("page"))

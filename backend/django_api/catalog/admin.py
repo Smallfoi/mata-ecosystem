@@ -169,7 +169,6 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
         "preview",
         "shop_title",
         "name",
-        "global_name",
         "brand",
         "price",
         "old_price",
@@ -211,13 +210,13 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     list_filter = (ShopTitleFilter, MissingFilter, "category_id", "brand", "in_stock",
                    "is_published", "is_featured", "is_new", "is_active_1c")
     search_fields = ("id", "name", "display_name", "display_name_override", "model_key",
-                     "model_key_override", "global_name", "brand", "article", "description")
+                     "model_key_override", "brand", "article", "description")
     ordering = ("sort",)
     actions = [make_published, make_draft, "rebuild_names", delete_products]
     fieldsets = (
         ("Основное", {
             "fields": ("id", "name", "display_name", "display_name_override",
-                       "model_key", "model_key_override", "global_name",
+                       "model_key", "model_key_override",
                        "brand", "article", "category_id", "description"),
             "description": "«Название» 1С шлёт по позиции — с артикулом, цветом и размером "
             "(«ЖИЛЕТ Жен. BMAI арт. FRWK006-1 цвет ЧЕРНЫЙ р. XL»): так удобно на "
