@@ -64,7 +64,7 @@ class ShopNameTests(TestCase):
 
     def test_case_is_normalised(self):
         """Капс выглядит как складской код; латиницу и бренды не трогаем."""
-        self.assertEqual(shop_name("БЛУЗКА Муж. BMAI"), "Блузка мужской BMAI")
+        self.assertEqual(shop_name("БЛУЗКА Муж. BMAI"), "Блузка мужская BMAI")
         self.assertEqual(shop_name("BMAI EXPEDITION RIVER"), "BMAI EXPEDITION RIVER")
 
     def test_full_gender_word_is_left_alone(self):

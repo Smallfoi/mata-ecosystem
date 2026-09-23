@@ -27,6 +27,60 @@
   function priceFmt(v) {
     return new Intl.NumberFormat("ru-RU").format(v) + " ₽";
   }
+  // Цвета 1С приходят названиями («ЧЕРНЫЙ», «Серый/Желтый»), а точки на карточке
+  // ждут настоящий цвет для CSS. Без перевода точки все одинаковые и бессмысленные.
+  var COLOR_HEX = {
+    "ЧЕРН": "#1c1f24", "БЕЛ": "#f2f3f5", "СЕР": "#8a93a3", "СИН": "#2f5ad0",
+    "ГОЛУБ": "#5bb8e8", "КРАСН": "#d23b3b", "БОРДОВ": "#7d2338", "РОЗОВ": "#e879a8",
+    "МЯТН": "#7bd3b0", "ОЛИВК": "#7a8b4a", "ЗЕЛЕН": "#3f9c53", "ЖЕЛТ": "#e9c53b",
+    "ОРАНЖ": "#e67e22", "ФИОЛЕТ": "#7c5cd0", "БЕЖЕВ": "#d9c3a3", "КОРИЧН": "#6b4a32",
+    "ХАКИ": "#6f7250", "СЕРЕБР": "#c6cad1", "ЗОЛОТ": "#d4af52", "БИРЮЗ": "#3fb8b0",
+    "ЛАЙМ": "#c3e83b", "ГРАФИТ": "#3b4149", "ИНДИГО": "#3a4a8c", "МОЛОЧН": "#f4efe6",
+    "ПЕСОЧН": "#e0cfa8", "ТЕРРАКОТ": "#c1603f", "ЛИЛОВ": "#b28ad0", "ИЗУМРУД": "#2e8f6a",
+    "ПУРПУР": "#8e3b6b", "МАЛИНОВ": "#c2255c", "САЛАТОВ": "#9ad13f"
+  };
+  function colorHex(name) {
+    var up = String(name || "").toUpperCase().replace(/Ё/g, "Е");
+    var first = up.split(/[\/\-]/)[0].replace(/[^А-ЯA-Z]/g, "");
+    for (var key in COLOR_HEX) {
+      if (first.indexOf(key) === 0) return COLOR_HEX[key];
+    }
+    return "#8a93a3";
+  }
+
+  // Карточка модели (/v1/models) → те же поля, что ждёт вёрстка карточки.
+  // Одна карточка на модель: внутри цвета, у каждого свои размеры с наличием.
+  function fromModel(card) {
+    var colors = Array.isArray(card.colors) ? card.colors : [];
+    var sizes = Array.isArray(card.sizes) ? card.sizes.slice() : [];
+    var available = {};
+    colors.forEach(function (c) {
+      (c.sizes || []).forEach(function (v) {
+        if (v.inStock) available[v.size] = true;
+      });
+    });
+    var stockBySize = {};
+    sizes.forEach(function (s) { stockBySize[s] = available[s] ? 1 : 0; });
+    return {
+      id: card.key,
+      name: card.name,
+      brand: card.brand,
+      categoryId: card.categoryId,
+      categoryLabel: card.brand || "",   // бренд в 1С есть не у всех — пусто, значит строки нет
+      price: card.price,
+      oldPrice: card.oldPrice,
+      imageUrl: card.imageUrl,
+      description: card.description,
+      sizes: sizes,
+      colors: colors.map(function (c) { return colorHex(c.name); }),
+      colorNames: colors.map(function (c) { return c.name; }),
+      stockBySize: sizes.length ? stockBySize : null,
+      inStock: card.inStock,
+      rating: 0,
+      reviewCount: 0
+    };
+  }
+
   function imgUrl(p) {
     var u = p.imageUrl || (p.imageUrls && p.imageUrls[0]) || "";
     if (!u) return "";
@@ -37,9 +91,13 @@
   function cardHtml(p) {
     var img = imgUrl(p);
     var cat = p.categoryId || ""; // для фильтра каталога
-    var catLabel = p.categoryLabel || p.brand || "МАТА";
-    var sizes = Array.isArray(p.sizes) && p.sizes.length ? p.sizes : ["S", "M", "L", "XL"];
-    var colors = Array.isArray(p.colors) && p.colors.length ? p.colors : ["#2b2f36", "#8a93a3"];
+    // Бренд в 1С пока заполнен не у всех. Пусто — строки нет: «МАТА» на каждой
+    // карточке ничего не сообщает, а место занимает.
+    var catLabel = p.categoryLabel || p.brand || "";
+    // Размеры показываем ТОЛЬКО настоящие: раньше при пустом списке подставлялись
+    // S/M/L/XL, и у геля с бутылкой появлялись размеры, которых не бывает.
+    var sizes = Array.isArray(p.sizes) ? p.sizes.filter(Boolean) : [];
+    var colors = Array.isArray(p.colors) && p.colors.length ? p.colors : [];
     var stock = p.inStock === false ? "Скоро в продаже" : "В наличии";
     var stockCls = p.inStock === false ? " product-stock--soon" : "";
     var colorDots = colors
@@ -63,6 +121,7 @@
       ' data-name="' + esc(p.name) + '" data-price="' + Number(p.price) + '"' +
       ' data-cat="' + esc(catLabel) + '" data-img="' + esc(img) + '"' +
       ' data-sizes="' + esc(sizes.join(",")) + '" data-colors="' + esc(colors.join(",")) + '"' +
+      (p.colorNames ? ' data-color-names="' + esc(p.colorNames.join(",")) + '"' : "") +
       ' data-outofstock="' + esc(out.join(",")) + '"' +
       ' data-stock="' + esc(stock) + '" data-desc="' + esc(desc) + '">' +
       '<div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее: ' +
@@ -70,14 +129,14 @@
       (img ? '<img src="' + esc(img) + '" alt="' + esc(p.name) + '" loading="lazy" />' : "") +
       "</div>" +
       '<div class="product-info">' +
-      '<p class="product-cat">' + esc(catLabel) + "</p>" +
+      (catLabel ? '<p class="product-cat">' + esc(catLabel) + "</p>" : "") +
       "<h3>" + esc(p.name) + "</h3>" +
       (Number(p.reviewCount) > 0
         ? '<div class="product-rating">★ ' + (Number(p.rating) || 0).toFixed(1) +
           ' <span>(' + Number(p.reviewCount) + ")</span></div>"
         : "") +
-      '<div class="product-colors" aria-hidden="true">' + colorDots + "</div>" +
-      '<div class="product-sizes" aria-hidden="true">' + sizeChips + "</div>" +
+      (colorDots ? '<div class="product-colors" aria-hidden="true">' + colorDots + "</div>" : "") +
+      (sizeChips ? '<div class="product-sizes" aria-hidden="true">' + sizeChips + "</div>" : "") +
       '<div class="product-bottom">' +
       '<span class="product-price">' + priceFmt(p.price) + "</span>" +
       '<span class="product-stock' + stockCls + '">' + esc(stock) + "</span>" +
@@ -126,10 +185,18 @@
   }
 
   function load() {
-    fetch(API + "/products?platform=site" + (PREVIEW ? "&preview=1" : ""))
+    var tail = "?platform=site" + (PREVIEW ? "&preview=1" : "");
+    // Витрина показывает МОДЕЛИ: один товар — много цветов и размеров (D-94).
+    // Если бэкенд старый и адреса нет — падаем на прежний список позиций.
+    fetch(API + "/models" + tail)
       .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-      .then(render)
-      .catch(function () { /* офлайн/нет API — оставляем статичные карточки */ });
+      .then(function (cards) { render(cards.map(fromModel)); })
+      .catch(function () {
+        fetch(API + "/products" + tail)
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+          .then(render)
+          .catch(function () { /* офлайн — остаются статичные карточки */ });
+      });
   }
 
   // ── Отзывы в quick-view (общий бэкенд /products/<id>/reviews) ───────────────
