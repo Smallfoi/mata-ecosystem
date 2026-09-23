@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# «Проверка данных»: что похоже на ошибку в каталоге. Оформление общее, m-*. #}
+
+<div class="m-sum">
+  <div class="m-tile"><b>{{ found }}</b><span>замечаний</span></div>
+  <div class="m-tile"><b>{{ total }}</b><span>товаров проверено</span></div>
+</div>
+
+{% if not found %}
+  <div class="m-good">Подозрительного не нашлось — данные выглядят согласованными.</div>
+{% else %}
+  <div class="m-hint">
+    Здесь только подозрения, а не приговор: правим в 1С, страница перепроверит при
+    следующем открытии. Ничего автоматически не меняется.
+  </div>
+{% endif %}
+
+{% for section in sections %}
+  {% if section.total %}
+    <div class="m-card">
+      <div class="m-head">{{ section.title }} <span class="m-chip">{{ section.total }}</span></div>
+      <div class="m-wrap">
+        <table class="m">
+          <thead>
+            <tr><th>Что не так</th><th>Подробности</th><th>Карточки</th></tr>
+          </thead>
+          <tbody>
+            {% for item in section.items %}
+              <tr>
+                <td>
+                  {{ item.title }}
+                  <div class="m-hint">{{ item.hint }}</div>
+                </td>
+                <td class="m-muted">{{ item.detail }}</td>
+                <td>
+                  {% for link in item.links %}
+                    <a href="{{ link.url }}" title="{{ link.name }}">{{ link.name|truncatechars:42 }}</a>{% if not forloop.last %}<br>{% endif %}
+                  {% endfor %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if section.total > section.items|length %}
+        <div class="m-hint">Показаны первые {{ section.items|length }} из {{ section.total }}.</div>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endfor %}
+
+<div class="m-hint">
+  Проверено {{ checked_at }}{% if last_exchange %} · последняя выгрузка каталога из 1С: {{ last_exchange }}{% endif %} ·
+  <a href="{{ fill_link }}">заполненность полей</a>
+</div>
+{% endblock %}
