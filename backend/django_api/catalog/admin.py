@@ -213,7 +213,7 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     search_fields = ("id", "name", "display_name", "display_name_override", "model_key",
                      "model_key_override", "global_name", "brand", "article", "description")
     ordering = ("sort",)
-    actions = [make_published, make_draft, delete_products]
+    actions = [make_published, make_draft, "rebuild_names", delete_products]
     fieldsets = (
         ("Основное", {
             "fields": ("id", "name", "display_name", "display_name_override",
@@ -253,6 +253,26 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
         }),
     )
     readonly_fields = ("preview_large", "display_name", "model_key")
+
+    @admin.action(description="🔤 Пересчитать витринные названия и модели")
+    def rebuild_names(self, request, queryset):
+        """Пересчитать разбор названий у выбранных товаров.
+
+        Обычно имя и ключ модели считаются сами при выгрузке из 1С. Кнопка нужна,
+        когда правила разбора поменялись, а выгрузки ждать незачем — и чтобы это
+        не требовало доступа к серверу. Ручные правки не трогаем: они сильнее.
+        """
+        changed = []
+        for product in queryset.iterator(chunk_size=500):
+            was = (product.display_name, product.model_key)
+            product.rebuild_display_name()
+            if (product.display_name, product.model_key) != was:
+                changed.append(product)
+        for start in range(0, len(changed), 500):
+            Product.objects.bulk_update(changed[start:start + 500],
+                                        ["display_name", "model_key"])
+        StaffAudit.write(request, f"пересчитаны витринные названия: {len(changed)}")
+        self.message_user(request, f"Пересчитано названий: {len(changed)}", messages.SUCCESS)
 
     def get_actions(self, request):
         # Штатное «Удалить выбранные» на тысячах товаров упиралось в лимит полей
