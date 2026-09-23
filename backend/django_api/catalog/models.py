@@ -65,6 +65,13 @@ class Product(models.Model):
     # Ручная правка: если заполнено — показываем её, автоматика не перебивает.
     display_name_override = models.CharField(max_length=200, blank=True, default="",
                                              verbose_name="Витринное название вручную")
+    # Ключ карточки на витрине: складские позиции одной модели (все цвета и
+    # размеры) имеют один ключ. Считается автоматически (catalog/naming.py).
+    model_key = models.CharField(max_length=200, blank=True, default="", db_index=True,
+                                 verbose_name="Ключ модели")
+    # Ручная склейка: вписали чужой ключ — карточка переехала в ту модель.
+    model_key_override = models.CharField(max_length=200, blank=True, default="",
+                                          verbose_name="Ключ модели вручную")
     brand = models.CharField(max_length=120, blank=True, default="", verbose_name="Бренд")
     category_id = models.CharField(max_length=40, db_index=True, verbose_name="Категория")
     price = models.FloatField(verbose_name="Цена")
@@ -132,11 +139,19 @@ class Product(models.Model):
         """Что видит покупатель: ручная правка, иначе автоматическая, иначе имя 1С."""
         return (self.display_name_override or self.display_name or self.name).strip()
 
+    @property
+    def shop_model_key(self) -> str:
+        """Ключ карточки: ручная склейка сильнее автоматической."""
+        return (self.model_key_override or self.model_key).strip()
+
     def rebuild_display_name(self) -> str:
-        """Пересчитать витринное имя из складского. Возвращает результат."""
+        """Пересчитать витринное имя и ключ модели из складского названия."""
+        from .naming import model_key as build_key
         from .naming import shop_name
 
         self.display_name = shop_name(self.name, self.sizes, self.colors, self.article)[:200]
+        self.model_key = build_key(self.name, self.sizes, self.colors, self.article,
+                                   self.display_name)[:200]
         return self.display_name
 
     def network_image_url(self) -> str:

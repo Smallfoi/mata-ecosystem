@@ -291,8 +291,8 @@ def import_categories(items) -> dict:
 # Что переписывает выгрузка карточек. Поля витрины (публикация, новинка,
 # рекомендуемое, порядок, рейтинг) в списке отсутствуют намеренно — это зона МАТА.
 CATALOG_FIELDS = [
-    "external_id", "article", "name", "display_name", "global_name", "category_id",
-    "brand", "is_active_1c",
+    "external_id", "article", "name", "display_name", "model_key", "global_name",
+    "category_id", "brand", "is_active_1c",
     "source_updated_at", "from_1c", "price", "old_price", "description",
     "sizes", "colors", "image_urls", "weight_g", "length_cm", "width_cm", "height_cm",
 ]

@@ -189,6 +189,7 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
         "parcel",
         "description_short",
         "onec_code",
+        "model_group",
     )
     list_display_links = ("name",)
     # Скрывать нельзя: по названию открывается карточка, а витринное имя — то,
@@ -196,7 +197,7 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     columns_locked = ("name", "shop_title")
     # По умолчанию — компактный набор. Остальное не потеряно: включается шестерёнкой.
     columns_hidden_default = ("description_short", "onec_code", "source_updated_at",
-                              "parcel", "category_name")
+                              "parcel", "category_name", "model_group")
     columns_editable = (
         "price",
         "old_price",
@@ -209,19 +210,23 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     )
     list_filter = (ShopTitleFilter, MissingFilter, "category_id", "brand", "in_stock",
                    "is_published", "is_featured", "is_new", "is_active_1c")
-    search_fields = ("id", "name", "display_name", "display_name_override", "global_name",
-                     "brand", "article", "description")
+    search_fields = ("id", "name", "display_name", "display_name_override", "model_key",
+                     "model_key_override", "global_name", "brand", "article", "description")
     ordering = ("sort",)
     actions = [make_published, make_draft, delete_products]
     fieldsets = (
         ("Основное", {
-            "fields": ("id", "name", "display_name", "display_name_override", "global_name",
+            "fields": ("id", "name", "display_name", "display_name_override",
+                       "model_key", "model_key_override", "global_name",
                        "brand", "article", "category_id", "description"),
             "description": "«Название» 1С шлёт по позиции — с артикулом, цветом и размером "
             "(«ЖИЛЕТ Жен. BMAI арт. FRWK006-1 цвет ЧЕРНЫЙ р. XL»): так удобно на "
             "этикетке и в офлайн-магазине. «Витринное название» считается из него "
             "автоматически — это то, что видит покупатель. Если разобрано неверно, "
-            "впишите своё в «Витринное название вручную»: оно сильнее автоматики.",
+            "впишите своё в «Витринное название вручную»: оно сильнее автоматики. "
+            "«Ключ модели» собирает позиции в одну карточку на витрине: у одежды это "
+            "артикул модели (FRWK006 из FRWK006-1), у обуви — витринное название. "
+            "Чтобы перенести позицию в другую карточку, впишите её ключ вручную.",
         }),
         ("Фото", {
             "fields": ("image", "preview_large", "image_urls"),
@@ -247,7 +252,7 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
             "странице «Конструктор витрины».",
         }),
     )
-    readonly_fields = ("preview_large", "display_name")
+    readonly_fields = ("preview_large", "display_name", "model_key")
 
     def get_actions(self, request):
         # Штатное «Удалить выбранные» на тысячах товаров упиралось в лимит полей
@@ -324,6 +329,17 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
             return format_html('<span title="{}">{}</span> '
                                '<span class="m-tag warn">не разобрано</span>', obj.name, title)
         return format_html('<span title="{}">{}</span>', obj.name, title)
+
+    @admin.display(description="Модель", ordering="model_key")
+    def model_group(self, obj):
+        """Ключ карточки на витрине: у одежды это артикул модели, у обуви — имя.
+        Позиции с одним ключом покупатель видит как одну карточку."""
+        key = obj.shop_model_key
+        if not key:
+            return "—"
+        if obj.model_key_override:
+            return format_html('{} <span class="m-tag info">вручную</span>', key)
+        return key
 
     @admin.display(description="Категория")
     def category_name(self, obj):
