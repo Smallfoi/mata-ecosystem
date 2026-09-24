@@ -92,6 +92,12 @@ sleep 8
 # публикуем юр.документы с актуальными реквизитами (читает LEGAL_* из окружения web)
 docker compose -f docker-compose.prod.yml --env-file .env exec -T web python manage.py publish_legal || echo "WARN: publish_legal не отработал"
 
+# ВАЖНО: web пересоздан (--force-recreate) → получил НОВЫЙ внутренний IP. nginx резолвит
+# upstream `web` при загрузке конфига и кэширует IP — без перечитки он будет стучать по старому
+# адресу и отдавать 502. Перечитываем nginx (как в prod-autodeploy.sh).
+docker compose -f docker-compose.prod.yml --env-file .env exec -T nginx nginx -s reload 2>/dev/null \
+  || docker compose -f docker-compose.prod.yml --env-file .env up -d nginx || true
+
 echo "=== health ==="
 curl -s https://api.mata-club.ru/v1/health || true
 echo
