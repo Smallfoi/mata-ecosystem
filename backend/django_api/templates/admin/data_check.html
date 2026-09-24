@@ -6,14 +6,22 @@
 <div class="m-sum">
   <div class="m-tile"><b>{{ found }}</b><span>замечаний</span></div>
   <div class="m-tile"><b>{{ total }}</b><span>товаров проверено</span></div>
+  <div class="m-tile"><b>{{ dismissed }}</b><span>закрыто вручную</span></div>
+</div>
+
+{% if note %}<div class="m-good">{{ note }}</div>{% endif %}
+
+<div class="m-tabs">
+  <a class="m-tab" href="{{ closed_link }}">Закрытые замечания</a>
+  <a class="m-tab" href="{{ fill_link }}">Заполненность 1С</a>
 </div>
 
 {% if not found %}
   <div class="m-good">Подозрительного не нашлось — данные выглядят согласованными.</div>
 {% else %}
   <div class="m-hint">
-    Здесь только подозрения, а не приговор: правим в 1С, страница перепроверит при
-    следующем открытии. Ничего автоматически не меняется.
+    Здесь подозрения, а не приговор. «Разобрать» — посмотреть позиции рядом и решить:
+    поправить в 1С или закрыть замечание. Закрытое вернётся, если данные снова изменятся.
   </div>
 {% endif %}
 
@@ -24,7 +32,7 @@
       <div class="m-wrap">
         <table class="m">
           <thead>
-            <tr><th>Что не так</th><th>Подробности</th><th>Карточки</th></tr>
+            <tr><th>Что не так</th><th>Подробности</th><th>Карточки</th><th></th></tr>
           </thead>
           <tbody>
             {% for item in section.items %}
@@ -39,6 +47,7 @@
                     <a href="{{ link.url }}" title="{{ link.name }}">{{ link.name|truncatechars:42 }}</a>{% if not forloop.last %}<br>{% endif %}
                   {% endfor %}
                 </td>
+                <td><a class="m-btn" href="{{ item.open_url }}">Разобрать</a></td>
               </tr>
             {% endfor %}
           </tbody>

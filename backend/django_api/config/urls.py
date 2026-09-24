@@ -44,7 +44,7 @@ from territories import views as territories_views
 from blocks import views as blocks_views
 from analytics import views as analytics_views
 from config.errors_view import error_detail, errors_console
-from config.data_check_view import data_check
+from config.data_check_view import data_check, data_check_closed, data_check_item
 from config.onec_fill_view import onec_fill
 from config.product_photos_view import product_photos
 from config.onec_log_view import onec_log
@@ -74,6 +74,8 @@ urlpatterns = [
     path("admin/1c-log/", onec_log, name="onec_log"),
     path("admin/1c-fill/", onec_fill, name="onec_fill"),
     path("admin/data-check/", data_check, name="data_check"),
+    path("admin/data-check/item/", data_check_item, name="data_check_item"),
+    path("admin/data-check/closed/", data_check_closed, name="data_check_closed"),
     path("admin/photos/", product_photos, name="product_photos"),
     # «Проверка забегов» — разбор помеченных анти-читом (S-04 ф.2). ДО admin/.
     path("admin/runs-review/", runs_review, name="runs_review"),

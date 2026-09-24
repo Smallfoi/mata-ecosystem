@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from collections import defaultdict
 
@@ -85,6 +86,7 @@ def check_gender_mismatch(products):
         if len(counts) > 1:
             rare = min(counts.values(), key=len)
             found.append({
+                "key": model,
                 "title": f"Артикул {model}: в названиях разный пол",
                 "detail": " · ".join(f"{g} — {len(v)}" for g, v in counts.items()),
                 "hint": "Скорее всего, опечатка в названии у меньшинства позиций.",
@@ -110,6 +112,7 @@ def check_model_name_differs(products):
     for model, values in titles.items():
         if len(values) > 1:
             found.append({
+                "key": model,
                 "title": f"Артикул {model}: разные названия модели",
                 "detail": " | ".join(sorted(values)[:4]),
                 "hint": "У одной модели название должно быть одним — сверьте написание.",
@@ -130,6 +133,7 @@ def check_strange_size(products):
                     or _RANGE_SIZE.match(value) or _UNIT_SIZE.match(value)):
                 continue
             found.append({
+                "key": f"{product.id}:{value}",
                 "title": f"Странный размер: «{value}»",
                 "detail": product.name,
                 "hint": "Похоже, в строку размера попало другое — длина, объём или номер.",
@@ -154,6 +158,7 @@ def check_color_mismatch(products):
                 continue
             if any(other[:4] in name_upper for other in _COLOR_ROOTS):
                 found.append({
+                    "key": f"{product.id}:{color}",
                     "title": f"Цвет в строке «{color}», а в названии другой",
                     "detail": product.name,
                     "hint": "Проверьте, какой цвет верный: на витрину идёт строка.",
@@ -169,6 +174,7 @@ def check_bad_article(products):
         article = (product.article or "").strip()
         if article and not _GOOD_ARTICLE.match(article):
             found.append({
+                "key": product.id,
                 "title": f"Артикул странного вида: «{article}»",
                 "detail": product.name,
                 "hint": "Кириллица, пробел или лишний знак в артикуле — обычно опечатка.",
@@ -198,6 +204,7 @@ def check_duplicate_variant(products):
     for (model, color, size), items in seen.items():
         if len(items) > 1:
             found.append({
+                "key": f"{model}|{color}|{size}",
                 "title": f"Повтор варианта: {model}, цвет «{color}», размер «{size}»",
                 "detail": f"позиций: {len(items)}",
                 "hint": "Две карточки на один вариант — покупатель увидит дубль.",
@@ -220,6 +227,7 @@ def check_price_differs(products):
         low, high = min(prices), max(prices)
         if low and high / low >= 3:
             found.append({
+                "key": model,
                 "title": f"Артикул {model}: цены расходятся в {round(high / low)} раза",
                 "detail": f"от {low:.0f} ₽ до {high:.0f} ₽",
                 "hint": "Внутри модели цены обычно близки — проверьте, нет ли лишнего нуля.",
@@ -229,23 +237,62 @@ def check_price_differs(products):
 
 
 CHECKS = (
-    ("Разный пол у одного артикула", check_gender_mismatch),
-    ("Разные названия у одного артикула", check_model_name_differs),
-    ("Странный размер", check_strange_size),
-    ("Цвет в строке и в названии расходятся", check_color_mismatch),
-    ("Артикул странного вида", check_bad_article),
-    ("Повтор варианта", check_duplicate_variant),
-    ("Цены внутри модели расходятся", check_price_differs),
+    ("gender", "Разный пол у одного артикула", check_gender_mismatch),
+    ("names", "Разные названия у одного артикула", check_model_name_differs),
+    ("size", "Странный размер", check_strange_size),
+    ("color", "Цвет в строке и в названии расходятся", check_color_mismatch),
+    ("article", "Артикул странного вида", check_bad_article),
+    ("duplicate", "Повтор варианта", check_duplicate_variant),
+    ("price", "Цены внутри модели расходятся", check_price_differs),
 )
 
+BY_ID = {check_id: (title, func) for check_id, title, func in CHECKS}
 
-def run_all(queryset=None, limit_per_check: int = 50):
-    """Все проверки разом. Возвращает разделы с находками, самые важные — первыми."""
+
+def fingerprint(item) -> str:
+    """Отпечаток находки: что именно сейчас не так.
+
+    Нужен для кнопки «проверено». Скрываем не находку вообще, а именно ЭТО
+    состояние данных: поправили в 1С или добавили позицию — отпечаток другой,
+    и замечание появляется снова. Иначе один раз закрытая ошибка исчезла бы
+    навсегда, даже если её так и не исправили.
+    """
+    parts = []
+    for product in item.get("products", []):
+        parts.append("|".join([
+            str(product.id), product.name or "", product.article or "",
+            ",".join(map(str, product.sizes or [])),
+            ",".join(map(str, product.colors or [])),
+            f"{product.price:.2f}",
+        ]))
+    base = item.get("key", "") + "#" + ";".join(sorted(parts))
+    return hashlib.sha1(base.encode("utf-8")).hexdigest()[:16]
+
+
+def run_check(check_id: str, products=None):
+    """Одна проверка по её идентификатору."""
+    if check_id not in BY_ID:
+        return []
+    _title, func = BY_ID[check_id]
+    items = list(products if products is not None else Product.objects.all())
+    found = func(items)
+    for item in found:
+        item["check"] = check_id
+        item["fingerprint"] = fingerprint(item)
+    return found
+
+
+def run_all(queryset=None, limit_per_check: int = 50, hidden=None):
+    """Все проверки разом. `hidden` — множество (проверка, ключ, отпечаток),
+    которые владелец уже посмотрел и пометил «проверено»."""
     products = list(queryset if queryset is not None else Product.objects.all())
+    hidden = hidden or set()
     sections = []
-    for title, check in CHECKS:
-        found = check(products)
+    for check_id, title, _func in CHECKS:
+        found = [item for item in run_check(check_id, products)
+                 if (check_id, item["key"], item["fingerprint"]) not in hidden]
         sections.append({
+            "id": check_id,
             "title": title,
             "total": len(found),
             "items": found[:limit_per_check],

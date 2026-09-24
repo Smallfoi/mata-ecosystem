@@ -306,3 +306,33 @@ class SiteContent(models.Model):
 
     def to_json(self) -> dict:
         return {"value": self.value, "imageUrl": self.image_url()}
+
+
+class CheckDismissal(models.Model):
+    """Замечание проверки, помеченное как «проверено» — его больше не показываем.
+
+    Скрываем не замечание вообще, а конкретное СОСТОЯНИЕ данных: вместе с ключом
+    храним отпечаток (что именно сейчас не так). Поправили в 1С или добавили
+    позицию — отпечаток другой, и замечание вернётся. Иначе один раз закрытая
+    ошибка исчезла бы навсегда, даже если её так и не исправили.
+    """
+
+    # Имя `check` занято самим Django (Model.check), поэтому `check_id`.
+    check_id = models.CharField(max_length=40, db_index=True, verbose_name="Проверка")
+    key = models.CharField(max_length=200, verbose_name="Ключ замечания")
+    fingerprint = models.CharField(max_length=40, verbose_name="Отпечаток данных")
+    note = models.CharField(max_length=300, blank=True, default="",
+                            verbose_name="Комментарий")
+    actor = models.CharField(max_length=150, blank=True, default="", verbose_name="Кто закрыл")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Когда")
+
+    class Meta:
+        db_table = "catalog_check_dismissals"
+        unique_together = ("check_id", "key", "fingerprint")
+        ordering = ["-created_at"]
+        verbose_name = "Закрытое замечание"
+        verbose_name_plural = "Закрытые замечания"
+
+    def __str__(self):
+        return f"{self.check_id}:{self.key}"
+

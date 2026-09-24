@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from catalog import audit
-from catalog.models import Product
+from catalog.models import CheckDismissal, Product
 from common.testutils import login_admin
 from staff.models import StaffProfile
 
@@ -116,3 +116,71 @@ class DataCheckPageTests(TestCase):
         other = self.client_class()
         login_admin(other, "clerk_dc", "ClerkPass!2026")
         self.assertNotEqual(other.get(PAGE).status_code, 200)
+
+
+class DismissTests(TestCase):
+    """«Проверено, не ошибка»: замечание уходит, но возвращается, если данные менялись."""
+
+    def setUp(self):
+        get_user_model().objects.create_superuser("owner_dis", "di@t.dev", "OwnerPass!2026")
+        login_admin(self.client, "owner_dis", "OwnerPass!2026")
+        for i in range(3):
+            make(f"dz{i}", f"Футболка женская BMAI {i}", article="FRTM020-1")
+        self.odd = make("dz-odd", "Футболка мужская BMAI", article="FRTM020-2")
+
+    def _item_url(self):
+        return "/admin/data-check/item/?check=gender&key=FRTM020"
+
+    def _gender_found(self):
+        """Сколько замечаний именно по полу: на этих данных срабатывает не только
+        проверка пола, поэтому общий счётчик тут ничего не скажет."""
+        page = self.client.get("/admin/data-check/")
+        section = next(s for s in page.context["sections"] if s["id"] == "gender")
+        return section["total"], page
+
+    def test_detail_page_shows_positions(self):
+        r = self.client.get(self._item_url())
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Футболка мужская BMAI")
+        self.assertContains(r, "/admin/catalog/product/dz-odd/change/")
+
+    def test_dismiss_hides_the_finding(self):
+        self.client.post("/admin/data-check/item/",
+                         {"check": "gender", "key": "FRTM020", "note": "так и надо"})
+        self.assertEqual(CheckDismissal.objects.count(), 1)
+
+        total, page = self._gender_found()
+        self.assertEqual(total, 0, "закрытое замечание всё ещё показывается")
+        self.assertEqual(page.context["dismissed"], 1)
+
+    def test_finding_returns_when_data_changes(self):
+        """Закрываем КОНКРЕТНОЕ состояние: правка данных возвращает замечание."""
+        self.client.post("/admin/data-check/item/", {"check": "gender", "key": "FRTM020"})
+        self.assertEqual(self._gender_found()[0], 0)
+
+        odd = Product.objects.get(pk="dz-odd")
+        odd.name = "Футболка мужская BMAI новая"
+        odd.save(update_fields=["name"])
+
+        self.assertEqual(self._gender_found()[0], 1,
+                         "данные изменились — замечание обязано вернуться")
+
+    def test_closed_page_can_restore(self):
+        self.client.post("/admin/data-check/item/", {"check": "gender", "key": "FRTM020"})
+        row = CheckDismissal.objects.get()
+        self.client.post("/admin/data-check/closed/", {"id": row.pk})
+        self.assertEqual(CheckDismissal.objects.count(), 0)
+        self.assertEqual(self._gender_found()[0], 1)
+
+    def test_fixed_finding_just_disappears(self):
+        """Исправили в 1С — замечание пропадает само, без кнопок."""
+        odd = Product.objects.get(pk="dz-odd")
+        odd.name = "Футболка женская BMAI исправленная"
+        odd.rebuild_display_name()
+        odd.save(update_fields=["name", "display_name", "model_key"])
+        self.assertEqual(self._gender_found()[0], 0)
+
+    def test_unknown_check_is_404(self):
+        self.assertEqual(self.client.get("/admin/data-check/item/?check=нет&key=x").status_code,
+                         404)
+
