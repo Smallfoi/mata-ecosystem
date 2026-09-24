@@ -58,11 +58,12 @@ def intake(batch, items):
     return jobs
 
 
-def run_job(job):
+def run_job(job, attach=True):
     """Одно задание: исходник → мастер (ИИ) → webp → привязка к карточке.
 
-    Идемпотентно по смыслу: skipped/без товара — ничего не делаем; сбой ИИ/сети → failed
-    с текстом ошибки, карточка не меняется.
+    `attach=False` — прогнать ИИ и получить мастер/webp на задании, но НЕ трогать витрину
+    (режим предпросмотра: посмотреть результат, ничего не выкладывая). Идемпотентно по смыслу:
+    skipped/без товара — ничего не делаем; сбой ИИ/сети → failed с текстом, карточка не меняется.
     """
     if job.product is None:
         job.status = PhotoJob.STATUS_SKIPPED
@@ -85,7 +86,8 @@ def run_job(job):
         job.webp.save("%s.webp" % base, ContentFile(webp), save=False)
 
         # В галерею витрины кладём МАСТЕР — хранилище само сделает webp 1600 и миниатюру 400.
-        attached = _attach(job, master)
+        # attach=False (предпросмотр) — витрину не трогаем, мастер/webp остаются на задании.
+        attached = _attach(job, master) if attach else False
 
         job.status = PhotoJob.STATUS_DONE
         job.error = ""

@@ -219,3 +219,46 @@ class PhotoPipelineServiceTests(TestCase):
         self.assertEqual(summary["failed"], 0)
         # несопоставленный уже помечен skipped на приёме — в очередь run_batch не попадает
         self.assertEqual(batch.jobs.filter(status=PhotoJob.STATUS_SKIPPED).count(), 1)
+
+    @mock.patch("productmedia.processing.process")
+    def test_run_job_preview_skips_attach(self, m_proc):
+        # attach=False (предпросмотр): мастер/webp на задании есть, витрину не трогаем.
+        m_proc.return_value = _png_bytes((7, 7, 7), (1100, 1100))
+        batch = self._batch()
+        job = service.intake(batch, [
+            {"article": "HD-1", "content": _png_bytes(), "filename": "a.png"}])[0]
+        service.run_job(job, attach=False)
+        job.refresh_from_db()
+        self.assertEqual(job.status, PhotoJob.STATUS_DONE)
+        self.assertTrue(job.master.name)
+        self.assertTrue(job.webp.name.endswith(".webp"))
+        self.assertIsNone(job.attached_at)
+        self.assertEqual(ProductPhoto.objects.count(), 0)    # в галерею ничего не выложено
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class PhotoTestCommandTests(TestCase):
+    """Команда photo_test: предпросмотр не трогает витрину, --apply выкладывает."""
+
+    def setUp(self):
+        from django.core.files.base import ContentFile
+        self.p = Product.objects.create(id="cmd1", name="Кроссовки", category_id="c",
+                                        price=5000, article="RUN-9",
+                                        colors=["Белый"], model_key="RUNNER")
+        self.p.image.save("cur.png", ContentFile(_png_bytes((1, 2, 3), (600, 600))), save=True)
+
+    @mock.patch("productmedia.processing.process")
+    def test_preview_does_not_touch_showcase(self, m_proc):
+        from django.core.management import call_command
+        m_proc.return_value = _png_bytes((10, 10, 10), (1000, 1000))
+        call_command("photo_test", "--article", "RUN-9", "--from-product")
+        self.assertEqual(ProductPhoto.objects.count(), 0)    # предпросмотр — витрина чиста
+        self.assertEqual(PhotoJob.objects.filter(status=PhotoJob.STATUS_DONE).count(), 1)
+
+    @mock.patch("productmedia.processing.process")
+    def test_apply_attaches_to_showcase(self, m_proc):
+        from django.core.management import call_command
+        m_proc.return_value = _png_bytes((20, 20, 20), (1000, 1000))
+        call_command("photo_test", "--article", "RUN-9", "--from-product", "--apply")
+        self.assertEqual(
+            ProductPhoto.objects.filter(model_key="RUNNER", color="Белый").count(), 1)
