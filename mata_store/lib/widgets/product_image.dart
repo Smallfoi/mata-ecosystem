@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+
+import '../data/api/api_config.dart';
 import '../theme/app_theme.dart';
 
 /// Универсальный загрузчик фото товара.
 ///
-/// Если путь начинается с `http` — грузит из сети через [CachedNetworkImage]
-/// (так будет работать с реальным backend/CDN). Иначе берёт локальный asset
+/// Путь с `http` или `/media/...` — грузит из сети через [CachedNetworkImage]
+/// (так приходят загруженные в админке фото: на проде это адрес хранилища, в
+/// разработке — относительный путь бэкенда). Иначе берёт локальный asset
 /// (используется в прототипе, работает офлайн на любой сети).
 class ProductImage extends StatelessWidget {
   final String path;
@@ -19,13 +22,18 @@ class ProductImage extends StatelessWidget {
     this.iconSize = 28,
   });
 
-  bool get _isNetwork => path.startsWith('http');
+  // `/media/...` — сетевой путь бэкенда, а не ассет приложения: так приходят
+  // загруженные в админке фото, когда медиа отдаёт сам сервер (dev), а не S3.
+  bool get _isNetwork => path.startsWith('http') || path.startsWith('/media');
+
+  String get _url =>
+      path.startsWith('http') ? path : ApiConfig.resolveMedia(path);
 
   @override
   Widget build(BuildContext context) {
     if (_isNetwork) {
       return CachedNetworkImage(
-        imageUrl: path,
+        imageUrl: _url,
         fit: fit,
         placeholder: (_, __) => Container(color: AppColors.grey100),
         errorWidget: (_, __, ___) => _error(),

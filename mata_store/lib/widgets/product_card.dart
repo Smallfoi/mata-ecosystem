@@ -61,7 +61,7 @@ class _ProductCardState extends State<ProductCard> {
                       Positioned.fill(
                         child: Hero(
                           tag: heroTag,
-                          child: ProductImage(path: p.firstImage),
+                          child: ProductImage(path: p.coverThumb),
                         ),
                       ),
 

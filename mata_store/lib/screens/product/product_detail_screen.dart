@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -34,6 +35,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _currentImage = 0;
   String? _selectedSize;
   String? _selectedColor;
+  bool _prefetched = false;
+
+  /// Показать снимок из ленты миниатюр.
+  void _showPhoto(int index) {
+    setState(() => _currentImage = index);
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(index,
+          duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+    }
+  }
+
+  /// Первый снимок каждого цвета — в кэш заранее: переключение цвета должно быть
+  /// мгновенным, а не «подождите, грузится» (D-99).
+  void _prefetchColors(Product product) {
+    if (_prefetched) return;
+    _prefetched = true;
+    for (final url in product.colorCovers) {
+      if (url.isEmpty) continue;
+      precacheImage(CachedNetworkImageProvider(url), context);
+    }
+  }
 
   @override
   void dispose() {
@@ -101,6 +123,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       );
     }
 
+    // Первый доступный цвет отмечаем сразу — как на сайте, у Nike и STAW:
+    // карточка обязана открыться показанной вещью, а не пустой галереей. Размер
+    // человек выбирает сам: это настоящее решение, а цвет виден на фото.
+    // Присваиваем без setState: значение используется тут же, в этом же кадре.
+    if (_selectedColor == null && product.colors.isNotEmpty) {
+      for (final c in product.colors) {
+        if (product.hasColor(c)) {
+          _selectedColor = c;
+          break;
+        }
+      }
+    }
+    _prefetchColors(product);
+
     return Scaffold(
       backgroundColor: AppColors.white,
       body: Stack(
@@ -109,9 +145,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             slivers: [
               _ImageGallery(
                 product: product,
+                photos: product.photosFor(_selectedColor),
                 controller: _pageController,
                 currentIndex: _currentImage,
                 onPageChanged: (i) => setState(() => _currentImage = i),
+                onThumbTap: _showPhoto,
                 heroTag: widget.heroTag,
               ),
               SliverToBoxAdapter(
@@ -210,8 +248,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         colors: product.colors,
                         selected: _selectedColor,
                         isAvailable: product.hasColor,
+                        coverOf: (c) {
+                          final shots = product.photosByColor[c];
+                          return (shots == null || shots.isEmpty) ? '' : shots.first.thumb;
+                        },
                         onSelected: (c) => setState(() {
                           _selectedColor = c;
+                          // Галерея показывает выбранный цвет — начинаем с первого
+                          // его снимка, иначе остался бы кадр от прежнего цвета.
+                          _currentImage = 0;
+                          if (_pageController.hasClients) {
+                            _pageController.jumpToPage(0);
+                          }
                           // Размер мог быть только у прежнего цвета — снимаем,
                           // чтобы не положить в корзину то, чего нет.
                           if (_selectedSize != null &&
@@ -270,23 +318,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
 class _ImageGallery extends StatelessWidget {
   final Product product;
+
+  /// Снимки ВЫБРАННОГО цвета (D-99): выбрал чёрный — смотришь чёрный.
+  final List<ProductPhoto> photos;
   final PageController controller;
   final int currentIndex;
   final ValueChanged<int> onPageChanged;
+  final ValueChanged<int> onThumbTap;
   final String? heroTag;
 
   const _ImageGallery({
     required this.product,
+    required this.photos,
     required this.controller,
     required this.currentIndex,
     required this.onPageChanged,
+    required this.onThumbTap,
     this.heroTag,
   });
 
   @override
   Widget build(BuildContext context) {
     return SliverAppBar(
-      expandedHeight: 440,
+      expandedHeight: photos.length > 1 ? 520 : 440,
       pinned: true,
       backgroundColor: AppColors.white,
       leading: GestureDetector(
@@ -301,44 +355,83 @@ class _ImageGallery extends StatelessWidget {
         ),
       ),
       flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
+        background: Column(
           children: [
-            PageView.builder(
-              controller: controller,
-              itemCount: product.imageUrls.length,
-              onPageChanged: onPageChanged,
-              itemBuilder: (context, index) {
-                final image = ProductImage(path: product.imageUrls[index]);
-                // Hero только на первом фото — совпадает с ProductCard
-                if (index == 0) {
-                  return Hero(
-                    tag: heroTag ?? 'product-img-${product.id}',
-                    child: image,
-                  );
-                }
-                return image;
-              },
-            ),
-            if (product.imageUrls.length > 1)
-              Positioned(
-                bottom: 16,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    product.imageUrls.length,
-                    (i) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: i == currentIndex ? 16 : 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: i == currentIndex
-                            ? AppColors.black
-                            : AppColors.grey400,
-                        borderRadius: BorderRadius.circular(3),
+            Expanded(
+              child: Stack(
+                children: [
+                  if (photos.isEmpty)
+                    // Снимков у выбранного цвета ещё нет: честная заглушка, а не
+                    // фотография другого цвета.
+                    const ProductImage(path: ''),
+                  PageView.builder(
+                    controller: controller,
+                    itemCount: photos.length,
+                    onPageChanged: onPageChanged,
+                    itemBuilder: (context, index) {
+                      final image = ProductImage(path: photos[index].url);
+                      // Hero только на первом фото — совпадает с ProductCard
+                      if (index == 0) {
+                        return Hero(
+                          tag: heroTag ?? 'product-img-${product.id}',
+                          child: image,
+                        );
+                      }
+                      return image;
+                    },
+                  ),
+                  if (photos.length > 1)
+                    Positioned(
+                      bottom: 16,
+                      left: 0,
+                      right: 0,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          photos.length,
+                          (i) => AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: i == currentIndex ? 16 : 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: i == currentIndex
+                                  ? AppColors.black
+                                  : AppColors.grey400,
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
                       ),
+                    ),
+                ],
+              ),
+            ),
+            // Лента миниатюр: видно сразу все снимки цвета, и до нужного один
+            // палец вместо нескольких смахиваний.
+            if (photos.length > 1)
+              SizedBox(
+                height: 76,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: photos.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, i) => GestureDetector(
+                    onTap: () => onThumbTap(i),
+                    child: Container(
+                      width: 48,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: i == currentIndex
+                              ? AppColors.black
+                              : AppColors.grey200,
+                          width: i == currentIndex ? 2 : 1,
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: ProductImage(path: photos[i].thumb),
                     ),
                   ),
                 ),
@@ -449,12 +542,17 @@ class _ColorSelector extends StatelessWidget {
   final List<String> colors;
   final String? selected;
   final bool Function(String color) isAvailable;
+
+  /// Миниатюра вещи в этом цвете — честнее точки: видно, как выглядит, ещё до
+  /// нажатия (D-99). Пусто — снимков у цвета нет, показываем одно название.
+  final String Function(String color) coverOf;
   final ValueChanged<String> onSelected;
 
   const _ColorSelector({
     required this.colors,
     required this.selected,
     required this.isAvailable,
+    required this.coverOf,
     required this.onSelected,
   });
 
@@ -497,12 +595,14 @@ class _ColorSelector extends StatelessWidget {
             // Цвета нет ни в одном размере — гасим и не даём выбрать: узнать об
             // этом в корзине куда обиднее.
             final available = isAvailable(color);
+            final cover = coverOf(color);
             return GestureDetector(
               onTap: available ? () => onSelected(color) : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: EdgeInsets.only(
+                    left: cover.isEmpty ? 16 : 6, right: 16,
+                    top: cover.isEmpty ? 10 : 6, bottom: cover.isEmpty ? 10 : 6),
                 decoration: BoxDecoration(
                   color: !available
                       ? AppColors.grey100
@@ -515,17 +615,36 @@ class _ColorSelector extends StatelessWidget {
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  color,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    decoration:
-                        available ? TextDecoration.none : TextDecoration.lineThrough,
-                    color: !available
-                        ? AppColors.grey400
-                        : (isSelected ? AppColors.lime : AppColors.black),
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (cover.isNotEmpty) ...[
+                      ClipOval(
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: Opacity(
+                            opacity: available ? 1 : .45,
+                            child: ProductImage(path: cover),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      color,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        decoration: available
+                            ? TextDecoration.none
+                            : TextDecoration.lineThrough,
+                        color: !available
+                            ? AppColors.grey400
+                            : (isSelected ? AppColors.lime : AppColors.black),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );

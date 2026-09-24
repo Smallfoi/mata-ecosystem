@@ -1,3 +1,24 @@
+/// Снимок витрины в двух размерах (D-99).
+///
+/// `url` — витринный webp для галереи, `thumb` — миниатюра для ленты каталога и
+/// кружков выбора цвета: тянуть полноразмерные снимки в список из двух сотен
+/// карточек незачем.
+class ProductPhoto {
+  final String url;
+  final String thumb;
+
+  const ProductPhoto({required this.url, required this.thumb});
+
+  factory ProductPhoto.fromJson(Map<String, dynamic> j) {
+    final url = (j['url'] ?? '').toString();
+    return ProductPhoto(url: url, thumb: (j['thumb'] ?? '').toString().isEmpty
+        ? url
+        : (j['thumb']).toString());
+  }
+
+  Map<String, dynamic> toJson() => {'url': url, 'thumb': thumb};
+}
+
 /// Вариант модели: сочетание цвета и размера — это отдельная позиция на складе.
 ///
 /// В 1С каждый размер и цвет ведутся отдельными карточками (так печатают
@@ -60,6 +81,13 @@ class Product {
   /// из старого списка позиций, тогда работаем как раньше.
   final List<ProductVariant> variants;
 
+  /// Миниатюра обложки — её показывает карточка в ленте каталога (D-99).
+  final String thumbUrl;
+
+  /// Снимки по цветам: выбрал чёрный — смотришь чёрный. Ключ «» — общие снимки
+  /// модели (в 1С цвет ещё не заполнен).
+  final Map<String, List<ProductPhoto>> photosByColor;
+
   const Product({
     required this.id,
     required this.name,
@@ -78,9 +106,34 @@ class Product {
     this.inStock = true,
     this.stockBySize = const {},
     this.variants = const [],
+    this.thumbUrl = '',
+    this.photosByColor = const {},
   });
 
   bool get isOnSale => oldPrice != null && oldPrice! > price;
+
+  /// Снимки выбранного цвета. Нет таких — общие снимки модели, а если и их нет,
+  /// остаются прежние картинки позиции: витрина не должна пустеть.
+  List<ProductPhoto> photosFor(String? color) {
+    final own = color == null ? null : photosByColor[color];
+    if (own != null && own.isNotEmpty) return own;
+    final common = photosByColor[''];
+    if (common != null && common.isNotEmpty) return common;
+    // У товара галереи есть, но у ЭТОГО цвета снимков нет — показывать чужие
+    // нельзя: человек выбрал синий и увидел бы чёрную вещь. Лучше честная
+    // заглушка, тем более что в админке видно, каким цветам фото не хватает.
+    if (color != null && photosByColor.isNotEmpty) return const [];
+    return imageUrls
+        .map((u) => ProductPhoto(url: u, thumb: u))
+        .toList(growable: false);
+  }
+
+  /// Первый снимок каждого цвета — их прогреваем заранее, чтобы переключение
+  /// цвета было мгновенным (D-99).
+  List<String> get colorCovers => photosByColor.values
+      .where((list) => list.isNotEmpty)
+      .map((list) => list.first.url)
+      .toList(growable: false);
 
   /// Позиция склада для выбранного сочетания — её и кладём в заказ.
   ProductVariant? variantFor(String size, String color) {
@@ -113,6 +166,14 @@ class Product {
   /// Первое фото или '' (безопасно при пустом списке — напр. данные из API).
   String get firstImage => imageUrls.isNotEmpty ? imageUrls.first : '';
 
+  /// Картинка для ленты каталога и корзины: миниатюра, если она есть (D-99).
+  String get coverThumb {
+    if (thumbUrl.isNotEmpty) return thumbUrl;
+    final common = photosByColor.values.where((l) => l.isNotEmpty);
+    if (common.isNotEmpty) return common.first.first.thumb;
+    return firstImage;
+  }
+
   int get discountPercent {
     if (!isOnSale) return 0;
     return (((oldPrice! - price) / oldPrice!) * 100).round();
@@ -137,6 +198,8 @@ class Product {
         inStock: inStock,
         stockBySize: stockBySize,
         variants: variants,
+        thumbUrl: thumbUrl,
+        photosByColor: photosByColor,
       );
 
   Map<String, dynamic> toJson() => {
@@ -157,6 +220,9 @@ class Product {
         'inStock': inStock,
         'stockBySize': stockBySize,
         'variants': variants.map((v) => v.toJson()).toList(),
+        'thumbUrl': thumbUrl,
+        'photosByColor': photosByColor.map(
+            (k, v) => MapEntry(k, v.map((p) => p.toJson()).toList())),
       };
 
   factory Product.fromJson(Map<String, dynamic> j) => Product(
@@ -178,6 +244,7 @@ class Product {
         stockBySize: ((j['stockBySize'] as Map?) ?? const {}).map(
           (k, v) => MapEntry(k.toString(), (v as num?)?.toInt() ?? 0),
         ),
+        thumbUrl: (j['thumbUrl'] ?? '').toString(),
         variants: (j['variants'] as List? ?? const [])
             .map((e) => ProductVariant.fromJson(
                 e as Map<String, dynamic>, (e['color'] ?? '').toString()))
@@ -192,11 +259,16 @@ class Product {
   factory Product.fromModelCard(Map<String, dynamic> j) {
     final colors = (j['colors'] as List? ?? const []).cast<Map<String, dynamic>>();
     final variants = <ProductVariant>[];
+    final photos = <String, List<ProductPhoto>>{};
     for (final c in colors) {
       final name = (c['name'] ?? '').toString();
       for (final s in (c['sizes'] as List? ?? const [])) {
         variants.add(ProductVariant.fromJson(s as Map<String, dynamic>, name));
       }
+      final shots = (c['photos'] as List? ?? const [])
+          .map((p) => ProductPhoto.fromJson(p as Map<String, dynamic>))
+          .toList();
+      if (shots.isNotEmpty) photos[name] = shots;
     }
     final image = (j['imageUrl'] ?? '').toString();
     return Product(
@@ -216,6 +288,8 @@ class Product {
       reviewCount: (j['reviewCount'] as num?)?.toInt() ?? 0,
       inStock: j['inStock'] as bool? ?? true,
       variants: variants,
+      thumbUrl: (j['thumbUrl'] ?? '').toString(),
+      photosByColor: photos,
     );
   }
 }
