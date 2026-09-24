@@ -492,6 +492,27 @@ class ReceiptTests(ApiTestCase):
         self.assertEqual(receipt["items"][-1]["description"], "Доставка")
 
     @mock.patch.dict(os.environ, {"PAYMENT_RECEIPT": "1"})
+    def test_payment_receipt_is_a_prepayment(self):
+        """Интернет-магазин при оплате получает предоплату: вещь ещё на складе.
+
+        «Полный расчёт» здесь означал бы, что товар уже у покупателя, — и требовал бы
+        кода маркировки, которого до сборки не существует (D-101).
+        """
+        from orders.receipt import build_receipt
+
+        receipt = build_receipt(self.PAYLOAD, 9800)
+        modes = {i["payment_mode"] for i in receipt["items"]}
+        self.assertEqual(modes, {"full_prepayment"})
+
+    @mock.patch.dict(os.environ, {"PAYMENT_RECEIPT": "1", "PAYMENT_MODE": "full_payment"})
+    def test_mode_can_be_overridden(self):
+        """Товар отдают сразу (самовывоз в магазине) — признак меняется настройкой."""
+        from orders.receipt import build_receipt
+
+        receipt = build_receipt(self.PAYLOAD, 9800)
+        self.assertEqual(receipt["items"][0]["payment_mode"], "full_payment")
+
+    @mock.patch.dict(os.environ, {"PAYMENT_RECEIPT": "1"})
     def test_points_discount_is_absorbed_by_last_item(self):
         """Списали 800 баллов — сумма позиций всё равно обязана сойтись с платежом."""
         from orders.receipt import build_receipt
