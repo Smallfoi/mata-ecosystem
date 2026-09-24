@@ -3268,6 +3268,25 @@ html:has(.eco-modal.is-open) {
   .lc-platinum .lc-signGlow path, .lc-platinum .lc-edge { animation: none; }
 }
 
+/* Размеры на карточке кликабельны: нажал свой размер — окно открылось с ним.
+   У Nike размеров на карточке нет вовсе, и приходится заходить в каждую модель,
+   чтобы узнать, есть ли твой. */
+.product-sizes span[data-quick-size] { cursor: pointer; }
+.product-sizes span[data-quick-size]:hover {
+  border-color: var(--ink, #20252b);
+  background: var(--ink, #20252b);
+  color: #fff;
+}
+
+/* Подсказка вместо кнопки: карточка сама ведёт внутрь (как у Nike), но пока у
+   товаров нет фотографий, по одному тексту это неочевидно — особенно на телефоне,
+   где нет наведения. Появятся фото — подсказку можно будет убрать. */
+.product-more {
+  display: inline-block; margin-top: 4px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--muted, #6f7278);
+}
+.product-card:hover .product-more { color: var(--ink, #20252b); }
+
 /* ── Выбор цвета в быстром просмотре ─────────────────────────────────────────
    Раньше цвета были просто точками: видно, что их несколько, а выбрать нельзя.
    Теперь это кнопки с названием — человек говорит, какой цвет берёт. */

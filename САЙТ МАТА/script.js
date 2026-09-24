@@ -373,6 +373,30 @@ function closeQuickView() {
 }
 
 function bindQuickView() {
+  // Размер прямо на карточке: открываем окно и отмечаем выбранное. Иначе человек
+  // видит свой размер в списке, нажимает — и ничего не происходит.
+  document.querySelectorAll("[data-quick-size]:not([data-bound])").forEach((el) => {
+    el.setAttribute("data-bound", "1");
+    const card = el.closest(".product-card");
+    const pick = () => {
+      openQuickView(card);
+      const wanted = el.dataset.quickSize;
+      const button = pvModal.querySelector(
+        `[data-pv-sizes] button[data-size="${CSS.escape(wanted)}"]:not([disabled])`);
+      if (button) button.click();
+    };
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      pick();
+    });
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        pick();
+      }
+    });
+  });
+
   document.querySelectorAll("[data-quick-view]:not([data-bound])").forEach((el) => {
     el.setAttribute("data-bound", "1");
     const card = el.closest(".product-card");
