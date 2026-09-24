@@ -84,7 +84,8 @@ def run_job(job):
         job.master.save("%s.png" % base, ContentFile(master), save=False)
         job.webp.save("%s.webp" % base, ContentFile(webp), save=False)
 
-        attached = _attach(job, webp, base)
+        # В галерею витрины кладём МАСТЕР — хранилище само сделает webp 1600 и миниатюру 400.
+        attached = _attach(job, master)
 
         job.status = PhotoJob.STATUS_DONE
         job.error = ""
@@ -95,6 +96,10 @@ def run_job(job):
         job.status = PhotoJob.STATUS_FAILED
         job.error = str(e)[:2000]
         job.save(update_fields=["status", "error", "updated_at"])
+    except ValueError as e:                      # у цвета уже 6 фото (ProductPhoto.MAX_PER_COLOR)
+        job.status = PhotoJob.STATUS_FAILED
+        job.error = str(e)[:2000]
+        job.save(update_fields=["status", "error", "updated_at"])
     except Exception as e:                       # noqa: BLE001 — фиксируем любой сбой в задании
         job.status = PhotoJob.STATUS_FAILED
         job.error = ("непредвиденная ошибка: %s" % e)[:2000]
@@ -102,21 +107,25 @@ def run_job(job):
     return job
 
 
-def _attach(job, webp_bytes, base):
-    """Прикрепить готовый webp к карточке. Возвращает True, если реально прикрепили.
+def _attach(job, data_bytes):
+    """Прикрепить готовый снимок к галерее витрины (catalog.ProductPhoto). Возвращает True.
 
-    Главное фото → product.image (тот же путь, что у ручной вкладки «Фото товаров»).
-    Галерея (несколько фото на модель+ЦВЕТ, до 6, меняется при переключении цвета) поедет
-    через catalog.ProductPhoto, когда она появится в main (координация с параллельной
-    сессией). До тех пор webp уже сохранён на задании (job.webp), карточку НЕ трогаем, чтобы
-    не плодить второе, неверное хранилище. В image_urls не пишем: это складская позиция, и
-    network_image_url() всё равно режет полный S3-URL до имени файла.
+    Единое хранилище фото — у каталога (модель + ЦВЕТ, до 6, галерея меняется при
+    переключении цвета; D-99). Отдаём мастер-байты, а витринный webp 1600, миниатюру 400,
+    имена и порядок делает catalog.photos.attach. attach_as="main" → обложка (order 0),
+    иначе снимок встаёт следующим. ValueError (у цвета уже 6) пробрасывается — run_job
+    поставит заданию failed с текстом. Ключ модели и цвет берём как их читает витрина.
     """
-    if job.attach_as == PhotoJob.ATTACH_GALLERY:
-        return False    # ждём catalog.ProductPhoto (модель+цвет)
-    product = job.product
-    product.image.save("%s.webp" % base, ContentFile(webp_bytes), save=False)
-    product.save(update_fields=["image"])
+    from catalog import photos as photolib
+
+    # Товар в задании пришёл из intake через .only("id","article") — перечитываем полностью,
+    # чтобы точно получить цвет и ключ модели (иначе цвет уедет пустым).
+    product = Product.objects.get(pk=job.product_id)
+    model_key = product.shop_model_key or str(product.id)
+    colors = product.colors or []
+    color = colors[0] if colors else ""
+    photolib.attach(model_key, color=color, data=data_bytes,
+                    first=(job.attach_as == PhotoJob.ATTACH_MAIN))
     return True
 
 

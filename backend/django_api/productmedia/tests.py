@@ -102,6 +102,8 @@ import tempfile  # noqa: E402
 
 from django.test import override_settings  # noqa: E402
 
+from catalog import photos as photolib  # noqa: E402
+from catalog.models import ProductPhoto  # noqa: E402
 from productmedia import service  # noqa: E402
 from productmedia.models import PhotoBatch, PhotoJob  # noqa: E402
 
@@ -118,8 +120,10 @@ class PhotoPipelineServiceTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        Product.objects.create(id="pp1", name="Худи", category_id="c",
-                               price=2000, article="HD-1")
+        # model_key в бою строит импорт/rebuild_display_name; в тесте задаём явно,
+        # чтобы shop_model_key был непустым (по нему витрина группирует снимки).
+        Product.objects.create(id="pp1", name="Худи", category_id="c", price=2000,
+                               article="HD-1", colors=["Чёрный"], model_key="HOODIE")
 
     def _batch(self, track="catalog"):
         return PhotoBatch.objects.create(track=track)
@@ -138,7 +142,7 @@ class PhotoPipelineServiceTests(TestCase):
         self.assertEqual(skipped.status, PhotoJob.STATUS_SKIPPED)
 
     @mock.patch("productmedia.processing.process")
-    def test_run_job_success_sets_main_image(self, m_proc):
+    def test_run_job_attaches_photo_to_showcase(self, m_proc):
         m_proc.return_value = _png_bytes((200, 50, 50), (1200, 1200))
         batch = self._batch()
         job = service.intake(batch, [
@@ -146,32 +150,33 @@ class PhotoPipelineServiceTests(TestCase):
         service.run_job(job)
         job.refresh_from_db()
         self.assertEqual(job.status, PhotoJob.STATUS_DONE)
-        self.assertTrue(job.master.name)
-        self.assertTrue(job.webp.name.endswith(".webp"))
+        self.assertTrue(job.master.name)                     # мастер сохранён на задании
         self.assertIsNotNone(job.attached_at)
-        job.product.refresh_from_db()
-        self.assertTrue(job.product.image.name)              # главное фото проставлено
+        photos = ProductPhoto.objects.filter(
+            model_key=job.product.shop_model_key, color="Чёрный")
+        self.assertEqual(photos.count(), 1)                  # снимок в галерее витрины
+        self.assertTrue(photos.first().image.name.endswith(".webp"))
+        self.assertTrue(photos.first().thumb.name)           # миниатюра сделана хранилищем
 
     @mock.patch("productmedia.processing.process")
-    def test_run_job_gallery_produces_webp_but_defers_attach(self, m_proc):
-        # Галерея (модель+цвет) поедет через catalog.ProductPhoto, когда она появится в main.
-        # Пока: webp создаётся и хранится на задании, карточку не трогаем.
+    def test_main_job_becomes_cover(self, m_proc):
         m_proc.return_value = _png_bytes((0, 150, 0), (1000, 1000))
+        p = Product.objects.get(id="pp1")
+        pre = photolib.attach(p.shop_model_key, color="Чёрный",
+                              data=_png_bytes(), first=False)
         batch = self._batch()
         job = service.intake(batch, [
             {"article": "HD-1", "content": _png_bytes(),
-             "filename": "a.png", "attach_as": "gallery"}])[0]
+             "filename": "a.png", "attach_as": "main"}])[0]
         service.run_job(job)
-        job.refresh_from_db()
-        job.product.refresh_from_db()
-        self.assertEqual(job.status, PhotoJob.STATUS_DONE)
-        self.assertTrue(job.webp.name.endswith(".webp"))     # webp готов на задании
-        self.assertIsNone(job.attached_at)                   # к карточке ещё не прикреплён
-        self.assertFalse(job.product.image.name)             # главное фото не трогали
-        self.assertEqual(job.product.image_urls or [], [])   # в image_urls не пишем
+        self.assertEqual(
+            ProductPhoto.objects.filter(model_key=p.shop_model_key).count(), 2)
+        cover = ProductPhoto.objects.get(
+            model_key=p.shop_model_key, color="Чёрный", order=0)
+        self.assertNotEqual(cover.id, pre.id)                # обложкой стал main-снимок
 
     @mock.patch.dict("os.environ", {}, clear=False)
-    def test_run_job_failed_without_key_keeps_card(self):
+    def test_run_job_failed_without_key_keeps_showcase(self):
         import os
         os.environ.pop("OPENAI_API_KEY", None)               # провайдер выключен
         batch = self._batch()
@@ -179,10 +184,27 @@ class PhotoPipelineServiceTests(TestCase):
             {"article": "HD-1", "content": _png_bytes(), "filename": "a.png"}])[0]
         service.run_job(job)
         job.refresh_from_db()
-        job.product.refresh_from_db()
         self.assertEqual(job.status, PhotoJob.STATUS_FAILED)
         self.assertTrue(job.error)
-        self.assertFalse(job.product.image.name)             # карточка не изменилась
+        self.assertEqual(ProductPhoto.objects.count(), 0)    # в галерею ничего не попало
+
+    @mock.patch("productmedia.processing.process")
+    def test_run_job_failed_when_color_full(self, m_proc):
+        m_proc.return_value = _png_bytes((9, 9, 9), (800, 800))
+        p = Product.objects.get(id="pp1")
+        for _ in range(ProductPhoto.MAX_PER_COLOR):          # цвет уже заполнен (6)
+            photolib.attach(p.shop_model_key, color="Чёрный", data=_png_bytes())
+        batch = self._batch()
+        job = service.intake(batch, [
+            {"article": "HD-1", "content": _png_bytes(), "filename": "a.png"}])[0]
+        service.run_job(job)
+        job.refresh_from_db()
+        self.assertEqual(job.status, PhotoJob.STATUS_FAILED)
+        self.assertIn("6", job.error)                        # понятная ошибка про лимит
+        self.assertEqual(
+            ProductPhoto.objects.filter(
+                model_key=p.shop_model_key, color="Чёрный").count(),
+            ProductPhoto.MAX_PER_COLOR)                       # седьмой не добавлен
 
     @mock.patch("productmedia.processing.process")
     def test_run_batch_counts_done(self, m_proc):
