@@ -69,6 +69,17 @@ for k in POSTGRES_PASSWORD DJANGO_SECRET_KEY JWT_SECRET; do
   grep -q "^$k=" .env || { echo "FATAL: $k отсутствует (Lockbox не отдал) — abort"; exit 1; }
 done
 
+# Доп. секрет фотопайплайна (mata-eco-image): OPENAI_API_KEY (+ опц. OPENAI_BASE_URL).
+# Тот же сервисный аккаунт ВМ читает его (lockbox.payloadViewer на уровне папки).
+# ОПЦИОНАЛЬНО: нет секрета/ключа → фотопайплайн просто не гоняет GPT (no-op), деплой не падает.
+ECO_IMAGE_SECRET_ID="e6qu8vruift7elbpm6o8"
+ECO_IAM=$(curl -s -H "Metadata-Flavor: Google" "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || true)
+if [ -n "$ECO_IAM" ]; then
+  curl -s -H "Authorization: Bearer $ECO_IAM" "https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/$ECO_IMAGE_SECRET_ID/payload" 2>/dev/null \
+    | python3 -c "import sys,json,shlex;[print(e['key']+'='+shlex.quote(e.get('textValue',''))) for e in json.load(sys.stdin).get('entries',[])]" >> .env 2>/dev/null || true
+  grep -q "^OPENAI_API_KEY=" .env && echo "Lockbox: mata-eco-image подключён (OPENAI_API_KEY)" || echo "Lockbox: mata-eco-image без OPENAI_API_KEY — фотопайплайн в no-op"
+fi
+
 # Постоянный диск под БД (/dev/vdb) — форматируем ТОЛЬКО пустой; монтируем в /mnt/data.
 DBDEV=/dev/vdb
 mkdir -p /mnt/data
