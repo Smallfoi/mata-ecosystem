@@ -15,10 +15,15 @@ void main() {
         'sizes': ['41', '42'],
         'rating': 4.5,
         'reviewCount': 3,
+        'thumbUrl': 'https://e.org/b1-t.webp',
         'colors': colors ??
             [
               {
                 'name': 'ЧЁРНЫЙ',
+                'photos': [
+                  {'url': 'https://e.org/b1.webp', 'thumb': 'https://e.org/b1-t.webp'},
+                  {'url': 'https://e.org/b2.webp', 'thumb': 'https://e.org/b2-t.webp'},
+                ],
                 'sizes': [
                   {'size': '41', 'productId': 'p1', 'price': 4490, 'inStock': true},
                   {'size': '42', 'productId': 'p2', 'price': 4490, 'inStock': false},
@@ -26,6 +31,9 @@ void main() {
               },
               {
                 'name': 'МЯТНЫЙ',
+                'photos': [
+                  {'url': 'https://e.org/m1.webp', 'thumb': 'https://e.org/m1-t.webp'},
+                ],
                 'sizes': [
                   {'size': '42', 'productId': 'p3', 'price': 4990, 'inStock': true},
                 ],
@@ -108,6 +116,79 @@ void main() {
       // Без вариантов работаем как раньше: размеры не прячем.
       expect(p.hasSizeInColor('42', null), isTrue);
       expect(p.hasColor('ЧЁРНЫЙ'), isTrue);
+    });
+  });
+
+  group('Галерея по цветам (D-99)', () {
+    test('снимки берутся у выбранного цвета', () {
+      final p = Product.fromModelCard(card());
+      expect(p.photosFor('ЧЁРНЫЙ').length, 2);
+      expect(p.photosFor('МЯТНЫЙ').length, 1);
+      expect(p.photosFor('МЯТНЫЙ').first.url, 'https://e.org/m1.webp');
+    });
+
+    test('у миниатюры свой адрес — её и грузит лента каталога', () {
+      final p = Product.fromModelCard(card());
+      expect(p.coverThumb, 'https://e.org/b1-t.webp');
+      expect(p.photosFor('ЧЁРНЫЙ').first.thumb, isNot(p.photosFor('ЧЁРНЫЙ').first.url));
+    });
+
+    test('цвет без снимков не подставляет чужие', () {
+      final p = Product.fromModelCard(card(colors: [
+        {
+          'name': 'ЧЁРНЫЙ',
+          'photos': [
+            {'url': 'https://e.org/b1.webp', 'thumb': 'https://e.org/b1-t.webp'},
+          ],
+          'sizes': [
+            {'size': '41', 'productId': 'p1', 'price': 4490, 'inStock': true},
+          ],
+        },
+        {
+          'name': 'МЯТНЫЙ',
+          'sizes': [
+            {'size': '41', 'productId': 'p2', 'price': 4490, 'inStock': true},
+          ],
+        },
+      ]));
+      expect(p.photosFor('ЧЁРНЫЙ').length, 1);
+      expect(p.photosFor('МЯТНЫЙ'), isEmpty, reason: 'подставили чужие снимки');
+    });
+
+    test('общие снимки модели показываются, пока цвет не заполнен', () {
+      final p = Product.fromModelCard({
+        'key': 'k',
+        'name': 'Товар',
+        'price': 100,
+        'colors': [
+          {
+            'name': '',
+            'photos': [
+              {'url': 'https://e.org/c1.webp', 'thumb': 'https://e.org/c1-t.webp'},
+            ],
+            'sizes': [
+              {'size': '', 'productId': 'p1', 'price': 100, 'inStock': true},
+            ],
+          },
+        ],
+      });
+      expect(p.photosFor('ЛЮБОЙ').length, 1, reason: 'общие снимки не подхватились');
+    });
+
+    test('без галереи остаются прежние картинки позиции', () {
+      final p = Product.fromJson({
+        'id': 'p1',
+        'name': 'Кроссовки',
+        'price': 100,
+        'imageUrls': ['old.jpg'],
+      });
+      expect(p.photosFor('ЧЁРНЫЙ').single.url, 'old.jpg');
+      expect(p.coverThumb, 'old.jpg');
+    });
+
+    test('обложки цветов — по одной на цвет, для прогрева', () {
+      final p = Product.fromModelCard(card());
+      expect(p.colorCovers, ['https://e.org/b1.webp', 'https://e.org/m1.webp']);
     });
   });
 }

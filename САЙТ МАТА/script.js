@@ -276,8 +276,18 @@ function pvShowPhotos(color) {
   const img = pvModal.querySelector("[data-pv-img]");
   const strip = pvModal.querySelector("[data-pv-thumbs]");
   const list = (color && pvPhotos[color]) || [];
+  // У товара галереи есть, но у ЭТОГО цвета снимков нет — обложку не подставляем:
+  // она принадлежит другому цвету, и человек увидел бы чёрную вещь вместо синей.
+  const hasGalleries = Object.keys(pvPhotos).length > 0;
+  const media = pvModal.querySelector(".pv-media");
 
-  img.src = list.length ? list[0].u : pvFallback;
+  if (!list.length && hasGalleries) {
+    img.removeAttribute("src");
+    if (media) media.classList.add("is-empty");
+  } else {
+    img.src = list.length ? list[0].u : pvFallback;
+    if (media) media.classList.remove("is-empty");
+  }
   if (!strip) return;
   if (list.length < 2) {
     strip.hidden = true;

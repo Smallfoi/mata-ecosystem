@@ -3303,6 +3303,14 @@ html:has(.eco-modal.is-open) {
 .pv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pv-thumb.is-selected { border-color: var(--ink, #20252b); }
 .pv-thumb:focus-visible { outline: 2px solid var(--ink, #20252b); outline-offset: 2px; }
+/* Цвет без снимков: честная заглушка вместо фотографии другого цвета (D-99). */
+.pv-media.is-empty { position: relative; min-height: 320px; }
+.pv-media.is-empty img { visibility: hidden; }
+.pv-media.is-empty::after {
+  content: "Фото этого цвета пока нет";
+  position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; color: var(--muted, #6b7280); font-size: 14px;
+}
 
 /* Подсказка «выберите размер»: появляется по нажатию «В корзину» без выбора. */
 .pv-hint {
