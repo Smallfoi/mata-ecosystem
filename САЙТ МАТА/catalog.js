@@ -118,7 +118,11 @@
     var sizeChips = sizes
       .map(function (s) {
         var gone = out.indexOf(s) !== -1;
-        return '<span' + (gone ? ' class="is-out"' : "") + ">" + esc(s) + "</span>";
+        // Размер на карточке — не украшение: нажал, и окно открылось уже с ним.
+        return gone
+          ? '<span class="is-out">' + esc(s) + "</span>"
+          : '<span data-quick-size="' + esc(s) + '" role="button" tabindex="0">' +
+            esc(s) + "</span>";
       })
       .join("");
     var desc = p.description || "";
@@ -150,7 +154,8 @@
       '<span class="product-stock' + stockCls + '">' + esc(stock) + "</span>" +
       "</div>" +
       (sizes.length || colors.length
-        ? '<button class="product-add" type="button" data-quick-view>Выбрать размер</button>'
+        ? '<span class="product-more" data-quick-view role="button" tabindex="0">' +
+          "Размеры и цвета →</span>"
         : '<button class="product-add" type="button" data-add-cart="' + esc(p.name) +
           '" data-price="' + Number(p.price) + '" data-product-id="' + esc(p.id) +
           '">В корзину</button>') +
