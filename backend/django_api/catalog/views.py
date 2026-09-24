@@ -132,22 +132,36 @@ def site_content(request):
 
 # ── Отзывы на товары ────────────────────────────────────────────────────────
 
-def _recompute_rating(product_id):
+def _recompute_rating(product_ids):
+    """Пересчитать рейтинг модели по её отзывам.
+
+    Отзыв покупатель пишет на МОДЕЛЬ, а купил один размер (D-94): считаем по
+    всем позициям модели и одно и то же значение пишем каждой из них — чтобы
+    рейтинг был один и на карточке модели, и на отдельной позиции.
+    """
+    ids = [product_ids] if isinstance(product_ids, str) else list(product_ids)
     # Скрытые модерацией отзывы не влияют на рейтинг.
-    agg = Review.objects.filter(product_id=product_id, hidden=False).aggregate(
+    agg = Review.objects.filter(product_id__in=ids, hidden=False).aggregate(
         a=Avg("rating"), c=Count("id")
     )
-    Product.objects.filter(id=product_id).update(
+    Product.objects.filter(id__in=ids).update(
         rating=round(agg["a"] or 0, 1), review_count=agg["c"] or 0
     )
 
 
 def _has_purchased(uid, product_id):
+    return bool(_purchased_position(uid, [product_id]))
+
+
+def _purchased_position(uid, product_ids):
+    """Какую из позиций модели человек купил (или None). Отзыв пишем именно на
+    неё: так остаётся видно, какой размер человек носил."""
+    wanted = set(product_ids)
     for o in Order.objects.filter(user_id=uid).only("payload"):
         for it in (o.payload or {}).get("items", []):
-            if isinstance(it, dict) and it.get("productId") == product_id:
-                return True
-    return False
+            if isinstance(it, dict) and str(it.get("productId") or "") in wanted:
+                return str(it["productId"])
+    return None
 
 
 def _review_name(uid):
@@ -172,28 +186,38 @@ def _review_json(r, uid):
 @throttle_classes(PUBLIC_READ)
 def product_reviews(request, pid):
     """GET — список отзывов товара (+ можно ли оставить). POST — оставить/обновить
-    свой отзыв (только купившие товар). Рейтинг товара пересчитывается."""
-    product = Product.objects.filter(id=pid).first()
-    if not product:
+    свой отзыв (только купившие товар). Рейтинг товара пересчитывается.
+
+    `pid` — либо позиция склада, либо ключ модели: витрина показывает модель, а
+    склад ведёт размеры отдельными карточками (D-94). Отзывы у модели общие —
+    иначе отзыв о кроссовках виден только тем, кто смотрит ровно 42-й размер.
+    """
+    from .models_api import siblings_of
+
+    items = siblings_of(pid)
+    if not items:
         return Response({"detail": "Товар не найден"}, status=404)
+    ids = [p.id for p in items]
+    product = items[0]
     uid = user_id_from_request(request)
     if request.method == "GET":
         reviews = [
             _review_json(r, uid)
-            for r in Review.objects.filter(product_id=pid, hidden=False)
+            for r in Review.objects.filter(product_id__in=ids, hidden=False)
         ]
         return Response(
             {
                 "rating": product.rating,
                 "reviewCount": product.review_count,
                 "reviews": reviews,
-                "canReview": bool(uid and _has_purchased(uid, pid)),
+                "canReview": bool(uid and _purchased_position(uid, ids)),
                 "hasMine": any(r["mine"] for r in reviews) if uid else False,
             }
         )
     if not uid:
         return Response({"detail": "Нет токена"}, status=401)
-    if not _has_purchased(uid, pid):
+    bought = _purchased_position(uid, ids)
+    if not bought:
         return Response({"detail": "Отзыв доступен после покупки товара"}, status=403)
     d = request.data
     try:
@@ -208,7 +232,9 @@ def product_reviews(request, pid):
     if not isinstance(photos, list):
         photos = []
     photos = [str(p).strip() for p in photos if isinstance(p, str) and p.strip()][:5]
-    obj = Review.objects.filter(product_id=pid, user_id=uid).first()
+    # Отзыв храним на купленной позиции, но ищем по всей модели: второй отзыв
+    # на те же кроссовки в другом размере — это всё тот же один отзыв.
+    obj = Review.objects.filter(product_id__in=ids, user_id=uid).first()
     if obj:
         obj.rating = rating
         obj.text = text
@@ -218,13 +244,13 @@ def product_reviews(request, pid):
     else:
         obj = Review.objects.create(
             id=f"rev_{secrets.token_hex(8)}",
-            product_id=pid,
+            product_id=bought,
             user_id=uid,
             rating=rating,
             text=text,
             photos=photos,
         )
-    _recompute_rating(pid)
+    _recompute_rating(ids)
     product.refresh_from_db()
     return Response(
         {
