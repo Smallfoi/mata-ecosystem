@@ -107,10 +107,10 @@ GPS-трек тренировки, отправка планов на часы, 
 Берутся из публичных документов сайта (раздел «Контакты»):
 
 ```
-Организация:  Индивидуальный предприниматель Татаринов Михаил Игнатьевич
-              (в англоязычных формах: Individual Entrepreneur Mikhail Tatarinov)
-ОГРНИП:       323140000031561
-ИНН:          141100509786
+Организация:  Индивидуальный предприниматель Татаринова Алена Анатольевна
+              (в англоязычных формах: Individual Entrepreneur Alena Tatarinova)
+ОГРНИП:       325140000028101
+ИНН:          143524274080
 Адрес:        Республика Саха (Якутия), г. Якутск, Россия
 Сайт:         https://mata-club.ru
 Email:        bmairussia@gmail.com
@@ -199,8 +199,8 @@ We do not resell data, do not use it for advertising and do not share it with
 third parties. Data is stored on our own servers and is deleted when the user
 disconnects the integration.
 
-Company: Individual Entrepreneur Mikhail Tatarinov (OGRNIP 323140000031561,
-INN 141100509786), Yakutsk, Russia
+Company: Individual Entrepreneur Alena Tatarinova (OGRNIP 325140000028101,
+INN 143524274080), Yakutsk, Russia
 Website: https://mata-club.ru
 Application: MATA Kvartal — Android in testing, iOS in preparation
 Expected volume: up to 5,000 connected devices in the first year
