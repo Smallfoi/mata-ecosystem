@@ -144,45 +144,59 @@ class ApiProductRepository implements ProductRepository {
     return data.map((j) => Category.fromJson(j as Map<String, dynamic>)).toList();
   }
 
-  @override
-  Future<List<Product>> getProducts() async {
-    final data = await _client.get('/products', query: _q()) as List;
-    return data.map((j) => Product.fromJson(j as Map<String, dynamic>)).toList();
+  /// Витрина показывает МОДЕЛИ: один товар — много цветов и размеров (D-94).
+  /// Если бэкенд старый и адреса нет — работаем с прежним списком позиций
+  /// (`fallback` — тот адрес, который отвечал раньше).
+  Future<List<Product>> _models(
+    Map<String, dynamic>? extra, {
+    String fallback = '/products',
+  }) async {
+    try {
+      final data = await _client.get('/models', query: _q(extra)) as List;
+      return data
+          .map((j) => Product.fromModelCard(j as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      final data = await _client.get(fallback, query: _q(extra)) as List;
+      return data.map((j) => Product.fromJson(j as Map<String, dynamic>)).toList();
+    }
   }
 
   @override
-  Future<List<Product>> getByCategory(String categoryId) async {
-    final data = await _client
-        .get('/products', query: _q({'category': categoryId})) as List;
-    return data.map((j) => Product.fromJson(j as Map<String, dynamic>)).toList();
-  }
+  Future<List<Product>> getProducts() => _models(null);
 
+  @override
+  Future<List<Product>> getByCategory(String categoryId) =>
+      _models({'category': categoryId});
+
+  /// Витрина открывает карточку МОДЕЛИ по её ключу, избранное и корзина хранят
+  /// складскую позицию. Поэтому пробуем модель, а не нашли — обычный товар.
   @override
   Future<Product?> getById(String id) async {
+    try {
+      final card = await _client.get('/models/$id', query: _q());
+      if (card != null) {
+        return Product.fromModelCard(card as Map<String, dynamic>);
+      }
+    } catch (_) {
+      // Ключа модели с таким значением нет — значит это позиция склада.
+    }
     final data = await _client.get('/products/$id', query: _q());
     if (data == null) return null;
     return Product.fromJson(data as Map<String, dynamic>);
   }
 
   @override
-  Future<List<Product>> getFeatured() async {
-    final data =
-        await _client.get('/products', query: _q({'featured': true})) as List;
-    return data.map((j) => Product.fromJson(j as Map<String, dynamic>)).toList();
-  }
+  Future<List<Product>> getFeatured() => _models({'featured': true});
 
   @override
-  Future<List<Product>> getNew() async {
-    final data = await _client.get('/products', query: _q({'new': true})) as List;
-    return data.map((j) => Product.fromJson(j as Map<String, dynamic>)).toList();
-  }
+  Future<List<Product>> getNew() => _models({'new': true});
 
+  /// Поиск тоже отдаёт модели: иначе по запросу «шорты» выпадут шесть
+  /// одинаковых карточек разных размеров.
   @override
-  Future<List<Product>> search(String query) async {
-    final data =
-        await _client.get('/products/search', query: _q({'q': query})) as List;
-    return data.map((j) => Product.fromJson(j as Map<String, dynamic>)).toList();
-  }
+  Future<List<Product>> search(String query) =>
+      _models({'q': query}, fallback: '/products/search');
 
   @override
   Future<List<String>> getBrands() async {

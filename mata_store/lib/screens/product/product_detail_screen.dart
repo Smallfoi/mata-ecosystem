@@ -50,8 +50,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _showErrorSnack('Выберите цвет');
       return;
     }
-    context.read<CartProvider>().add(product, _selectedSize!, _selectedColor!);
-    _showAddedToCartSheet(product);
+    // Заказ уходит на складскую позицию: карточка модели — это витрина,
+    // а на складе живут отдельные карточки по цвету и размеру (D-94).
+    final variant = product.variantFor(_selectedSize!, _selectedColor!);
+    if (product.variants.isNotEmpty && variant == null) {
+      _showErrorSnack('Этого сочетания нет в наличии');
+      return;
+    }
+    final ordered = variant == null
+        ? product
+        : product.copyWith(id: variant.productId, price: variant.price);
+    context.read<CartProvider>().add(ordered, _selectedSize!, _selectedColor!);
+    _showAddedToCartSheet(ordered);
   }
 
   void _showErrorSnack(String message) {
@@ -189,14 +199,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       _SizeSelector(
                         sizes: product.sizes,
                         selected: _selectedSize,
-                        isAvailable: product.hasSize,
+                        // Наличие зависит от цвета: чёрных 42-х может не быть,
+                        // а белые лежат. Выбрал цвет — видно, что реально есть.
+                        isAvailable: (size) =>
+                            product.hasSizeInColor(size, _selectedColor),
                         onSelected: (s) => setState(() => _selectedSize = s),
                       ),
                       const SizedBox(height: 20),
                       _ColorSelector(
                         colors: product.colors,
                         selected: _selectedColor,
-                        onSelected: (c) => setState(() => _selectedColor = c),
+                        isAvailable: product.hasColor,
+                        onSelected: (c) => setState(() {
+                          _selectedColor = c;
+                          // Размер мог быть только у прежнего цвета — снимаем,
+                          // чтобы не положить в корзину то, чего нет.
+                          if (_selectedSize != null &&
+                              !product.hasSizeInColor(_selectedSize!, c)) {
+                            _selectedSize = null;
+                          }
+                        }),
                       ),
                       const SizedBox(height: 24),
                       const Divider(),
@@ -426,11 +448,13 @@ class _SizeSelector extends StatelessWidget {
 class _ColorSelector extends StatelessWidget {
   final List<String> colors;
   final String? selected;
+  final bool Function(String color) isAvailable;
   final ValueChanged<String> onSelected;
 
   const _ColorSelector({
     required this.colors,
     required this.selected,
+    required this.isAvailable,
     required this.onSelected,
   });
 
@@ -470,16 +494,23 @@ class _ColorSelector extends StatelessWidget {
           runSpacing: 8,
           children: colors.map((color) {
             final isSelected = color == selected;
+            // Цвета нет ни в одном размере — гасим и не даём выбрать: узнать об
+            // этом в корзине куда обиднее.
+            final available = isAvailable(color);
             return GestureDetector(
-              onTap: () => onSelected(color),
+              onTap: available ? () => onSelected(color) : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.black : AppColors.white,
+                  color: !available
+                      ? AppColors.grey100
+                      : (isSelected ? AppColors.black : AppColors.white),
                   border: Border.all(
-                    color: isSelected ? AppColors.black : AppColors.grey200,
+                    color: !available
+                        ? AppColors.grey200
+                        : (isSelected ? AppColors.black : AppColors.grey200),
                     width: 1.5,
                   ),
                   borderRadius: BorderRadius.circular(8),
@@ -489,7 +520,11 @@ class _ColorSelector extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: isSelected ? AppColors.lime : AppColors.black,
+                    decoration:
+                        available ? TextDecoration.none : TextDecoration.lineThrough,
+                    color: !available
+                        ? AppColors.grey400
+                        : (isSelected ? AppColors.lime : AppColors.black),
                   ),
                 ),
               ),

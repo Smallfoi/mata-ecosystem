@@ -124,3 +124,104 @@ class VariantsComeFromFieldsOnlyTests(TestCase):
         card = self.client.get("/v1/models/FRSM007").json()
         self.assertEqual(card["sizes"], ["M"])
         self.assertEqual([c["name"] for c in card["colors"]], ["ЧЕРНЫЙ"])
+
+
+class ModelSearchTests(TestCase):
+    """Поиск обязан выглядеть как витрина: одна карточка, а не шесть размеров."""
+
+    def setUp(self):
+        make("s1", "BMAI EXPEDITION CORDURA ЧЕРНЫЙ 41р.", sizes=["41"],
+             colors=["ЧЕРНЫЙ"], brand="BMAI", stock_count=5)
+        make("s2", "BMAI EXPEDITION CORDURA ЧЕРНЫЙ 42р.", sizes=["42"],
+             colors=["ЧЕРНЫЙ"], brand="BMAI", stock_count=5)
+        make("s3", "ФУТБОЛКА женская MATA БЕЛЫЙ р.S", sizes=["S"],
+             colors=["БЕЛЫЙ"], article="FRTW001", stock_count=1)
+
+    def test_query_groups_variants_into_one_card(self):
+        cards = self.client.get("/v1/models?q=expedition").json()
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["variantCount"], 2)
+
+    def test_query_filters_out_the_rest(self):
+        cards = self.client.get("/v1/models?q=футболка").json()
+        self.assertEqual([c["variantCount"] for c in cards], [1])
+
+    def test_article_is_searchable(self):
+        cards = self.client.get("/v1/models?q=FRTW001").json()
+        self.assertEqual(len(cards), 1)
+
+    def test_empty_query_is_the_whole_storefront(self):
+        self.assertEqual(len(self.client.get("/v1/models?q=").json()), 2)
+
+
+class ModelReviewTests(TestCase):
+    """Отзыв покупатель пишет на МОДЕЛЬ, а купил один размер (D-94).
+
+    Иначе отзыв о кроссовках видят только те, кто смотрит ровно 42-й размер, и
+    «оставить отзыв» не предлагается никому: куплена позиция, открыта модель.
+    """
+
+    def setUp(self):
+        make("r1", "BMAI EXPEDITION CORDURA ЧЕРНЫЙ 41р.", sizes=["41"],
+             colors=["ЧЕРНЫЙ"], stock_count=5)
+        make("r2", "BMAI EXPEDITION CORDURA ЧЕРНЫЙ 42р.", sizes=["42"],
+             colors=["ЧЕРНЫЙ"], stock_count=5)
+        self.key = Product.objects.get(pk="r1").shop_model_key
+        r = self.client.post(
+            "/v1/auth/phone/verify",
+            data='{"phone": "+79990004420", "code": "1234"}',
+            content_type="application/json",
+        )
+        self.token = r.json()["token"]
+        self.uid = r.json()["user"]["id"]
+
+    def _buy(self, pid):
+        from orders.models import Order
+        Order.objects.create(
+            user_id=self.uid, order_id=f"SS-R-{pid}", total=4990, status="paid",
+            payment_status="paid",
+            payload={"items": [{"productId": pid, "productName": "Кроссовки",
+                                "price": 4990, "quantity": 1}]},
+        )
+
+    def _post_review(self, pid, rating=5, text="Хорошие"):
+        return self.client.post(
+            f"/v1/products/{pid}/reviews",
+            data=f'{{"rating": {rating}, "text": "{text}"}}',
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {self.token}",
+        )
+
+    def test_review_on_the_model_key_is_allowed_after_buying_a_size(self):
+        self._buy("r2")
+        r = self._post_review(self.key)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["rating"], 5.0)
+
+    def test_without_a_purchase_it_is_still_forbidden(self):
+        self.assertEqual(self._post_review(self.key).status_code, 403)
+
+    def test_review_is_visible_on_the_other_size(self):
+        self._buy("r1")
+        self._post_review(self.key)
+        body = self.client.get("/v1/products/r2/reviews").json()
+        self.assertEqual(len(body["reviews"]), 1)
+        self.assertEqual(body["reviewCount"], 1)
+
+    def test_rating_shows_up_on_the_model_card(self):
+        self._buy("r1")
+        self._post_review(self.key, rating=4)
+        card = self.client.get(f"/v1/models/{self.key}").json()
+        self.assertEqual(card["rating"], 4.0)
+        self.assertEqual(card["reviewCount"], 1, "один отзыв не должен посчитаться дважды")
+
+    def test_second_review_on_another_size_updates_the_same_one(self):
+        self._buy("r1")
+        self._post_review(self.key, rating=5)
+        self._post_review("r2", rating=3)
+        card = self.client.get(f"/v1/models/{self.key}").json()
+        self.assertEqual(card["reviewCount"], 1)
+        self.assertEqual(card["rating"], 3.0)
+
+    def test_unknown_key_is_404(self):
+        self.assertEqual(self.client.get("/v1/products/нет-такого/reviews").status_code, 404)

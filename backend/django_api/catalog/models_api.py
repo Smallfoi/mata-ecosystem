@@ -63,6 +63,45 @@ def _variant_colors(product: Product):
     return colors or [""]
 
 
+def positions_of_model(key: str, qs=None):
+    """Все складские позиции одной модели по её ключу.
+
+    Ключ может быть переопределён руками, поэтому сначала ищем по переопределению,
+    потом по вычисленному ключу, и только в крайнем случае считаем, что нам дали
+    id самой позиции (товар заведён руками, модели у него нет).
+    """
+    base = Product.objects.all() if qs is None else qs
+    items = list(base.filter(model_key_override=key))
+    if not items:
+        items = list(base.filter(model_key_override="", model_key=key))
+    if not items:
+        items = list(base.filter(pk=key))
+    return items
+
+
+def siblings_of(pid: str, qs=None):
+    """Позиции той же модели, что и `pid` — где `pid` либо id позиции, либо ключ.
+
+    Нужно там, где покупатель имеет дело с моделью, а купил конкретный размер:
+    например, отзыв он пишет на модель, а в заказе лежит одна позиция.
+    """
+    base = Product.objects.all() if qs is None else qs
+    product = base.filter(pk=pid).first()
+    key = (product.shop_model_key if product else "") or pid
+    items = positions_of_model(key, qs=base)
+    if not items and product:
+        items = [product]
+    return items
+
+
+def _model_rating(items):
+    """Рейтинг модели. После пересчёта отзывов все позиции модели держат одно и
+    то же значение, поэтому берём позицию с максимумом отзывов — складывать
+    нельзя, иначе один отзыв превратится в три."""
+    best = max(items, key=lambda p: (p.review_count or 0))
+    return round(best.rating or 0, 1), (best.review_count or 0)
+
+
 def build_card(items) -> dict:
     """Собрать карточку модели из складских позиций одной модели."""
     items = list(items)
@@ -97,6 +136,7 @@ def build_card(items) -> dict:
     sizes_all = sorted({v["size"] for c in colors.values() for v in c["sizes"] if v["size"]},
                        key=_size_sort)
     image = next((c["imageUrl"] for c in colors.values() if c["imageUrl"]), "")
+    rating, review_count = _model_rating(items)
 
     return {
         "key": first.shop_model_key or first.id,
@@ -110,6 +150,8 @@ def build_card(items) -> dict:
         "oldPrice": first.old_price,
         "imageUrl": image,
         "description": first.description,
+        "rating": rating,
+        "reviewCount": review_count,
         "isNew": any(p.is_new for p in items),
         "isFeatured": any(p.is_featured for p in items),
         "inStock": in_stock_any,
@@ -130,13 +172,30 @@ def build_cards(queryset):
 @api_view(["GET"])
 @throttle_classes(PUBLIC_READ)
 def models_list(request):
-    """Витрина карточками моделей: `/v1/models`."""
+    """Витрина карточками моделей: `/v1/models`.
+
+    `q` — поиск. Он здесь, а не отдельным адресом, потому что результат поиска
+    обязан выглядеть как витрина: одна карточка модели, а не шесть одинаковых
+    позиций разных размеров.
+    """
+    from django.db.models import Q
+
     from .views import _platform_order, _visible_products
 
     qs = _visible_products(request)
     category = request.query_params.get("category")
     if category and category != "all":
         qs = qs.filter(category_id=category)
+    query = (request.query_params.get("q") or "").strip()
+    if query:
+        qs = qs.filter(
+            Q(name__icontains=query)
+            | Q(display_name__icontains=query)
+            | Q(display_name_override__icontains=query)
+            | Q(description__icontains=query)
+            | Q(brand__icontains=query)
+            | Q(article__icontains=query)
+        )
     if request.query_params.get("new") in ("1", "true", "yes"):
         qs = qs.filter(is_new=True)
     if request.query_params.get("featured") in ("1", "true", "yes"):
@@ -151,10 +210,7 @@ def model_card(request, key):
     from .views import _visible_products
 
     qs = _visible_products(request)
-    items = list(qs.filter(model_key_override=key)) or list(
-        qs.filter(model_key_override="", model_key=key))
-    if not items:
-        items = list(qs.filter(pk=key))
+    items = positions_of_model(key, qs=qs)
     if not items:
         return Response({"error": "not_found"}, status=404)
     return Response(build_card(items))

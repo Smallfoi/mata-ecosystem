@@ -87,6 +87,33 @@
 >
 > Расширения на будущее (из RECOMMENDATION ч.3): `subcategoryId`, `videoUrl`, `shortDescription`, `isBestseller`, `stockCount`, `materialComposition`, `careInstructions`, `weight`.
 
+```json
+// ModelCard — то, что видит покупатель (GET /models). D-94
+{
+  "key": "FRSM007",
+  "name": "Шорты мужские BMAI",
+  "brand": "BMAI", "article": "FRSM007", "categoryId": "clothes",
+  "price": 3990, "oldPrice": null,
+  "imageUrl": "https://cdn.mata-club.ru/p/frsm007.webp",
+  "description": "…",
+  "rating": 4.7, "reviewCount": 12,
+  "isNew": false, "isFeatured": false, "inStock": true,
+  "variantCount": 6,
+  "sizes": ["S","M","L"],
+  "colors": [
+    { "name": "ЧЁРНЫЙ", "imageUrl": "…", "inStock": true,
+      "sizes": [ { "size": "S", "productId": "p1", "price": 3990, "oldPrice": null, "inStock": true } ] }
+  ]
+}
+```
+> **Одна модель — одна карточка, но заказ уходит на позицию склада.** В 1С каждый
+> размер и цвет — отдельная карточка (так печатают этикетки), покупателю это
+> показывать нельзя. Клиент выбирает цвет и размер и кладёт в корзину
+> `colors[].sizes[].productId` — именно его ждёт склад.
+>
+> Размер и цвет берутся ТОЛЬКО из полей 1С (D-95): строка пуста — выбора на
+> витрине нет, заполнили — появился сам, без правок в коде.
+
 ### 2.3 Order (Order)
 ```json
 {
@@ -212,7 +239,12 @@ GET /products?category=:id              → Product[]
 GET /products?featured=true             → Product[]
 GET /products?new=true                  → Product[]
 GET /products/:id                       → Product
-GET /products/search?q=:q               → Product[]
+GET /products/search?q=:q               → Product[]   (позициями; витрина ищет через /models?q=)
+GET /models                             → ModelCard[] ← ВИТРИНА: один товар = одна карточка (D-94)
+GET /models?category=:id|featured|new   → ModelCard[]
+GET /models?q=:q                        → ModelCard[] (поиск карточками, а не позициями)
+GET /models/:key                        → ModelCard   (:key — ключ модели; id позиции тоже принимается)
+GET /products/:id/reviews               → отзывы МОДЕЛИ (:id — ключ модели или позиция)
 GET /brands                             → string[]
 GET /sizes                              → string[]
 GET /products/price-range               → { min, max }
