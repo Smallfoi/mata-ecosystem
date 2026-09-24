@@ -96,3 +96,104 @@ class ProviderTests(TestCase):
         self.assertEqual(providers.base_url(), "https://api.openai.com/v1")
         with mock.patch.dict("os.environ", {"OPENAI_BASE_URL": "https://relay.example/v1/"}):
             self.assertEqual(providers.base_url(), "https://relay.example/v1")
+
+
+import tempfile  # noqa: E402
+
+from django.test import override_settings  # noqa: E402
+
+from productmedia import service  # noqa: E402
+from productmedia.models import PhotoBatch, PhotoJob  # noqa: E402
+
+
+def _png_bytes(color=(10, 20, 30), size=(8, 8)):
+    buf = io.BytesIO()
+    Image.new("RGB", size, color).save(buf, "PNG")
+    return buf.getvalue()
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class PhotoPipelineServiceTests(TestCase):
+    """Оркестрация: приём партии по артикулам → ИИ (мок) → webp → карточка."""
+
+    @classmethod
+    def setUpTestData(cls):
+        Product.objects.create(id="pp1", name="Худи", category_id="c",
+                               price=2000, article="HD-1")
+
+    def _batch(self, track="catalog"):
+        return PhotoBatch.objects.create(track=track)
+
+    def test_intake_matches_pending_and_skips_unknown(self):
+        batch = self._batch()
+        jobs = service.intake(batch, [
+            {"article": "hd-1", "content": _png_bytes(), "filename": "a.png"},
+            {"article": "НЕТ", "content": _png_bytes(), "filename": "b.png"},
+        ])
+        self.assertEqual(len(jobs), 2)
+        matched = next(j for j in jobs if j.product_id == "pp1")
+        self.assertEqual(matched.status, PhotoJob.STATUS_PENDING)
+        self.assertTrue(matched.source.name)                 # исходник сохранён
+        skipped = next(j for j in jobs if j.product_id is None)
+        self.assertEqual(skipped.status, PhotoJob.STATUS_SKIPPED)
+
+    @mock.patch("productmedia.processing.process")
+    def test_run_job_success_sets_main_image(self, m_proc):
+        m_proc.return_value = _png_bytes((200, 50, 50), (1200, 1200))
+        batch = self._batch()
+        job = service.intake(batch, [
+            {"article": "HD-1", "content": _png_bytes(), "filename": "a.png"}])[0]
+        service.run_job(job)
+        job.refresh_from_db()
+        self.assertEqual(job.status, PhotoJob.STATUS_DONE)
+        self.assertTrue(job.master.name)
+        self.assertTrue(job.webp.name.endswith(".webp"))
+        self.assertIsNotNone(job.attached_at)
+        job.product.refresh_from_db()
+        self.assertTrue(job.product.image.name)              # главное фото проставлено
+
+    @mock.patch("productmedia.processing.process")
+    def test_run_job_gallery_produces_webp_but_defers_attach(self, m_proc):
+        # Галерея (модель+цвет) поедет через catalog.ProductPhoto, когда она появится в main.
+        # Пока: webp создаётся и хранится на задании, карточку не трогаем.
+        m_proc.return_value = _png_bytes((0, 150, 0), (1000, 1000))
+        batch = self._batch()
+        job = service.intake(batch, [
+            {"article": "HD-1", "content": _png_bytes(),
+             "filename": "a.png", "attach_as": "gallery"}])[0]
+        service.run_job(job)
+        job.refresh_from_db()
+        job.product.refresh_from_db()
+        self.assertEqual(job.status, PhotoJob.STATUS_DONE)
+        self.assertTrue(job.webp.name.endswith(".webp"))     # webp готов на задании
+        self.assertIsNone(job.attached_at)                   # к карточке ещё не прикреплён
+        self.assertFalse(job.product.image.name)             # главное фото не трогали
+        self.assertEqual(job.product.image_urls or [], [])   # в image_urls не пишем
+
+    @mock.patch.dict("os.environ", {}, clear=False)
+    def test_run_job_failed_without_key_keeps_card(self):
+        import os
+        os.environ.pop("OPENAI_API_KEY", None)               # провайдер выключен
+        batch = self._batch()
+        job = service.intake(batch, [
+            {"article": "HD-1", "content": _png_bytes(), "filename": "a.png"}])[0]
+        service.run_job(job)
+        job.refresh_from_db()
+        job.product.refresh_from_db()
+        self.assertEqual(job.status, PhotoJob.STATUS_FAILED)
+        self.assertTrue(job.error)
+        self.assertFalse(job.product.image.name)             # карточка не изменилась
+
+    @mock.patch("productmedia.processing.process")
+    def test_run_batch_counts_done(self, m_proc):
+        m_proc.return_value = _png_bytes((5, 5, 5), (900, 900))
+        batch = self._batch()
+        service.intake(batch, [
+            {"article": "HD-1", "content": _png_bytes(), "filename": "a.png"},
+            {"article": "НЕТ", "content": _png_bytes(), "filename": "b.png"},
+        ])
+        summary = service.run_batch(batch)
+        self.assertEqual(summary["done"], 1)                 # только сопоставленный прогнан
+        self.assertEqual(summary["failed"], 0)
+        # несопоставленный уже помечен skipped на приёме — в очередь run_batch не попадает
+        self.assertEqual(batch.jobs.filter(status=PhotoJob.STATUS_SKIPPED).count(), 1)
