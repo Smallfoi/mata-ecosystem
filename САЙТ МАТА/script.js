@@ -266,14 +266,44 @@ document.querySelectorAll("[data-eco-profile-cta]").forEach((btn) => {
 const pvModal = document.querySelector("[data-pv-modal]");
 let pvCurrent = null; // {name, price}
 let pvSize = null;
+let pvColor = null;
 
 function pvBuildColors(card) {
   const wrap = pvModal.querySelector("[data-pv-colors]");
-  const colors = (card.dataset.colors || "")
+  // Точка — это цвет для глаза, название — для понимания. Раньше были только
+  // точки, и выбрать цвет было нельзя: человек не мог сказать, что берёт.
+  const dots = (card.dataset.colors || "").split(",").map((c) => c.trim());
+  const names = (card.dataset.colorNames || "").split(",").map((c) => c.trim());
+  const out = (card.dataset.outcolors || "")
     .split(",")
     .map((c) => c.trim())
     .filter(Boolean);
-  wrap.innerHTML = colors.map((c) => `<i style="--c:${c}"></i>`).join("");
+  const list = (names.filter(Boolean).length ? names : dots).filter(Boolean);
+
+  pvColor = null;
+  wrap.innerHTML = list
+    .map((name, i) => {
+      const gone = out.includes(name);
+      const dot = dots[i] || "#8a93a3";
+      return `<button type="button" class="pv-color${gone ? " is-out" : ""}"` +
+        ` data-color="${name}"${gone ? " disabled aria-disabled=\"true\"" : ""}>` +
+        `<i style="--c:${dot}"></i><span>${name}</span></button>`;
+    })
+    .join("");
+
+  // Один цвет — выбирать нечего, отмечаем сразу.
+  const buttons = wrap.querySelectorAll("button:not([disabled])");
+  buttons.forEach((b) => {
+    b.addEventListener("click", () => {
+      wrap.querySelectorAll("button").forEach((x) => x.classList.remove("is-selected"));
+      b.classList.add("is-selected");
+      pvColor = b.dataset.color;
+    });
+  });
+  if (buttons.length === 1) {
+    buttons[0].classList.add("is-selected");
+    pvColor = buttons[0].dataset.color;
+  }
 }
 
 function pvBuildSizes(card) {
@@ -320,10 +350,20 @@ function openQuickView(card) {
   const stock = card.dataset.stock || "В наличии";
   stockEl.textContent = stock;
   stockEl.style.color = /скоро/i.test(stock) ? "var(--muted)" : "#2e8b6f";
+  const hint = pvModal.querySelector("[data-pv-hint]");
+  if (hint) hint.classList.remove("is-shown");
   pvBuildColors(card);
   pvBuildSizes(card);
   pvModal.classList.add("is-open");
   pvModal.setAttribute("aria-hidden", "false");
+}
+
+function pvWarn(text) {
+  const el = pvModal.querySelector("[data-pv-hint]");
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add("is-shown");
+  setTimeout(() => el.classList.remove("is-shown"), 2500);
 }
 
 function closeQuickView() {
@@ -352,8 +392,17 @@ if (pvModal) {
   );
   pvModal.querySelector("[data-pv-add]").addEventListener("click", () => {
     if (!pvCurrent) return;
-    const label = pvCurrent.name + (pvSize ? " · " + pvSize : "");
-    addToCart(label, pvCurrent.price);
+    // Без размера и цвета заказ собрать нельзя: на складе это разные позиции.
+    // Лучше сказать об этом здесь, чем разбираться при сборке заказа.
+    const needSize = pvModal.querySelectorAll("[data-pv-sizes] button").length > 0;
+    const needColor = pvModal.querySelectorAll("[data-pv-colors] button").length > 0;
+    if (needSize && !pvSize) return pvWarn("Выберите размер");
+    if (needColor && !pvColor) return pvWarn("Выберите цвет");
+
+    const parts = [pvCurrent.name];
+    if (pvColor) parts.push(pvColor);
+    if (pvSize) parts.push(pvSize);
+    addToCart(parts.join(" · "), pvCurrent.price);
     closeQuickView();
     if (!cartPanel.classList.contains("is-open")) toggleCart();
   });

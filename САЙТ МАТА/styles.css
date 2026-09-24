@@ -3268,3 +3268,28 @@ html:has(.eco-modal.is-open) {
   .lc-platinum .lc-signGlow path, .lc-platinum .lc-edge { animation: none; }
 }
 
+/* ── Выбор цвета в быстром просмотре ─────────────────────────────────────────
+   Раньше цвета были просто точками: видно, что их несколько, а выбрать нельзя.
+   Теперь это кнопки с названием — человек говорит, какой цвет берёт. */
+.pv-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.pv-color {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px 6px 8px; border: 1.5px solid var(--line, #e2e6ea);
+  border-radius: 999px; background: #fff; cursor: pointer;
+  font: inherit; font-size: 13px; color: inherit;
+}
+.pv-color i {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--c, #8a93a3); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
+}
+.pv-color:hover { border-color: var(--ink, #20252b); }
+.pv-color.is-selected { border-color: var(--ink, #20252b); background: var(--ink, #20252b); color: #fff; }
+.pv-color.is-out { opacity: .45; cursor: not-allowed; text-decoration: line-through; }
+
+/* Подсказка «выберите размер»: появляется по нажатию «В корзину» без выбора. */
+.pv-hint {
+  margin: 6px 0 0; min-height: 18px; font-size: 13px; color: #c0392b;
+  opacity: 0; transition: opacity .18s ease;
+}
+.pv-hint.is-shown { opacity: 1; }
+

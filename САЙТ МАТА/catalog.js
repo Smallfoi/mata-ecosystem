@@ -61,6 +61,11 @@
     });
     var stockBySize = {};
     sizes.forEach(function (s) { stockBySize[s] = available[s] ? 1 : 0; });
+    // Цвета, у которых не осталось ни одного размера: в окне выбора гасим их,
+    // иначе человек выберет цвет и упрётся в пустой список размеров.
+    var outColors = colors
+      .filter(function (c) { return c.inStock === false; })
+      .map(function (c) { return c.name; });
     return {
       id: card.key,
       name: card.name,
@@ -75,6 +80,7 @@
       colors: colors.map(function (c) { return colorHex(c.name); }),
       colorNames: colors.map(function (c) { return c.name; }),
       stockBySize: sizes.length ? stockBySize : null,
+      outColors: outColors,
       inStock: card.inStock,
       rating: 0,
       reviewCount: 0
@@ -122,13 +128,15 @@
       ' data-cat="' + esc(catLabel) + '" data-img="' + esc(img) + '"' +
       ' data-sizes="' + esc(sizes.join(",")) + '" data-colors="' + esc(colors.join(",")) + '"' +
       (p.colorNames ? ' data-color-names="' + esc(p.colorNames.join(",")) + '"' : "") +
+      (p.outColors && p.outColors.length
+        ? ' data-outcolors="' + esc(p.outColors.join(",")) + '"' : "") +
       ' data-outofstock="' + esc(out.join(",")) + '"' +
       ' data-stock="' + esc(stock) + '" data-desc="' + esc(desc) + '">' +
       '<div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее: ' +
       esc(p.name) + '">' +
       (img ? '<img src="' + esc(img) + '" alt="' + esc(p.name) + '" loading="lazy" />' : "") +
       "</div>" +
-      '<div class="product-info">' +
+      '<div class="product-info" data-quick-view tabindex="0" role="button">' +
       (catLabel ? '<p class="product-cat">' + esc(catLabel) + "</p>" : "") +
       "<h3>" + esc(p.name) + "</h3>" +
       (Number(p.reviewCount) > 0
@@ -141,9 +149,11 @@
       '<span class="product-price">' + priceFmt(p.price) + "</span>" +
       '<span class="product-stock' + stockCls + '">' + esc(stock) + "</span>" +
       "</div>" +
-      '<button class="product-add" type="button" data-add-cart="' + esc(p.name) +
-      '" data-price="' + Number(p.price) + '" data-product-id="' + esc(p.id) +
-      '">В корзину</button>' +
+      (sizes.length || colors.length
+        ? '<button class="product-add" type="button" data-quick-view>Выбрать размер</button>'
+        : '<button class="product-add" type="button" data-add-cart="' + esc(p.name) +
+          '" data-price="' + Number(p.price) + '" data-product-id="' + esc(p.id) +
+          '">В корзину</button>') +
       "</div></article>"
     );
   }
