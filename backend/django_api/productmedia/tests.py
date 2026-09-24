@@ -153,7 +153,9 @@ class PhotoPipelineServiceTests(TestCase):
         self.assertTrue(job.product.image.name)              # главное фото проставлено
 
     @mock.patch("productmedia.processing.process")
-    def test_run_job_gallery_appends_url(self, m_proc):
+    def test_run_job_gallery_produces_webp_but_defers_attach(self, m_proc):
+        # Галерея (модель+цвет) поедет через catalog.ProductPhoto, когда она появится в main.
+        # Пока: webp создаётся и хранится на задании, карточку не трогаем.
         m_proc.return_value = _png_bytes((0, 150, 0), (1000, 1000))
         batch = self._batch()
         job = service.intake(batch, [
@@ -163,8 +165,10 @@ class PhotoPipelineServiceTests(TestCase):
         job.refresh_from_db()
         job.product.refresh_from_db()
         self.assertEqual(job.status, PhotoJob.STATUS_DONE)
-        self.assertEqual(len(job.product.image_urls), 1)
+        self.assertTrue(job.webp.name.endswith(".webp"))     # webp готов на задании
+        self.assertIsNone(job.attached_at)                   # к карточке ещё не прикреплён
         self.assertFalse(job.product.image.name)             # главное фото не трогали
+        self.assertEqual(job.product.image_urls or [], [])   # в image_urls не пишем
 
     @mock.patch.dict("os.environ", {}, clear=False)
     def test_run_job_failed_without_key_keeps_card(self):

@@ -84,11 +84,12 @@ def run_job(job):
         job.master.save("%s.png" % base, ContentFile(master), save=False)
         job.webp.save("%s.webp" % base, ContentFile(webp), save=False)
 
-        _attach(job, webp, base)
+        attached = _attach(job, webp, base)
 
         job.status = PhotoJob.STATUS_DONE
         job.error = ""
-        job.attached_at = timezone.now()
+        if attached:
+            job.attached_at = timezone.now()
         job.save()
     except providers.ImageProviderError as e:
         job.status = PhotoJob.STATUS_FAILED
@@ -102,18 +103,21 @@ def run_job(job):
 
 
 def _attach(job, webp_bytes, base):
-    """Прикрепить готовый webp к карточке: главное фото или в галерею."""
-    product = job.product
+    """Прикрепить готовый webp к карточке. Возвращает True, если реально прикрепили.
+
+    Главное фото → product.image (тот же путь, что у ручной вкладки «Фото товаров»).
+    Галерея (несколько фото на модель+ЦВЕТ, до 6, меняется при переключении цвета) поедет
+    через catalog.ProductPhoto, когда она появится в main (координация с параллельной
+    сессией). До тех пор webp уже сохранён на задании (job.webp), карточку НЕ трогаем, чтобы
+    не плодить второе, неверное хранилище. В image_urls не пишем: это складская позиция, и
+    network_image_url() всё равно режет полный S3-URL до имени файла.
+    """
     if job.attach_as == PhotoJob.ATTACH_GALLERY:
-        url = job.webp.url
-        gallery = list(product.image_urls or [])
-        if url not in gallery:
-            gallery.append(url)
-        product.image_urls = gallery
-        product.save(update_fields=["image_urls"])
-    else:
-        product.image.save("%s.webp" % base, ContentFile(webp_bytes), save=False)
-        product.save(update_fields=["image"])
+        return False    # ждём catalog.ProductPhoto (модель+цвет)
+    product = job.product
+    product.image.save("%s.webp" % base, ContentFile(webp_bytes), save=False)
+    product.save(update_fields=["image"])
+    return True
 
 
 def run_batch(batch):

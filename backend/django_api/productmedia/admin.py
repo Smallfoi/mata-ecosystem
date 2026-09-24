@@ -21,7 +21,7 @@ class PhotoJobInline(TabularInline):
 
 @admin.register(PhotoBatch)
 class PhotoBatchAdmin(ModelAdmin):
-    list_display = ("id", "created_at", "track", "created_by", "jobs_total")
+    list_display = ("created_at", "track", "created_by", "jobs_total")
     list_filter = ("track", "created_at")
     readonly_fields = ("created_at", "created_by")
     inlines = [PhotoJobInline]
@@ -42,7 +42,7 @@ class PhotoBatchAdmin(ModelAdmin):
 
 @admin.register(PhotoJob)
 class PhotoJobAdmin(ModelAdmin):
-    list_display = ("id", "article", "product", "track", "attach_as", "status", "created_at")
+    list_display = ("article", "product", "track", "attach_as", "status", "created_at")
     list_filter = ("status", "track", "attach_as", "created_at")
     search_fields = ("article", "product__name", "product__article")
     readonly_fields = ("batch", "source", "master", "webp",
