@@ -378,12 +378,11 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
                                '— товар не попадёт ни в один раздел витрины')
         category = Category.objects.filter(id=code).first()
         if category is None:
-            return format_html(
-                '<span class="m-tag bad">категории с таким кодом нет</span> '
-                '<span class="m-mono">{}</span> — товар не попадёт в раздел витрины', code)
+            return format_html('<span class="m-tag bad">категории с таким кодом нет</span> '
+                               '— товар не попадёт в раздел витрины')
+        # Код не повторяем: он в поле «Категория» строкой выше.
         url = reverse("admin:catalog_category_change", args=[category.pk])
-        return format_html('<a href="{}"><b>{}</b></a> <span class="m-mono">{}</span>',
-                           url, category.name, code)
+        return format_html('<a href="{}"><b>{}</b></a>', url, category.name)
 
     @admin.display(description="Фото")
     def preview(self, obj):

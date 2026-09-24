@@ -130,9 +130,15 @@ class CategoryRefTests(TestCase):
     def test_known_category_shows_its_name(self):
         Product.objects.create(id="p_cat", name="Кроссовки", category_id="38d6081b-b0cd-11f1",
                                price=100)
-        html = self._card("p_cat")
-        self.assertIn("Обувь", html)
-        self.assertIn("38d6081b-b0cd-11f1", html, "код 1С тоже должен быть виден")
+        self.assertIn("Обувь", self._card("p_cat"))
+
+        # Код 1С в самой строке не повторяем: он и так в поле «Категория» выше.
+        # (В ссылке на карточку категории он остаётся — это адрес, а не текст.)
+        product_admin = admin.site._registry[Product]
+        shown = product_admin.category_ref(Product.objects.get(pk="p_cat"))
+        self.assertIn("Обувь", shown)
+        self.assertNotIn("38d6081b-b0cd-11f1</span>", shown)
+        self.assertNotIn("m-mono", shown)
 
     def test_unknown_category_is_flagged(self):
         Product.objects.create(id="p_lost", name="Кроссовки", category_id="нет-такого",
