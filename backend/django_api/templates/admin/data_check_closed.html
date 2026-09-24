@@ -1,0 +1,47 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# Закрытые замечания: что признали не ошибкой. Вернуть в список можно кнопкой. #}
+
+<div class="m-tabs">
+  <a class="m-tab" href="{{ back_link }}">← ко всем замечаниям</a>
+</div>
+
+{% if note %}<div class="m-good">{{ note }}</div>{% endif %}
+
+{% if rows %}
+  <div class="m-card">
+    <div class="m-head">Закрытые замечания <span class="m-chip">{{ rows|length }}</span></div>
+    <div class="m-wrap">
+      <table class="m">
+        <thead>
+          <tr><th>Проверка</th><th>Что закрыли</th><th>Комментарий</th><th>Кто и когда</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td>{{ row.check }}</td>
+              <td class="m-mono">{{ row.key }}</td>
+              <td class="m-muted">{{ row.note|default:"—" }}</td>
+              <td class="m-muted">{{ row.actor }} · {{ row.when }}</td>
+              <td>
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="id" value="{{ row.id }}">
+                  <button class="m-btn" type="submit">Вернуть</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="m-hint">
+      Закрыто конкретное состояние данных. Если в 1С что-то поменяется — замечание
+      появится снова само, даже без кнопки «Вернуть».
+    </div>
+  </div>
+{% else %}
+  <div class="m-good">Закрытых замечаний нет.</div>
+{% endif %}
+{% endblock %}

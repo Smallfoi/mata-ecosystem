@@ -1,0 +1,70 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# Разбор одного замечания: позиции рядом, поле к полю — видно, где расхождение. #}
+
+<div class="m-tabs">
+  <a class="m-tab" href="{{ back_link }}">← ко всем замечаниям</a>
+  <span class="m-chip">{{ check_title }}</span>
+</div>
+
+<div class="m-card">
+  <div class="m-head">{{ item.title }}</div>
+  <p>{{ item.hint }}</p>
+  {% if item.detail %}<p class="m-muted">{{ item.detail }}</p>{% endif %}
+
+  <div class="m-wrap">
+    <table class="m">
+      <thead>
+        <tr>
+          <th>Складское название</th>
+          <th>На витрине</th>
+          <th>Артикул</th>
+          <th>Размеры</th>
+          <th>Цвета</th>
+          <th class="n">Цена</th>
+          <th class="n">Остаток</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td>{{ row.name }}</td>
+            <td>{{ row.shop_title }}</td>
+            <td class="m-mono">{{ row.article|default:"—" }}</td>
+            <td>{{ row.sizes|default:"—" }}</td>
+            <td>{{ row.colors|default:"—" }}</td>
+            <td class="n">{{ row.price }}</td>
+            <td class="n">{% if row.stock == None %}—{% else %}{{ row.stock }}{% endif %}</td>
+            <td><a class="m-btn" href="{{ row.url }}">Открыть карточку</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="m-hint">
+    Правим в 1С — при следующей выгрузке замечание пропадёт само. Если это не ошибка,
+    закройте его: замечание вернётся, только если данные снова изменятся.
+  </div>
+</div>
+
+<div class="m-card narrow">
+  <div class="m-head">Проверено, это не ошибка</div>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="check" value="{{ check_id }}">
+    <input type="hidden" name="key" value="{{ key }}">
+    <div class="m-field">
+      <label for="note">Комментарий (необязательно)</label>
+      <input class="m-input wide" type="text" id="note" name="note" maxlength="300"
+             placeholder="Например: так и должно быть, это разные модели">
+    </div>
+    <div class="m-form">
+      <button class="m-btn" type="submit">Закрыть замечание</button>
+      <a class="m-btn" href="{{ back_link }}">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
