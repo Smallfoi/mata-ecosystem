@@ -262,3 +262,12 @@ class PhotoTestCommandTests(TestCase):
         call_command("photo_test", "--article", "RUN-9", "--from-product", "--apply")
         self.assertEqual(
             ProductPhoto.objects.filter(model_key="RUNNER", color="Белый").count(), 1)
+
+    @mock.patch("productmedia.processing.process")
+    def test_target_by_product_id(self, m_proc):
+        # товар можно указать по id (его отдаёт публичный API), не только по артикулу
+        from django.core.management import call_command
+        m_proc.return_value = _png_bytes((30, 30, 30), (1000, 1000))
+        call_command("photo_test", "--product-id", "cmd1", "--from-product")
+        self.assertEqual(ProductPhoto.objects.count(), 0)    # предпросмотр — витрина чиста
+        self.assertEqual(PhotoJob.objects.filter(status=PhotoJob.STATUS_DONE).count(), 1)
