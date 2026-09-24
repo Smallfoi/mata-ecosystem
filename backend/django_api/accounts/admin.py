@@ -17,9 +17,9 @@ from .models import Account
 class AccountAdmin(ExportCsvMixin, ModelAdmin):
     # ID — служебный: в списке не показываем (открывается по имени, ищется поиском).
     list_display = ("who", "phone", "email", "city", "provider",
-                    "is_blocked", "needs_review", "created_at")
+                    "is_blocked", "needs_review", "test_payment", "created_at")
     list_display_links = ("who",)
-    list_filter = ("provider", "city", "is_blocked", "needs_review")
+    list_filter = ("provider", "city", "is_blocked", "needs_review", "test_payment")
     search_fields = ("id", "name", "phone", "email")
     ordering = ("-created_at",)
     date_hierarchy = "created_at"
@@ -37,6 +37,13 @@ class AccountAdmin(ExportCsvMixin, ModelAdmin):
         }),
         ("Приватность", {
             "fields": ("profile_public", "route_public", "realtime_public"),
+        }),
+        ("Проверка заказов", {
+            "fields": ("test_payment",),
+            "description": "Тестовая оплата: этот человек «оплачивает» заказы без денег, "
+            "чтобы пройти весь путь — заказ, выгрузка в 1С, статусы. Нужно для проверки "
+            "обмена со стороны 1С. Такие заказы помечены «тест» и у нас, и в выгрузке; "
+            "продажей они не считаются. Выключайте, когда проверка закончена.",
         }),
         ("Модерация и анти-чит", {
             "fields": ("is_blocked", "block_reason", "needs_review"),

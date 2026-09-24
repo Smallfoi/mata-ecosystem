@@ -24,6 +24,13 @@ class Account(models.Model):
     route_public = models.BooleanField(default=False, verbose_name="Маршруты публичны")
     realtime_public = models.BooleanField(default=False, verbose_name="Геопозиция в реальном времени")
 
+    # Тестовая оплата: этому аккаунту разрешено «оплачивать» заказы без денег,
+    # чтобы пройти весь путь — заказ, выгрузка в 1С, статусы. Нужно для проверки
+    # обмена со стороны 1С (D-97). Такие заказы помечены как тестовые и в выгрузке,
+    # и в админке — спутать их с настоящими нельзя.
+    test_payment = models.BooleanField(default=False, db_index=True,
+                                       verbose_name="Тестовая оплата (без денег)")
+
     # Модерация (S-10): бан абьюзеров. Блокирует вход (новые токены).
     is_blocked = models.BooleanField(default=False, db_index=True, verbose_name="Заблокирован")
     block_reason = models.CharField(max_length=300, blank=True, default="", verbose_name="Причина блокировки")

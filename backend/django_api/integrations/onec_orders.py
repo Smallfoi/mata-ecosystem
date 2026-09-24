@@ -103,6 +103,9 @@ def order_to_json(order: Order) -> dict:
         "pointsRedeemed": order.points_redeemed,
         "payment": checkout.get("paymentType") or "",
         "paymentStatus": order.payment_status,
+        # Тестовый заказ: оплачен симуляцией, денег не было. В 1С его можно
+        # принять и провести весь путь, но продажей считать нельзя (D-97).
+        "test": order.is_test,
         "delivery": checkout.get("deliveryType") or "",
         "address": address,
         "postalCode": checkout.get("postalCode") or "",

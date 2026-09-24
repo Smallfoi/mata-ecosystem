@@ -20,6 +20,10 @@ class Order(models.Model):
         max_length=20, default="pending", choices=STATUS_CHOICES, verbose_name="Статус"
     )
     points_redeemed = models.IntegerField(default=0, verbose_name="Списано баллов")
+    # Заказ оплачен симуляцией (без денег) — для проверки цикла. Уходит в 1С
+    # с признаком «тест», чтобы там его не провели как настоящую продажу.
+    is_test = models.BooleanField(default=False, db_index=True,
+                                  verbose_name="Тестовый заказ")
     # Доставка по городу своими силами (D-92): курьера заказывают вручную
     # (Яндекс/inDrive) или везёт свой. Здесь — что сказать клиенту: кто везёт,
     # телефон, когда ждать. Уходит ему в уведомление вместе со статусом.

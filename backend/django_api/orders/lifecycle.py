@@ -62,6 +62,12 @@ def expire_unpaid(now=None) -> dict:
         payment_status="pending", created_at__lt=deadline
     ).order_by("created_at")[:BATCH]
     for order in rows:
+        if order.is_test:
+            # Тестовый заказ (D-97): в ЮKassa такого платежа нет, спрашивать её
+            # про номер «TEST-…» бессмысленно. Не оплатили вовремя — отменяем.
+            mark_canceled(order)
+            stats["canceled"] += 1
+            continue
         if not order.payment_id:
             mark_canceled(order)
             stats["canceled"] += 1
