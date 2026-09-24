@@ -51,10 +51,13 @@ def dashboard_callback(request, context):
     def _sum(qs, field="amount"):
         return qs.aggregate(s=Sum(field))["s"] or 0
 
-    orders_total = Order.objects.count()
-    orders_today = Order.objects.filter(created_at__date=today).count()
-    revenue = _sum(Order.objects.all(), "total")
-    revenue_week = _sum(Order.objects.filter(created_at__gte=week_ago), "total")
+    # Тестовые заказы (D-97) в счётчиках не участвуют: денег по ним нет, а
+    # выручка на дашборде должна быть настоящей.
+    real_orders = Order.objects.filter(is_test=False)
+    orders_total = real_orders.count()
+    orders_today = real_orders.filter(created_at__date=today).count()
+    revenue = _sum(real_orders, "total")
+    revenue_week = _sum(real_orders.filter(created_at__gte=week_ago), "total")
     users = Account.objects.count()
     products = Product.objects.count()
     clubs = Club.objects.count()
@@ -111,7 +114,7 @@ def dashboard_callback(request, context):
     for i in range(6, -1, -1):
         d = (now - timedelta(days=i)).date()
         daily.append({"label": d.strftime("%d.%m"),
-                      "value": Order.objects.filter(created_at__date=d).count()})
+                      "value": real_orders.filter(created_at__date=d).count()})
     peak = max([x["value"] for x in daily] + [1])
     for x in daily:
         x["pct"] = round(x["value"] / peak * 100)

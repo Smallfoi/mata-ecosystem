@@ -14,6 +14,13 @@ from .payment import PaymentError, create_payment, fetch_payment, payment_enable
 from .receipt import build_receipt
 
 
+def _test_payer(uid: str) -> bool:
+    """Разрешена ли этому аккаунту оплата без денег (D-97)."""
+    from accounts.models import Account
+
+    return Account.objects.filter(id=uid, test_payment=True).exists()
+
+
 @api_view(["POST"])
 def pay_order(request, order_id):
     """Инициировать оплату заказа (D-13). Dev (без провайдера) — сразу «оплачено»;
@@ -32,6 +39,24 @@ def pay_order(request, order_id):
         return Response(
             {"detail": "Время на оплату истекло — оформите заказ заново"}, status=409
         )
+
+    # Тестовая оплата: аккаунту с этим правом «платим» без денег, чтобы пройти
+    # весь путь — заказ, выгрузка в 1С, статусы. Нужно для проверки обмена со
+    # стороны 1С (D-97). Заказ помечается тестовым: и у нас, и в выгрузке.
+    if _test_payer(uid):
+        order.is_test = True
+        order.payment_id = f"TEST-{order.order_id}"
+        order.payment_status = "pending"
+        order.save(update_fields=["is_test", "payment_id", "payment_status"])
+        mark_paid(order)
+        order.refresh_from_db()
+        return Response({
+            "status": "paid",
+            "paymentId": order.payment_id,
+            "confirmationUrl": "",
+            "test": True,
+            "note": "Тестовая оплата: деньги не списаны, заказ уйдёт в 1С с пометкой «тест».",
+        })
     try:
         receipt = build_receipt(order.payload, order.total)
     except ValueError as e:

@@ -38,6 +38,7 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
         "total",
         "status",
         "payment_status",
+        "test_mark",
         "points_redeemed",
         "created_at",
         # Обмен с 1С: сразу видно, ушёл ли заказ на склад и что там с ним.
@@ -46,7 +47,7 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
     )
     list_display_links = ("order_id",)
     list_editable = ("status",)
-    list_filter = ("status", "payment_status", "onec_status")
+    list_filter = ("status", "payment_status", "onec_status", "is_test")
     search_fields = ("order_id", "user_id")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
@@ -60,6 +61,13 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
             return "—"
         return format_html('<a href="{}">Оформить возврат — целиком или частями</a>',
                            reverse("order_return", args=[obj.pk]))
+
+    @admin.display(description="Тест", boolean=False, ordering="is_test")
+    def test_mark(self, obj):
+        """Оплачен симуляцией (D-97): денег не было, продажей не считается."""
+        if not obj.is_test:
+            return ""
+        return format_html('<span class="m-tag warn">тест</span>')
 
     @admin.display(description="1С")
     def onec_state(self, obj):
