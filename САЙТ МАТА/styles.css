@@ -1066,11 +1066,14 @@ html.js.motion-off .hero .brand-wordmark span {
 
 .pv-media {
   background: #f3f1ec;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .pv-media img {
   width: 100%;
-  height: 100%;
+  height: auto;
   object-fit: cover;
   aspect-ratio: 4 / 5;
 }
@@ -3276,6 +3279,30 @@ html:has(.eco-modal.is-open) {
 .pv-color:hover { border-color: var(--ink, #20252b); }
 .pv-color.is-selected { border-color: var(--ink, #20252b); background: var(--ink, #20252b); color: #fff; }
 .pv-color.is-out { opacity: .45; cursor: not-allowed; text-decoration: line-through; }
+/* Кружок-мини-фото вместо точки: видно вещь в этом цвете до нажатия (D-99).
+   Селектор с `i`: у соседнего правила `.pv-color i` фоном идёт цвет, и без
+   равной весомости он закрасил бы снимок. */
+.pv-color i.pv-color-shot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background-color: transparent;
+  background-size: cover; background-position: center;
+}
+
+/* ── Лента миниатюр под большим фото ─────────────────────────────────────────
+   Показываем снимки ТОЛЬКО выбранного цвета: выбрал чёрный — смотришь чёрный.
+   Одна фотография — ленты нет, ряд из одного элемента ничего не сообщает. */
+.pv-thumbs {
+  display: flex; gap: 8px; padding: 10px; overflow-x: auto;
+  scrollbar-width: thin;
+}
+.pv-thumb {
+  flex: 0 0 auto; width: 56px; height: 70px; padding: 0; cursor: pointer;
+  border: 1.5px solid transparent; border-radius: 10px; overflow: hidden;
+  background: #fff;
+}
+.pv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pv-thumb.is-selected { border-color: var(--ink, #20252b); }
+.pv-thumb:focus-visible { outline: 2px solid var(--ink, #20252b); outline-offset: 2px; }
 
 /* Подсказка «выберите размер»: появляется по нажатию «В корзину» без выбора. */
 .pv-hint {
