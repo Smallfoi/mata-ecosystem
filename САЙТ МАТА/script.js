@@ -267,6 +267,49 @@ const pvModal = document.querySelector("[data-pv-modal]");
 let pvCurrent = null; // {name, price}
 let pvSize = null;
 let pvColor = null;
+let pvPhotos = {};    // {цвет: [{u, t}]} — снимки карточки, по цветам (D-99)
+let pvFallback = "";  // обложка на случай, если у цвета снимков ещё нет
+
+// Показать снимки выбранного цвета: большое фото плюс лента миниатюр.
+// Снимков может не быть вовсе — тогда остаётся обложка, а ленту прячем.
+function pvShowPhotos(color) {
+  const img = pvModal.querySelector("[data-pv-img]");
+  const strip = pvModal.querySelector("[data-pv-thumbs]");
+  const list = (color && pvPhotos[color]) || [];
+
+  img.src = list.length ? list[0].u : pvFallback;
+  if (!strip) return;
+  if (list.length < 2) {
+    strip.hidden = true;
+    strip.innerHTML = "";
+    return;
+  }
+  strip.hidden = false;
+  strip.innerHTML = list
+    .map((ph, i) =>
+      `<button type="button" class="pv-thumb${i === 0 ? " is-selected" : ""}"` +
+      ` aria-label="Фото ${i + 1}"><img src="${ph.t}" alt="" loading="lazy"></button>`)
+    .join("");
+  strip.querySelectorAll("button").forEach((b, i) => {
+    b.addEventListener("click", () => {
+      strip.querySelectorAll("button").forEach((x) => x.classList.remove("is-selected"));
+      b.classList.add("is-selected");
+      img.src = list[i].u;
+    });
+  });
+}
+
+// Первый снимок каждого цвета — в кэш браузера, пока он свободен. Тогда
+// переключение цвета мгновенное, а не «подождите, грузится» (D-99).
+function pvPrefetch() {
+  const urls = Object.keys(pvPhotos)
+    .map((c) => pvPhotos[c][0] && pvPhotos[c][0].u)
+    .filter(Boolean);
+  if (!urls.length) return;
+  const run = () => urls.forEach((u) => { new Image().src = u; });
+  if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 2000 });
+  else setTimeout(run, 1200);
+}
 
 function pvBuildColors(card) {
   const wrap = pvModal.querySelector("[data-pv-colors]");
@@ -285,9 +328,15 @@ function pvBuildColors(card) {
     .map((name, i) => {
       const gone = out.includes(name);
       const dot = dots[i] || "#8a93a3";
+      // Кружок-мини-фото честнее точки: видно, как вещь выглядит в этом цвете,
+      // ещё до нажатия. Снимка нет — остаётся цветная точка.
+      const shot = (pvPhotos[name] || [])[0];
+      const face = shot
+        ? `<i class="pv-color-shot" style="background-image:url('${shot.t}')"></i>`
+        : `<i style="--c:${dot}"></i>`;
       return `<button type="button" class="pv-color${gone ? " is-out" : ""}"` +
         ` data-color="${name}"${gone ? " disabled aria-disabled=\"true\"" : ""}>` +
-        `<i style="--c:${dot}"></i><span>${name}</span></button>`;
+        `${face}<span>${name}</span></button>`;
     })
     .join("");
 
@@ -298,9 +347,13 @@ function pvBuildColors(card) {
       wrap.querySelectorAll("button").forEach((x) => x.classList.remove("is-selected"));
       b.classList.add("is-selected");
       pvColor = b.dataset.color;
+      pvShowPhotos(pvColor);            // выбрал синий — видишь синий
     });
   });
-  if (buttons.length === 1) {
+  // Первый доступный цвет отмечаем сразу — как у Nike и STAW: карточка обязана
+  // открыться показанной вещью, а не пустой галереей. Размер человек выбирает
+  // сам: это настоящее решение, а цвет всегда виден на фото.
+  if (buttons.length) {
     buttons[0].classList.add("is-selected");
     pvColor = buttons[0].dataset.color;
   }
@@ -340,7 +393,15 @@ function openQuickView(card) {
   if (!pvModal || !card) return;
   pvCurrent = { name: card.dataset.name, price: Number(card.dataset.price) };
   const img = pvModal.querySelector("[data-pv-img]");
-  img.src = card.dataset.img || "";
+  pvFallback = card.dataset.img || "";
+  // Снимки по цветам едут в разметке карточки. Битый словарь не должен ронять
+  // окно: без галереи оно просто покажет обложку.
+  try {
+    pvPhotos = card.dataset.photos ? JSON.parse(card.dataset.photos) : {};
+  } catch (e) {
+    pvPhotos = {};
+  }
+  img.src = pvFallback;
   img.alt = card.dataset.name || "";
   pvModal.querySelector("[data-pv-cat]").textContent = card.dataset.cat || "";
   pvModal.querySelector("[data-pv-name]").textContent = card.dataset.name || "";
@@ -354,6 +415,8 @@ function openQuickView(card) {
   if (hint) hint.classList.remove("is-shown");
   pvBuildColors(card);
   pvBuildSizes(card);
+  pvShowPhotos(pvColor);                // один цвет — галерея открыта сразу
+  pvPrefetch();
   pvModal.classList.add("is-open");
   pvModal.setAttribute("aria-hidden", "false");
 }

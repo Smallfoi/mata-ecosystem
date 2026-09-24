@@ -48,6 +48,20 @@
     return "#8a93a3";
   }
 
+  // Снимки по цветам: {«ЧЁРНЫЙ»: [{u: полный, t: миниатюра}], ...}. Ключи короткие —
+  // словарь едет в атрибуте разметки, и каждый лишний символ идёт в вес страницы.
+  function photosByColor(colors) {
+    var out = {};
+    colors.forEach(function (c) {
+      var list = Array.isArray(c.photos) ? c.photos : [];
+      if (!list.length) return;
+      out[c.name] = list.map(function (ph) {
+        return { u: abs(ph.url), t: abs(ph.thumb || ph.url) };
+      });
+    });
+    return out;
+  }
+
   // Карточка модели (/v1/models) → те же поля, что ждёт вёрстка карточки.
   // Одна карточка на модель: внутри цвета, у каждого свои размеры с наличием.
   function fromModel(card) {
@@ -75,6 +89,10 @@
       price: card.price,
       oldPrice: card.oldPrice,
       imageUrl: card.imageUrl,
+      // В ленту каталога — миниатюра (400 px): две сотни полноразмерных снимков
+      // качать незачем, полный размер берётся уже в карточке товара (D-99).
+      thumbUrl: card.thumbUrl || card.imageUrl,
+      photos: photosByColor(colors),
       description: card.description,
       sizes: sizes,
       colors: colors.map(function (c) { return colorHex(c.name); }),
@@ -87,15 +105,26 @@
     };
   }
 
-  function imgUrl(p) {
-    var u = p.imageUrl || (p.imageUrls && p.imageUrls[0]) || "";
+  function abs(u) {
+    u = u || "";
     if (!u) return "";
     if (u.indexOf("http") === 0) return u;
     return u.charAt(0) === "/" ? ORIGIN + u : ORIGIN + "/" + u;
   }
 
+  function imgUrl(p) {
+    return abs(p.imageUrl || (p.imageUrls && p.imageUrls[0]) || "");
+  }
+
+  function thumbUrl(p) {
+    return abs(p.thumbUrl || p.imageUrl || (p.imageUrls && p.imageUrls[0]) || "");
+  }
+
   function cardHtml(p) {
     var img = imgUrl(p);
+    var thumb = thumbUrl(p) || img;
+    var gallery = p.photos && Object.keys(p.photos).length
+      ? JSON.stringify(p.photos) : "";
     var cat = p.categoryId || ""; // для фильтра каталога
     // Бренд в 1С пока заполнен не у всех. Пусто — строки нет: «МАТА» на каждой
     // карточке ничего не сообщает, а место занимает.
@@ -130,6 +159,7 @@
       '<article class="product-card reveal" data-id="' + esc(p.id) + '" data-category="' + esc(cat) + '"' +
       ' data-name="' + esc(p.name) + '" data-price="' + Number(p.price) + '"' +
       ' data-cat="' + esc(catLabel) + '" data-img="' + esc(img) + '"' +
+      (gallery ? ' data-photos="' + esc(gallery) + '"' : "") +
       ' data-sizes="' + esc(sizes.join(",")) + '" data-colors="' + esc(colors.join(",")) + '"' +
       (p.colorNames ? ' data-color-names="' + esc(p.colorNames.join(",")) + '"' : "") +
       (p.outColors && p.outColors.length
@@ -138,7 +168,7 @@
       ' data-stock="' + esc(stock) + '" data-desc="' + esc(desc) + '">' +
       '<div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее: ' +
       esc(p.name) + '">' +
-      (img ? '<img src="' + esc(img) + '" alt="' + esc(p.name) + '" loading="lazy" />' : "") +
+      (thumb ? '<img src="' + esc(thumb) + '" alt="' + esc(p.name) + '" loading="lazy" />' : "") +
       "</div>" +
       '<div class="product-info" data-quick-view tabindex="0" role="button">' +
       (catLabel ? '<p class="product-cat">' + esc(catLabel) + "</p>" : "") +
