@@ -28,7 +28,9 @@ class Command(BaseCommand):
     help = "Прогнать один товар через фотопайплайн (по умолчанию — предпросмотр без привязки)."
 
     def add_arguments(self, parser):
-        parser.add_argument("--article", required=True, help="Артикул товара")
+        who = parser.add_mutually_exclusive_group(required=True)
+        who.add_argument("--article", help="Артикул товара")
+        who.add_argument("--product-id", help="ID товара (виден в публичном /v1/products)")
         src = parser.add_mutually_exclusive_group(required=True)
         src.add_argument("--from-product", action="store_true",
                          help="Исходник = текущее фото товара")
@@ -40,15 +42,21 @@ class Command(BaseCommand):
                             help="Выложить результат в галерею витрины (иначе только предпросмотр)")
 
     def handle(self, *args, **o):
-        # 1) товар по артикулу
-        product = next((p for p in Product.objects.filter(article__iexact=o["article"].strip())), None)
-        if product is None:
-            # запасной поиск по нормализованному артикулу (пробелы/регистр)
-            want = _norm(o["article"])
-            product = next((p for p in Product.objects.exclude(article="")
-                            if _norm(p.article) == want), None)
-        if product is None:
-            raise CommandError("товар с артикулом %r не найден" % o["article"])
+        # 1) товар по id или по артикулу
+        if o.get("product_id"):
+            product = Product.objects.filter(pk=o["product_id"]).first()
+            if product is None:
+                raise CommandError("товар с id %r не найден" % o["product_id"])
+        else:
+            product = next((p for p in Product.objects.filter(
+                article__iexact=o["article"].strip())), None)
+            if product is None:
+                # запасной поиск по нормализованному артикулу (пробелы/регистр)
+                want = _norm(o["article"])
+                product = next((p for p in Product.objects.exclude(article="")
+                                if _norm(p.article) == want), None)
+            if product is None:
+                raise CommandError("товар с артикулом %r не найден" % o["article"])
 
         # 2) исходник
         if o["from_product"]:
