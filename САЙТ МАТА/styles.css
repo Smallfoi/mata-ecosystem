@@ -667,8 +667,7 @@ html.js.motion-off .hero .brand-wordmark span {
 }
 
 .cinema,
-.catalog,
-.references {
+.catalog {
   padding: 96px clamp(18px, 5vw, 72px);
 }
 
@@ -1227,24 +1226,6 @@ html.js.motion-off .hero .brand-wordmark span {
   .pv-media img {
     aspect-ratio: 16 / 10;
   }
-}
-
-.references {
-  background: #ffffff;
-}
-
-.reference-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.reference-grid img {
-  aspect-ratio: 1;
-  height: auto;
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  background: #f3f1ec;
 }
 
 /* — Лояльность / экосистема — */
@@ -2918,10 +2899,6 @@ html.lenis body {
   .sticky-copy {
     position: static;
   }
-
-  .reference-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 @media (max-width: 720px) {
@@ -3044,8 +3021,7 @@ html.lenis body {
   .statement,
   .cinema,
   .product-story,
-  .catalog,
-  .references {
+  .catalog {
     padding-left: 18px;
     padding-right: 18px;
   }
@@ -3057,10 +3033,6 @@ html.lenis body {
   .product-story {
     padding-top: 86px;
     padding-bottom: 86px;
-  }
-
-  .reference-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 
   .footer-top {

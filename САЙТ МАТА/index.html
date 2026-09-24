@@ -3,10 +3,10 @@
   <head>
     <!-- Стартует загрузку правок и прячет «старую» вёрстку до их применения.
          Должен идти ПЕРВЫМ: смысл в том, чтобы успеть до отрисовки. -->
-    <script src="boot.js?v=20260924c"></script>
+    <script src="boot.js?v=20260924d"></script>
     <!-- Правки применяются как можно раньше: качается параллельно с
          разметкой, выполняется сразу после её разбора. -->
-    <script defer src="content.js?v=20260924c"></script>
+    <script defer src="content.js?v=20260924d"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>МАТА — интернет-магазин спортивной одежды, обуви и аксессуаров</title>
@@ -48,7 +48,7 @@
       rel="stylesheet"
     />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
-    <link rel="stylesheet" href="styles.css?v=20260924c" />
+    <link rel="stylesheet" href="styles.css?v=20260924d" />
     <script>
       // Прогрессивное улучшение: помечаем, что JS активен (под этим классом hero
       // стартует скрытым и анимируется через motion.js). Страховка: если motion-слой
@@ -67,7 +67,6 @@
         <a href="philosophy/" data-edit="nav.philosophy">Философия</a>
         <a href="#catalog" data-edit="nav.catalog">Каталог</a>
         <a href="#loyalty" data-edit="nav.loyalty">Экосистема</a>
-        <a href="#references" data-edit="nav.references">Референсы</a>
       </nav>
       <div class="header-actions">
         <button class="cart-button" type="button" data-cart-toggle aria-label="Корзина">
@@ -103,7 +102,6 @@
       <a href="philosophy/" data-mobile-link data-edit="nav.philosophy">Философия</a>
       <a href="#catalog" data-mobile-link data-edit="nav.catalog">Каталог</a>
       <a href="#loyalty" data-mobile-link data-edit="nav.loyalty">Экосистема и баллы</a>
-      <a href="#references" data-mobile-link data-edit="nav.references">Референсы</a>
       <button class="mobile-login" type="button" data-eco-login-cta data-mobile-link data-edit="eco.loginCta">Войти в аккаунт</button>
       <button class="mobile-login" type="button" data-eco-auth-only data-eco-profile-cta data-mobile-link hidden>Профиль</button>
     </nav>
@@ -493,23 +491,6 @@
         </div>
       </section>
 
-      <section class="references scene" id="references">
-        <div class="section-heading reveal">
-          <p class="eyebrow" data-edit="references.eyebrow">References</p>
-          <h2 data-edit="references.title">Материалы из товарных карточек</h2>
-        </div>
-        <div class="reference-grid" data-sortable="references">
-          <img class="reveal" loading="lazy" src="media/staw-clean-01.jpg" alt="Референс МАТА 1" data-sid="r1" data-hideable="ref1" data-edit-img="references.img1" />
-          <img class="reveal" loading="lazy" src="media/staw-clean-02.jpg" alt="Референс МАТА 2" data-sid="r2" data-hideable="ref2" data-edit-img="references.img2" />
-          <img class="reveal" loading="lazy" src="media/staw-clean-03.jpg" alt="Референс МАТА 3" data-sid="r3" data-hideable="ref3" data-edit-img="references.img3" />
-          <img class="reveal" loading="lazy" src="media/staw-clean-05.jpg" alt="Референс МАТА 4" data-sid="r4" data-hideable="ref4" data-edit-img="references.img4" />
-          <img class="reveal" loading="lazy" src="media/staw-clean-06.jpg" alt="Референс МАТА 5" data-sid="r5" data-hideable="ref5" data-edit-img="references.img5" />
-          <img class="reveal" loading="lazy" src="media/staw-clean-07.jpg" alt="Референс МАТА 6" data-sid="r6" data-hideable="ref6" data-edit-img="references.img6" />
-          <img class="reveal" loading="lazy" src="media/staw-clean-09.jpg" alt="Референс МАТА 7" data-sid="r7" data-hideable="ref7" data-edit-img="references.img7" />
-          <img class="reveal" loading="lazy" src="media/staw-clean-10.jpg" alt="Референс МАТА 8" data-sid="r8" data-hideable="ref8" data-edit-img="references.img8" />
-          <img class="reveal" loading="lazy" src="media/staw-clean-11.jpg" alt="Референс МАТА 9" data-sid="r9" data-hideable="ref9" data-edit-img="references.img9" />
-        </div>
-      </section>
     </main>
 
     <aside class="cart-panel" data-cart-panel aria-label="Корзина">
@@ -746,7 +727,6 @@
           <h4 data-edit="footer.brandTitle">Бренд</h4>
           <a href="#philosophy" data-edit="footer.brand1">Философия</a>
           <a href="#loyalty" data-edit="footer.brand2">Экосистема и баллы</a>
-          <a href="#references" data-edit="footer.brand3">Референсы</a>
         </nav>
 
         <nav class="footer-col" aria-label="Помощь">
@@ -806,25 +786,25 @@
 
     <!-- Единый журнал ошибок экосистемы (D-32): JS-ошибки сайта → GlitchTip.
          Подключаем ПЕРВЫМ, чтобы ловить ошибки остальных скриптов. -->
-    <script src="observability.js?v=20260924c"></script>
-    <script src="script.js?v=20260924c"></script>
+    <script src="observability.js?v=20260924d"></script>
+    <script src="script.js?v=20260924d"></script>
     <!-- Динамический каталог из общего backend (наполняет сетку товарами). -->
-    <script src="catalog.js?v=20260924c"></script>
+    <script src="catalog.js?v=20260924d"></script>
     <!-- Промо-баннеры из админки (/banners) → стрип под hero. -->
-    <script src="promo.js?v=20260924c"></script>
+    <script src="promo.js?v=20260924d"></script>
     <!-- Юр-документы из админки (/legal/documents) → модалка по ссылкам. -->
-    <script src="legal.js?v=20260924c"></script>
+    <script src="legal.js?v=20260924d"></script>
     <!-- Экосистема: единый аккаунт + общие баллы (самодостаточный модуль). -->
-    <script src="ecosystem.js?v=20260924c"></script>
+    <script src="ecosystem.js?v=20260924d"></script>
     <!-- Мини-CMS: тексты/фото сайта из бэкенда (задаются в «Конструкторе»). -->
     <!-- Режим редактирования для «Конструктора» (активен только при ?edit=1). -->
-    <script src="editor.js?v=20260924c"></script>
+    <script src="editor.js?v=20260924d"></script>
 
     <!-- Motion-слой (premium): плавный скролл Lenis + сцены GSAP/ScrollTrigger.
          Загружается с CDN; при недоступности сайт работает без анимаций (фолбэк). -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js"></script>
-    <script src="motion.js?v=20260924c"></script>
+    <script src="motion.js?v=20260924d"></script>
   </body>
 </html>
