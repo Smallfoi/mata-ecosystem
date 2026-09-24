@@ -97,6 +97,21 @@ class ProviderTests(TestCase):
         with mock.patch.dict("os.environ", {"OPENAI_BASE_URL": "https://relay.example/v1/"}):
             self.assertEqual(providers.base_url(), "https://relay.example/v1")
 
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "k"}, clear=False)
+    @mock.patch("productmedia.providers.urllib.request.urlopen")
+    def test_request_sets_non_bot_user_agent(self, m_open):
+        # Без User-Agent Cloudflare-релей рубит запрос бот-защитой (1010) — проверяем, что шлём свой.
+        class _Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return b'{"data": []}'
+        m_open.return_value = _Resp()
+        providers._post_multipart("/images/edits", "multipart/form-data; boundary=x", b"body")
+        req = m_open.call_args.args[0]
+        ua = req.get_header("User-agent") or ""
+        self.assertTrue(ua)
+        self.assertNotIn("urllib", ua.lower())   # не дефолтный Python-urllib
+
 
 import tempfile  # noqa: E402
 

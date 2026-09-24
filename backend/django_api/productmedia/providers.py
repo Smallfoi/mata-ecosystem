@@ -61,6 +61,11 @@ def _post_multipart(path, content_type, body):
     req = urllib.request.Request(base_url() + path, data=body, method="POST")
     req.add_header("Authorization", "Bearer " + key)
     req.add_header("Content-Type", content_type)
+    # User-Agent ОБЯЗАТЕЛЕН: без него urllib шлёт "Python-urllib/…", и релей за Cloudflare
+    # рубит запрос бот-защитой (ошибка 1010). curl в бот-листах не значится (им же и показаны
+    # примеры в доках Cloudflare). Переопределяется OPENAI_USER_AGENT при необходимости.
+    req.add_header("User-Agent",
+                   (os.environ.get("OPENAI_USER_AGENT") or "curl/8.5.0").strip())
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
             return json.loads(resp.read().decode("utf-8") or "{}")
