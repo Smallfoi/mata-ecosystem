@@ -108,3 +108,37 @@ class ColumnPickerTests(TestCase):
     def test_unsafe_redirect_is_ignored(self):
         r = self.client.post(COLUMNS, {"show": ALL_BUT_OLD_PRICE, "next": "https://evil.tld/"})
         self.assertEqual(r["Location"], reverse("admin:catalog_product_changelist"))
+
+
+class CategoryRefTests(TestCase):
+    """В карточке товара категория приходит кодом 1С — рядом должно быть название.
+
+    В поле «Категория» лежит GUID из их справочника: по нему не понять, о чём речь,
+    а если категории с таким кодом у нас нет, товар молча пропадает с витрины.
+    """
+
+    def setUp(self):
+        get_user_model().objects.create_superuser("owner_cat", "cat@t.dev", "OwnerPass!2026")
+        login_admin(self.client, "owner_cat", "OwnerPass!2026")
+        from catalog.models import Category
+
+        Category.objects.create(id="38d6081b-b0cd-11f1", name="Обувь")
+
+    def _card(self, pid):
+        return self.client.get(f"/admin/catalog/product/{pid}/change/").content.decode()
+
+    def test_known_category_shows_its_name(self):
+        Product.objects.create(id="p_cat", name="Кроссовки", category_id="38d6081b-b0cd-11f1",
+                               price=100)
+        html = self._card("p_cat")
+        self.assertIn("Обувь", html)
+        self.assertIn("38d6081b-b0cd-11f1", html, "код 1С тоже должен быть виден")
+
+    def test_unknown_category_is_flagged(self):
+        Product.objects.create(id="p_lost", name="Кроссовки", category_id="нет-такого",
+                               price=100)
+        self.assertIn("категории с таким кодом нет", self._card("p_lost"))
+
+    def test_empty_category_is_flagged(self):
+        Product.objects.create(id="p_none", name="Кроссовки", category_id="", price=100)
+        self.assertIn("категория не указана", self._card("p_none"))

@@ -2,6 +2,7 @@ from django.contrib import admin, messages
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.db.models import Avg, Count, F, Q
 from django.template.response import TemplateResponse
+from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin
 
@@ -217,7 +218,7 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
         ("Основное", {
             "fields": ("id", "name", "display_name", "display_name_override",
                        "model_key", "model_key_override",
-                       "brand", "article", "category_id", "description"),
+                       "brand", "article", "category_id", "category_ref", "description"),
             "description": "«Название» 1С шлёт по позиции — с артикулом, цветом и размером "
             "(«ЖИЛЕТ Жен. BMAI арт. FRWK006-1 цвет ЧЕРНЫЙ р. XL»): так удобно на "
             "этикетке и в офлайн-магазине. «Витринное название» считается из него "
@@ -251,7 +252,7 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
             "странице «Конструктор витрины».",
         }),
     )
-    readonly_fields = ("preview_large", "display_name", "model_key")
+    readonly_fields = ("preview_large", "display_name", "model_key", "category_ref")
 
     @admin.action(description="🔤 Пересчитать витринные названия и модели")
     def rebuild_names(self, request, queryset):
@@ -364,6 +365,25 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     def category_name(self, obj):
         c = Category.objects.filter(id=obj.category_id).only("name").first()
         return c.name if c else (obj.category_id or "—")
+
+    @admin.display(description="Какая это категория")
+    def category_ref(self, obj):
+        """Расшифровка кода 1С: в поле «Категория» лежит GUID из их справочника,
+        и по нему не понять, о чём речь. Показываем название рядом — и сразу
+        видно, если категории с таким кодом у нас нет (товар пропадёт с витрины).
+        """
+        code = (obj.category_id or "").strip()
+        if not code:
+            return format_html('<span class="m-tag warn">категория не указана</span> '
+                               '— товар не попадёт ни в один раздел витрины')
+        category = Category.objects.filter(id=code).first()
+        if category is None:
+            return format_html(
+                '<span class="m-tag bad">категории с таким кодом нет</span> '
+                '<span class="m-mono">{}</span> — товар не попадёт в раздел витрины', code)
+        url = reverse("admin:catalog_category_change", args=[category.pk])
+        return format_html('<a href="{}"><b>{}</b></a> <span class="m-mono">{}</span>',
+                           url, category.name, code)
 
     @admin.display(description="Фото")
     def preview(self, obj):
