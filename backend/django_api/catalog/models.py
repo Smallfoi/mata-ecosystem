@@ -336,3 +336,49 @@ class CheckDismissal(models.Model):
     def __str__(self):
         return f"{self.check_id}:{self.key}"
 
+
+
+class ProductPhoto(models.Model):
+    """Фотографии витрины: привязаны к МОДЕЛИ и ЦВЕТУ, а не к складской позиции.
+
+    В 1С каждый размер — отдельная карточка, но фотографии от размера не зависят:
+    чёрные кроссовки выглядят одинаково в 41-м и 42-м. Привязка к позиции означала
+    бы заливать одни и те же снимки по разу на размер (у обуви это 11 раз) и столько
+    же раз переделывать при замене. Поэтому ключ — модель плюс цвет: выбрал синий,
+    увидел синий (решение владельца 24.09.2026, D-99).
+
+    Цвет пустой — снимки общие для всей модели: пока 1С не заполнила строку цвета,
+    показывать что-то всё равно нужно.
+
+    Храним два файла: витринный webp (длинная сторона 1600) и миниатюру (400) для
+    ленты каталога и кружков выбора цвета — чтобы в списке из двух сотен карточек не
+    качать полноразмерные снимки.
+    """
+
+    # Решение владельца 24.09.2026: шесть снимков на цвет. Первый — каталожный на
+    # светлом фоне, он же обложка карточки в ленте.
+    MAX_PER_COLOR = 6
+
+    model_key = models.CharField(max_length=200, db_index=True, verbose_name="Модель (ключ)")
+    color = models.CharField(max_length=80, blank=True, default="", verbose_name="Цвет")
+    order = models.IntegerField(default=0, verbose_name="Порядок")
+    image = models.ImageField(upload_to="uploads/photos/", verbose_name="Фото (webp)")
+    thumb = models.ImageField(upload_to="uploads/photos/", blank=True,
+                              verbose_name="Миниатюра (webp)")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Загружено")
+
+    class Meta:
+        db_table = "catalog_product_photos"
+        ordering = ["order", "id"]
+        indexes = [models.Index(fields=["model_key", "color", "order"])]
+        verbose_name = "Фото товара"
+        verbose_name_plural = "Фото товаров"
+
+    def __str__(self):
+        return f"{self.model_key} · {self.color or 'без цвета'} · {self.order + 1}"
+
+    def to_json(self) -> dict:
+        return {
+            "url": self.image.url if self.image else "",
+            "thumb": self.thumb.url if self.thumb else (self.image.url if self.image else ""),
+        }

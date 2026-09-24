@@ -6,7 +6,7 @@
 """
 from django.test import TestCase
 
-from catalog.models import Product
+from catalog.models import Product, ProductPhoto
 from catalog.naming import model_base, model_key
 
 
@@ -225,3 +225,80 @@ class ModelReviewTests(TestCase):
 
     def test_unknown_key_is_404(self):
         self.assertEqual(self.client.get("/v1/products/нет-такого/reviews").status_code, 404)
+
+class ModelPhotoTests(TestCase):
+    """Галерея витрины: снимки привязаны к модели и ЦВЕТУ (D-99).
+
+    Выбрал чёрный — видишь чёрный. Снимки лежат не на складской позиции, потому
+    что от размера они не зависят: иначе одно и то же заливали бы по разу на
+    каждый размер.
+    """
+
+    def setUp(self):
+        make("ph1", "BMAI EXPEDITION ЧЕРНЫЙ 41р.", sizes=["41"], colors=["ЧЕРНЫЙ"],
+             stock_count=5)
+        make("ph2", "BMAI EXPEDITION ЧЕРНЫЙ 42р.", sizes=["42"], colors=["ЧЕРНЫЙ"],
+             stock_count=5)
+        make("ph3", "BMAI EXPEDITION МЯТНЫЙ 41р.", sizes=["41"], colors=["МЯТНЫЙ"],
+             stock_count=5)
+        self.key = Product.objects.get(pk="ph1").shop_model_key
+
+    def _photo(self, color, order=0, name="a"):
+        return ProductPhoto.objects.create(
+            model_key=self.key, color=color, order=order,
+            image=f"uploads/photos/{name}.webp", thumb=f"uploads/photos/{name}-t.webp")
+
+    def _card(self):
+        return self.client.get(f"/v1/models/{self.key}").json()
+
+    def test_photos_land_on_their_colour(self):
+        self._photo("ЧЕРНЫЙ", 0, "black1")
+        self._photo("ЧЕРНЫЙ", 1, "black2")
+        self._photo("МЯТНЫЙ", 0, "mint1")
+        colors = {c["name"]: c for c in self._card()["colors"]}
+        self.assertEqual(len(colors["ЧЕРНЫЙ"]["photos"]), 2)
+        self.assertEqual(len(colors["МЯТНЫЙ"]["photos"]), 1)
+        self.assertIn("mint1", colors["МЯТНЫЙ"]["photos"][0]["url"])
+
+    def test_photos_keep_their_order(self):
+        self._photo("ЧЕРНЫЙ", 1, "second")
+        self._photo("ЧЕРНЫЙ", 0, "first")
+        black = next(c for c in self._card()["colors"] if c["name"] == "ЧЕРНЫЙ")
+        self.assertIn("first", black["photos"][0]["url"], "обложка не первая")
+
+    def test_cover_and_thumb_come_from_the_first_photo(self):
+        self._photo("ЧЕРНЫЙ", 0, "cover")
+        card = self._card()
+        self.assertIn("cover.webp", card["imageUrl"])
+        self.assertIn("cover-t.webp", card["thumbUrl"], "в ленту уходит полноразмерный снимок")
+
+    def test_colour_without_photos_stays_empty(self):
+        """У мятного снимков нет — чужие подставлять нельзя."""
+        self._photo("ЧЕРНЫЙ", 0, "black1")
+        mint = next(c for c in self._card()["colors"] if c["name"] == "МЯТНЫЙ")
+        self.assertEqual(mint["photos"], [])
+
+    def test_photos_without_colour_are_shared(self):
+        """Цвет в 1С ещё не заполнен — снимки модели показываем всем цветам."""
+        self._photo("", 0, "common")
+        for color in self._card()["colors"]:
+            self.assertEqual(len(color["photos"]), 1, color["name"])
+
+    def test_list_gives_the_same_gallery(self):
+        self._photo("ЧЕРНЫЙ", 0, "black1")
+        card = self.client.get("/v1/models").json()[0]
+        black = next(c for c in card["colors"] if c["name"] == "ЧЕРНЫЙ")
+        self.assertEqual(len(black["photos"]), 1)
+
+    def test_one_query_for_the_whole_list(self):
+        """Две сотни карточек не должны превратиться в две сотни запросов."""
+        for i in range(3):
+            self._photo("ЧЕРНЫЙ", i, f"b{i}")
+        with self.assertNumQueries(2):        # товары + фото
+            self.client.get("/v1/models")
+
+    def test_old_position_photo_still_works(self):
+        """Пока галереи нет, показываем прежнее фото позиции — витрина не пустеет."""
+        Product.objects.filter(pk="ph1").update(image_urls=["shoe.jpg"])
+        card = self._card()
+        self.assertIn("shoe.jpg", card["imageUrl"])
