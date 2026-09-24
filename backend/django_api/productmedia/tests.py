@@ -1,12 +1,21 @@
-"""Фотопайплайн товаров: привязка папок по артикулу + генерация webp из мастера."""
+"""Фотопайплайн товаров: привязка папок по артикулу + webp + провайдер (на моках)."""
+import base64
 import io
+from unittest import mock
 
 from django.test import TestCase
 from PIL import Image
 
 from catalog.models import Product
+from productmedia import processing, providers
 from productmedia.images import make_webp
 from productmedia.matching import match_folders_to_products
+
+
+def _png_b64():
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(buf, "PNG")
+    return base64.b64encode(buf.getvalue()).decode()
 
 
 class ArticleMatchTests(TestCase):
@@ -44,3 +53,46 @@ class WebpTests(TestCase):
         self.assertEqual(out.format, "WEBP")
         self.assertLessEqual(max(out.size), 1600)
         self.assertLess(len(webp), len(buf.getvalue()))  # легче мастера
+
+
+class ProviderTests(TestCase):
+    """GPT-провайдер: без реального ключа/сети — сетевой вызов замокан."""
+
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False)
+    @mock.patch("productmedia.providers._post_multipart")
+    def test_catalog_track_calls_edits_with_high_fidelity(self, m_post):
+        m_post.return_value = {"data": [{"b64_json": _png_b64()}]}
+        out = processing.process(b"raw-source", track="catalog")
+        self.assertTrue(out.startswith(b"\x89PNG"))  # вернулся PNG-мастер
+        path, ctype, body = m_post.call_args.args
+        self.assertEqual(path, "/images/edits")
+        self.assertIn(b"gpt-image-1", body)
+        self.assertIn(b"input_fidelity", body)   # каталог бережёт товар точнее
+        self.assertIn(b"1024x1536", body)
+
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False)
+    @mock.patch("productmedia.providers._post_multipart")
+    def test_model_track_no_high_fidelity(self, m_post):
+        m_post.return_value = {"data": [{"b64_json": _png_b64()}]}
+        processing.process(b"raw-source", track="model")
+        _, _, body = m_post.call_args.args
+        self.assertNotIn(b"input_fidelity", body)  # маркетинг — генерация свободнее
+
+    def test_disabled_without_key(self):
+        with mock.patch.dict("os.environ", {}, clear=False):
+            import os
+            os.environ.pop("OPENAI_API_KEY", None)
+            self.assertFalse(providers.openai_enabled())
+            with self.assertRaises(providers.ImageProviderError):
+                processing.process(b"x", track="catalog")
+
+    def test_unknown_track_rejected(self):
+        with self.assertRaises(providers.ImageProviderError):
+            processing.process(b"x", track="nope")
+
+    def test_base_url_default_and_proxy_override(self):
+        import os
+        os.environ.pop("OPENAI_BASE_URL", None)
+        self.assertEqual(providers.base_url(), "https://api.openai.com/v1")
+        with mock.patch.dict("os.environ", {"OPENAI_BASE_URL": "https://relay.example/v1/"}):
+            self.assertEqual(providers.base_url(), "https://relay.example/v1")
