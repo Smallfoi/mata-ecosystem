@@ -56,6 +56,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Отдельное приложение, чтобы debug-сборка для проверки НЕ затирала
+            // тестерскую release с телефона: подписи разные, пакет один — иначе
+            // пришлось бы удалять боевую сборку и заново входить по коду.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             signingConfig = if (hasReleaseKeystore) {
                 signingConfigs.getByName("release")
