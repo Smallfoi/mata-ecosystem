@@ -1,16 +1,16 @@
 {% extends "admin/base_site.html" %}
 
 {% block content %}
-{# «Фото товаров» (D-91): заливка плиткой, перетаскиванием. Оформление общее, m-*. #}
+{# «Фото товаров» (D-91, D-99): плитка = модель + цвет, внутри до шести снимков. #}
 
 <div class="m-sum">
-  <div class="m-tile"><b>{{ left }}</b><span>осталось без фото</span></div>
-  <div class="m-tile"><b>{{ total }}</b><span>товаров всего</span></div>
+  <div class="m-tile"><b>{{ left }}</b><span>цветов без фото</span></div>
+  <div class="m-tile"><b>{{ total }}</b><span>всего «модель + цвет»</span></div>
 </div>
 
 <div class="m-tabs">
   <a class="m-tab {% if only != 'all' %}on{% endif %}" href="?only=empty&q={{ query }}">Без фото</a>
-  <a class="m-tab {% if only == 'all' %}on{% endif %}" href="?only=all&q={{ query }}">Все товары</a>
+  <a class="m-tab {% if only == 'all' %}on{% endif %}" href="?only=all&q={{ query }}">Все</a>
   <a class="m-tab" href="{{ fill_link }}">Заполненность 1С</a>
 </div>
 
@@ -22,29 +22,41 @@
 </form>
 
 <div class="m-hint">
-  Перетащите картинку на карточку — она сохранится сразу, заходить внутрь не нужно.
-  JPEG, PNG или WEBP до {{ max_mb }} МБ.
+  Перетащите файлы на плитку — можно сразу несколько, они займут свободные места.
+  До {{ max_photos }} снимков на цвет; первый идёт обложкой в каталоге, поменять —
+  звёздочка. Снимки видны у всех размеров этого цвета. JPEG, PNG или WEBP до {{ max_mb }} МБ.
 </div>
 
 {% csrf_token %}
 
 {% if items %}
-  <div class="m-photos" id="photo-grid">
+  <div class="m-gals" id="photo-grid">
     {% for it in items %}
-      <div class="m-photo" data-id="{{ it.id }}">
-        <div class="m-photo-box">
-          {% if it.url %}
-            <img src="{{ it.url }}" alt="">
-          {% else %}
-            <span class="m-photo-empty">перетащите фото</span>
-          {% endif %}
+      <div class="m-gal" data-key="{{ it.key }}" data-color="{{ it.color }}">
+        <div class="m-gal-head">
+          <div class="m-gal-name" title="{{ it.name }}">{{ it.name }}</div>
+          <div class="m-gal-meta">
+            {% if it.color %}<span class="m-tag soft">{{ it.color }}</span>
+            {% else %}<span class="m-tag off">цвет не заполнен</span>{% endif %}
+            {{ it.meta }}
+          </div>
         </div>
-        <label class="m-photo-pick">
-          <input type="file" accept="image/jpeg,image/png,image/webp" hidden>
-          Выбрать файл
-        </label>
-        <div class="m-photo-name" title="{{ it.name }}">{{ it.name }}</div>
-        <div class="m-photo-meta">{{ it.meta|default:"—" }}</div>
+        <div class="m-gal-slots">
+          {% for ph in it.photos %}
+            <div class="m-slot is-filled" data-id="{{ ph.id }}">
+              <img src="{{ ph.thumb }}" alt="">
+              <button type="button" class="m-slot-main" title="Сделать обложкой">★</button>
+              <button type="button" class="m-slot-del" title="Удалить">×</button>
+            </div>
+          {% endfor %}
+          {% for _ in it.free %}
+            <label class="m-slot">
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+              <span>+</span>
+            </label>
+          {% endfor %}
+        </div>
+        <div class="m-gal-count">{{ it.photos|length }} из {{ max_photos }}</div>
       </div>
     {% endfor %}
   </div>
@@ -59,9 +71,7 @@
     {% endif %}
   </div>
 {% else %}
-  <div class="m-good">
-    {% if query %}Ничего не нашлось по запросу «{{ query }}».
-    {% else %}Фото есть у всех товаров.{% endif %}
-  </div>
+  <div class="m-empty">Ничего не нашлось.</div>
 {% endif %}
+
 {% endblock %}

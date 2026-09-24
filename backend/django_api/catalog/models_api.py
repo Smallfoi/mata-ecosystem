@@ -15,6 +15,7 @@ from rest_framework.response import Response
 
 from common.throttling import PUBLIC_READ
 
+from . import photos as photolib
 from .models import Product
 
 # Порядок размеров: по алфавиту вышло бы «L, M, S, XL».
@@ -102,8 +103,13 @@ def _model_rating(items):
     return round(best.rating or 0, 1), (best.review_count or 0)
 
 
-def build_card(items) -> dict:
-    """Собрать карточку модели из складских позиций одной модели."""
+def build_card(items, photos: dict | None = None) -> dict:
+    """Собрать карточку модели из складских позиций одной модели.
+
+    `photos` — снимки этой модели по цветам (`catalog.photos.by_model`). Их отдают
+    заранее одним запросом: в списке из двух сотен карточек ходить в базу за каждой
+    значило бы две сотни запросов.
+    """
     items = list(items)
     first = items[0]
     colors = OrderedDict()
@@ -112,9 +118,18 @@ def build_card(items) -> dict:
     for product in items:
         for color in _variant_colors(product):
             entry = colors.setdefault(color, {"name": color, "imageUrl": "",
+                                              "thumbUrl": "", "photos": [],
                                               "sizes": [], "inStock": False})
+            if not entry["photos"]:
+                entry["photos"] = [p.to_json() for p in photolib.pick(photos, color)]
             if not entry["imageUrl"]:
-                entry["imageUrl"] = product.network_image_url()
+                # Обложка цвета: первый снимок галереи, иначе старое фото позиции.
+                entry["imageUrl"] = (entry["photos"][0]["url"] if entry["photos"]
+                                     else product.network_image_url())
+                # Миниатюра — для ленты каталога и кружков выбора цвета: две сотни
+                # полноразмерных снимков в списке качать незачем.
+                entry["thumbUrl"] = (entry["photos"][0]["thumb"] if entry["photos"]
+                                     else entry["imageUrl"])
             for size in _variant_sizes(product):
                 available = _in_stock(product, size)
                 entry["sizes"].append({
@@ -136,6 +151,7 @@ def build_card(items) -> dict:
     sizes_all = sorted({v["size"] for c in colors.values() for v in c["sizes"] if v["size"]},
                        key=_size_sort)
     image = next((c["imageUrl"] for c in colors.values() if c["imageUrl"]), "")
+    thumb = next((c["thumbUrl"] for c in colors.values() if c["thumbUrl"]), image)
     rating, review_count = _model_rating(items)
 
     return {
@@ -149,6 +165,7 @@ def build_card(items) -> dict:
         "price": min(all_prices) if all_prices else 0,
         "oldPrice": first.old_price,
         "imageUrl": image,
+        "thumbUrl": thumb,
         "description": first.description,
         "rating": rating,
         "reviewCount": review_count,
@@ -166,7 +183,9 @@ def build_cards(queryset):
     groups = OrderedDict()
     for product in queryset:
         groups.setdefault(product.shop_model_key or product.id, []).append(product)
-    return [build_card(items) for items in groups.values()]
+    photos = photolib.by_model(groups.keys())
+    return [build_card(items, photos.get(key))
+            for key, items in groups.items()]
 
 
 @api_view(["GET"])
@@ -213,4 +232,5 @@ def model_card(request, key):
     items = positions_of_model(key, qs=qs)
     if not items:
         return Response({"error": "not_found"}, status=404)
-    return Response(build_card(items))
+    model_key = items[0].shop_model_key or items[0].id
+    return Response(build_card(items, photolib.by_model([model_key]).get(model_key)))

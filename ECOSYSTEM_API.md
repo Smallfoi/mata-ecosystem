@@ -97,11 +97,13 @@
   "imageUrl": "https://cdn.mata-club.ru/p/frsm007.webp",
   "description": "…",
   "rating": 4.7, "reviewCount": 12,
+  "thumbUrl": "https://cdn.mata-club.ru/p/frsm007-t.webp",
   "isNew": false, "isFeatured": false, "inStock": true,
   "variantCount": 6,
   "sizes": ["S","M","L"],
   "colors": [
-    { "name": "ЧЁРНЫЙ", "imageUrl": "…", "inStock": true,
+    { "name": "ЧЁРНЫЙ", "imageUrl": "…", "thumbUrl": "…", "inStock": true,
+      "photos": [ { "url": "…-1.webp", "thumb": "…-1-t.webp" } ],
       "sizes": [ { "size": "S", "productId": "p1", "price": 3990, "oldPrice": null, "inStock": true } ] }
   ]
 }
@@ -110,6 +112,11 @@
 > размер и цвет — отдельная карточка (так печатают этикетки), покупателю это
 > показывать нельзя. Клиент выбирает цвет и размер и кладёт в корзину
 > `colors[].sizes[].productId` — именно его ждёт склад.
+>
+> **Фотографии — у цвета, до шести** (D-99): `colors[].photos` в порядке показа, первый
+> снимок он же обложка. `thumb` (400 px) — для ленты каталога и кружков выбора цвета,
+> `url` (webp 1600) — для галереи. Цвет без снимков отдаёт пустой список: чужие
+> фотографии подставлять нельзя.
 >
 > Размер и цвет берутся ТОЛЬКО из полей 1С (D-95): строка пуста — выбора на
 > витрине нет, заполнили — появился сам, без правок в коде.
