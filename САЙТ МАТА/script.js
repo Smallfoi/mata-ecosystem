@@ -268,6 +268,7 @@ let pvCurrent = null; // {name, price}
 let pvSize = null;
 let pvColor = null;
 let pvPhotos = {};    // {цвет: [{u, t}]} — снимки карточки, по цветам (D-99)
+let pvVariants = {};  // {цвет: {размер: [id позиции, цена]}} — что уйдёт в заказ
 let pvFallback = "";  // обложка на случай, если у цвета снимков ещё нет
 
 // Показать снимки выбранного цвета: большое фото плюс лента миниатюр.
@@ -411,6 +412,11 @@ function openQuickView(card) {
   } catch (e) {
     pvPhotos = {};
   }
+  try {
+    pvVariants = card.dataset.variants ? JSON.parse(card.dataset.variants) : {};
+  } catch (e) {
+    pvVariants = {};
+  }
   img.src = pvFallback;
   img.alt = card.dataset.name || "";
   pvModal.querySelector("[data-pv-cat]").textContent = card.dataset.cat || "";
@@ -496,10 +502,20 @@ if (pvModal) {
     if (needSize && !pvSize) return pvWarn("Выберите размер");
     if (needColor && !pvColor) return pvWarn("Выберите цвет");
 
+    // Склад собирает конкретную вещь, поэтому в заказ уходит id ПОЗИЦИИ выбранного
+    // сочетания. Без него сервер не сверит заказ с каталогом и откажет (D-94).
+    const byColor = pvVariants[pvColor || ""] || pvVariants[""] || {};
+    const variant = byColor[pvSize || ""] || byColor[""];
+    if (Object.keys(pvVariants).length && !variant) {
+      return pvWarn("Этого сочетания нет в наличии");
+    }
+
     const parts = [pvCurrent.name];
     if (pvColor) parts.push(pvColor);
     if (pvSize) parts.push(pvSize);
-    addToCart(parts.join(" · "), pvCurrent.price);
+    addToCart(parts.join(" · "),
+              variant ? variant[1] : pvCurrent.price,
+              variant ? variant[0] : "");
     closeQuickView();
     if (!cartPanel.classList.contains("is-open")) toggleCart();
   });
@@ -744,10 +760,14 @@ if (coModal) {
       window.STAW
         .api("/orders", { method: "POST", body: payload })
         .then((o) => startPayment((o && o.id) || orderId))
-        .catch(() => {
+        .catch((e) => {
           // Заказ не дошёл до сервера — «оформлен» не показываем (D-72): человек
           // ждал бы посылку, которой нет. Корзина цела, можно повторить.
-          err.textContent = "Не удалось оформить заказ. Проверьте соединение и попробуйте ещё раз.";
+          // Сервер объяснил причину (`detail` прилетает сообщением ошибки) — показываем
+          // её. «Проверьте соединение» врёт, когда связь была и сервер ответил отказом.
+          err.textContent = (e && e.message && e.message !== "Ошибка сервера")
+            ? e.message
+            : "Не удалось оформить заказ. Проверьте соединение и попробуйте ещё раз.";
           submitBtn.disabled = false;
           submitBtn.textContent = "Подтвердить заказ";
         });
