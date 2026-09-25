@@ -341,53 +341,88 @@ def merch_site_video(request):
     # original — без сжатия (4K, полное качество, но грузится дольше).
     quality = (request.POST.get("quality") or "web").lower()
     if quality != "original":
-        saved = _webify_video(saved, quality) or saved
+        web = _webify_video(saved, quality)
+        if web:
+            saved = web
+        elif f.size > _HEAVY_VIDEO_BYTES:
+            # Сжать не вышло, а исходник тяжёлый. Молча отдать его — значит получить
+            # страницу, которая «жёстко тормозит у всех»: ровно это и случилось с
+            # роликом на 100 МБ в окне входа. Лучше честный отказ.
+            try:
+                default_storage.delete(saved)
+            except Exception:
+                pass
+            return JsonResponse({
+                "detail": "Не удалось сжать видео, а исходник слишком тяжёлый "
+                          "(%d МБ). Такой файл будет тормозить у всех. Сожмите ролик "
+                          "примерно до %d МБ или загрузите с качеством «оригинал», "
+                          "если это осознанное решение."
+                          % (f.size // 1024 // 1024, _HEAVY_VIDEO_BYTES // 1024 // 1024),
+            }, status=400)
     return JsonResponse({"ok": True, "url": default_storage.url(saved)})
 
 
 # Пресеты сжатия: макс. сторона (px) и CRF (меньше = лучше качество/больше вес).
 _VIDEO_PRESETS = {"web": ("1280", "30"), "high": ("1920", "24")}
 
+# Выше этого веса несжатый ролик на фон не пускаем: браузер тянет фоновое видео
+# целиком, и стомегабайтный файл кладёт страницу на любом устройстве.
+_HEAVY_VIDEO_BYTES = 20 * 1024 * 1024
+
 
 def _webify_video(saved, quality="web"):
-    """Транскод фонового видео в web-формат по пресету качества (web/high). Камерные
-    ролики огромны (80-100 МБ, 4K) и долго декодируются в браузере. Делаем H.264,
-    ≤maxdim, без звука, faststart. Только локальное хранилище (dev/диск); на S3 или без
-    ffmpeg — тихо None (отдаётся оригинал). Возвращает имя web-версии либо None."""
+    """Транскод фонового видео в web-формат по пресету качества (web/high).
+
+    Камерные ролики огромны (80–100 МБ, 4K): браузер тянет их целиком и захлёбывается
+    на декодировании. Делаем H.264, ≤maxdim, без звука, faststart.
+
+    Работает и с локальным диском, и с облачным хранилищем. Раньше — только с диском:
+    на S3 `default_storage.path()` бросает NotImplementedError, и сжатие тихо
+    пропускалось, а на сайт уходил стомегабайтный исходник. Молчаливое «ничего не
+    делаем» на проде — худший из вариантов, поэтому теперь качаем во временный файл.
+
+    Возвращает имя web-версии либо None (тогда остаётся оригинал).
+    """
     import os
+    import shutil
     import subprocess
+    import tempfile
+
+    from django.core.files.base import File
     from django.core.files.storage import default_storage
+
     maxdim, crf = _VIDEO_PRESETS.get(quality, _VIDEO_PRESETS["web"])
-    try:
-        src = default_storage.path(saved)  # NotImplementedError на нелокальном хранилище
-    except Exception:
-        return None
     try:
         import imageio_ffmpeg
         ff = imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
         return None
-    web_name = os.path.splitext(saved)[0] + "_web.mp4"
-    web_path = default_storage.path(web_name)
+
+    tmpdir = tempfile.mkdtemp(prefix="mata-video-")
+    src = os.path.join(tmpdir, "src" + (os.path.splitext(saved)[1] or ".mp4"))
+    out = os.path.join(tmpdir, "web.mp4")
     scale = ("scale=w=%s:h=%s:force_original_aspect_ratio=decrease:force_divisible_by=2"
              % (maxdim, maxdim))
     try:
-        os.makedirs(os.path.dirname(web_path), exist_ok=True)
+        # Исходник — из хранилища, каким бы оно ни было (диск, S3).
+        with default_storage.open(saved, "rb") as fh, open(src, "wb") as dst:
+            shutil.copyfileobj(fh, dst)
         subprocess.run(
             [ff, "-y", "-i", src, "-vf", scale,
              "-c:v", "libx264", "-crf", crf, "-preset", "veryfast", "-pix_fmt", "yuv420p",
-             "-an", "-movflags", "+faststart", web_path],
-            check=True, timeout=600, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+             "-an", "-movflags", "+faststart", out],
+            check=True, timeout=900, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
+        if not os.path.exists(out) or os.path.getsize(out) == 0:
+            return None
+        with open(out, "rb") as fh:
+            web_name = default_storage.save(
+                os.path.splitext(saved)[0] + "_web.mp4", File(fh))
     except Exception:
-        try:
-            if os.path.exists(web_path):
-                os.remove(web_path)
-        except Exception:
-            pass
         return None
-    if not os.path.exists(web_path) or os.path.getsize(web_path) == 0:
-        return None
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
     try:
         default_storage.delete(saved)  # оригинал-тяжеловес больше не нужен
     except Exception:

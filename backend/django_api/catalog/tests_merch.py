@@ -2,7 +2,9 @@
 правка центрального товара. Эндпоинты staff-only."""
 import json
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from catalog.models import Product
@@ -273,3 +275,31 @@ class MerchOverride1CTests(TestCase):
         self.client.post("/admin/merch/product/k2", data=json.dumps({"price": 200}),
                          content_type="application/json")
         self.assertEqual(Product.objects.get(id="k2").overrides, [])
+
+class HeavyVideoTests(TestCase):
+    """Тяжёлое видео на фон не пускаем молча (владелец: «жёстко тормозит у всех»).
+
+    Сжатие при загрузке работало только с локальным диском: на проде хранилище
+    облачное, и на сайт уходил стомегабайтный исходник прямо с камеры. Теперь при
+    неудачном сжатии тяжёлый файл получает честный отказ, а не тихо едет на витрину.
+    """
+
+    def setUp(self):
+        get_user_model().objects.create_superuser("owner_vid", "v@t.dev", "OwnerPass!2026")
+        login_admin(self.client, "owner_vid", "OwnerPass!2026")
+
+    def _send(self, size_mb):
+        data = bytes(size_mb * 1024 * 1024)
+        return self.client.post("/admin/merch/site-video", {
+            "video": SimpleUploadedFile("158A9990.MP4", data, content_type="video/mp4"),
+        })
+
+    def test_heavy_unwebifiable_video_is_refused(self):
+        r = self._send(21)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("тормозить", r.json()["detail"])
+
+    def test_small_video_still_passes(self):
+        r = self._send(1)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.json()["url"])
