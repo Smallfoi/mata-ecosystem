@@ -281,7 +281,12 @@ class Product {
       imageUrls: image.isEmpty ? const [] : [image],
       description: (j['description'] ?? '').toString(),
       sizes: (j['sizes'] as List? ?? const []).map((e) => e.toString()).toList(),
-      colors: colors.map((c) => (c['name'] ?? '').toString()).toList(),
+      // Только НАЗВАННЫЕ цвета: 1С заполнила строку не везде, а пустой кружок
+      // выбрать нельзя — он превращался в пустую кнопку.
+      colors: colors
+          .map((c) => (c['name'] ?? '').toString())
+          .where((name) => name.trim().isNotEmpty)
+          .toList(),
       isNew: j['isNew'] as bool? ?? false,
       isFeatured: j['isFeatured'] as bool? ?? false,
       rating: (j['rating'] as num?)?.toDouble() ?? 0,

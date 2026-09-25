@@ -48,6 +48,22 @@
     return "#8a93a3";
   }
 
+  // Позиции склада по цвету и размеру: {«ЧЁРНЫЙ»: {«41»: ["p1", 4490]}}.
+  // Именно id позиции уходит в заказ: карточка на витрине — это модель, а склад
+  // собирает конкретную вещь. Размер или цвет могут быть пустыми — тогда ключ «».
+  function variantsByColor(colors) {
+    var out = {};
+    colors.forEach(function (c) {
+      var bySize = {};
+      (c.sizes || []).forEach(function (v) {
+        if (!v || !v.productId) return;
+        bySize[String(v.size || "")] = [String(v.productId), Number(v.price) || 0];
+      });
+      if (Object.keys(bySize).length) out[c.name] = bySize;
+    });
+    return out;
+  }
+
   // Снимки по цветам: {«ЧЁРНЫЙ»: [{u: полный, t: миниатюра}], ...}. Ключи короткие —
   // словарь едет в атрибуте разметки, и каждый лишний символ идёт в вес страницы.
   function photosByColor(colors) {
@@ -66,6 +82,7 @@
   // Одна карточка на модель: внутри цвета, у каждого свои размеры с наличием.
   function fromModel(card) {
     var colors = Array.isArray(card.colors) ? card.colors : [];
+    var named = colors.filter(function (c) { return String(c.name || "").trim(); });
     var sizes = Array.isArray(card.sizes) ? card.sizes.slice() : [];
     var available = {};
     colors.forEach(function (c) {
@@ -77,7 +94,7 @@
     sizes.forEach(function (s) { stockBySize[s] = available[s] ? 1 : 0; });
     // Цвета, у которых не осталось ни одного размера: в окне выбора гасим их,
     // иначе человек выберет цвет и упрётся в пустой список размеров.
-    var outColors = colors
+    var outColors = named
       .filter(function (c) { return c.inStock === false; })
       .map(function (c) { return c.name; });
     return {
@@ -93,10 +110,13 @@
       // качать незачем, полный размер берётся уже в карточке товара (D-99).
       thumbUrl: card.thumbUrl || card.imageUrl,
       photos: photosByColor(colors),
+      variants: variantsByColor(colors),
       description: card.description,
       sizes: sizes,
-      colors: colors.map(function (c) { return colorHex(c.name); }),
-      colorNames: colors.map(function (c) { return c.name; }),
+      // Показываем только НАЗВАННЫЕ цвета: 1С их заполнила не везде, а кружок без
+      // названия выбрать нельзя — он превращался в подпись вида «#8a93a3».
+      colors: named.map(function (c) { return colorHex(c.name); }),
+      colorNames: named.map(function (c) { return c.name; }),
       stockBySize: sizes.length ? stockBySize : null,
       outColors: outColors,
       inStock: card.inStock,
@@ -125,6 +145,18 @@
     var thumb = thumbUrl(p) || img;
     var gallery = p.photos && Object.keys(p.photos).length
       ? JSON.stringify(p.photos) : "";
+    var variants = p.variants && Object.keys(p.variants).length
+      ? JSON.stringify(p.variants) : "";
+    // Товар без выбора (гель, аксессуар) — одна позиция: её id и кладём в корзину,
+    // иначе кнопка «В корзину» отправила бы ключ модели.
+    var only = "";
+    if (p.variants) {
+      var colorKeys = Object.keys(p.variants);
+      if (colorKeys.length === 1) {
+        var sizeKeys = Object.keys(p.variants[colorKeys[0]]);
+        if (sizeKeys.length === 1) only = p.variants[colorKeys[0]][sizeKeys[0]][0];
+      }
+    }
     var cat = p.categoryId || ""; // для фильтра каталога
     // Бренд в 1С пока заполнен не у всех. Пусто — строки нет: «МАТА» на каждой
     // карточке ничего не сообщает, а место занимает.
@@ -160,6 +192,7 @@
       ' data-name="' + esc(p.name) + '" data-price="' + Number(p.price) + '"' +
       ' data-cat="' + esc(catLabel) + '" data-img="' + esc(img) + '"' +
       (gallery ? ' data-photos="' + esc(gallery) + '"' : "") +
+      (variants ? ' data-variants="' + esc(variants) + '"' : "") +
       ' data-sizes="' + esc(sizes.join(",")) + '" data-colors="' + esc(colors.join(",")) + '"' +
       (p.colorNames ? ' data-color-names="' + esc(p.colorNames.join(",")) + '"' : "") +
       (p.outColors && p.outColors.length
@@ -187,7 +220,7 @@
         ? '<span class="product-more" data-quick-view role="button" tabindex="0">' +
           "Размеры и цвета →</span>"
         : '<button class="product-add" type="button" data-add-cart="' + esc(p.name) +
-          '" data-price="' + Number(p.price) + '" data-product-id="' + esc(p.id) +
+          '" data-price="' + Number(p.price) + '" data-product-id="' + esc(only || p.id) +
           '">В корзину</button>') +
       "</div></article>"
     );

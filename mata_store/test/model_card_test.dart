@@ -191,4 +191,58 @@ void main() {
       expect(p.colorCovers, ['https://e.org/b1.webp', 'https://e.org/m1.webp']);
     });
   });
+
+  group('Товар без выбора покупается (D-94)', () {
+    Map<String, dynamic> noChoice() => {
+          'key': 'RUNGEL',
+          'name': 'RUNGEL FOR LIFE',
+          'price': 208,
+          'sizes': <String>[],
+          'colors': [
+            {
+              'name': '',
+              'sizes': [
+                {'size': '', 'productId': 'pos-gel', 'price': 208, 'inStock': true},
+              ],
+            },
+          ],
+        };
+
+    test('пустое название цвета не показываем', () {
+      final p = Product.fromModelCard(noChoice());
+      expect(p.colors, isEmpty, reason: 'пустой кружок выбрать нельзя');
+      expect(p.sizes, isEmpty);
+    });
+
+    test('позиция склада всё равно находится — по пустым ключам', () {
+      final p = Product.fromModelCard(noChoice());
+      expect(p.variantFor('', '')!.productId, 'pos-gel');
+    });
+
+    test('вкусы геля — это цвета, и у каждого своя позиция', () {
+      final p = Product.fromModelCard({
+        'key': 'RUNGEL',
+        'name': 'RUNGEL',
+        'price': 208,
+        'sizes': <String>[],
+        'colors': [
+          {
+            'name': 'Лопух и Клюква',
+            'sizes': [
+              {'size': '', 'productId': 'pos-klukva', 'price': 208, 'inStock': true},
+            ],
+          },
+          {
+            'name': 'Лопух и Черника',
+            'sizes': [
+              {'size': '', 'productId': 'pos-chernika', 'price': 250, 'inStock': true},
+            ],
+          },
+        ],
+      });
+      expect(p.colors, ['Лопух и Клюква', 'Лопух и Черника']);
+      expect(p.variantFor('', 'Лопух и Черника')!.productId, 'pos-chernika');
+      expect(p.variantFor('', 'Лопух и Черника')!.price, 250);
+    });
+  });
 }

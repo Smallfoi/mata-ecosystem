@@ -64,17 +64,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _addToCart(Product product) {
-    if (_selectedSize == null) {
+    // Выбор требуем только там, где есть из чего выбирать: у геля нет размера,
+    // у половины каталога 1С ещё не заполнила цвет. Иначе такой товар вообще
+    // нельзя положить в корзину — «Выберите размер» при пустом списке.
+    if (product.sizes.isNotEmpty && _selectedSize == null) {
       _showErrorSnack('Выберите размер');
       return;
     }
-    if (_selectedColor == null) {
+    if (product.colors.isNotEmpty && _selectedColor == null) {
       _showErrorSnack('Выберите цвет');
       return;
     }
+    final size = _selectedSize ?? '';
+    final color = _selectedColor ?? '';
+
     // Заказ уходит на складскую позицию: карточка модели — это витрина,
     // а на складе живут отдельные карточки по цвету и размеру (D-94).
-    final variant = product.variantFor(_selectedSize!, _selectedColor!);
+    final variant = product.variantFor(size, color);
     if (product.variants.isNotEmpty && variant == null) {
       _showErrorSnack('Этого сочетания нет в наличии');
       return;
@@ -82,7 +88,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final ordered = variant == null
         ? product
         : product.copyWith(id: variant.productId, price: variant.price);
-    context.read<CartProvider>().add(ordered, _selectedSize!, _selectedColor!);
+    context.read<CartProvider>().add(ordered, size, color);
     _showAddedToCartSheet(ordered);
   }
 
@@ -234,7 +240,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       const SizedBox(height: 24),
                       const Divider(),
                       const SizedBox(height: 20),
-                      _SizeSelector(
+                      // Пустой блок «РАЗМЕР» без единой кнопки только путает:
+                      // у геля размера нет, и спрашивать его не о чем.
+                      if (product.sizes.isNotEmpty) _SizeSelector(
                         sizes: product.sizes,
                         selected: _selectedSize,
                         // Наличие зависит от цвета: чёрных 42-х может не быть,
@@ -243,8 +251,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             product.hasSizeInColor(size, _selectedColor),
                         onSelected: (s) => setState(() => _selectedSize = s),
                       ),
-                      const SizedBox(height: 20),
-                      _ColorSelector(
+                      if (product.sizes.isNotEmpty) const SizedBox(height: 20),
+                      if (product.colors.isNotEmpty) _ColorSelector(
                         colors: product.colors,
                         selected: _selectedColor,
                         isAvailable: product.hasColor,
