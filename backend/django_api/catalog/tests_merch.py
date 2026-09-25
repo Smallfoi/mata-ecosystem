@@ -1,11 +1,13 @@
 """Конструктор витрины (мерчендайзинг): раздельный порядок по площадкам +
 правка центрального товара. Эндпоинты staff-only."""
 import json
+import shutil
+import tempfile
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from catalog.models import Product
 from common.testutils import login_admin
@@ -276,7 +278,18 @@ class MerchOverride1CTests(TestCase):
                          content_type="application/json")
         self.assertEqual(Product.objects.get(id="k2").overrides, [])
 
+# Свой временный каталог: без него тест пишет в боевую папку медиа, которой на CI
+# просто нет (Permission denied: /srv/media). Грабли записаны в PITFALLS.
+_VIDEO_MEDIA = tempfile.mkdtemp(prefix="mata-merch-video-")
+
+
+@override_settings(MEDIA_ROOT=_VIDEO_MEDIA)
 class HeavyVideoTests(TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(_VIDEO_MEDIA, ignore_errors=True)
+        super().tearDownClass()
+
     """Тяжёлое видео на фон не пускаем молча (владелец: «жёстко тормозит у всех»).
 
     Сжатие при загрузке работало только с локальным диском: на проде хранилище
