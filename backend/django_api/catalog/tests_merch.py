@@ -303,3 +303,9 @@ class HeavyVideoTests(TestCase):
         r = self._send(1)
         self.assertEqual(r.status_code, 200, r.content)
         self.assertTrue(r.json()["url"])
+
+    def test_broken_video_does_not_break_upload(self):
+        """Мусор под видом mp4: постер не снимется, но 500 быть не должно."""
+        from config.admin_views import _video_poster
+
+        self.assertIsNone(_video_poster("uploads/site-video/нет-такого.mp4"))

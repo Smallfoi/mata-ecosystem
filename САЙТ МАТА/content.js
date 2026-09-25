@@ -191,6 +191,16 @@
     var elA = ew / eh;
     return (elA >= a) ? (100 * zoom) + "% auto" : "auto " + (100 * zoom) + "%";
   }
+  // Постер рядом с роликом: бэкенд кладёт первый кадр под именем `<ролик>_poster.jpg`.
+  // Файла может не быть (ролик залит до этой правки) — тогда браузер просто не покажет
+  // постер, и останется прежняя загрузка. Проверять существование заранее незачем.
+  function posterFor(video) {
+    var clean = String(video || "").split("?")[0];
+    return /\.(mp4|webm|ogg|mov)$/i.test(clean)
+      ? clean.replace(/\.[^.]+$/, "_poster.jpg")
+      : "";
+  }
+
   function refreshBg(el) {
     if (!el) return;
     var off = el._bgOff === "1";
@@ -203,9 +213,12 @@
     if (!off && vid) {
       el.style.backgroundImage = ""; el.style.backgroundSize = ""; el.style.backgroundPosition = "";
       if (!layer) { layer = document.createElement("div"); layer.className = "staw-bg-layer"; el.insertBefore(layer, el.firstChild); }
-      // Постер-кадр (вариант 1): если у блока задана и картинка-фон — используем её как
-      // мгновенный постер видео. Нет картинки → шиммер-загрузка (см. setupBgVideo).
-      setupBgVideo(layer, vid, fit, focal, el._bgFade !== "0", el._bgLoop !== "0", img);
+      // Постер-кадр: пока ролик грузится, на его месте стоит неподвижная картинка,
+      // а не мерцание (решение владельца). Берём картинку-фон блока, если её задали;
+      // иначе — первый кадр, который бэкенд снял при загрузке видео и положил рядом
+      // по имени `<ролик>_poster.jpg`. Нет и его (старые ролики) → прежний шиммер.
+      setupBgVideo(layer, vid, fit, focal, el._bgFade !== "0", el._bgLoop !== "0",
+                   img || posterFor(vid));
       el.classList.add("staw-bg-on");
     } else if (!off && img) {
       if (layer) layer.remove(); el.classList.remove("staw-bg-on");

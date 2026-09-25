@@ -427,7 +427,52 @@ def _webify_video(saved, quality="web"):
         default_storage.delete(saved)  # оригинал-тяжеловес больше не нужен
     except Exception:
         pass
+    _video_poster(web_name)
     return web_name
+
+
+def _video_poster(video_name):
+    """Первый кадр видео — картинкой рядом, по соглашению `<имя>_poster.jpg`.
+
+    Решение владельца: пока ролик грузится, на его месте стоит первый кадр, а не
+    мерцание. Постер снимаем сами при загрузке — иначе его надо задавать руками, и
+    его не задают: в окне входа так и осталось мерцание.
+
+    Возвращает имя файла или None (тогда сайт покажет прежнюю загрузку).
+    """
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+
+    from django.core.files.base import File
+    from django.core.files.storage import default_storage
+
+    try:
+        import imageio_ffmpeg
+        ff = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
+
+    tmpdir = tempfile.mkdtemp(prefix="mata-poster-")
+    src = os.path.join(tmpdir, "src.mp4")
+    out = os.path.join(tmpdir, "poster.jpg")
+    try:
+        with default_storage.open(video_name, "rb") as fh, open(src, "wb") as dst:
+            shutil.copyfileobj(fh, dst)
+        subprocess.run(
+            [ff, "-y", "-i", src, "-frames:v", "1", "-q:v", "4", out],
+            check=True, timeout=120, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        if not os.path.exists(out) or os.path.getsize(out) == 0:
+            return None
+        name = os.path.splitext(video_name)[0] + "_poster.jpg"
+        with open(out, "rb") as fh:
+            return default_storage.save(name, File(fh))
+    except Exception:
+        return None
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 # ── Баннеры (промо) в конструкторе: полный CRUD перенесён из Django-админки ───

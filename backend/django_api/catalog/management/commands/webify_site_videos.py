@@ -13,6 +13,8 @@
     python manage.py webify_site_videos            # показать, что будет сделано
     python manage.py webify_site_videos --apply    # сделать
 """
+import os
+
 from django.core.management.base import BaseCommand
 
 from catalog.models import SiteContent
@@ -38,12 +40,22 @@ class Command(BaseCommand):
 
         from config.admin_views import _webify_video
 
+        from config.admin_views import _video_poster
+
         rows = [c for c in SiteContent.objects.all() if c.key.startswith("bgvid.")]
         todo = []
         for row in rows:
             url = row.value or ""
             name = _storage_name(url)
-            if not name or name.endswith("_web.mp4"):
+            if not name:
+                continue
+            if name.endswith("_web.mp4"):
+                # Уже лёгкий: сжимать нечего, но постер-кадр мог не сняться (ролик
+                # залит до того, как мы начали их снимать) — доделываем.
+                poster = os.path.splitext(name)[0] + "_poster.jpg"
+                if opts["apply"] and not default_storage.exists(poster):
+                    self.stdout.write(f"  {row.key}: снимаю постер-кадр")
+                    _video_poster(name)
                 continue
             try:
                 size = default_storage.size(name)
