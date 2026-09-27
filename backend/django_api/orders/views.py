@@ -239,6 +239,12 @@ def payment_webhook(request):
     уведомление и «оплатить» заказ бесплатно так нельзя.
     """
     obj = (request.data or {}).get("object") or {}
+    event = str((request.data or {}).get("event") or "")
+    if event.startswith("refund.") or "payment_id" in obj:
+        # Уведомление о ВОЗВРАТЕ (у объекта возврата есть payment_id, у платежа —
+        # нет). Его id — номер возврата, не платежа: спрашивать о нём как о
+        # платеже бессмысленно (аудит B04).
+        return _refund_webhook(obj)
     payment_id = str(obj.get("id") or "").strip()
     if not payment_id:
         return Response({"detail": "Нет id платежа"}, status=400)
@@ -260,6 +266,30 @@ def payment_webhook(request):
         # доставки ничего не изменит, а расхождение уже в логе ошибок.
         return Response({"ok": False, "detail": problem, "status": order.payment_status})
     return Response({"ok": True, "status": order.payment_status})
+
+
+def _refund_webhook(obj):
+    """Уведомление ЮKassa о возврате: статус берём из API, не из тела."""
+    import logging
+
+    from .payment import fetch_refund
+    from .returns import apply_refund_info
+
+    refund_id = str(obj.get("id") or "").strip()
+    if not refund_id:
+        return Response({"detail": "Нет id возврата"}, status=400)
+    try:
+        info = fetch_refund(refund_id)
+    except PaymentError as e:
+        return Response({"detail": str(e)}, status=502)  # ЮKassa повторит позже
+    ret = apply_refund_info(info)
+    if ret is None:
+        # Возврат сделан не через нас (например, в личном кабинете ЮKassa).
+        # Повтор доставки ничего не изменит — отвечаем 200 и оставляем след в логе.
+        logging.getLogger(__name__).warning(
+            "Уведомление о чужом возврате %s (платёж %s)", refund_id, info.get("paymentId"))
+        return Response({"ok": False, "detail": "Возврат не найден"})
+    return Response({"ok": True, "status": ret.status})
 
 
 @api_view(["GET", "POST"])

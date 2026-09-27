@@ -90,7 +90,7 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
         баллы — назад, начисленные — снять. Частями — на странице заказа.
         Заказы без платежа ЮKassa (разработка, неоплаченные) пропускаем.
         """
-        done, skipped, failed = 0, 0, []
+        done, waiting, skipped, failed = 0, 0, 0, []
         for order in queryset:
             if order.payment_status not in RETURNABLE or not order.payment_id:
                 skipped += 1
@@ -98,13 +98,24 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
             try:
                 left = [row["index"] for row in return_plan(order)
                         if row["subject"] == "commodity" and not row["returned"]]
-                make_return(order.pk, left, by=request.user.get_username())
+                ret = make_return(order.pk, left, by=request.user.get_username())
             except ReturnError as e:
                 failed.append(f"{order.order_id}: {e}")
                 continue
-            done += 1
+            if ret.status == "done":
+                done += 1
+            else:
+                waiting += 1
         if done:
             self.message_user(request, f"Возвращено заказов: {done}", messages.SUCCESS)
+        if waiting:
+            # Деньги ещё не подтверждены — не говорим «возвращено» (аудит B04).
+            self.message_user(
+                request,
+                f"Возврат отправлен, ждём подтверждения ЮKassa: {waiting}. Баллы и "
+                "статус заказа изменятся после подтверждения.",
+                messages.WARNING,
+            )
         if skipped:
             self.message_user(
                 request, f"Пропущено (нет оплаты): {skipped}", messages.WARNING
