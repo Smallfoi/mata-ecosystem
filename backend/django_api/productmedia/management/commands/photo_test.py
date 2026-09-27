@@ -39,6 +39,8 @@ class Command(BaseCommand):
         parser.add_argument("--track", choices=["catalog", "model"], default="catalog")
         parser.add_argument("--attach", choices=["main", "gallery"], default="main",
                             help="Куда при --apply: обложка (main) или в галерею")
+        parser.add_argument("--text", default="",
+                            help="Буквальный текст принта (модель рисует его точнее)")
         parser.add_argument("--apply", action="store_true",
                             help="Выложить результат в галерею витрины (иначе только предпросмотр)")
 
@@ -84,7 +86,7 @@ class Command(BaseCommand):
             "filename": "source.bin", "attach_as": o["attach"],
         }])[0]
         t0 = time.monotonic()
-        service.run_job(job, attach=o["apply"])
+        service.run_job(job, attach=o["apply"], text=o["text"])
         job.refresh_from_db()
         self.stdout.write("Время прогона: %.0f с" % (time.monotonic() - t0))
 
