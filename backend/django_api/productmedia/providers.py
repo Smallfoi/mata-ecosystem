@@ -151,7 +151,9 @@ def edit_image(source_bytes, prompt, size="1024x1536", high_fidelity=True) -> by
     # stream + partial_images: соединение живое всю генерацию (см. _parse_sse)
     fields = {"model": model, "prompt": prompt, "size": size, "n": "1",
               "stream": "true", "partial_images": "2"}
-    if high_fidelity:
+    # input_fidelity понимают только модели gpt-image-1* (1, 1-mini, 1.5); gpt-image-2.5
+    # отвечает на него 400 invalid_input_fidelity_model, новые модели и так держат исходник.
+    if high_fidelity and model.startswith("gpt-image-1"):
         fields["input_fidelity"] = "high"
     ctype, body = _multipart(fields, "image", "source.png", source_bytes)
     data = _post_multipart("/images/edits", ctype, body)
