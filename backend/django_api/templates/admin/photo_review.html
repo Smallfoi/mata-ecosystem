@@ -9,6 +9,7 @@
     <a class="m-tab {% if key == show %}on{% endif %}"
        href="?show={{ key }}{% if batch %}&batch={{ batch }}{% endif %}">{{ label }} · {{ n }}</a>
   {% endfor %}
+  <a class="m-tab" href="{{ prompts_link }}">Промты</a>
 </div>
 
 {% if batch %}
@@ -43,6 +44,13 @@
           <figure>{% if it.source %}<a href="{{ it.source }}" target="_blank"><img src="{{ it.source }}" alt="" loading="lazy"></a>{% endif %}<figcaption>Исходник</figcaption></figure>
           <figure>{% if it.result %}<a href="{{ it.result }}" target="_blank"><img src="{{ it.result }}" alt="" loading="lazy"></a>{% else %}<span class="m-muted">нет результата</span>{% endif %}<figcaption>Результат</figcaption></figure>
         </div>
+        {% if it.details %}
+          <div class="m-strip-imgs">
+            {% for d in it.details %}<a href="{{ d }}" target="_blank" title="Крупный план принта"><img src="{{ d }}" alt="" loading="lazy"></a>{% endfor %}
+            <span class="m-small m-muted">крупные планы принта</span>
+          </div>
+        {% endif %}
+        <div class="m-small m-muted">Промт: {{ it.prompt }}{% if it.tokens %} · токенов: {{ it.tokens }}{% endif %}</div>
         {% if it.text %}<div class="m-small m-muted">Текст принта: {{ it.text }}</div>{% endif %}
         {% if it.note %}<div class="m-small">Замечание: {{ it.note }}</div>{% endif %}
         {% if it.error %}<div class="m-gal-error">{{ it.error }}</div>{% endif %}

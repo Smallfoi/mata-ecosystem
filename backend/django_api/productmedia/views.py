@@ -20,9 +20,9 @@ from django.urls import reverse
 
 from catalog import photos as photolib
 from catalog.models import Product, ProductPhoto
-from productmedia import service, tasks
-from productmedia.matching import match_folders_to_products
-from productmedia.models import PhotoBatch, PhotoJob
+from productmedia import processing, service, tasks
+from productmedia.matching import _norm, match_folders_to_products
+from productmedia.models import PhotoBatch, PhotoDetail, PhotoJob, PhotoPrompt
 from staff.access import can, tab_required
 from staff.models import LEVEL_EDIT, StaffAudit
 
@@ -99,6 +99,11 @@ def _upload(request):
     if photo.content_type not in ALLOWED:
         return _err("нужен JPEG, PNG или WEBP")
     attach_as = request.POST.get("attach_as") or PhotoJob.ATTACH_GALLERY
+    if attach_as == "detail":
+        # Крупный план принта: не снимок витрины, а справка для генерации этого артикула.
+        row = service.add_detail(batch, request.POST.get("article") or "", photo,
+                                 photo.name or "detail.jpg")
+        return JsonResponse({"ok": True, "detail": row.pk})
     if attach_as not in dict(PhotoJob.ATTACH_CHOICES):
         attach_as = PhotoJob.ATTACH_GALLERY
     job = service.intake(batch, [{
@@ -149,6 +154,7 @@ def photo_pipeline(request):
         "batches": batches,
         "tracks": PhotoBatch.TRACK_CHOICES,
         "review_link": reverse("photo_review"),
+        "prompts_link": reverse("photo_prompts"),
         "can_edit": _can_edit(request),
         "max_mb": MAX_BYTES // 1024 // 1024,
     })
@@ -211,10 +217,17 @@ def photo_review(request):
     tab_counts = {k: qs.filter(status__in=v[0]).count() for k, v in SHOW.items()}
     qs = qs.filter(status__in=SHOW[show][0]).order_by("-updated_at")
 
-    page = Paginator(qs, PER_PAGE).get_page(request.GET.get("page"))
+    page = Paginator(qs.select_related("prompt"), PER_PAGE).get_page(request.GET.get("page"))
+
+    # Крупные планы принтов для карточек страницы — одним запросом.
+    details = {}
+    for row in PhotoDetail.objects.filter(batch_id__in={j.batch_id for j in page}):
+        details.setdefault((row.batch_id, _norm(row.article)), []).append(_url(row.image))
+
     items = []
     for j in page:
         p = j.product
+        usage = j.usage if isinstance(j.usage, dict) else {}
         items.append({
             "id": j.pk, "article": j.article, "status": j.status,
             "status_label": j.get_status_display(),
@@ -222,6 +235,9 @@ def photo_review(request):
             "color": _color(p), "attach": j.get_attach_as_display(),
             "attempts": j.attempts, "note": j.note, "error": j.error, "text": j.text,
             "source": _url(j.source), "result": _url(j.webp),
+            "details": [u for u in details.get((j.batch_id, _norm(j.article)), []) if u],
+            "prompt": ("версия #%s" % j.prompt_id) if j.prompt_id else "встроенный",
+            "tokens": usage.get("total_tokens"),
             "batch": j.batch_id,
         })
     return TemplateResponse(request, "admin/photo_review.html", {
@@ -233,5 +249,82 @@ def photo_review(request):
         "tabs": [(k, v[1], tab_counts[k]) for k, v in SHOW.items()],
         "batch": batch_id if batch_id.isdigit() else "",
         "pipeline_link": reverse("photo_pipeline"),
+        "prompts_link": reverse("photo_prompts"),
+        "can_edit": _can_edit(request),
+    })
+
+
+# ── «Промты» ────────────────────────────────────────────────────────────────
+
+def _prompt_action(request):
+    if not can(request.user, TAB, LEVEL_EDIT):
+        return _err("нет прав на правку промтов", 403)
+    action = request.POST.get("action")
+    user = request.user if request.user.is_authenticated else None
+    if action == "save":
+        track = request.POST.get("track")
+        text = (request.POST.get("text") or "").strip()
+        if track not in processing.TRACKS:
+            return _err("неизвестный трек")
+        if len(text) < 20:
+            return _err("промт слишком короткий")
+        row = PhotoPrompt.objects.create(track=track, text=text, created_by=user,
+                                         comment=(request.POST.get("comment") or "")[:200])
+    elif action == "restore":
+        old = PhotoPrompt.objects.filter(pk=request.POST.get("id")).first()
+        if old is None:
+            return _err("версия не найдена", 404)
+        row = PhotoPrompt.objects.create(track=old.track, text=old.text, created_by=user,
+                                         comment="возврат к версии #%s" % old.pk)
+    elif action == "reset":
+        track = request.POST.get("track")
+        if track not in processing.TRACKS:
+            return _err("неизвестный трек")
+        row = PhotoPrompt.objects.create(track=track, text=processing.TRACKS[track][0],
+                                         created_by=user, comment="встроенный промт")
+    else:
+        return _err("неизвестное действие")
+    StaffAudit.write(request, "фотопайплайн: промт %s → версия #%s" % (row.track, row.pk))
+    return JsonResponse({"ok": True, "id": row.pk})
+
+
+@staff_member_required
+@tab_required(TAB)
+def photo_prompts(request):
+    if request.method == "POST":
+        return _prompt_action(request)
+
+    tracks = []
+    for code, label in PhotoBatch.TRACK_CHOICES:
+        active = PhotoPrompt.active(code)
+        history = list(PhotoPrompt.objects.filter(track=code)
+                       .select_related("created_by")[:10])
+        tracks.append({
+            "code": code, "label": label,
+            "text": active.text if active else processing.TRACKS[code][0],
+            "active": active,
+            "history": [{
+                "id": h.pk, "when": h.created_at, "comment": h.comment,
+                "who": h.created_by.get_username() if h.created_by else "",
+                "current": active is not None and h.pk == active.pk,
+            } for h in history],
+        })
+
+    # Замечания проверяющих — из них видно, что стоит поправить в промте.
+    notes = []
+    for j in (PhotoJob.objects.exclude(note="").select_related("product")
+              .order_by("-reviewed_at", "-updated_at")[:30]):
+        notes.append({"when": j.reviewed_at or j.updated_at, "article": j.article,
+                      "status": j.get_status_display(), "note": j.note,
+                      "link": reverse("photo_review") + "?show=%s" % (
+                          "rejected" if j.status == PhotoJob.STATUS_REJECTED else "review")})
+
+    return TemplateResponse(request, "admin/photo_prompts.html", {
+        **admin.site.each_context(request),
+        "title": "Промты фотопайплайна",
+        "tracks": tracks,
+        "notes": notes,
+        "pipeline_link": reverse("photo_pipeline"),
+        "review_link": reverse("photo_review"),
         "can_edit": _can_edit(request),
     })

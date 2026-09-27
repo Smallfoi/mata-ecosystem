@@ -19,7 +19,31 @@ from django.utils import timezone
 from catalog.models import Product
 from productmedia import images, processing, providers
 from productmedia.matching import _norm
-from productmedia.models import PhotoJob
+from productmedia.models import PhotoDetail, PhotoJob, PhotoPrompt
+
+
+def add_detail(batch, article, content, filename="detail.jpg"):
+    """Сохранить крупный план принта для артикула партии (не отдельный снимок витрины)."""
+    if not isinstance(content, (bytes, bytearray)):
+        content = content.read()
+    row = PhotoDetail(batch=batch, article=(article or "").strip()[:64])
+    row.image.save(filename or "detail.jpg", ContentFile(bytes(content)), save=False)
+    row.save()
+    return row
+
+
+def _details(job):
+    """Байты крупных планов того же артикула в той же партии (сравнение без регистра)."""
+    out = []
+    for row in PhotoDetail.objects.filter(batch_id=job.batch_id):
+        if _norm(row.article) != _norm(job.article):
+            continue
+        try:
+            with row.image.open("rb") as f:
+                out.append(f.read())
+        except Exception:                        # noqa: BLE001 — нет файла: без крупного плана
+            continue
+    return out
 
 
 def _safe_base(job):
@@ -93,8 +117,13 @@ def generate(job, note=None):
         with job.source.open("rb") as f:
             source_bytes = f.read()
 
+        prompt_row = PhotoPrompt.active(job.track)
         master = processing.process(source_bytes, track=job.track, text=job.text,
-                                    note=job.note if note is None else note)
+                                    note=job.note if note is None else note,
+                                    details=_details(job),
+                                    base=prompt_row.text if prompt_row else "")
+        job.prompt = prompt_row
+        job.usage = providers.last_usage()
         webp = images.make_webp(master)
 
         base = _safe_base(job)

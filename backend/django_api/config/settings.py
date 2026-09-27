@@ -472,6 +472,9 @@ UNFOLD = {
                     {"title": "Проверка фото", "icon": "fact_check",
                      "link": reverse_lazy("photo_review"),
                      "permission": _tab("photo_pipeline")},
+                    {"title": "Промты фото", "icon": "edit_note",
+                     "link": reverse_lazy("photo_prompts"),
+                     "permission": _tab("photo_pipeline")},
                 ],
             },
             {

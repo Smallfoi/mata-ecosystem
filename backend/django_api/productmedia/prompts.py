@@ -61,6 +61,24 @@ MODEL = (
 )
 
 
+def with_details(prompt: str, count: int = 0) -> str:
+    """Сказать модели, что после основного снимка идут крупные планы принта.
+
+    Без пояснения модель может принять крупный план за отдельную вещь или показать его
+    в кадре. Нет крупных планов — промт без изменений.
+    """
+    if not count:
+        return prompt
+    return (
+        prompt
+        + "\nREFERENCE IMAGES: the FIRST image shows the whole garment and which side to show. "
+        "The next %d image(s) are close-ups of prints, labels or text on this same garment. "
+        "Use the close-ups only to reproduce those details exactly (letters, shapes, colours); "
+        "do not show the close-ups themselves and do not add their prints anywhere they are "
+        "not on the garment." % count
+    )
+
+
 def with_text(prompt: str, text: str = "") -> str:
     """Добавить к промту буквальный текст принта, если он известен.
 

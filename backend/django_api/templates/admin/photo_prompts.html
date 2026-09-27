@@ -1,0 +1,86 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# Промты фотопайплайна: действующий текст по трекам, история версий, замечания проверяющих. #}
+
+<div class="m-tabs">
+  <a class="m-tab" href="{{ pipeline_link }}">Загрузка и партии</a>
+  <a class="m-tab" href="{{ review_link }}">Проверка фото</a>
+  <a class="m-tab on" href="">Промты</a>
+</div>
+
+<div class="m-hint">
+  Промт — инструкция для модели: что сохранить, какой фон и свет. Правка вступает в силу
+  для следующих генераций, уже сделанные снимки не меняются. У каждого снимка на экране
+  проверки видно, какой версией промта он сделан. Если после правки стало хуже —
+  верните прошлую версию из истории. Промт лучше писать по-английски: модель держит такие
+  ограничения надёжнее; замечания к «Переделать» можно писать по-русски.
+</div>
+
+{% csrf_token %}
+
+<div id="photo-prompts">
+{% for t in tracks %}
+  <div class="m-card pad" data-track="{{ t.code }}">
+    <div class="m-lead">{{ t.label }}</div>
+    <div class="m-small m-muted">
+      {% if t.active %}Действует версия #{{ t.active.pk }} от {{ t.active.created_at|date:"d.m.Y H:i" }}{% if t.active.created_by %}, {{ t.active.created_by.get_username }}{% endif %}.
+      {% else %}Действует встроенный промт (правок ещё не было).{% endif %}
+    </div>
+    <textarea class="m-input m-prompt" data-role="text" {% if not can_edit %}readonly{% endif %}>{{ t.text }}</textarea>
+    {% if can_edit %}
+      <div class="m-row">
+        <input class="m-input wide" type="text" data-role="comment" maxlength="200"
+               placeholder="Что поменяли (для истории)">
+        <button type="button" class="m-btn primary" data-prompt-act="save">Сохранить новую версию</button>
+        <button type="button" class="m-btn quiet" data-prompt-act="reset">Вернуть встроенный</button>
+      </div>
+    {% endif %}
+    {% if t.history %}
+      <div class="m-wrap">
+        <table class="m">
+          <thead><tr><th>Версия</th><th>Когда</th><th>Кто</th><th>Что поменяли</th><th></th></tr></thead>
+          <tbody>
+          {% for h in t.history %}
+            <tr>
+              <td class="m-mono">#{{ h.id }}</td>
+              <td class="m-small">{{ h.when|date:"d.m.Y H:i" }}</td>
+              <td class="m-small">{{ h.who|default:"—" }}</td>
+              <td class="m-small">{{ h.comment|default:"—" }}</td>
+              <td>{% if h.current %}<span class="m-tag ok">действует</span>
+                  {% elif can_edit %}<button type="button" class="m-btn quiet" data-prompt-act="restore" data-id="{{ h.id }}">Вернуть</button>{% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+    <div class="m-gal-error" data-role="error" hidden></div>
+  </div>
+{% endfor %}
+</div>
+
+<div class="m-card">
+  <h3>Замечания проверяющих</h3>
+  {% if notes %}
+  <div class="m-wrap">
+    <table class="m">
+      <thead><tr><th>Когда</th><th>Артикул</th><th>Статус</th><th>Замечание</th></tr></thead>
+      <tbody>
+      {% for n in notes %}
+        <tr>
+          <td class="m-small">{{ n.when|date:"d.m H:i" }}</td>
+          <td class="m-mono">{{ n.article }}</td>
+          <td class="m-small"><a href="{{ n.link }}">{{ n.status }}</a></td>
+          <td>{{ n.note }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="m-empty">Замечаний пока нет. Они появятся, когда на проверке нажмут «Переделать» или «Отклонить».</div>
+  {% endif %}
+</div>
+
+{% endblock %}
