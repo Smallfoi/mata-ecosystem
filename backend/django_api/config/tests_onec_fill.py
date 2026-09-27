@@ -46,17 +46,21 @@ class OnecFillTests(TestCase):
         self.assertEqual(self._row("category")["blank"], 1)      # только p_empty
         self.assertEqual(self._row("brand")["blank"], 2)
         self.assertEqual(self._row("price")["blank"], 1)         # цена ноль
-        self.assertEqual(self._row("photo")["blank"], 1)
         self.assertEqual(self._row("parcel")["blank"], 2)
         self.assertEqual(self._row("sizes")["blank"], 2)
 
     def test_link_opens_exactly_those_products(self):
         """Цифра в сводке обязана совпасть со списком по ссылке."""
-        for key in ("category", "brand", "photo", "parcel", "sizes", "stock"):
+        for key in ("category", "brand", "parcel", "sizes", "stock"):
             row = self._row(key)
             page = self.client.get(f"{LIST}?missing={key}")
             self.assertEqual(page.context["cl"].result_count, row["blank"],
                              f"расходится по полю «{row['title']}»")
+
+    def test_no_photo_row(self):
+        """Фото в 1С не ведём — их заполненность живёт в «Фото товаров», не здесь."""
+        keys = {r["key"] for r in self.client.get(FILL).context["rows"]}
+        self.assertNotIn("photo", keys)
 
     def test_foreign_category_is_visible(self):
         r = self.client.get(FILL)
@@ -64,7 +68,7 @@ class OnecFillTests(TestCase):
         self.assertContains(r, "c-НЕТ")
 
     def test_ready_counts_only_sellable(self):
-        """«Готовы к витрине» — есть категория, цена и фото."""
+        """«С ценой и категорией» — есть наша категория и цена; фото не учитываются."""
         self.assertEqual(self.client.get(FILL).context["ready"], 1)
 
     def test_tab_permission_required(self):

@@ -18,7 +18,6 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse
 from django.template.response import TemplateResponse
-from django.urls import reverse
 
 from catalog import photos as photolib
 from catalog.models import Product, ProductPhoto
@@ -159,5 +158,4 @@ def product_photos(request):
         "total": all_count,
         "max_photos": ProductPhoto.MAX_PER_COLOR,
         "max_mb": MAX_BYTES // 1024 // 1024,
-        "fill_link": reverse("onec_fill"),
     })
