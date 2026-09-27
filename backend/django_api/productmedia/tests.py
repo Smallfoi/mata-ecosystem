@@ -653,3 +653,31 @@ class TestRunsHiddenTests(TestCase):
         self.assertEqual(preview.status, PhotoJob.STATUS_REJECTED)
         self.assertIn("предпросмотр", preview.note)
         self.assertEqual(shown.status, PhotoJob.STATUS_DONE)  # настоящая выкладка не тронута
+
+    def test_cleanup_deletes_only_photo_test_runs_with_files(self):
+        import importlib
+        from django.apps import apps
+        from productmedia.models import PhotoDetail
+        mig = importlib.import_module("productmedia.migrations.0005_delete_photo_test_runs")
+
+        test_batch = PhotoBatch.objects.create(track="catalog", note=PhotoBatch.NOTE_TEST)
+        test_job = service.intake(test_batch, [
+            {"article": "SH-1", "content": _png_bytes(), "filename": "t.png"}])[0]
+        service.add_detail(test_batch, "SH-1", _png_bytes(), "t-detail.png")
+        storage = test_job.source.storage
+        test_file = test_job.source.name
+
+        real_batch = PhotoBatch.objects.create(track="catalog")
+        real_job = service.intake(real_batch, [
+            {"article": "SH-1", "content": _png_bytes(), "filename": "r.png"}])[0]
+        photolib.attach("SHOE1", color="Зелёный", data=_png_bytes())    # фото на витрине
+
+        mig.forward(apps, None)
+
+        self.assertFalse(PhotoBatch.objects.filter(pk=test_batch.pk).exists())
+        self.assertFalse(PhotoJob.objects.filter(pk=test_job.pk).exists())
+        self.assertEqual(PhotoDetail.objects.filter(batch_id=test_batch.pk).count(), 0)
+        self.assertFalse(storage.exists(test_file))                    # файл тоже удалён
+        self.assertTrue(PhotoJob.objects.filter(pk=real_job.pk).exists())
+        self.assertTrue(real_job.source.storage.exists(real_job.source.name))
+        self.assertEqual(ProductPhoto.objects.filter(model_key="SHOE1").count(), 1)
