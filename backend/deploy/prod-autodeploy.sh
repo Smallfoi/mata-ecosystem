@@ -74,8 +74,12 @@ else
   rm -rf /opt/mata-site/"Референсы" 2>/dev/null || true
 fi
 cd /opt/mata/backend || fail "cd backend"
-cp nginx/mata.conf.example nginx/mata.conf || fail "nginx conf"
-sed -i 's/api\.mata-store\.ru/api.mata-club.ru/g' nginx/mata.conf || fail "nginx conf (sed)"
+# Конфиг nginx пишем ПО МЕСТУ (тот же inode): mata.conf смонтирован в контейнер ОТДЕЛЬНЫМ
+# ФАЙЛОМ (bind-mount файла держит inode). `sed -i` создаёт новый файл с новым inode —
+# контейнер оставался на старом и видел конфиг первого прохода после своего создания.
+# Перенаправление `>` усекает и переписывает существующий файл — inode прежний.
+sed 's/api\.mata-store\.ru/api.mata-club.ru/g' nginx/mata.conf.example > nginx/mata.conf \
+  || fail "nginx conf"
 
 # Пересобрать код (migrate+collectstatic — в команде web). timeout — чтобы зависание не
 # держало flock вечно; упавшая/зависшая сборка = сбой (ревизия НЕ записывается).
@@ -85,8 +89,18 @@ timeout 900 $COMPOSE up -d --build web worker beat || fail "сборка/зап�
 timeout 120 $COMPOSE exec -T web python manage.py publish_legal < /dev/null \
   || log "WARN: publish_legal не отработал (релиз не блокирует)"
 # nginx: перечитать конфиг. web пересоздан → новый IP; без reload nginx стучит в старый → 502.
-timeout 60 $COMPOSE exec -T nginx nginx -s reload < /dev/null 2>/dev/null \
-  || timeout 120 $COMPOSE up -d nginx || fail "nginx reload"
+# Сначала `nginx -t`: битый конфиг НЕ перечитываем (nginx остаётся на прежнем рабочем),
+# пишем WARN и релиз не блокируем. Не запущен nginx — поднимаем.
+NGINX_T_LOG=/opt/mata-autodeploy-nginx-t.log
+if timeout 60 $COMPOSE exec -T nginx nginx -t < /dev/null > "$NGINX_T_LOG" 2>&1; then
+  timeout 60 $COMPOSE exec -T nginx nginx -s reload < /dev/null 2>/dev/null \
+    || timeout 120 $COMPOSE up -d nginx || fail "nginx reload"
+elif [ -z "$($COMPOSE ps -q --status running nginx 2>/dev/null)" ]; then
+  timeout 120 $COMPOSE up -d nginx || fail "nginx up"
+else
+  log "AUTODEPLOY WARN: nginx -t не прошёл — конфиг НЕ перечитан, nginx работает на прежнем (см. $NGINX_T_LOG)"
+  sed 's/^/    nginx -t| /' "$NGINX_T_LOG"
+fi
 
 # ── Готовность — условие успеха ─────────────────────────────────────────────
 health_of() {  # health_of <сервис> → healthy|unhealthy|starting|none|missing
