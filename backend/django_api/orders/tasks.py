@@ -8,3 +8,11 @@ def expire_unpaid_orders():
     from .lifecycle import expire_unpaid
 
     return expire_unpaid()
+
+
+@shared_task(name="orders.reconcile_returns", ignore_result=True)
+def reconcile_returns():
+    """Досверить с ЮKassa возвраты «в обработке» (аудит B04)."""
+    from .returns import reconcile_returns as run
+
+    return run()

@@ -301,9 +301,18 @@ class AccountDeletionTests(ApiTestCase):
         self.api_post("/v1/orders", {"id": "o1", "total": 500, "items": []})  # заказ
         self.api_post("/v1/orders/o1/pay", {})  # оплата (dev) — баллы за покупку
         self.assertTrue(LoyaltyTransaction.objects.filter(user_id=self.uid).exists())
+        # Удалить можно после получения и 7 дней срока возврата (D-103).
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        Order.objects.filter(user_id=self.uid).update(
+            status="delivered", onec_status="delivered",
+            onec_status_at=timezone.now() - timedelta(days=8))
         r = self.api_post("/v1/account/delete", {"confirm": True})
         self.assertEqual(r.status_code, 200)
         self.assertFalse(Account.objects.filter(id=self.uid).exists())
+        # Заказы и проводки удалены целиком (статистика продаж — отдельно, без человека).
         self.assertFalse(LoyaltyTransaction.objects.filter(user_id=self.uid).exists())
         self.assertFalse(Order.objects.filter(user_id=self.uid).exists())
 
@@ -415,7 +424,8 @@ class PhoneIdentityTests(ApiTestCase):
         from common.security import make_token
 
         acc = Account.objects.create(id="u_nophone", email="nophone@test.local", phone=None)
-        r = self.api_patch("/v1/profile", {"phone": "+79990009003"}, token=make_token(acc.id))
+        r = self.api_patch("/v1/profile", {"phone": "+79990009003", "phoneCode": "1234"},
+                           token=make_token(acc.id))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(Account.objects.get(id=acc.id).phone, "+79990009003")
 
@@ -424,7 +434,8 @@ class PhoneIdentityTests(ApiTestCase):
         from common.security import make_token
 
         acc = Account.objects.create(id="u_nophone2", email="nophone2@test.local", phone=None)
-        r = self.api_patch("/v1/profile", {"phone": self.phone}, token=make_token(acc.id))
+        r = self.api_patch("/v1/profile", {"phone": self.phone, "phoneCode": "1234"},
+                           token=make_token(acc.id))
         self.assertEqual(r.status_code, 409)
 
 
