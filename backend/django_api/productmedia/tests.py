@@ -112,6 +112,48 @@ class ProviderTests(TestCase):
         self.assertTrue(ua)
         self.assertNotIn("urllib", ua.lower())   # не дефолтный Python-urllib
 
+    def test_request_asks_for_stream(self):
+        # стрим держит соединение живым всю генерацию (иначе прокси рвут его как зависшее)
+        with mock.patch.dict("os.environ", {"OPENAI_API_KEY": "k"}, clear=False),                 mock.patch("productmedia.providers._post_multipart") as m_post:
+            m_post.return_value = {"data": [{"b64_json": _png_b64()}]}
+            processing.process(b"raw", track="catalog")
+        body = m_post.call_args.args[2]
+        self.assertIn(b'name="stream"', body)
+        self.assertIn(b'name="partial_images"', body)
+
+    def test_parse_sse_takes_completed_image(self):
+        final = _png_b64()
+        lines = [
+            b"event: image_edit.partial_image\n",
+            b'data: {"type": "image_edit.partial_image", "b64_json": "AAAA", "partial_image_index": 0}\n',
+            b"\n",
+            b"event: image_edit.completed\n",
+            ('data: {"type": "image_edit.completed", "b64_json": "%s", "usage": {}}\n' % final).encode(),
+            b"\n",
+        ]
+        data = providers._parse_sse(lines)
+        self.assertEqual(data["data"][0]["b64_json"], final)   # итог, а не промежуточный кадр
+
+    def test_parse_sse_error_event_raises(self):
+        lines = [b'data: {"type": "error", "error": {"message": "boom"}}\n', b"\n"]
+        with self.assertRaises(providers.ImageProviderError):
+            providers._parse_sse(lines)
+
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "k"}, clear=False)
+    @mock.patch("productmedia.providers.urllib.request.urlopen")
+    def test_stream_response_is_parsed(self, m_open):
+        final = _png_b64()
+        chunks = [b'data: {"type": "image_edit.completed", "b64_json": "%s"}\n' % final.encode(), b"\n"]
+
+        class _Resp:
+            headers = {"Content-Type": "text/event-stream; charset=utf-8"}
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def __iter__(self): return iter(chunks)
+        m_open.return_value = _Resp()
+        data = providers._post_multipart("/images/edits", "multipart/form-data; boundary=x", b"b")
+        self.assertEqual(data["data"][0]["b64_json"], final)
+
 
 import tempfile  # noqa: E402
 
