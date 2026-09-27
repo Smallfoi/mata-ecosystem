@@ -67,6 +67,7 @@ class AdminPagesRenderTests(TestCase):
             "/admin/catalog/product/",
             reverse("photo_pipeline"),
             reverse("photo_review"),
+            reverse("photo_prompts"),
         ]
         for url in pages:
             self._open(url)

@@ -508,3 +508,99 @@ class PipelineScreensTests(TestCase):
         m_regen.assert_called_once_with(jobs[1].pk)
         jobs[1].refresh_from_db()
         self.assertEqual(jobs[1].note, "не та ткань")
+
+    def test_detail_upload_is_not_a_showcase_shot(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.urls import reverse
+        from productmedia.models import PhotoDetail
+        url = reverse("photo_pipeline")
+        batch = self._post(url, action="create", track="catalog")["batch"]
+        photo = SimpleUploadedFile("3-detail.jpg", _jpeg_bytes(), content_type="image/jpeg")
+        up = self.client.post(url, {"action": "upload", "batch": batch, "article": "TS-7",
+                                    "attach_as": "detail", "photo": photo}).json()
+        self.assertTrue(up["ok"])
+        self.assertEqual(PhotoDetail.objects.filter(batch_id=batch, article="TS-7").count(), 1)
+        self.assertEqual(PhotoJob.objects.filter(batch_id=batch).count(), 0)
+
+    def test_prompts_page_save_restore_reset(self):
+        from django.urls import reverse
+        from productmedia import prompts
+        from productmedia.models import PhotoPrompt
+        url = reverse("photo_prompts")
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+        too_short = self._post(url, action="save", track="catalog", text="кратко")
+        self.assertFalse(too_short["ok"])
+
+        v1 = self._post(url, action="save", track="catalog",
+                        text=prompts.CATALOG + "\nExtra rule one.", comment="правило 1")
+        v2 = self._post(url, action="save", track="catalog",
+                        text=prompts.CATALOG + "\nExtra rule two.")
+        self.assertEqual(PhotoPrompt.active("catalog").pk, v2["id"])
+
+        back = self._post(url, action="restore", id=v1["id"])
+        self.assertIn("Extra rule one.", PhotoPrompt.objects.get(pk=back["id"]).text)
+        self.assertEqual(PhotoPrompt.active("catalog").pk, back["id"])
+
+        self._post(url, action="reset", track="catalog")
+        self.assertEqual(PhotoPrompt.active("catalog").text, prompts.CATALOG)
+
+
+def _jpeg_bytes(color=(40, 50, 60), size=(16, 16)):
+    buf = io.BytesIO()
+    Image.new("RGB", size, color).save(buf, "JPEG")
+    return buf.getvalue()
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class DetailsAndPromptVersionTests(TestCase):
+    """Крупные планы уходят в запрос вместе с основным снимком; действует версия промта из админки."""
+
+    @classmethod
+    def setUpTestData(cls):
+        Product.objects.create(id="dt1", name="Лонгслив", category_id="c", price=3000,
+                               article="LS-9", colors=["Оливковый"], model_key="LS9")
+
+    @mock.patch("productmedia.processing.process")
+    def test_generate_passes_details_and_active_prompt(self, m_proc):
+        from productmedia.models import PhotoPrompt
+        m_proc.return_value = _png_bytes((1, 2, 3), (900, 900))
+        batch = PhotoBatch.objects.create(track="catalog")
+        service.add_detail(batch, "ls-9", _jpeg_bytes(), "2-detail.jpg")
+        other = PhotoBatch.objects.create(track="catalog")
+        service.add_detail(other, "LS-9", _jpeg_bytes(), "x-detail.jpg")   # чужая партия — мимо
+        row = PhotoPrompt.objects.create(track="catalog", text="Custom catalog prompt v7.")
+        job = service.intake(batch, [
+            {"article": "LS-9", "content": _png_bytes(), "filename": "1.png"}])[0]
+        service.generate(job)
+        kwargs = m_proc.call_args.kwargs
+        self.assertEqual(len(kwargs["details"]), 1)
+        self.assertEqual(kwargs["base"], "Custom catalog prompt v7.")
+        job.refresh_from_db()
+        self.assertEqual(job.prompt_id, row.pk)
+
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "k"}, clear=False)
+    @mock.patch("productmedia.providers._post_multipart")
+    def test_details_go_as_extra_images_with_right_types(self, m_post):
+        m_post.return_value = {"data": [{"b64_json": _png_b64()}],
+                               "usage": {"total_tokens": 1234}}
+        processing.process(_png_bytes(), track="catalog", details=[_jpeg_bytes()])
+        body = m_post.call_args.args[2]
+        self.assertEqual(body.count(b'name="image[]"'), 2)            # основной + крупный план
+        self.assertIn(b"Content-Type: image/jpeg", body)               # тип по содержимому
+        self.assertIn(b"REFERENCE IMAGES", body)                      # модель знает, что это
+        self.assertEqual(providers.last_usage(), {"total_tokens": 1234})
+
+    def test_usage_taken_from_stream_completed_event(self):
+        final = _png_b64()
+        providers._parse_sse([
+            ('data: {"type": "image_edit.completed", "b64_json": "%s", '
+             '"usage": {"total_tokens": 77}}' % final).encode(),
+            b"",
+        ])
+        self.assertEqual(providers.last_usage(), {"total_tokens": 77})
+
+    def test_prompt_override_and_no_details_keep_builtin_rules(self):
+        from productmedia import prompts
+        self.assertEqual(prompts.with_details(prompts.CATALOG, 0), prompts.CATALOG)
+        self.assertIn("close-ups", prompts.with_details(prompts.CATALOG, 2))

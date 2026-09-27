@@ -90,6 +90,11 @@ class PhotoJob(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="photo_reviews", verbose_name="Проверил")
     reviewed_at = models.DateTimeField("Проверено", null=True, blank=True)
+    # Какой версией промта сделан последний результат (None — встроенный промт из кода).
+    prompt = models.ForeignKey("PhotoPrompt", null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name="jobs", verbose_name="Версия промта")
+    # Расход токенов последней генерации (как отдал OpenAI) — основа учёта стоимости.
+    usage = models.JSONField("Расход токенов", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     attached_at = models.DateTimeField("Прикреплено", null=True, blank=True)
@@ -101,3 +106,54 @@ class PhotoJob(models.Model):
 
     def __str__(self):
         return "Фото %s [%s]" % (self.article or "—", self.get_status_display())
+
+
+class PhotoDetail(models.Model):
+    """Крупный план принта/бирки для артикула в партии.
+
+    Не превращается в отдельный снимок витрины: прикладывается к запросу каждого снимка
+    этого артикула как справочная картинка, чтобы мелкий текст модель срисовала, а не
+    придумала (живой прогон 27.09: мелкое солнце на груди → выдуманное «SUN CARE»).
+    """
+    batch = models.ForeignKey(PhotoBatch, on_delete=models.CASCADE, related_name="details",
+                              verbose_name="Пакет")
+    article = models.CharField("Артикул (папка)", max_length=64, db_index=True)
+    image = models.FileField("Крупный план", upload_to="photopipeline/detail/")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Крупный план принта"
+        verbose_name_plural = "Крупные планы принтов"
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return "Крупный план %s" % self.article
+
+
+class PhotoPrompt(models.Model):
+    """Версия промта трека. Действует последняя по времени; старые — история для возврата.
+
+    Правит владелец на странице «Промты» без выкладки кода. Нет ни одной версии — работает
+    встроенный промт из prompts.py.
+    """
+    track = models.CharField("Трек", max_length=16, choices=PhotoBatch.TRACK_CHOICES,
+                             db_index=True)
+    text = models.TextField("Текст промта")
+    comment = models.CharField("Что поменяли", max_length=200, blank=True, default="")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="photo_prompts",
+                                   verbose_name="Автор")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Версия промта"
+        verbose_name_plural = "Версии промтов"
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return "Промт %s v%s" % (self.track, self.pk)
+
+    @classmethod
+    def active(cls, track):
+        """Действующая версия трека или None (тогда — встроенный промт)."""
+        return cls.objects.filter(track=track).order_by("-created_at", "-id").first()

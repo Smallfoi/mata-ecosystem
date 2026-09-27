@@ -270,8 +270,10 @@
     var status = box.querySelector("[data-role=status]");
     var track = box.querySelector("select[name=track]");
     var IMG = /\.(jpe?g|png|webp)$/i;
+    // Крупный план принта: в имени файла detail / деталь / принт / print / macro / close / крупн.
+    var DETAIL = /(detail|детал|принт|print|macro|close|крупн)/i;
     var MAXPX = 2560;
-    var groups = {};    // артикул → [File]
+    var groups = {};    // артикул → { shots: [File], details: [File] }
     var matched = {};   // артикул → true, если нашёлся товар
 
     function post(body) {
@@ -288,18 +290,23 @@
       return parts.length > 1 ? parts[parts.length - 2].trim() : "";
     }
 
+    function byName(x, y) {
+      return x.name.localeCompare(y.name, undefined, { numeric: true });
+    }
+
     function collect(list) {
       groups = {};
       list.forEach(function (it) {
         if (!IMG.test(it.file.name)) return;
         var a = folderOf(it.path);
         if (!a) return;
-        (groups[a] = groups[a] || []).push(it.file);
+        var g = groups[a] = groups[a] || { shots: [], details: [] };
+        var bare = it.file.name.replace(/\.[^.]+$/, "");
+        (DETAIL.test(bare) ? g.details : g.shots).push(it.file);
       });
       Object.keys(groups).forEach(function (a) {
-        groups[a].sort(function (x, y) {
-          return x.name.localeCompare(y.name, undefined, { numeric: true });
-        });
+        groups[a].shots.sort(byName);
+        groups[a].details.sort(byName);
       });
       check();
     }
@@ -333,17 +340,24 @@
         if (!data.ok) { status.textContent = data.error || "не вышло"; return; }
         matched = {};
         data.matched.forEach(function (m) {
+          var g = groups[m.folder];
           matched[m.folder] = true;
-          addRow([m.folder, m.name, m.color || "—", groups[m.folder].length,
-                  m.used + " из " + m.max], false);
+          addRow([m.folder, m.name, m.color || "—", g.shots.length, g.details.length,
+                  m.used + " из " + m.max], g.shots.length === 0);
         });
         data.unmatched.forEach(function (u) {
+          var g = groups[u.folder] || { shots: [], details: [] };
           addRow([u.folder, "товар не найден — пропустим", "",
-                  (groups[u.folder] || []).length, ""], true);
+                  g.shots.length, g.details.length, ""], true);
         });
-        var n = 0;
-        Object.keys(matched).forEach(function (a) { n += groups[a].length; });
-        status.textContent = "К загрузке: " + n + " снимков из " +
+        var n = 0, d = 0;
+        Object.keys(matched).forEach(function (a) {
+          if (!groups[a].shots.length) return;       // одни крупные планы — нечего снимать
+          n += groups[a].shots.length;
+          d += groups[a].details.length;
+        });
+        status.textContent = "К загрузке: " + n + " снимков" +
+          (d ? " и " + d + " крупных планов" : "") + " из " +
           Object.keys(matched).length + " папок";
         go.disabled = n === 0;
       }).catch(function () { status.textContent = "сеть не ответила"; });
@@ -381,7 +395,13 @@
     go.addEventListener("click", function () {
       var queue = [];
       Object.keys(matched).forEach(function (a) {
-        groups[a].forEach(function (f, i) { queue.push({ a: a, f: f, main: i === 0 }); });
+        var g = groups[a];
+        if (!g.shots.length) return;
+        // Сначала крупные планы: к запуску генерации они уже должны лежать на сервере.
+        g.details.forEach(function (f) { queue.push({ a: a, f: f, role: "detail" }); });
+        g.shots.forEach(function (f, i) {
+          queue.push({ a: a, f: f, role: i === 0 ? "main" : "gallery" });
+        });
       });
       if (!queue.length) return;
       go.disabled = true;
@@ -402,7 +422,7 @@
             fd.append("action", "upload");
             fd.append("batch", batch);
             fd.append("article", q.a);
-            fd.append("attach_as", q.main ? "main" : "gallery");
+            fd.append("attach_as", q.role);
             var name = blob === q.f ? q.f.name : q.f.name.replace(/\.[^.]+$/, "") + ".jpg";
             fd.append("photo", blob, name);
             return post(fd);
@@ -530,6 +550,63 @@
       }).catch(function () {
         card.classList.remove("is-busy");
         fail(card, "сеть не ответила");
+      });
+    });
+  }
+})();
+
+/* Фотопайплайн: промты. «Сохранить новую версию», «Вернуть» из истории, «Вернуть
+ * встроенный». Каждое действие создаёт новую версию — старые остаются в истории. */
+(function () {
+  "use strict";
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  function init() {
+    var root = document.getElementById("photo-prompts");
+    if (!root) return;
+    var token = document.querySelector("input[name=csrfmiddlewaretoken]");
+
+    function post(body) {
+      if (token) body.append("csrfmiddlewaretoken", token.value);
+      return fetch(window.location.pathname, {
+        method: "POST", body: body, credentials: "same-origin",
+        headers: token ? { "X-CSRFToken": token.value } : {}
+      }).then(function (r) { return r.json(); });
+    }
+
+    root.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-prompt-act]");
+      if (!btn) return;
+      var card = btn.closest("[data-track]");
+      var act = btn.dataset.promptAct;
+      var err = card.querySelector("[data-role=error]");
+      if (act === "reset" && !window.confirm("Вернуть встроенный промт? Текущая версия останется в истории.")) return;
+
+      var body = new FormData();
+      body.append("action", act);
+      body.append("track", card.dataset.track);
+      if (act === "save") {
+        body.append("text", card.querySelector("[data-role=text]").value);
+        body.append("comment", (card.querySelector("[data-role=comment]") || {}).value || "");
+      }
+      if (act === "restore") body.append("id", btn.dataset.id);
+
+      btn.disabled = true;
+      post(body).then(function (data) {
+        if (!data.ok) {
+          btn.disabled = false;
+          if (err) { err.hidden = false; err.textContent = data.error || "не вышло"; }
+          return;
+        }
+        window.location.reload();
+      }).catch(function () {
+        btn.disabled = false;
+        if (err) { err.hidden = false; err.textContent = "сеть не ответила"; }
       });
     });
   }

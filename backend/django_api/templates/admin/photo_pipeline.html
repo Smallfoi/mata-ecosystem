@@ -6,15 +6,19 @@
 <div class="m-tabs">
   <a class="m-tab on" href="">Загрузка и партии</a>
   <a class="m-tab" href="{{ review_link }}">Проверка фото</a>
+  <a class="m-tab" href="{{ prompts_link }}">Промты</a>
 </div>
 
 {% if can_edit %}
 <div class="m-card pad" id="pipeline-upload">
   <div class="m-lead">Новая партия</div>
   <div class="m-hint">
-    Каждая папка называется <b>артикулом</b> товара и содержит его снимки: перед, спина,
-    крупный план принта. Первый по имени файл станет обложкой, остальные уйдут в галерею.
-    Одна вещь в кадре. Фото перед отправкой уменьшаются до 2560 px.
+    Каждая папка называется <b>артикулом</b> товара и содержит его снимки: перед, спина.
+    Первый по имени файл станет обложкой, остальные уйдут в галерею. Одна вещь в кадре.
+    <b>Крупный план мелкого принта</b> назовите со словом <span class="m-mono">detail</span>,
+    <span class="m-mono">деталь</span> или <span class="m-mono">принт</span> (например
+    <span class="m-mono">3-detail.jpg</span>): он не станет отдельным фото, а поможет модели
+    точно срисовать надпись. Фото перед отправкой уменьшаются до 2560 px.
     После обработки снимки ждут проверки — на витрину без «Принять» ничего не попадёт.
   </div>
 
@@ -34,7 +38,7 @@
   <div data-role="plan" hidden>
     <div class="m-wrap">
       <table class="m">
-        <thead><tr><th>Папка</th><th>Товар</th><th>Цвет</th><th class="n">Файлов</th><th class="n">В галерее</th></tr></thead>
+        <thead><tr><th>Папка</th><th>Товар</th><th>Цвет</th><th class="n">Снимков</th><th class="n">Крупных планов</th><th class="n">В галерее</th></tr></thead>
         <tbody data-role="rows"></tbody>
       </table>
     </div>
