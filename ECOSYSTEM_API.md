@@ -384,6 +384,12 @@ POST /loyalty/transactions  LoyaltyTransaction → 200   (только redeem/п
                             source ∈ {runnerRun, runnerTerritory, purchase, registration} → 403
                             (анти-чит S-04 D-23: начисление считает сервер —
                              бег→/runs, территория→/territories/capture, покупка/рег→/orders)
+POST /loyalty/redeem  { amount, orderId, description? }   (прежний адрес Store; баллы списывает
+                            сам POST /orders по pointsRedeemed — D-72)
+                            → { ok, deduped, balance, spent }  списание по заказу уже есть (обычный путь)
+                            → { ok, balance, spent, level }    списал: тот же сервис и правила, что /orders
+                               (заказ существует и не отменён, amount == его pointsRedeemed, ≥50, ≤30%)
+                            → 400/404 { detail, balance }       нет orderId / заказа / нарушены правила
 ```
 
 ### Runs (история пробежек + серверный расчёт очков — анти-чит S-04)
@@ -518,7 +524,7 @@ JWT сохраняется → работает в Квартале, Store и н
               ↓ сервер валидирует забег и САМ начисляет runnerRun = км×10 = 120 (анти-чит S-04)
               ↓ единый баланс на backend
 Открыл Store → GET /loyalty/account → видит 430 баллов
-В корзине применяет → заказ с pointsRedeemed → POST /loyalty/transactions {source:"redeem", amount:-430}
+В корзине применяет → POST /orders {pointsRedeemed:430, ...} — сервер сам списывает (≥50, ≤30%)
 ```
 
 ### 4.3 Покупка → кроссовки (Store → Квартал)
