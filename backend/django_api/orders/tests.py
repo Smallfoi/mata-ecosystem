@@ -22,6 +22,19 @@ def _yk(status="pending", pid="pay_1", url="https://yoomoney.ru/checkout/pay_1")
     return {"id": pid, "status": status, "confirmation": {"confirmation_url": url}}
 
 
+def _yk_paid(order_id, pid="pay_1"):
+    """«Оплачено» от ЮKassa ровно по этому заказу: сумма, рубли, наш reference.
+
+    Сервер засчитывает оплату, только если платёж совпал с заказом (аудит B01).
+    """
+    order = Order.objects.get(order_id=order_id)
+    data = _yk(status="succeeded", pid=pid)
+    data["amount"] = {"value": f"{order.total:.2f}", "currency": "RUB"}
+    data["metadata"] = {"order_id": order.order_id,
+                        "reference": f"{order.order_id}-{order.pk}"}
+    return data
+
+
 def _catalog_items(total, pid=None):
     """Позиция из каталога ровно на `total` ₽.
 
@@ -142,7 +155,7 @@ class YooKassaPaymentTests(ApiTestCase):
         self.api_post("/v1/orders/SS-Y4/pay", {})
         self.assertEqual(self.balance(), 0)  # ссылка выдана, деньги ещё не пришли
 
-        http.return_value = _yk(status="succeeded")
+        http.return_value = _yk_paid("SS-Y4")
         self.assertEqual(self._webhook("pay_1").status_code, 200)
         self.assertEqual(self.balance(), 150)  # 100 за сумму + 50 за первый заказ
 
@@ -152,7 +165,7 @@ class YooKassaPaymentTests(ApiTestCase):
         http.return_value = _yk()
         self._order("SS-Y5", total=1000)
         self.api_post("/v1/orders/SS-Y5/pay", {})
-        http.return_value = _yk(status="succeeded")
+        http.return_value = _yk_paid("SS-Y5")
         self._webhook("pay_1")
         self._webhook("pay_1")  # ЮKassa повторяет доставку при сбоях
         self.assertEqual(self.balance(), 150)
@@ -276,7 +289,7 @@ class OrderCheckoutTests(ApiTestCase):
         self.api_post("/v1/orders/SS-T/pay", {})
         self.assertEqual(self.balance(), 50)
 
-    def test_repeat_post_updates_status_without_reaward(self):
+    def test_repeat_post_is_idempotent_and_keeps_server_status(self):
         self.api_post(
             "/v1/orders", {"id": "SS-U", "total": 1000, "status": "pending", "items": []}
         )
@@ -288,9 +301,11 @@ class OrderCheckoutTests(ApiTestCase):
         self.assertEqual(self.balance(), 150)  # повтор не задваивает баллы
         from orders.models import Order
 
+        # Статус заказа ведёт сервер (оплата, 1С, админка), не клиент: повтор
+        # оплаченного заказа его не меняет (аудит B01).
         self.assertEqual(
-            Order.objects.get(user_id=self.uid, order_id="SS-U").status, "shipped"
-        )  # статус обновился
+            Order.objects.get(user_id=self.uid, order_id="SS-U").status, "paid"
+        )
 
     def test_orders_require_auth(self):
         self.assertEqual(self.client.get("/v1/orders").status_code, 401)
@@ -579,7 +594,7 @@ class PaymentStateTests(ApiTestCase):
         # Вебхук не дошёл: заказ висит в «ждёт оплаты», хотя деньги списаны.
         self.assertEqual(Order.objects.get(order_id="SS-S1").payment_status, "pending")
 
-        with mock.patch("orders.payment._http", return_value=_yk(status="succeeded")):
+        with mock.patch("orders.payment._http", return_value=_yk_paid("SS-S1")):
             r = self.api_get("/v1/orders/SS-S1/payment")
 
         self.assertEqual(r.status_code, 200)
@@ -803,7 +818,7 @@ class UnpaidOrderExpiryTests(ApiTestCase):
         self._expire()
         self.assertEqual(self._get("SS-X3").payment_status, "pending")
 
-        http.return_value = _yk(status="succeeded")
+        http.return_value = _yk_paid("SS-X3")
         self._expire()
         self.assertEqual(self._get("SS-X3").payment_status, "paid")
         self.assertEqual(self.balance(), 700 + 70 + 50)  # покупка 700//10 + первый заказ

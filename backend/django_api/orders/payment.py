@@ -109,12 +109,55 @@ def _idem_key(*parts) -> str:
 
 
 def _result(data) -> dict:
-    """Ответ ЮKassa → наш контракт {status, paymentId, confirmationUrl}."""
+    """Ответ ЮKassa → наш контракт {status, paymentId, confirmationUrl}.
+
+    Плюс то, что сверяется с заказом перед «оплачено» (аудит B01): сумма, валюта
+    и reference из metadata. Наружу (клиентам) эти поля не отдаются — см. views.
+    """
+    amount = data.get("amount") or {}
     return {
         "status": _STATUS_MAP.get(data.get("status"), "pending"),
         "paymentId": data.get("id") or "",
         "confirmationUrl": (data.get("confirmation") or {}).get("confirmation_url") or "",
+        "amount": str(amount.get("value") or ""),
+        "currency": str(amount.get("currency") or ""),
+        "reference": str((data.get("metadata") or {}).get("reference") or ""),
     }
+
+
+def payment_reference(order) -> str:
+    """Глобально уникальный номер заказа для провайдера (см. шапку модуля)."""
+    return f"{order.order_id}-{order.pk}"
+
+
+def _kop(value):
+    """Сумма в копейках (целое) или None, если это не число."""
+    try:
+        return int(round(float(value) * 100))
+    except (TypeError, ValueError):
+        return None
+
+
+def payment_mismatch(order, info) -> str:
+    """Почему этот платёж НЕЛЬЗЯ засчитать заказу; пустая строка — всё сходится.
+
+    «Оплачено» ставим, только если провайдер подтвердил ровно то, что мы просили:
+    тот же платёж, та же сумма до копейки, рубли и наш reference. Иначе (заказ
+    успели поменять, платёж от другого заказа, сбой провайдера) заказ остаётся
+    неоплаченным, а расхождение уходит в лог ошибок — разбирает человек.
+    """
+    pid = info.get("paymentId") or ""
+    if order.payment_id and pid and pid != order.payment_id:
+        return f"платёж {pid} не относится к заказу (ждали {order.payment_id})"
+    if info.get("currency") != "RUB":
+        return f"валюта платежа «{info.get('currency') or '—'}», ждали RUB"
+    paid, due = _kop(info.get("amount")), _kop(order.total)
+    if paid is None or paid != due:
+        return f"сумма платежа {info.get('amount') or '—'} ≠ сумме заказа {_money(order.total)}"
+    ref = payment_reference(order)
+    if info.get("reference") != ref:
+        return f"reference платежа «{info.get('reference') or '—'}», ждали «{ref}»"
+    return ""
 
 
 def create_payment(order_id, amount, return_url="", reference=None,
