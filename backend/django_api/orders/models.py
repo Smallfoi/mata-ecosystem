@@ -72,9 +72,41 @@ class Order(models.Model):
     def __str__(self) -> str:
         return self.order_id
 
+    # Серверный статус → словарь приложения Store (`pending | processing | shipped |
+    # delivered | cancelled`). Старые сборки неизвестный статус читают как «ожидает»,
+    # поэтому «оплачен» отдаём как «в обработке».
+    CLIENT_STATUS = {
+        "pending": "pending",
+        "paid": "processing",
+        "processing": "processing",
+        "shipped": "shipped",
+        "delivered": "delivered",
+        "cancelled": "cancelled",
+    }
+
     def to_json(self) -> dict:
-        # payload уже в точном контракте SportStore (Order.fromJson).
-        return self.payload
+        """Заказ для приложения: payload (контракт SportStore, Order.fromJson) +
+        актуальное состояние из колонок (аудит B08).
+
+        payload — то, что прислали при оформлении; оплата, отмена, статусы 1С меняют
+        только колонки. Поля payload не убираем (старые клиенты), а `status`
+        заменяем серверным — иначе покупатель вечно видит «ожидает».
+        """
+        data = dict(self.payload or {})
+        data.setdefault("id", self.order_id)
+        client_status = self.CLIENT_STATUS.get(self.status)
+        if client_status:
+            data["status"] = client_status
+        data.update({
+            "serverId": self.pk,
+            "serverStatus": self.status,
+            "paymentStatus": self.payment_status,
+            "onecStatus": self.onec_status,
+            "onecStatusAt": self.onec_status_at.isoformat() if self.onec_status_at else None,
+            "onecNumber": self.onec_number,
+            "courierNote": self.courier_note,
+        })
+        return data
 
 
 class OrderReturn(models.Model):

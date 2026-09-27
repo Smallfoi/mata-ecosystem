@@ -141,9 +141,23 @@
     "paymentType": "card | cash | sbp"
   },
   "status": "pending | processing | shipped | delivered | cancelled",
-  "createdAt": "2026-06-05T13:09:00Z"
+  "createdAt": "2026-06-05T13:09:00Z",
+
+  // ↓ добавляет сервер в ответах /orders (аудит B08) — актуальное состояние
+  "serverId": 5812,                 // глобальный номер заказа на сервере
+  "serverStatus": "pending | paid | shipped | delivered | cancelled",
+  "paymentStatus": "pending | paid | canceled | refunded | partially_refunded | none",
+  "onecStatus": "'' | accepted | assembled | shipped | delivered | canceled",
+  "onecStatusAt": "2026-06-06T10:00:00+00:00",   // null, пока статусов из 1С не было
+  "onecNumber": "УТ-000123",        // номер документа в 1С, '' если нет
+  "courierNote": "Иван, +7…, к 18:00" // кто везёт и когда, '' если нет
 }
 ```
+> **Актуальное состояние (B08).** Сервер хранит присланный при оформлении payload и
+> отдаёт его поля как есть, но `status` берёт из своего состояния (оплата, отмена,
+> статусы 1С). Серверный `paid` в `status` отдаётся как `processing` — это словарь
+> приложения; сырой серверный статус — в `serverStatus`. Клиент должен считать
+> серверные поля главнее локальной копии заказа.
 > В Sport Store уже есть всё, кроме `userId` и `pointsRedeemed` — добавить при подключении backend (см. §6 Пробелы).
 
 ### 2.4 Loyalty (Loyalty) — ЯДРО ЭКОСИСТЕМЫ
@@ -318,25 +332,36 @@ price?, oldPrice?, description?, sizes?, colors?, images? }`.
 
 ```
 GET  /integrations/1c/orders[?limit=200]              → { orders: [...] }
-POST /integrations/1c/orders/ack     { orderIds: [] } → { acked, unknown[] }
-POST /integrations/1c/orders/status  { orders: [...] }→ { received, updated, errors }
+POST /integrations/1c/orders/ack     { serverIds?: [], orderIds?: [] }
+                                     → { acked, unknown[], ambiguous[], unknownServerIds[] }
+POST /integrations/1c/orders/status  { orders: [...] }→ { received, updated, errors, ambiguous[] }
 ```
+
+**Идентификатор заказа (аудит B06).** `orderId` (`SS-xxxxx`) придумывает клиент, он
+уникален только вместе с пользователем. Глобальный номер — `serverId` (id заказа на
+сервере): он есть в каждом заказе выдачи, по нему 1С подтверждает (`serverIds`) и
+присылает статусы (`serverId`). Старый контракт по `orderId` работает, пока номер
+однозначен; если под номером несколько заказов, из них берётся тот, что вообще мог
+попасть в 1С (оплачен ЮKassa или уже забран). Не удалось однозначно — не трогаем ни
+один заказ: номер в `ambiguous` (+ в `errors` у статусов), строка журнала обмена —
+«частично», текст «номер неоднозначен — пришлите serverId». Прислали и `serverId`, и
+`orderId`, но они от разных заказов — статус не применяется, ошибка в `errors`.
 
 **Заказ остаётся в очереди, пока 1С не подтвердит приём** через `ack`. Оборванная
 связь не должна стоить покупателю заказа, поэтому выдача и подтверждение — разные
 запросы. Повторный `ack` не ошибка (`acked: 0`).
 
-**В очередь попадают только заказы, готовые к сборке:** оплата не требуется
-(`none`) или уже прошла (`paid`). Заказ, ждущий оплаты, в 1С не уходит — иначе там
-копятся брошенные корзины.
+**В очередь попадают только заказы, готовые к сборке:** оплата подтверждена ЮKassa
+(`paid` и есть номер платежа, D-72). Заказ, ждущий оплаты, и «оплаченный» без
+настоящего платежа в 1С не уходят — иначе там копятся брошенные корзины.
 
-Заказ отдаётся в виде: `{ orderId, createdAt, customer{phone,name,email}, items[],
+Заказ отдаётся в виде: `{ orderId, serverId, createdAt, customer{phone,name,email}, items[],
 total, deliveryCost, pointsRedeemed, payment, paymentStatus, delivery, address,
-postalCode }`. Позиция: `{ id, article, productId, name, size, color, qty, price }` —
+postalCode, test }`. Позиция: `{ id, article, productId, name, size, color, qty, price }` —
 `id` и `article` подставляются из карточки товара, чтобы склад не сопоставлял позиции
 по названию.
 
-**Статусы обратно:** `{ orderId, status, number? }`, где `status` — `accepted`,
+**Статусы обратно:** `{ serverId?, orderId?, status, number? }` (нужен хотя бы один из номеров), где `status` — `accepted`,
 `assembled`, `shipped`, `delivered`, `canceled`. `shipped`/`delivered`/`canceled`
 двигают общий статус заказа; `accepted` и `assembled` — этапы склада: их видно
 покупателю отдельной строкой, но общий статус не меняют. Один и тот же статус
