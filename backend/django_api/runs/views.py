@@ -12,6 +12,7 @@ from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from common.locks import ACTIVITY, lock_user
 from common.numeric import BadNumber, bounded_int, finite_float
 from common.security import user_id_from_request
 from loyalty.models import LoyaltyTransaction, add_txn
@@ -219,17 +220,21 @@ def runs(request):
     except BadNumber:
         return Response({"detail": "Некорректные числа в забеге"}, status=400)
 
-    # Анти-чит: считаем очки на сервере; неправдоподобный забег → флаг + 0 очков.
     mock = bool(d.get("mockDetected"))  # клиент сообщает о mock-GPS (Android)
-    reason = _validate(uid, distance_m, duration_s, finished, mock=mock)
-    flagged = bool(reason)
-    points = 0 if flagged else points_for(distance_m)
 
     # Забег и начисление — одно целое (аудит C05): сбой посередине откатывает оба,
     # и повтор из офлайн-очереди проходит заново. Run.id (PK) — уникальный ключ:
     # параллельный повтор упрётся в него и получит ответ «дубль».
     try:
         with transaction.atomic():
+            # Суточные лимиты (число забегов, дистанция вместе с импортом с часов)
+            # проверяем и записываем под блокировкой на пользователя (аудит C06):
+            # иначе параллельные забеги с разными id все видят «лимит не достигнут».
+            lock_user(ACTIVITY, uid)
+            # Анти-чит: считаем очки на сервере; неправдоподобный забег → флаг + 0 очков.
+            reason = _validate(uid, distance_m, duration_s, finished, mock=mock)
+            flagged = bool(reason)
+            points = 0 if flagged else points_for(distance_m)
             run = Run.objects.create(
                 id=rid,
                 user_id=uid,

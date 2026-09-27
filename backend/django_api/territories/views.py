@@ -7,7 +7,8 @@
   последнего забега; забег обновляет captured_at и продлевает; протухшие удаляются лениво;
 - ВЕЧНЫЙ личный след (footprints): объединение всего, что юзер когда-либо пробежал —
   растёт и НЕ уменьшается (ни временем, ни перехватом). Для профиля (исследовано км²);
-- античит: скорость (если клиент прислал дистанцию/время), мин/макс площадь, кулдаун;
+- античит: скорость (дистанция = max(присланная, длина маршрута); без времени —
+  захват без баллов), мин/макс площадь, кулдаун, суточный потолок под блокировкой;
 - загрузка по видимой области (bbox), отметка mine/club/enemy.
 Один владелец = одна (мульти)территория (owner_id UNIQUE).
 """
@@ -22,6 +23,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from clubs.models import ClubMember
+from common.locks import TERRITORY, lock_user
 from common.numeric import BadNumber, finite_float
 from common.security import user_id_from_request
 from loyalty.models import LoyaltyTransaction, add_txn
@@ -99,6 +101,38 @@ def _parse_ring(pts):
     return ring
 
 
+_EARTH_R_M = 6_371_008.8
+# Пробежки дольше недели не бывает; время вне (0; неделя] — «время неизвестно».
+_MAX_ELAPSED_S = 7 * 24 * 3600
+_MAX_DISTANCE_M = 10_000_000.0
+
+
+def _route_length_m(ring):
+    """Длина маршрута по точкам [(lng, lat), ...] БЕЗ замыкающего отрезка, м.
+
+    Это нижняя граница пройденного: сервер видит её сам и не зависит от того,
+    какую дистанцию клиент решил о себе сообщить (аудит C06).
+    """
+    total = 0.0
+    for (lng1, lat1), (lng2, lat2) in zip(ring, ring[1:]):
+        p1, p2 = math.radians(lat1), math.radians(lat2)
+        dp, dl = p2 - p1, math.radians(lng2 - lng1)
+        a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+        total += 2 * _EARTH_R_M * math.asin(min(1.0, math.sqrt(a)))
+    return total
+
+
+def _opt_positive(value, hi):
+    """Необязательное положительное число из запроса или None (нет/мусор/≤0)."""
+    if value is None:
+        return None
+    try:
+        v = finite_float(value, 0, hi)
+    except BadNumber:
+        return None
+    return v if v > 0 else None
+
+
 def _club_of(uid):
     m = ClubMember.objects.filter(user_id=uid).first()
     return m.club_id if m else None
@@ -121,40 +155,27 @@ def capture(request):
     if len(pts) > 20_000:
         return Response({"detail": "Слишком много точек в маршруте"}, status=400)
 
-    # Античит по скорости. ВАЖНО: проверка срабатывает только когда клиент сам
-    # прислал дистанцию и время — то есть выключается простым их отсутствием.
-    # Полагаться на неё как на защиту нельзя, она лишь отсекает явную небрежность.
-    # Настоящий ограничитель — суточный потолок захватов ниже: он не зависит от
-    # того, что клиент решил о себе сообщить.
-    distance = request.data.get("distanceMeters")
-    elapsed = request.data.get("elapsedSeconds")
-    try:
-        if distance is not None and elapsed is not None:
-            distance = float(distance)
-            elapsed = float(elapsed)
-            if elapsed > 0 and distance / elapsed > MAX_SPEED_MS:
-                return Response(
-                    {"detail": "Слишком высокая скорость для забега — захват отклонён."},
-                    status=400,
-                )
-    except (TypeError, ValueError):
-        pass  # некорректные числа просто игнорируем, не блокируем легитимный захват
-
-    # Суточный потолок: считаем по начисленным за захват баллам, а не по строкам
-    # территорий — территория у человека одна и обновляется, а начисления в
-    # истории баллов остаются и врать не могут.
-    since = timezone.now() - timedelta(days=1)
-    if LoyaltyTransaction.objects.filter(
-        user_id=uid, source="runnerTerritory", created_at__gte=since
-    ).count() >= MAX_CAPTURES_PER_DAY:
-        return Response(
-            {"detail": "Слишком много захватов за сутки — попробуй завтра."},
-            status=429,
-        )
-
     ring = _parse_ring(pts)  # (lng, lat)
     if ring is None:
         return Response({"detail": "Некорректные точки маршрута"}, status=400)
+
+    # Античит по скорости (аудит C06: неполные данные не отключают проверку).
+    # Дистанция — не меньше длины самого маршрута: занизить или не прислать её
+    # больше нельзя. Время сервер сам не знает (у точек нет меток): если его нет,
+    # оно мусорное или ≤ 0 — скорость не проверить, и такой захват засчитывается
+    # на карте (старые сборки не отбиваем), но БЕЗ баллов (`unverified`).
+    # mata_kvartal шлёт оба поля с июня 2026 (territory_provider.dart).
+    route_m = _route_length_m(ring)
+    client_distance = _opt_positive(request.data.get("distanceMeters"), _MAX_DISTANCE_M)
+    elapsed = _opt_positive(request.data.get("elapsedSeconds"), _MAX_ELAPSED_S)
+    distance = max(client_distance or 0.0, route_m)
+    speed_verified = elapsed is not None
+    if speed_verified and distance / elapsed > MAX_SPEED_MS:
+        return Response(
+            {"detail": "Слишком высокая скорость для забега — захват отклонён."},
+            status=400,
+        )
+
     if ring[0] != ring[-1]:
         ring.append(ring[0])
     wkt = "POLYGON((" + ", ".join(f"{lng} {lat}" for lng, lat in ring) + "))"
@@ -163,6 +184,22 @@ def capture(request):
     # не применяем заново — отдаём текущую территорию.
     capture_id = (str(request.data.get("captureId") or "")).strip()[:64] or None
     with transaction.atomic():
+        # Один захват человека за раз (аудит C06): иначе параллельные запросы
+        # оба проходят суточный потолок и кулдаун, а новый след (баллы) у обоих
+        # считается от одной и той же площади «до» — земля оплачивается дважды.
+        lock_user(TERRITORY, uid)
+        # Суточный потолок: считаем по начисленным за захват баллам, а не по строкам
+        # территорий — территория у человека одна и обновляется, а начисления в
+        # истории баллов остаются и врать не могут. Под блокировкой — видим
+        # начисления параллельного запроса, который закоммитился раньше.
+        since = timezone.now() - timedelta(days=1)
+        if LoyaltyTransaction.objects.filter(
+            user_id=uid, source="runnerTerritory", created_at__gte=since
+        ).count() >= MAX_CAPTURES_PER_DAY:
+            return Response(
+                {"detail": "Слишком много захватов за сутки — попробуй завтра."},
+                status=429,
+            )
         with connection.cursor() as cur:
             # 0a) дедуп по captureId — ДО кулдауна и любых изменений
             if capture_id:
@@ -318,6 +355,8 @@ def capture(request):
             territory_points = min(
                 round(new_area_m2 / AREA_PER_POINT_M2), MAX_TERRITORY_POINTS
             )
+            if not speed_verified:
+                territory_points = 0  # скорость не проверить — баллов нет (C06)
             # 7б) захват КВАРТАЛОВ (D-74, Ф2+Ф3): кварталы, чей центр внутри петли,
             #     становятся твоими. Ф3: владение живёт до конца сезона-месяца (старое
             #     владение = свободно), домашний квартал НЕсгораем, а чужой домашний
@@ -383,17 +422,20 @@ def capture(request):
     from analytics.models import E_TERRITORY_CAPTURED, track
 
     track(E_TERRITORY_CAPTURED, user_id=uid, source="kvartal", areaM2=round(area or 0))
-    return Response(
-        {
-            "ok": True,
-            "areaM2": round(area or 0),
-            "points": territory_points,
-            "blocksGained": blocks_gained,
-            "blocksTotal": blocks_total,
-            "geojson": json.loads(gj) if gj else None,
-            "holdHoursLeft": HOLD_HOURS,
-        }
-    )
+    out = {
+        "ok": True,
+        "areaM2": round(area or 0),
+        "points": territory_points,
+        "blocksGained": blocks_gained,
+        "blocksTotal": blocks_total,
+        "geojson": json.loads(gj) if gj else None,
+        "holdHoursLeft": HOLD_HOURS,
+    }
+    if not speed_verified:
+        # Новое поле (старые клиенты его не читают): баллы не начислены, потому что
+        # без времени пробежки скорость не проверить.
+        out["unverified"] = True
+    return Response(out)
 
 
 @api_view(["GET"])
