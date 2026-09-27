@@ -34,9 +34,15 @@ def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
-def make_token(user_id: str) -> str:
+def make_token(user_id: str, version: int = 0) -> str:
+    """Токен входа. `version` — версия сессий аккаунта (Account.token_version): её
+    поднимает смена пароля, и все выданные раньше токены перестают действовать.
+    Нулевую версию в токен не пишем — так он байт-в-байт прежнего формата."""
     header = _b64url(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-    payload = _b64url(json.dumps({"sub": user_id, "exp": int(time.time()) + JWT_TTL}).encode())
+    body = {"sub": user_id, "exp": int(time.time()) + JWT_TTL}
+    if version:
+        body["v"] = version
+    payload = _b64url(json.dumps(body).encode())
     sig = _b64url(hmac.new(JWT_SECRET.encode(), f"{header}.{payload}".encode(), hashlib.sha256).digest())
     return f"{header}.{payload}.{sig}"
 
@@ -58,31 +64,53 @@ def user_id_from_request(request) -> str | None:
             return None
         uid = data["sub"]
         # Мгновенный бан (S-10): заблокированный теряет доступ, не дожидаясь
-        # истечения 30-дневного токена. Кэш 60с — без удара по БД на каждый запрос.
-        if _is_blocked(uid):
+        # истечения 30-дневного токена. Аудит 27.09.2026 (A02): так же — удалённый
+        # аккаунт (подпись верная, а хозяина нет) и токен старой версии сессий
+        # (пароль с тех пор меняли). Кэш 60с — без удара по БД на каждый запрос.
+        if not _session_alive(uid, int(data.get("v") or 0)):
             return None
         return uid
     except Exception:
         return None
 
 
-def _is_blocked(uid) -> bool:
-    """Заблокирован ли аккаунт. Сбой кэша/БД → НЕ заблокирован (нельзя залочить
-    всех из-за хиккапа инфраструктуры)."""
+def _state_key(uid) -> str:
+    return f"acc_state:{uid}"
+
+
+def forget_account(uid) -> None:
+    """Сбросить закэшированное состояние аккаунта — сразу после бана, удаления или
+    смены пароля, чтобы старые токены не жили ещё минуту."""
     try:
         from django.core.cache import cache
 
-        key = f"acc_blocked:{uid}"
-        cached = cache.get(key)
-        if cached is not None:
-            return cached
-        from accounts.models import Account
-
-        blocked = Account.objects.filter(id=uid, is_blocked=True).exists()
-        cache.set(key, blocked, 60)
-        return blocked
+        cache.delete(_state_key(uid))
     except Exception:
-        return False
+        pass
+
+
+def _session_alive(uid, version: int) -> bool:
+    """Действует ли токен: аккаунт есть, не заблокирован, версия сессий совпадает.
+
+    Сбой кэша/БД → действует (нельзя залочить всех из-за хиккапа инфраструктуры).
+    """
+    try:
+        from django.core.cache import cache
+
+        key = _state_key(uid)
+        state = cache.get(key)
+        if state is None:
+            from accounts.models import Account
+
+            row = Account.objects.filter(id=uid).values_list(
+                "is_blocked", "token_version").first()
+            # (живой ли аккаунт, версия сессий). Нет строки — аккаунт удалён.
+            state = (False, 0) if row is None else (not row[0], row[1] or 0)
+            cache.set(key, state, 60)
+        alive, current = state
+        return bool(alive) and current == version
+    except Exception:
+        return True
 
 
 def normalize_phone(phone: str) -> str:

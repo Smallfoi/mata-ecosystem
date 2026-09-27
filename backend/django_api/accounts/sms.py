@@ -49,6 +49,17 @@ def sms_enabled() -> bool:
     return bool(os.environ.get("SMS_PROVIDER"))
 
 
+def dev_code_allowed() -> bool:
+    """Можно ли принимать dev-код 1234 без провайдера.
+
+    Только в разработке (DJANGO_DEBUG=1 — как в dev-докере и CI). Аудит A05: раньше
+    dev-режим включался просто отсутствием SMS_PROVIDER — потерянная при деплое
+    переменная превращала боевой вход в «любой номер + 1234». В проде
+    (DJANGO_DEBUG=0) без провайдера вход по коду просто не проходит.
+    """
+    return os.environ.get("DJANGO_DEBUG", "1") == "1"
+
+
 def code_length() -> int:
     """Сколько цифр в коде. Меньше 4 небезопасно, больше — не введут в поле."""
     try:
@@ -323,7 +334,7 @@ def check_code(phone, code) -> bool:
     """
     code = (code or "").strip()
     if not sms_enabled():
-        return code == _DEV_CODE
+        return dev_code_allowed() and code == _DEV_CODE
 
     if _is_propush():
         rec = cache.get(f"otp:{phone}") or {}
