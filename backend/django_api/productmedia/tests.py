@@ -154,6 +154,22 @@ class ProviderTests(TestCase):
         data = providers._post_multipart("/images/edits", "multipart/form-data; boundary=x", b"b")
         self.assertEqual(data["data"][0]["b64_json"], final)
 
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "k", "OPENAI_PROXY": "http://10.0.0.5:8888"},
+                     clear=False)
+    @mock.patch("productmedia.providers.urllib.request.urlopen")
+    @mock.patch("productmedia.providers.urllib.request.build_opener")
+    def test_openai_proxy_used_only_when_set(self, m_build, m_urlopen):
+        # OPENAI_PROXY задан → запрос идёт через прокси, а не напрямую
+        class _Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return b'{"data": []}'
+        m_build.return_value.open.return_value = _Resp()
+        providers._post_multipart("/images/edits", "multipart/form-data; boundary=x", b"b")
+        handler = m_build.call_args.args[0]
+        self.assertEqual(handler.proxies.get("https"), "http://10.0.0.5:8888")
+        m_urlopen.assert_not_called()
+
 
 import tempfile  # noqa: E402
 

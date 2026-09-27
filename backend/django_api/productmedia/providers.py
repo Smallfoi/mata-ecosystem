@@ -55,6 +55,24 @@ def _multipart(fields, file_field, file_name, file_bytes, file_type="image/png")
     return "multipart/form-data; boundary=" + boundary, body
 
 
+def _open(req):
+    """Открыть запрос к провайдеру — напрямую или через OPENAI_PROXY.
+
+    Прод в РФ, а OpenAI стоит за Cloudflare, который передаёт страну исходного
+    посетителя даже при запросе из Cloudflare-воркера. Поэтому прокси на Cloudflare
+    гео-блок не обходят; нужен обычный прокси вне РФ (VPS). OPENAI_PROXY =
+    http://host:port — прямой HTTP-прокси (CONNECT): TLS идёт насквозь до OpenAI,
+    прокси ключа не видит. Действует ТОЛЬКО на вызовы OpenAI, остальные внешние
+    вызовы прода (1С, оплата, звонки) идут как раньше.
+    """
+    proxy = (os.environ.get("OPENAI_PROXY") or "").strip()
+    if not proxy:
+        return urllib.request.urlopen(req, timeout=_TIMEOUT)
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({"https": proxy, "http": proxy}))
+    return opener.open(req, timeout=_TIMEOUT)
+
+
 def _post_multipart(path, content_type, body):
     """Единая точка сетевого вызова к провайдеру (мокается в тестах)."""
     key = (os.environ.get("OPENAI_API_KEY") or "").strip()
@@ -67,7 +85,7 @@ def _post_multipart(path, content_type, body):
     req.add_header("User-Agent",
                    (os.environ.get("OPENAI_USER_AGENT") or "curl/8.5.0").strip())
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+        with _open(req) as resp:
             hdrs = getattr(resp, "headers", None)
             ctype = (hdrs.get("Content-Type", "") if hdrs is not None else "") or ""
             if "text/event-stream" in ctype:
