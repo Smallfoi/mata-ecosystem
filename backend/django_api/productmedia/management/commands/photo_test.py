@@ -99,7 +99,8 @@ class Command(BaseCommand):
         if job.webp:
             self.stdout.write("Витринный webp: %s" % _url(job.webp))
 
-        if job.status != PhotoJob.STATUS_DONE:
+        want = PhotoJob.STATUS_DONE if o["apply"] else PhotoJob.STATUS_REVIEW
+        if job.status != want:
             raise CommandError("прогон не удался (см. ошибку выше)")
 
         if o["apply"]:

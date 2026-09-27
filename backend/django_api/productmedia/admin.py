@@ -45,18 +45,19 @@ class PhotoJobAdmin(ModelAdmin):
     list_display = ("article", "product", "track", "attach_as", "status", "created_at")
     list_filter = ("status", "track", "attach_as", "created_at")
     search_fields = ("article", "product__name", "product__article")
-    readonly_fields = ("batch", "source", "master", "webp",
-                       "created_at", "updated_at", "attached_at")
+    readonly_fields = ("batch", "source", "master", "webp", "attempts", "reviewed_by",
+                       "reviewed_at", "created_at", "updated_at", "attached_at")
     raw_id_fields = ("product",)   # товаров тысячи — без autocomplete-зависимости от ProductAdmin
     actions = ["run_selected"]
 
-    @admin.action(description="Обработать выбранные задания сейчас")
+    @admin.action(description="Сгенерировать выбранные (результат — «На проверке»)")
     def run_selected(self, request, queryset):
-        done = failed = skipped = 0
+        # Только генерация: на витрину снимок попадает после «Принять» на экране проверки.
+        review = failed = skipped = 0
         for job in queryset:
-            service.run_job(job)
-            done += job.status == PhotoJob.STATUS_DONE
+            service.generate(job)
+            review += job.status == PhotoJob.STATUS_REVIEW
             failed += job.status == PhotoJob.STATUS_FAILED
             skipped += job.status == PhotoJob.STATUS_SKIPPED
         self.message_user(
-            request, "Готово: %d · Ошибок: %d · Без товара: %d" % (done, failed, skipped))
+            request, "На проверке: %d · Ошибок: %d · Без товара: %d" % (review, failed, skipped))

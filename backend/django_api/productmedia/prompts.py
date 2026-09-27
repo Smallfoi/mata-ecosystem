@@ -76,3 +76,19 @@ def with_text(prompt: str, text: str = "") -> str:
         "these characters, letter for letter, in the same place and style as in the "
         "reference, and no other text." % text
     )
+
+
+def with_note(prompt: str, note: str = "") -> str:
+    """Добавить замечание проверяющего к промту повторной попытки («Переделать»).
+
+    Замечание пишет человек на экране проверки («принт перенесён на перед», «не та
+    ткань»); модель получает его как обязательную правку. Пустое — промт без изменений.
+    """
+    note = (note or "").strip()
+    if not note:
+        return prompt
+    return (
+        prompt
+        + "\nREVIEWER FEEDBACK on the previous attempt - it was rejected for this reason, "
+        "fix it now (the note may be in Russian): %s" % note
+    )

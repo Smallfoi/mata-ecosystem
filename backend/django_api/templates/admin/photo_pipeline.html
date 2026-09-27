@@ -1,0 +1,86 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# Фотопайплайн: партия исходников (папка = артикул) → ИИ → проверка → витрина. #}
+
+<div class="m-tabs">
+  <a class="m-tab on" href="">Загрузка и партии</a>
+  <a class="m-tab" href="{{ review_link }}">Проверка фото</a>
+</div>
+
+{% if can_edit %}
+<div class="m-card pad" id="pipeline-upload">
+  <div class="m-lead">Новая партия</div>
+  <div class="m-hint">
+    Каждая папка называется <b>артикулом</b> товара и содержит его снимки: перед, спина,
+    крупный план принта. Первый по имени файл станет обложкой, остальные уйдут в галерею.
+    Одна вещь в кадре. Фото перед отправкой уменьшаются до 2560 px.
+    После обработки снимки ждут проверки — на витрину без «Принять» ничего не попадёт.
+  </div>
+
+  <div class="m-row">
+    <label class="m-field">Трек
+      <select class="m-input" name="track">
+        {% for code, label in tracks %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="m-btn">Выбрать папки
+      <input type="file" webkitdirectory directory multiple hidden data-role="pick">
+    </label>
+  </div>
+
+  <div class="m-drop" data-role="drop">Или перетащите папки сюда</div>
+
+  <div data-role="plan" hidden>
+    <div class="m-wrap">
+      <table class="m">
+        <thead><tr><th>Папка</th><th>Товар</th><th>Цвет</th><th class="n">Файлов</th><th class="n">В галерее</th></tr></thead>
+        <tbody data-role="rows"></tbody>
+      </table>
+    </div>
+    <div class="m-row">
+      <button type="button" class="m-btn primary" data-role="go">Загрузить и обработать</button>
+      <span class="m-small m-muted" data-role="status"></span>
+    </div>
+  </div>
+</div>
+{% csrf_token %}
+{% endif %}
+
+<div class="m-card">
+  <h3>Партии</h3>
+  {% if batches %}
+  <div class="m-wrap">
+    <table class="m">
+      <thead><tr>
+        <th>№</th><th>Когда</th><th>Кто</th><th>Трек</th>
+        <th class="n">Всего</th><th class="n">В работе</th><th class="n">На проверке</th>
+        <th class="n">На витрине</th><th class="n">Отклонено</th><th class="n">Ошибки</th>
+        <th class="n">Без товара</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for b in batches %}
+        <tr>
+          <td class="m-mono">#{{ b.id }}</td>
+          <td class="m-small">{{ b.created_at|date:"d.m H:i" }}</td>
+          <td class="m-small">{{ b.who|default:"—" }}</td>
+          <td class="m-small">{{ b.track }}</td>
+          <td class="n">{{ b.total }}</td>
+          <td class="n">{{ b.c.pending|add:b.c.processing }}</td>
+          <td class="n">{% if b.c.review %}<span class="m-tag review">{{ b.c.review }}</span>{% else %}0{% endif %}</td>
+          <td class="n">{{ b.c.done }}</td>
+          <td class="n">{{ b.c.rejected }}</td>
+          <td class="n">{% if b.c.failed %}<span class="m-tag bad">{{ b.c.failed }}</span>{% else %}0{% endif %}</td>
+          <td class="n">{{ b.c.skipped }}</td>
+          <td><a class="m-btn quiet" href="{{ review_link }}?batch={{ b.id }}">Проверить</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="m-empty">Партий ещё не было.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

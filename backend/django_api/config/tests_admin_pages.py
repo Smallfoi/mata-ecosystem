@@ -65,6 +65,8 @@ class AdminPagesRenderTests(TestCase):
             "/admin/legal/consentclient/",
             "/admin/legal/consentclient/u_5Fpage/change/",
             "/admin/catalog/product/",
+            reverse("photo_pipeline"),
+            reverse("photo_review"),
         ]
         for url in pages:
             self._open(url)

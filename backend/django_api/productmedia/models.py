@@ -42,13 +42,17 @@ class PhotoJob(models.Model):
     """Один исходник → мастер (ИИ) → webp → привязка к карточке."""
     STATUS_PENDING = "pending"
     STATUS_PROCESSING = "processing"
-    STATUS_DONE = "done"
+    STATUS_REVIEW = "review"            # ИИ отработал, ждёт решения человека
+    STATUS_DONE = "done"                # принято и выложено на витрину
+    STATUS_REJECTED = "rejected"        # брак: не выкладываем
     STATUS_FAILED = "failed"
     STATUS_SKIPPED = "skipped"          # артикул папки не найден в каталоге
     STATUS_CHOICES = [
         (STATUS_PENDING, "В очереди"),
-        (STATUS_PROCESSING, "Обрабатывается"),
-        (STATUS_DONE, "Готово"),
+        (STATUS_PROCESSING, "Генерируется"),
+        (STATUS_REVIEW, "На проверке"),
+        (STATUS_DONE, "На витрине"),
+        (STATUS_REJECTED, "Отклонено"),
         (STATUS_FAILED, "Ошибка"),
         (STATUS_SKIPPED, "Без товара"),
     ]
@@ -77,6 +81,15 @@ class PhotoJob(models.Model):
     status = models.CharField("Статус", max_length=12, choices=STATUS_CHOICES,
                               default=STATUS_PENDING, db_index=True)
     error = models.TextField("Ошибка", blank=True, default="")
+    # Текст принта словами, если известен: модель рисует надпись точнее (prompts.with_text).
+    text = models.CharField("Текст принта", max_length=300, blank=True, default="")
+    # Последнее замечание проверяющего: при «Переделать» уходит в промт следующей попытки.
+    note = models.TextField("Замечание", blank=True, default="")
+    attempts = models.PositiveSmallIntegerField("Попыток генерации", default=0)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="photo_reviews", verbose_name="Проверил")
+    reviewed_at = models.DateTimeField("Проверено", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     attached_at = models.DateTimeField("Прикреплено", null=True, blank=True)

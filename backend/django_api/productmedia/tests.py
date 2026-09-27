@@ -302,7 +302,7 @@ class PhotoPipelineServiceTests(TestCase):
             ProductPhoto.MAX_PER_COLOR)                       # седьмой не добавлен
 
     @mock.patch("productmedia.processing.process")
-    def test_run_batch_counts_done(self, m_proc):
+    def test_run_batch_sends_to_review_not_showcase(self, m_proc):
         m_proc.return_value = _png_bytes((5, 5, 5), (900, 900))
         batch = self._batch()
         service.intake(batch, [
@@ -310,10 +310,12 @@ class PhotoPipelineServiceTests(TestCase):
             {"article": "НЕТ", "content": _png_bytes(), "filename": "b.png"},
         ])
         summary = service.run_batch(batch)
-        self.assertEqual(summary["done"], 1)                 # только сопоставленный прогнан
+        self.assertEqual(summary["review"], 1)               # только сопоставленный прогнан
         self.assertEqual(summary["failed"], 0)
         # несопоставленный уже помечен skipped на приёме — в очередь run_batch не попадает
         self.assertEqual(batch.jobs.filter(status=PhotoJob.STATUS_SKIPPED).count(), 1)
+        # на витрину без «Принять» ничего не попадает
+        self.assertEqual(ProductPhoto.objects.count(), 0)
 
     @mock.patch("productmedia.processing.process")
     def test_run_job_preview_skips_attach(self, m_proc):
@@ -324,7 +326,7 @@ class PhotoPipelineServiceTests(TestCase):
             {"article": "HD-1", "content": _png_bytes(), "filename": "a.png"}])[0]
         service.run_job(job, attach=False)
         job.refresh_from_db()
-        self.assertEqual(job.status, PhotoJob.STATUS_DONE)
+        self.assertEqual(job.status, PhotoJob.STATUS_REVIEW)
         self.assertTrue(job.master.name)
         self.assertTrue(job.webp.name.endswith(".webp"))
         self.assertIsNone(job.attached_at)
@@ -348,7 +350,7 @@ class PhotoTestCommandTests(TestCase):
         m_proc.return_value = _png_bytes((10, 10, 10), (1000, 1000))
         call_command("photo_test", "--article", "RUN-9", "--from-product")
         self.assertEqual(ProductPhoto.objects.count(), 0)    # предпросмотр — витрина чиста
-        self.assertEqual(PhotoJob.objects.filter(status=PhotoJob.STATUS_DONE).count(), 1)
+        self.assertEqual(PhotoJob.objects.filter(status=PhotoJob.STATUS_REVIEW).count(), 1)
 
     @mock.patch("productmedia.processing.process")
     def test_apply_attaches_to_showcase(self, m_proc):
@@ -365,4 +367,144 @@ class PhotoTestCommandTests(TestCase):
         m_proc.return_value = _png_bytes((30, 30, 30), (1000, 1000))
         call_command("photo_test", "--product-id", "cmd1", "--from-product")
         self.assertEqual(ProductPhoto.objects.count(), 0)    # предпросмотр — витрина чиста
-        self.assertEqual(PhotoJob.objects.filter(status=PhotoJob.STATUS_DONE).count(), 1)
+        self.assertEqual(PhotoJob.objects.filter(status=PhotoJob.STATUS_REVIEW).count(), 1)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class ReviewCycleTests(TestCase):
+    """Цикл проверки: генерация → «На проверке» → принять / переделать / отклонить."""
+
+    @classmethod
+    def setUpTestData(cls):
+        Product.objects.create(id="rv1", name="Лонгслив", category_id="c", price=3000,
+                               article="LS-1", colors=["Оливковый"], model_key="LONGSLEEVE")
+
+    def _job(self):
+        batch = PhotoBatch.objects.create(track="catalog")
+        return service.intake(batch, [
+            {"article": "LS-1", "content": _png_bytes(), "filename": "a.png"}])[0]
+
+    @mock.patch("productmedia.processing.process")
+    def test_generate_goes_to_review_not_showcase(self, m_proc):
+        m_proc.return_value = _png_bytes((1, 2, 3), (900, 900))
+        job = service.generate(self._job())
+        self.assertEqual(job.status, PhotoJob.STATUS_REVIEW)
+        self.assertEqual(job.attempts, 1)
+        self.assertEqual(ProductPhoto.objects.count(), 0)
+
+    @mock.patch("productmedia.processing.process")
+    def test_approve_puts_photo_on_showcase(self, m_proc):
+        m_proc.return_value = _png_bytes((1, 2, 3), (900, 900))
+        job = service.generate(self._job())
+        self.assertEqual(service.approve(job), "")
+        job.refresh_from_db()
+        self.assertEqual(job.status, PhotoJob.STATUS_DONE)
+        self.assertIsNotNone(job.reviewed_at)
+        self.assertEqual(ProductPhoto.objects.filter(model_key="LONGSLEEVE",
+                                                     color="Оливковый").count(), 1)
+
+    def test_approve_needs_review_status(self):
+        self.assertTrue(service.approve(self._job()))        # «в очереди» — принять нечего
+
+    @mock.patch("productmedia.processing.process")
+    def test_approve_when_color_full_stays_in_review(self, m_proc):
+        m_proc.return_value = _png_bytes((1, 2, 3), (900, 900))
+        for _ in range(ProductPhoto.MAX_PER_COLOR):
+            photolib.attach("LONGSLEEVE", color="Оливковый", data=_png_bytes())
+        job = service.generate(self._job())
+        err = service.approve(job)
+        job.refresh_from_db()
+        self.assertIn("6", err)
+        self.assertEqual(job.status, PhotoJob.STATUS_REVIEW)  # освободят место — примут снова
+
+    @mock.patch("productmedia.processing.process")
+    def test_redo_sends_note_into_next_attempt(self, m_proc):
+        m_proc.return_value = _png_bytes((1, 2, 3), (900, 900))
+        job = service.generate(self._job())
+        service.redo(job, "принт перенесён на перед")
+        self.assertEqual(job.status, PhotoJob.STATUS_PENDING)
+        service.generate(job)
+        self.assertEqual(m_proc.call_args.kwargs["note"], "принт перенесён на перед")
+        self.assertEqual(job.attempts, 2)
+
+    def test_reject_keeps_reason(self):
+        job = service.reject(self._job(), "выдумана надпись")
+        job.refresh_from_db()
+        self.assertEqual(job.status, PhotoJob.STATUS_REJECTED)
+        self.assertEqual(job.note, "выдумана надпись")
+
+    def test_note_goes_into_prompt(self):
+        from productmedia import prompts
+        self.assertIn("принт на спине", prompts.with_note(prompts.CATALOG, "принт на спине"))
+        self.assertEqual(prompts.with_note(prompts.CATALOG, ""), prompts.CATALOG)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class PipelineScreensTests(TestCase):
+    """Экраны «Фотопайплайн» и «Проверка фото»: загрузка партии и решения по снимкам."""
+
+    @classmethod
+    def setUpTestData(cls):
+        Product.objects.create(id="sc1", name="Майка", category_id="c", price=2000,
+                               article="TS-7", colors=["Чёрный"], model_key="TANK")
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from common.testutils import login_admin
+        get_user_model().objects.create_superuser("owner_pp", "pp@t.dev", "OwnerPass!2026")
+        login_admin(self.client, "owner_pp", "OwnerPass!2026")
+
+    def _post(self, url, **data):
+        return self.client.post(url, data).json()
+
+    def test_match_reports_found_and_missing_folders(self):
+        from django.urls import reverse
+        import json
+        data = self._post(reverse("photo_pipeline"), action="match",
+                          folders=json.dumps(["ts-7", "НЕТ-ТАКОГО"]))
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["matched"][0]["productId"], "sc1")
+        self.assertEqual(data["matched"][0]["color"], "Чёрный")
+        self.assertEqual(data["unmatched"], [{"folder": "НЕТ-ТАКОГО"}])
+
+    @mock.patch("productmedia.tasks.process_batch.delay")
+    def test_upload_and_start_batch(self, m_delay):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.urls import reverse
+        url = reverse("photo_pipeline")
+        batch = self._post(url, action="create", track="catalog")["batch"]
+        photo = SimpleUploadedFile("1.png", _png_bytes(), content_type="image/png")
+        up = self.client.post(url, {"action": "upload", "batch": batch, "article": "TS-7",
+                                    "attach_as": "main", "photo": photo}).json()
+        self.assertTrue(up["ok"])
+        self.assertEqual(PhotoJob.objects.get(pk=up["job"]).status, PhotoJob.STATUS_PENDING)
+        started = self._post(url, action="start", batch=batch)
+        self.assertTrue(started["ok"])
+        m_delay.assert_called_once_with(batch)
+
+    @mock.patch("productmedia.processing.process")
+    def test_review_approve_and_redo(self, m_proc):
+        from django.urls import reverse
+        m_proc.return_value = _png_bytes((1, 2, 3), (900, 900))
+        batch = PhotoBatch.objects.create(track="catalog")
+        jobs = service.intake(batch, [
+            {"article": "TS-7", "content": _png_bytes(), "filename": "a.png"},
+            {"article": "TS-7", "content": _png_bytes(), "filename": "b.png",
+             "attach_as": "gallery"}])
+        for j in jobs:
+            service.generate(j)
+        url = reverse("photo_review")
+        page = self.client.get(url)
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Принять")
+
+        ok = self._post(url, action="approve", job=jobs[0].pk)
+        self.assertEqual(ok["status"], PhotoJob.STATUS_DONE)
+        self.assertEqual(ProductPhoto.objects.filter(model_key="TANK").count(), 1)
+
+        with mock.patch("productmedia.tasks.regenerate_job.delay") as m_regen:
+            redo = self._post(url, action="redo", job=jobs[1].pk, note="не та ткань")
+        self.assertEqual(redo["status"], PhotoJob.STATUS_PENDING)
+        m_regen.assert_called_once_with(jobs[1].pk)
+        jobs[1].refresh_from_db()
+        self.assertEqual(jobs[1].note, "не та ткань")
