@@ -1,4 +1,4 @@
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from rest_framework.decorators import api_view, throttle_classes
 from rest_framework.response import Response
 
@@ -6,6 +6,7 @@ from common.throttling import AuthEndpointThrottle, OtpPollThrottle
 
 from common.uploads import image_extension
 from common.security import (
+    forget_account,
     hash_password,
     make_token,
     new_user_id,
@@ -55,7 +56,7 @@ def register(request):
         )
         seed_runner_points(acc.id)
         track(E_REGISTER, user_id=acc.id, source="phone")
-        return Response({"token": make_token(acc.id), "user": acc.to_json()})
+        return Response({"token": make_token(acc.id, acc.token_version), "user": acc.to_json()})
 
     # Легаси: регистрация по email+паролю (обратная совместимость).
     if Account.objects.filter(email=email).exists():
@@ -70,7 +71,7 @@ def register(request):
     )
     seed_runner_points(acc.id)
     track(E_REGISTER, user_id=acc.id, source="email")  # аналитика (D-30)
-    return Response({"token": make_token(acc.id), "user": acc.to_json()})
+    return Response({"token": make_token(acc.id, acc.token_version), "user": acc.to_json()})
 
 
 @api_view(["POST"])
@@ -88,7 +89,7 @@ def login(request):
         return Response({"detail": "Неверный телефон/email или пароль"}, status=401)
     if acc.is_blocked:
         return Response({"detail": "Аккаунт заблокирован"}, status=403)
-    return Response({"token": make_token(acc.id), "user": acc.to_json()})
+    return Response({"token": make_token(acc.id, acc.token_version), "user": acc.to_json()})
 
 
 @api_view(["POST"])
@@ -111,8 +112,13 @@ def password_reset(request):
     if acc.is_blocked:
         return Response({"detail": "Аккаунт заблокирован"}, status=403)
     acc.password_hash = hash_password(password)
-    acc.save(update_fields=["password_hash"])
-    return Response({"token": make_token(acc.id), "user": acc.to_json()})
+    # Аудит A02: новый пароль закрывает все прежние сессии — если пароль сбрасывают
+    # из-за угона, старый токен угонщика должен перестать работать. Новый токен
+    # (с новой версией) уходит в ответе тому, кто подтвердил телефон кодом.
+    acc.token_version = (acc.token_version or 0) + 1
+    acc.save(update_fields=["password_hash", "token_version"])
+    forget_account(acc.id)
+    return Response({"token": make_token(acc.id, acc.token_version), "user": acc.to_json()})
 
 
 @api_view(["POST"])
@@ -182,23 +188,36 @@ def phone_verify(request):
             acc.save(update_fields=["phone"])
     created = False
     if not acc:
-        acc = Account.objects.create(
-            id=new_user_id(),
-            name=(d.get("name") or "Runner").strip(),
-            email=email,
-            phone=phone,
-            provider="phone",
-            password_hash=hash_password(f"phone:{phone}"),
-        )
-        seed_runner_points(acc.id)
-        created = True
+        try:
+            with transaction.atomic():
+                acc = Account.objects.create(
+                    id=new_user_id(),
+                    name=(d.get("name") or "Runner").strip(),
+                    email=email,
+                    phone=phone,
+                    provider="phone",
+                    # Пароля нет: вход только по коду, пока человек сам не задаст
+                    # пароль через «сброс по SMS». Раньше здесь стоял пароль
+                    # «phone:<номер>» — войти в чужой аккаунт можно было, зная
+                    # один номер (аудит A01, 27.09.2026).
+                    password_hash=None,
+                )
+            seed_runner_points(acc.id)
+            created = True
+        except IntegrityError:
+            # Два входа с одним новым номером одновременно (аудит A03): второй
+            # упирается в уникальность телефона/email — берём уже созданный аккаунт.
+            acc = (Account.objects.filter(phone=phone).first()
+                   or Account.objects.filter(email=email).first())
+            if acc is None:
+                raise
     if acc.is_blocked:
         return Response({"detail": "Аккаунт заблокирован"}, status=403)
     # Аналитика (D-30): регистрация нового аккаунта или вход существующего.
     from analytics.models import E_LOGIN, E_REGISTER, track
 
     track(E_REGISTER if created else E_LOGIN, user_id=acc.id, source="phone")
-    return Response({"token": make_token(acc.id), "user": acc.to_json()})
+    return Response({"token": make_token(acc.id, acc.token_version), "user": acc.to_json()})
 
 
 @api_view(["GET"])
@@ -231,8 +250,15 @@ def update_profile(request):
         # уникально. Смена без подтверждения = присвоить себе чужой номер и перехватить
         # вход владельца (D-37). Меняем только первичное заполнение пустого поля;
         # смена номера — через поддержку или отдельный проверенный сценарий.
+        #
+        # Аудит A03: и первичное заполнение тоже только с кодом из SMS/звонка
+        # (`phoneCode`, как во входе): иначе к аккаунту без телефона можно
+        # «привязать» чужой номер и потом входить по нему. Без кода номер просто
+        # не сохраняется — остальные поля профиля сохраняются как раньше, чтобы
+        # старые сборки, шлющие phone в каждом PATCH, не ломались.
         new_phone = normalize_phone(d.get("phone") or "")
-        if not acc.phone and new_phone:
+        if (not acc.phone and new_phone and d.get("phoneCode") is not None
+                and check_code(new_phone, d.get("phoneCode") or "")):
             if Account.objects.filter(phone=new_phone).exclude(id=acc.id).exists():
                 return Response({"detail": "Этот номер уже занят"}, status=409)
             acc.phone = new_phone
@@ -505,6 +531,9 @@ def delete_account(request):
         deleted["footprints"] = cur.rowcount
     # Сам аккаунт.
     acc.delete()
+    # Аудит A02: токены удалённого аккаунта перестают работать сразу, а не через
+    # минуту кэша.
+    forget_account(uid)
     return Response({"ok": True, "deleted": deleted})
 
 
