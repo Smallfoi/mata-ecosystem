@@ -9,7 +9,8 @@ from common.security import user_id_from_request
 from .awards import redeem_for_order
 from .lifecycle import AWAITING, apply_payment_info, mark_paid, payment_started
 from .models import Order
-from .pricing import CartError, money, normalize_items, parse_quantity, total_is_acceptable
+from .money import kop_to_float, kop_to_rub, to_kop
+from .pricing import CartError, normalize_items, parse_quantity, total_is_acceptable
 from .payment import (
     PaymentError,
     create_payment,
@@ -26,8 +27,8 @@ _PAY_FIELDS = ("status", "paymentId", "confirmationUrl", "method")
 
 def _kop(value):
     try:
-        return int(round(float(value or 0) * 100))
-    except (TypeError, ValueError):
+        return to_kop(value)
+    except ValueError:
         return str(value)
 
 
@@ -59,7 +60,7 @@ def _billable(payload, total, points) -> tuple:
 
 
 def _order_billable(order) -> tuple:
-    return _billable(order.payload, order.total, order.points_redeemed)
+    return _billable(order.payload, kop_to_rub(order.amount_kop), order.points_redeemed)
 
 
 def _qty_key(raw):
@@ -87,7 +88,7 @@ def _shape(payload, total, points) -> tuple:
 
 
 def _order_shape(order) -> tuple:
-    return _shape(order.payload, order.total, order.points_redeemed)
+    return _shape(order.payload, kop_to_rub(order.amount_kop), order.points_redeemed)
 
 
 def _test_payer(uid: str) -> bool:
@@ -137,7 +138,10 @@ def pay_order(request, order_id):
     # должен поменяться (аудит B01) — проверим после ответа.
     snapshot = _order_billable(order)
     try:
-        receipt = build_receipt(order.payload, order.total)
+        # Сумма платежа и чек — из одних и тех же копеек (аудит B09): сумма строк
+        # чека обязана совпасть с платежом до копейки.
+        amount = kop_to_rub(order.amount_kop)
+        receipt = build_receipt(order.payload, amount)
     except ValueError as e:
         # Фискализация включена, а чек собрать не из чего. Платить без чека нельзя:
         # это нарушение 54-ФЗ, и касса всё равно откажет.
@@ -145,7 +149,7 @@ def pay_order(request, order_id):
     try:
         result = create_payment(
             order_id,
-            order.total,
+            amount,
             request.data.get("returnUrl") or "",
             # Номер заказа уникален только в паре с пользователем, провайдеру нужен
             # глобально уникальный — иначе два покупателя с одинаковым SS-… и равной
@@ -270,7 +274,8 @@ def orders(request):
         if not oid:
             return Response({"detail": "Нет id заказа"}, status=400)
         try:
-            total = float(money(d.get("total")))
+            total_kop = to_kop(d.get("total"))
+            total = kop_to_float(total_kop)  # float-зеркало для старых полей/API
         except ValueError:
             return Response({"detail": "Некорректная сумма заказа"}, status=400)
         try:
@@ -303,7 +308,10 @@ def orders(request):
             # Приём оплаты включён — позиции не из каталога не принимаем (D-37, D-72):
             # такой заказ оплатили бы хоть рублём.
             try:
-                cart = normalize_items(d.get("items"), strict=payment_enabled())
+                # Под блокировкой строк товаров и с учётом резерва неоплаченных
+                # заказов: последнюю вещь не оформят двое сразу.
+                cart = normalize_items(d.get("items"), strict=payment_enabled(),
+                                       lock=True, exclude=(uid, oid))
             except CartError as e:
                 return Response(e.body(), status=e.status)
 
@@ -320,12 +328,12 @@ def orders(request):
             # законно снижает порог, но только реально списанная. Не сошлось —
             # откатываем и списание.
             if not already:
-                problem = redeem_for_order(uid, oid, points, total + points)
+                problem = redeem_for_order(uid, oid, points, float(kop_to_rub(total_kop) + points))
                 if problem:
                     return Response({"detail": problem}, status=400)
             # Сумму присылает клиент — сверяем её с ценами каталога (D-37). Иначе
             # корзину на 50 000 ₽ можно оформить с total: 1 и заплатить рубль.
-            if not total_is_acceptable(total, cart, uid, oid):
+            if not total_is_acceptable(kop_to_rub(total_kop), cart, uid, oid):
                 transaction.set_rollback(True)
                 return Response(
                     {"detail": "Сумма заказа не совпадает с ценами каталога"}, status=400
@@ -335,7 +343,9 @@ def orders(request):
                 # Сумма товаров по ценам каталога — та же, что в строках.
                 payload["subtotal"] = float(cart.goods)
             fields = {
+                # Двойная запись: копейки — для расчётов, float — старым клиентам.
                 "total": total,
+                "total_kop": total_kop,
                 "points_redeemed": points,
                 "payload": payload,
             }

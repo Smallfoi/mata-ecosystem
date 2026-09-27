@@ -111,7 +111,7 @@ def order_return(request, pk):
         "may_edit": may_edit,
         "returnable": order.payment_status in RETURNABLE and bool(order.payment_id),
         "returns": returns,
-        "paid_rub": _rub(round(float(order.total or 0) * 100)),
+        "paid_rub": _rub(order.amount_kop),
         "payment_label": PAYMENT_LABELS.get(order.payment_status, order.payment_status),
         "redeemed": redeemed_for(order),
         "earned": earned_for(order),

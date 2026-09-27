@@ -24,6 +24,7 @@ from .awards import (
     revoke_earned_points,
 )
 from .models import Order, OrderReturn
+from .money import kop_to_rub
 from .payment import PaymentError, create_refund
 from .receipt import allocate, refund_receipt
 
@@ -37,7 +38,7 @@ class ReturnError(Exception):
 
 def _rows(order):
     try:
-        return allocate(order.payload, order.total)
+        return allocate(order.payload, kop_to_rub(order.amount_kop))
     except ValueError as e:
         raise ReturnError(f"Не удалось разложить заказ по позициям: {e}") from e
 
@@ -126,10 +127,10 @@ def make_return(order_pk, indexes, by=""):
 
     # Запрос в ЮKassa — вне транзакции: сеть не должна держать блокировку заказа.
     try:
-        receipt = refund_receipt(order.payload, order.total, plan["lines"])
+        receipt = refund_receipt(order.payload, kop_to_rub(order.amount_kop), plan["lines"])
         refund = create_refund(
             order.payment_id,
-            plan["amount_kop"] / 100,
+            kop_to_rub(plan["amount_kop"]),
             f"Возврат по заказу {order.order_id}",
             # Свой ключ у каждого возврата: ключ «платёж + сумма» склеил бы два
             # частичных возврата на равную сумму в один.
