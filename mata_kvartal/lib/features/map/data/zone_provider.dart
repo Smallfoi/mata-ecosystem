@@ -1,7 +1,6 @@
 import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:math';
-import 'package:dio/dio.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -77,12 +76,13 @@ double distMeters(LatLng a, LatLng b) {
   return sqrt(dlat * dlat + dlng * dlng);
 }
 
-// Источник полигонов кварталов (отдельный zones-сервис, не общий API).
-// Прод/иной хост: --dart-define=KVARTAL_ZONES_URL=https://.../api/zones
-const _backendUrl = String.fromEnvironment(
-  'KVARTAL_ZONES_URL',
-  defaultValue: 'http://localhost:3000/api/zones',
-);
+// Кварталы-заготовки (BlockZone) остались от прототипа: их полигоны приходили из
+// отдельного сервиса на localhost:3000, которого давно нет, а в релизной сборке
+// адрес и не задавался — слой всегда был пустым, зато карта ждала ответа и
+// показывала «Загружаем кварталы…»/«Зоны не загружены» во ВСЕХ режимах. Запрос
+// убран (27.09.2026): единственный источник владения — серверные territories,
+// а городские кварталы (632 по OSM) живут на бэкенде в /v1/blocks и придут на
+// карту отдельной фазой D-74 — одним кварталом-кругом, не сеткой (см. #685).
 const _capturedZoneIdsKey = 'kvartal.captured_zone_ids.v1';
 const _capturedAreasKey = 'kvartal.captured_areas.v1';
 const _mapCleanupOnceKey = 'kvartal.map_cleanup_2026_06_21.v2';
@@ -103,25 +103,6 @@ ZoneOwner _ownerFromString(String s) {
       return ZoneOwner.free;
   }
 }
-
-Future<List<BlockZone>> _fetchFromBackend() async {
-  final dio = Dio();
-  final response = await dio.get<Map<String, dynamic>>(
-    _backendUrl,
-    options: Options(
-      receiveTimeout: const Duration(seconds: 20),
-      sendTimeout: const Duration(seconds: 5),
-      validateStatus: (s) => s != null && s < 600,
-    ),
-  );
-  if (response.statusCode == 503) {
-    throw _BackendLoadingException();
-  }
-  final list = response.data?['zones'] as List? ?? [];
-  return _parseZoneList(list);
-}
-
-class _BackendLoadingException implements Exception {}
 
 Future<List<BlockZone>> _parseZoneList(List<dynamic> list) async {
   return list.map((z) {
@@ -175,24 +156,15 @@ class ZoneNotifier extends StateNotifier<AsyncValue<List<BlockZone>>> {
       (p) => p.remove(_capturedAreasKey),
     ));
 
-    for (int attempt = 1; ; attempt++) {
-      try {
-        final zones = await _fetchFromBackend();
-        _initialState = zones;
-        state = AsyncValue.data(_applyCapturedOwners(zones));
-        return;
-      } on _BackendLoadingException {
-        await Future.delayed(const Duration(seconds: 5));
-      } catch (_) {
-        try {
-          final zones = await _loadFromAssets();
-          _initialState = zones;
-          state = AsyncValue.data(_applyCapturedOwners(zones));
-        } catch (e, st) {
-          state = AsyncValue.error(e, st);
-        }
-        return;
-      }
+    try {
+      final zones = await _loadFromAssets();
+      _initialState = zones;
+      state = AsyncValue.data(_applyCapturedOwners(zones));
+    } catch (_) {
+      // Нет заготовок — карта просто без этого слоя. Это не ошибка: захват
+      // рисуется серверными territories, и пустой список честнее баннера.
+      _initialState = const [];
+      state = const AsyncValue.data([]);
     }
   }
 
