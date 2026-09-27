@@ -465,6 +465,13 @@ UNFOLD = {
                     {"title": "Фото товаров", "icon": "add_photo_alternate",
                      "link": reverse_lazy("product_photos"),
                      "permission": _tab("product_photos")},
+                    # Фотопайплайн: партии исходников по артикулу → ИИ → проверка.
+                    {"title": "Фотопайплайн", "icon": "auto_awesome",
+                     "link": reverse_lazy("photo_pipeline"),
+                     "permission": _tab("photo_pipeline")},
+                    {"title": "Проверка фото", "icon": "fact_check",
+                     "link": reverse_lazy("photo_review"),
+                     "permission": _tab("photo_pipeline")},
                 ],
             },
             {

@@ -13,13 +13,15 @@ TRACKS = {
 }
 
 
-def process(source_bytes: bytes, track: str = "catalog", text: str = "") -> bytes:
+def process(source_bytes: bytes, track: str = "catalog", text: str = "",
+            note: str = "") -> bytes:
     """Исходник → мастер по выбранному треку. Кидает ImageProviderError при сбое/без ключа.
 
-    text — буквальный текст принта, если известен (см. prompts.with_text).
+    text — буквальный текст принта, если известен (см. prompts.with_text);
+    note — замечание проверяющего к повторной попытке (prompts.with_note).
     """
     if track not in TRACKS:
         raise providers.ImageProviderError("неизвестный трек: %s" % track)
     prompt, size, high_fidelity = TRACKS[track]
-    prompt = prompts.with_text(prompt, text)
+    prompt = prompts.with_note(prompts.with_text(prompt, text), note)
     return providers.edit_image(source_bytes, prompt, size=size, high_fidelity=high_fidelity)

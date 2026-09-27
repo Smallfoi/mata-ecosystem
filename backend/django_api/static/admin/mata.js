@@ -244,3 +244,293 @@
   }
 })();
 
+
+/* Фотопайплайн: загрузка партии. Папка = артикул, первый по имени файл — обложка.
+ * Браузер заранее уменьшает снимки до 2560 px: так быстро и не упирается в лимит
+ * размера запроса на сервере. Файлы уходят по одному, потом партия запускается в фон. */
+(function () {
+  "use strict";
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  function init() {
+    var box = document.getElementById("pipeline-upload");
+    if (!box) return;
+
+    var token = document.querySelector("input[name=csrfmiddlewaretoken]");
+    var pick = box.querySelector("[data-role=pick]");
+    var drop = box.querySelector("[data-role=drop]");
+    var plan = box.querySelector("[data-role=plan]");
+    var rows = box.querySelector("[data-role=rows]");
+    var go = box.querySelector("[data-role=go]");
+    var status = box.querySelector("[data-role=status]");
+    var track = box.querySelector("select[name=track]");
+    var IMG = /\.(jpe?g|png|webp)$/i;
+    var MAXPX = 2560;
+    var groups = {};    // артикул → [File]
+    var matched = {};   // артикул → true, если нашёлся товар
+
+    function post(body) {
+      if (token) body.append("csrfmiddlewaretoken", token.value);
+      return fetch(window.location.pathname, {
+        method: "POST", body: body, credentials: "same-origin",
+        headers: token ? { "X-CSRFToken": token.value } : {}
+      }).then(function (r) { return r.json(); });
+    }
+
+    // Артикул — имя папки, в которой лежит файл (подходит и «ART/1.jpg», и «Партия/ART/1.jpg»).
+    function folderOf(path) {
+      var parts = (path || "").split("/");
+      return parts.length > 1 ? parts[parts.length - 2].trim() : "";
+    }
+
+    function collect(list) {
+      groups = {};
+      list.forEach(function (it) {
+        if (!IMG.test(it.file.name)) return;
+        var a = folderOf(it.path);
+        if (!a) return;
+        (groups[a] = groups[a] || []).push(it.file);
+      });
+      Object.keys(groups).forEach(function (a) {
+        groups[a].sort(function (x, y) {
+          return x.name.localeCompare(y.name, undefined, { numeric: true });
+        });
+      });
+      check();
+    }
+
+    function addRow(cells, off) {
+      var tr = document.createElement("tr");
+      if (off) tr.className = "m-off";
+      cells.forEach(function (v, i) {
+        var td = document.createElement("td");
+        td.textContent = v;
+        if (i >= 3) td.className = "n";
+        tr.appendChild(td);
+      });
+      rows.appendChild(tr);
+    }
+
+    function check() {
+      rows.innerHTML = "";
+      plan.hidden = false;
+      var names = Object.keys(groups);
+      if (!names.length) {
+        status.textContent = "Папок со снимками JPEG/PNG/WEBP не нашлось";
+        go.disabled = true;
+        return;
+      }
+      var body = new FormData();
+      body.append("action", "match");
+      body.append("folders", JSON.stringify(names));
+      status.textContent = "Ищу товары по артикулам…";
+      post(body).then(function (data) {
+        if (!data.ok) { status.textContent = data.error || "не вышло"; return; }
+        matched = {};
+        data.matched.forEach(function (m) {
+          matched[m.folder] = true;
+          addRow([m.folder, m.name, m.color || "—", groups[m.folder].length,
+                  m.used + " из " + m.max], false);
+        });
+        data.unmatched.forEach(function (u) {
+          addRow([u.folder, "товар не найден — пропустим", "",
+                  (groups[u.folder] || []).length, ""], true);
+        });
+        var n = 0;
+        Object.keys(matched).forEach(function (a) { n += groups[a].length; });
+        status.textContent = "К загрузке: " + n + " снимков из " +
+          Object.keys(matched).length + " папок";
+        go.disabled = n === 0;
+      }).catch(function () { status.textContent = "сеть не ответила"; });
+    }
+
+    // Уменьшить до 2560 px по длинной стороне. Не декодируется (например, HEIC) — как есть.
+    function shrink(file) {
+      if (!window.createImageBitmap) return Promise.resolve(file);
+      return createImageBitmap(file).then(function (bmp) {
+        var k = Math.min(1, MAXPX / Math.max(bmp.width, bmp.height));
+        var c = document.createElement("canvas");
+        c.width = Math.round(bmp.width * k);
+        c.height = Math.round(bmp.height * k);
+        c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+        return new Promise(function (res) {
+          c.toBlob(function (b) { res(b || file); }, "image/jpeg", 0.9);
+        });
+      }).catch(function () { return file; });
+    }
+
+    function finish(batch, done, bad) {
+      var body = new FormData();
+      body.append("action", "start");
+      body.append("batch", batch);
+      return post(body).then(function (data) {
+        status.textContent = "Загружено " + done + (bad ? ", не загрузилось " + bad : "") +
+          ". Обработка идёт в фоне, около 15 секунд на снимок. ";
+        var a = document.createElement("a");
+        a.href = (data && data.review) || "review/";
+        a.textContent = "Открыть проверку";
+        status.appendChild(a);
+      });
+    }
+
+    go.addEventListener("click", function () {
+      var queue = [];
+      Object.keys(matched).forEach(function (a) {
+        groups[a].forEach(function (f, i) { queue.push({ a: a, f: f, main: i === 0 }); });
+      });
+      if (!queue.length) return;
+      go.disabled = true;
+
+      var body = new FormData();
+      body.append("action", "create");
+      body.append("track", track ? track.value : "catalog");
+      post(body).then(function (data) {
+        if (!data.ok) throw new Error(data.error || "не вышло");
+        var batch = data.batch, done = 0, bad = 0;
+
+        function next(i) {
+          if (i >= queue.length) return finish(batch, done, bad);
+          status.textContent = "Загружаю " + (i + 1) + " из " + queue.length + "…";
+          var q = queue[i];
+          return shrink(q.f).then(function (blob) {
+            var fd = new FormData();
+            fd.append("action", "upload");
+            fd.append("batch", batch);
+            fd.append("article", q.a);
+            fd.append("attach_as", q.main ? "main" : "gallery");
+            var name = blob === q.f ? q.f.name : q.f.name.replace(/\.[^.]+$/, "") + ".jpg";
+            fd.append("photo", blob, name);
+            return post(fd);
+          }).then(function (r) {
+            if (r && r.ok) { done++; } else { bad++; }
+          }, function () { bad++; }).then(function () { return next(i + 1); });
+        }
+        return next(0);
+      }).catch(function (e) {
+        status.textContent = "Не вышло: " + (e && e.message ? e.message : "сеть");
+        go.disabled = false;
+      });
+    });
+
+    pick.addEventListener("change", function () {
+      collect(Array.prototype.map.call(pick.files || [], function (f) {
+        return { file: f, path: f.webkitRelativePath || f.name };
+      }));
+      pick.value = "";
+    });
+
+    // Перетаскивание папок: обходим дерево через webkitGetAsEntry.
+    function walk(entry, path, out) {
+      return new Promise(function (resolve) {
+        if (entry.isFile) {
+          entry.file(function (f) { out.push({ file: f, path: path + f.name }); resolve(); },
+                     function () { resolve(); });
+        } else if (entry.isDirectory) {
+          var reader = entry.createReader(), all = [];
+          (function more() {
+            reader.readEntries(function (ents) {
+              if (!ents.length) {
+                Promise.all(all.map(function (e) {
+                  return walk(e, path + entry.name + "/", out);
+                })).then(resolve);
+              } else {
+                all = all.concat(Array.prototype.slice.call(ents));
+                more();
+              }
+            }, function () { resolve(); });
+          })();
+        } else {
+          resolve();
+        }
+      });
+    }
+
+    drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("is-over"); });
+    drop.addEventListener("dragleave", function () { drop.classList.remove("is-over"); });
+    drop.addEventListener("drop", function (e) {
+      e.preventDefault();
+      drop.classList.remove("is-over");
+      var items = e.dataTransfer.items || [], out = [], jobs = [];
+      for (var i = 0; i < items.length; i++) {
+        var en = items[i].webkitGetAsEntry && items[i].webkitGetAsEntry();
+        if (en) jobs.push(walk(en, "", out));
+      }
+      Promise.all(jobs).then(function () { collect(out); });
+    });
+  }
+})();
+
+/* Фотопайплайн: проверка. «Принять» → витрина; «Переделать» с замечанием → новая
+ * генерация в фоне; «Отклонить» → брак. Решение уходит без перезагрузки страницы. */
+(function () {
+  "use strict";
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  function init() {
+    var grid = document.getElementById("photo-review");
+    if (!grid) return;
+
+    var token = document.querySelector("input[name=csrfmiddlewaretoken]");
+    var AFTER = {
+      approve: "Принято — снимок на витрине",
+      redo: "Переделывается в фоне — обновите страницу через минуту",
+      retry: "Генерируется заново — обновите страницу через минуту",
+      reject: "Отклонено"
+    };
+
+    function post(body) {
+      if (token) body.append("csrfmiddlewaretoken", token.value);
+      return fetch(window.location.pathname, {
+        method: "POST", body: body, credentials: "same-origin",
+        headers: token ? { "X-CSRFToken": token.value } : {}
+      }).then(function (r) { return r.json(); });
+    }
+
+    function fail(card, text) {
+      var note = card.querySelector(".m-gal-error") || document.createElement("div");
+      note.className = "m-gal-error";
+      note.textContent = text;
+      card.appendChild(note);
+    }
+
+    grid.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-act]");
+      if (!btn) return;
+      var card = btn.closest(".m-gal");
+      var act = btn.dataset.act;
+      var field = card.querySelector("[data-role=note]");
+      var note = field ? field.value.trim() : "";
+      if (act === "redo" && !note) { fail(card, "Напишите, что исправить"); return; }
+
+      var body = new FormData();
+      body.append("action", act);
+      body.append("job", card.dataset.job);
+      body.append("note", note);
+      card.classList.add("is-busy");
+      post(body).then(function (data) {
+        card.classList.remove("is-busy");
+        if (!data.ok) { fail(card, data.error || "не вышло"); return; }
+        var state = card.querySelector("[data-role=state]");
+        if (state) state.textContent = data.label;
+        var acts = card.querySelector(".m-acts");
+        if (acts) acts.textContent = AFTER[act] || data.label;
+        if (field) field.remove();
+        var err = card.querySelector(".m-gal-error");
+        if (err) err.remove();
+      }).catch(function () {
+        card.classList.remove("is-busy");
+        fail(card, "сеть не ответила");
+      });
+    });
+  }
+})();

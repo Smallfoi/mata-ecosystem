@@ -1,0 +1,81 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# Проверка результатов фотопайплайна: исходник и результат рядом, решение человека. #}
+
+<div class="m-tabs">
+  <a class="m-tab" href="{{ pipeline_link }}">Загрузка и партии</a>
+  {% for key, label, n in tabs %}
+    <a class="m-tab {% if key == show %}on{% endif %}"
+       href="?show={{ key }}{% if batch %}&batch={{ batch }}{% endif %}">{{ label }} · {{ n }}</a>
+  {% endfor %}
+</div>
+
+{% if batch %}
+  <div class="m-hint">Показана партия #{{ batch }}. <a href="?show={{ show }}">Все партии</a></div>
+{% endif %}
+
+{% if show == "review" %}
+<div class="m-hint">
+  «Принять» — снимок уходит на витрину в галерею своего цвета. «Переделать» — напишите,
+  что исправить («принт перенесён на перед», «не та ткань»): замечание уйдёт в промт новой
+  попытки. «Отклонить» — брак, причина сохранится в журнале.
+</div>
+{% endif %}
+
+{% csrf_token %}
+
+{% if items %}
+  <div class="m-gals" id="photo-review">
+    {% for it in items %}
+      <div class="m-gal" data-job="{{ it.id }}">
+        <div>
+          <div class="m-gal-name" title="{{ it.name }}">{{ it.name }}</div>
+          <div class="m-gal-meta">
+            <span class="m-mono">{{ it.article }}</span>
+            {% if it.color %}<span class="m-tag soft">{{ it.color }}</span>{% endif %}
+            <span>{{ it.attach }}</span>
+            {% if it.attempts > 1 %}<span>попытка {{ it.attempts }}</span>{% endif %}
+            <span class="m-tag" data-role="state">{{ it.status_label }}</span>
+          </div>
+        </div>
+        <div class="m-cmp">
+          <figure>{% if it.source %}<a href="{{ it.source }}" target="_blank"><img src="{{ it.source }}" alt="" loading="lazy"></a>{% endif %}<figcaption>Исходник</figcaption></figure>
+          <figure>{% if it.result %}<a href="{{ it.result }}" target="_blank"><img src="{{ it.result }}" alt="" loading="lazy"></a>{% else %}<span class="m-muted">нет результата</span>{% endif %}<figcaption>Результат</figcaption></figure>
+        </div>
+        {% if it.text %}<div class="m-small m-muted">Текст принта: {{ it.text }}</div>{% endif %}
+        {% if it.note %}<div class="m-small">Замечание: {{ it.note }}</div>{% endif %}
+        {% if it.error %}<div class="m-gal-error">{{ it.error }}</div>{% endif %}
+        {% if can_edit %}
+          {% if it.status == "review" %}
+            <textarea class="m-input" rows="2" data-role="note" placeholder="Что исправить (для «Переделать» / «Отклонить»)"></textarea>
+            <div class="m-acts">
+              <button type="button" class="m-btn ok" data-act="approve">Принять</button>
+              <button type="button" class="m-btn" data-act="redo">Переделать</button>
+              <button type="button" class="m-btn bad" data-act="reject">Отклонить</button>
+            </div>
+          {% elif it.status == "failed" or it.status == "rejected" %}
+            <textarea class="m-input" rows="2" data-role="note" placeholder="Замечание к новой попытке (необязательно)"></textarea>
+            <div class="m-acts">
+              <button type="button" class="m-btn" data-act="retry">Сгенерировать заново</button>
+            </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="m-pages">
+    {% if page.has_previous %}
+      <a class="m-btn" href="?show={{ show }}{% if batch %}&batch={{ batch }}{% endif %}&page={{ page.previous_page_number }}">Назад</a>
+    {% endif %}
+    <span class="m-mono">страница {{ page.number }} из {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+      <a class="m-btn" href="?show={{ show }}{% if batch %}&batch={{ batch }}{% endif %}&page={{ page.next_page_number }}">Дальше</a>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="m-empty">Здесь пусто.</div>
+{% endif %}
+
+{% endblock %}

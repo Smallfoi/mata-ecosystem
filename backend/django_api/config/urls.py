@@ -47,6 +47,7 @@ from config.errors_view import error_detail, errors_console
 from config.data_check_view import data_check, data_check_closed, data_check_item
 from config.onec_fill_view import onec_fill
 from config.product_photos_view import product_photos
+from productmedia.views import photo_pipeline, photo_review
 from config.onec_log_view import onec_log
 from config.runs_review_view import runs_review
 from config.order_return_view import order_return
@@ -77,6 +78,9 @@ urlpatterns = [
     path("admin/data-check/item/", data_check_item, name="data_check_item"),
     path("admin/data-check/closed/", data_check_closed, name="data_check_closed"),
     path("admin/photos/", product_photos, name="product_photos"),
+    # Фотопайплайн: загрузка партии по артикулам → ИИ → проверка → витрина. ДО admin/.
+    path("admin/photo-pipeline/", photo_pipeline, name="photo_pipeline"),
+    path("admin/photo-pipeline/review/", photo_review, name="photo_review"),
     # «Проверка забегов» — разбор помеченных анти-читом (S-04 ф.2). ДО admin/.
     path("admin/runs-review/", runs_review, name="runs_review"),
     path("admin/order-return/<int:pk>/", order_return, name="order_return"),
