@@ -5,8 +5,9 @@
 товар без категории не попадёт ни в один раздел, товар без цены нельзя
 продать, а без веса доставка считается по типовой коробке.
 
-Фото здесь НЕТ намеренно: в 1С фото не будет, снимки товаров ведём в своей
-системе (Фото товаров / Фотопайплайн) — и заполненность фото смотрим там.
+Строки «Фото» здесь НЕТ намеренно: в 1С фото не будет, снимки ведём в своей
+системе (Фото товаров / Фотопайплайн). Но в «готовы к витрине» фото входит —
+товар без снимка продавать нельзя; проверяем его так же, как витрина.
 
 Страница отвечает на один вопрос: что именно просить заполнить в 1С в первую
 очередь. По каждому полю — сколько заполнено, сколько пусто и чем пустота
@@ -19,6 +20,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils import timezone
 
+from catalog import photos as photolib
 from catalog.models import Category, Product
 from integrations.models import OneCExchange
 from staff.access import tab_required
@@ -49,6 +51,19 @@ FIELDS = (
 # Эти поля ведёт 1С — их и просить заполнять там. Остальное можем вести сами.
 FROM_1C = {"category", "price", "brand", "article", "sizes",
            "colors", "description", "parcel", "stock"}
+
+
+def _has_photo(product, photos: dict) -> bool:
+    """Есть ли у товара снимок на витрине — по тем же правилам, что у витрины.
+
+    Снимки нашей системы лежат у модели и цвета (Фото товаров / Фотопайплайн); нет
+    их — витрина покажет старое фото карточки. Цветов несколько — снимок нужен у
+    каждого: покупатель переключит цвет и увидит пустоту.
+    """
+    colors = [str(c).strip() for c in (product.colors or []) if str(c).strip()] or [""]
+    if all(photolib.pick(photos, c) for c in colors):
+        return True
+    return bool(product.image) or bool(product.image_urls)
 
 
 def _percent(part: int, whole: int) -> int:
@@ -89,12 +104,12 @@ def onec_fill(request):
 
     last = OneCExchange.objects.filter(operation="catalog",
                                        status__in=("ok", "partial")).first()
-    # «Готов по данным 1С» = есть цена и категория, КОТОРАЯ У НАС ЕСТЬ. Чужая категория
-    # не считается: на витрине такой товар теряется ровно так же, как без неё. Фото
-    # сюда не входят — их ведём у себя, не в 1С.
-    ready = (Product.objects.filter(category_id__in=known)
-             .exclude(price__lte=0)
-             .count())
+    # «Готов к витрине» = есть цена, фото и категория, КОТОРАЯ У НАС ЕСТЬ. Чужая
+    # категория не считается: на витрине такой товар теряется ровно так же, как без неё.
+    # Цена и категория — из 1С, фото — из нашей системы (в 1С их не будет).
+    sellable = list(Product.objects.filter(category_id__in=known).exclude(price__lte=0))
+    shots = photolib.by_model({p.shop_model_key or p.id for p in sellable})
+    ready = sum(1 for p in sellable if _has_photo(p, shots.get(p.shop_model_key or p.id)))
 
     return TemplateResponse(request, "admin/onec_fill.html", {
         **admin.site.each_context(request),

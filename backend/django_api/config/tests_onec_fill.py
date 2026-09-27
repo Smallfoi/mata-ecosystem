@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from catalog.models import Category, Product
+from catalog.models import Category, Product, ProductPhoto
 from common.testutils import login_admin
 
 FILL = "/admin/1c-fill/"
@@ -68,8 +68,17 @@ class OnecFillTests(TestCase):
         self.assertContains(r, "c-НЕТ")
 
     def test_ready_counts_only_sellable(self):
-        """«С ценой и категорией» — есть наша категория и цена; фото не учитываются."""
+        """«Готовы к витрине» — есть категория, цена и фото."""
         self.assertEqual(self.client.get(FILL).context["ready"], 1)
+
+    def test_ready_needs_photo_from_our_system(self):
+        """Без фото к витрине не готов; снимок из «Фото товаров» (модель+цвет) засчитывается."""
+        Product.objects.create(id="p_nophoto", name="Без фото", category_id="c1", price=500,
+                               colors=["Синий"])
+        self.assertEqual(self.client.get(FILL).context["ready"], 1)
+        ProductPhoto.objects.create(model_key="p_nophoto", color="СИНИЙ",
+                                    image="uploads/photos/x.webp")
+        self.assertEqual(self.client.get(FILL).context["ready"], 2)
 
     def test_tab_permission_required(self):
         staff = get_user_model().objects.create_user("clerk_fill", "c@t.dev", "ClerkPass!2026",
