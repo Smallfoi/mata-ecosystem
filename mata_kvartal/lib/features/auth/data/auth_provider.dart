@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/account_scope.dart';
 
 enum AuthStatus { unauthenticated, codeSent, authenticated }
 
@@ -142,7 +143,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   static const _tokenPrefsKey = 'kvartal.auth.token.v1';
   static const _phonePrefsKey = 'kvartal.auth.phone.v1';
-  static const _userIdPrefsKey = 'kvartal.auth.user_id.v1';
+  static const _userIdPrefsKey = authUserIdPrefsKey;
   static const _userNamePrefsKey = 'kvartal.auth.user_name.v1';
   static const _userEmailPrefsKey = 'kvartal.auth.user_email.v1';
   static const _userCityPrefsKey = 'kvartal.auth.user_city.v1';
