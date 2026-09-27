@@ -408,6 +408,19 @@ POST /runs  { id, distanceMeters, elapsedSeconds, finishedAtMs, capturedTerritor
 если оно когда-то не дошло (ровно один раз). `id` чужого забега/трека → 409.
 Некорректные числа (не число, NaN/∞, отрицательные, время вне 1970…2100) → 400,
 ничего не сохраняется.
+Проверка суточных лимитов и запись идут под блокировкой на пользователя (общей с
+импортом тренировок): параллельные забеги не обходят потолок (аудит C06).
+
+### Territories · захват (анти-чит — docs/ANTICHEAT_TRUST.md)
+```
+POST /territories/capture { points: [[lat,lng],...], captureId, distanceMeters?, elapsedSeconds? }
+     → { ok, areaM2, points, blocksGained, blocksTotal, geojson, holdHoursLeft, unverified? }
+     дубль captureId → { ok, duplicate: true, areaM2, geojson }
+```
+Скорость = max(distanceMeters, длина маршрута по points) / elapsedSeconds; > 40 км/ч → 400.
+Без `elapsedSeconds` (нет / не число / ≤ 0) скорость не проверить: зона засчитывается,
+но `points` = 0 и `unverified: true` (аудит C06; mata_kvartal шлёт оба поля).
+Суточный потолок — 20 начисленных захватов за 24 ч (429), под блокировкой на пользователя.
 
 ### League (зачёты лиги и профиль бегуна — docs/LEAGUE_PLAN.md)
 ```

@@ -19,6 +19,7 @@ from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from common.locks import ACTIVITY, lock_user
 from common.numeric import BadNumber, bounded_int, finite_float
 from common.security import user_id_from_request
 from loyalty.models import add_txn
@@ -188,17 +189,20 @@ def import_workouts(request):
         # даёт одну и ту же запись даже при гонке двух параллельных запросов.
         wid = hashlib.sha1(f"{me}:{source}:{data['source_id']}".encode()).hexdigest()[:32]
 
-        flag_reason = _validate(me, data)
-        same_run = None if flag_reason else _find_same_run(me, data)
-
-        points = 0
-        if not flag_reason and not same_run and data["sport"] in RUNNING_SPORTS:
-            points = round(data["distance_m"] / 1000.0 * POINTS_PER_KM)
-
         # Тренировка, реестр и начисление — одно целое (аудит C05): сбой посередине
         # откатывает всё, и повтор той же присылки доводит начисление ровно один раз.
         try:
             with transaction.atomic():
+                # Суточный потолок дистанции общий со своими забегами — проверка и
+                # запись под той же блокировкой на пользователя (аудит C06).
+                lock_user(ACTIVITY, me)
+                flag_reason = _validate(me, data)
+                same_run = None if flag_reason else _find_same_run(me, data)
+
+                points = 0
+                if not flag_reason and not same_run and data["sport"] in RUNNING_SPORTS:
+                    points = round(data["distance_m"] / 1000.0 * POINTS_PER_KM)
+
                 # Реестр переживает отключение источника (аудит C02): если по этой
                 # тренировке решение уже принималось, второй раз не платим —
                 # показываем то, что было начислено тогда.
