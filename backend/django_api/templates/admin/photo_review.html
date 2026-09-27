@@ -10,6 +10,7 @@
        href="?show={{ key }}{% if batch %}&batch={{ batch }}{% endif %}">{{ label }} · {{ n }}</a>
   {% endfor %}
   <a class="m-tab" href="{{ prompts_link }}">Промты</a>
+  <a class="m-tab" href="{% url 'photo_guide' %}">Как снимать</a>
 </div>
 
 {% if batch %}

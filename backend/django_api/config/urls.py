@@ -47,7 +47,7 @@ from config.errors_view import error_detail, errors_console
 from config.data_check_view import data_check, data_check_closed, data_check_item
 from config.onec_fill_view import onec_fill
 from config.product_photos_view import product_photos
-from productmedia.views import photo_pipeline, photo_prompts, photo_review
+from productmedia.views import photo_guide, photo_pipeline, photo_prompts, photo_review
 from config.onec_log_view import onec_log
 from config.runs_review_view import runs_review
 from config.order_return_view import order_return
@@ -82,6 +82,7 @@ urlpatterns = [
     path("admin/photo-pipeline/", photo_pipeline, name="photo_pipeline"),
     path("admin/photo-pipeline/review/", photo_review, name="photo_review"),
     path("admin/photo-pipeline/prompts/", photo_prompts, name="photo_prompts"),
+    path("admin/photo-pipeline/guide/", photo_guide, name="photo_guide"),
     # «Проверка забегов» — разбор помеченных анти-читом (S-04 ф.2). ДО admin/.
     path("admin/runs-review/", runs_review, name="runs_review"),
     path("admin/order-return/<int:pk>/", order_return, name="order_return"),
