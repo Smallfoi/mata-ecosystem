@@ -78,6 +78,17 @@ class ProviderTests(TestCase):
         _, _, body = m_post.call_args.args
         self.assertNotIn(b"input_fidelity", body)  # маркетинг — генерация свободнее
 
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "test-key",
+                                    "OPENAI_IMAGE_MODEL": "gpt-image-2.5-flare"}, clear=False)
+    @mock.patch("productmedia.providers._post_multipart")
+    def test_new_model_gets_no_input_fidelity(self, m_post):
+        # gpt-image-2.5 отвечает 400 на input_fidelity — шлём его только gpt-image-1*
+        m_post.return_value = {"data": [{"b64_json": _png_b64()}]}
+        processing.process(b"raw-source", track="catalog")
+        _, _, body = m_post.call_args.args
+        self.assertIn(b"gpt-image-2.5-flare", body)
+        self.assertNotIn(b"input_fidelity", body)
+
     def test_disabled_without_key(self):
         with mock.patch.dict("os.environ", {}, clear=False):
             import os
