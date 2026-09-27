@@ -89,6 +89,17 @@ class ProviderTests(TestCase):
         self.assertIn(b"gpt-image-2.5-flare", body)
         self.assertNotIn(b"input_fidelity", body)
 
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False)
+    @mock.patch("productmedia.providers._post_multipart")
+    def test_print_text_goes_into_prompt(self, m_post):
+        # буквальный текст принта передаётся словами — модель рисует его точнее
+        from productmedia import prompts
+        m_post.return_value = {"data": [{"b64_json": _png_b64()}]}
+        processing.process(b"raw", track="catalog", text="Staw Running Member")
+        body = m_post.call_args.args[2]
+        self.assertIn(b'reads exactly "Staw Running Member"', body)
+        self.assertEqual(prompts.with_text(prompts.CATALOG, ""), prompts.CATALOG)
+
     def test_disabled_without_key(self):
         with mock.patch.dict("os.environ", {}, clear=False):
             import os

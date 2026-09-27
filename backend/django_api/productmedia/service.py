@@ -58,7 +58,7 @@ def intake(batch, items):
     return jobs
 
 
-def run_job(job, attach=True):
+def run_job(job, attach=True, text=""):
     """Одно задание: исходник → мастер (ИИ) → webp → привязка к карточке.
 
     `attach=False` — прогнать ИИ и получить мастер/webp на задании, но НЕ трогать витрину
@@ -78,7 +78,7 @@ def run_job(job, attach=True):
         source_bytes = job.source.read()
         job.source.close()
 
-        master = processing.process(source_bytes, track=job.track)
+        master = processing.process(source_bytes, track=job.track, text=text)
         webp = images.make_webp(master)
 
         base = _safe_base(job)
