@@ -12,6 +12,7 @@
   # выложить результат в галерею витрины (модель+цвет):
   python manage.py photo_test --article ART-123 --from-product --apply
 """
+import time
 import urllib.request
 
 from django.core.management.base import BaseCommand, CommandError
@@ -82,8 +83,10 @@ class Command(BaseCommand):
             "article": product.article, "content": source,
             "filename": "source.bin", "attach_as": o["attach"],
         }])[0]
+        t0 = time.monotonic()
         service.run_job(job, attach=o["apply"])
         job.refresh_from_db()
+        self.stdout.write("Время прогона: %.0f с" % (time.monotonic() - t0))
 
         # 5) отчёт
         self.stdout.write("Статус задания: %s" % job.get_status_display())
