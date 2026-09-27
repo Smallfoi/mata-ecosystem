@@ -25,10 +25,28 @@ services:
   redis:
     image: redis:7-alpine
     restart: always
-    # Общий кэш для rate-limit/OTP/бана/баланса (D-07/D-28) + брокер Celery. LRU + лёгкая персистентность.
+    # Общий кэш для rate-limit/OTP/бана/баланса (D-07/D-28). LRU + лёгкая персистентность.
+    # Вытеснение (allkeys-lru) для КЭША — норма; брокер Celery здесь больше НЕ живёт (E04).
     command: redis-server --save 60 1 --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Брокер Celery — ОТДЕЛЬНЫЙ инстанс (аудит E04). В общем кэше с allkeys-lru при нехватке
+  # памяти Redis молча выкидывал бы очереди задач (пуши, чистка по 152-ФЗ, фотопайплайн).
+  # noeviction: при переполнении запись отвергается ОШИБКОЙ (видно в логах), а не теряется
+  # молча; AOF — очередь переживает рестарт контейнера. Политика вытеснения — на весь
+  # инстанс, поэтому «другая БД в том же Redis» не спасает: нужен свой процесс.
+  redis-broker:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 128mb --maxmemory-policy noeviction
+    volumes:
+      - redisbroker:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -44,6 +62,10 @@ services:
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
              gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60"
+    environment:
+      # Брокер — отдельный redis-broker (E04). environment перекрывает env_file, поэтому
+      # .env на ВМ (его пишут prod-deploy.sh/refresh-env.sh) менять не нужно.
+      CELERY_BROKER_URL: redis://redis-broker:6379/0
     volumes:
       - media_uploads:/srv/media/uploads
       - static_files:/app/staticfiles
@@ -52,10 +74,22 @@ services:
       - ../docs/legal:/legal_docs:ro
     expose:
       - "8000"   # только внутри сети compose; наружу — через nginx
+    # Готовность (аудит E05): /v1/health/ready отдаёт 200 только при живых БД и кэше.
+    # Host — первый из DJANGO_ALLOWED_HOSTS, X-Forwarded-Proto: https — как в smoke.sh
+    # (иначе 400 DisallowedHost / 301 на https, см. PITFALLS). start_period покрывает
+    # migrate + collectstatic на старте.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,urllib.request as u; h=(os.environ.get('DJANGO_ALLOWED_HOSTS') or '').split(',')[0].strip().lstrip('.'); h=h if h and h!='*' else '127.0.0.1'; u.urlopen(u.Request('http://127.0.0.1:8000/v1/health/ready', headers={'Host': h, 'X-Forwarded-Proto': 'https'}), timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-broker:
         condition: service_healthy
 
   # Фоновые задачи (D-07). БЕЗ них в проде не работают: ежедневная чистка данных
@@ -66,12 +100,23 @@ services:
     restart: always
     env_file: .env
     command: celery -A config worker -l info --concurrency 2
+    environment:
+      CELERY_BROKER_URL: redis://redis-broker:6379/0   # E04, см. web
     volumes:
       - media_uploads:/srv/media/uploads
+    # E05: воркер отвечает на ping через брокер (жив процесс И есть связь с очередью).
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME --timeout 10 >/dev/null 2>&1"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-broker:
         condition: service_healthy
 
   beat:
@@ -79,12 +124,24 @@ services:
     restart: always
     env_file: .env
     command: celery -A config beat -l info
+    environment:
+      CELERY_BROKER_URL: redis://redis-broker:6379/0   # E04, см. web
     volumes:
       - media_uploads:/srv/media/uploads
+    # E05: у beat нет ping-команды; процесс — PID 1 (умер → контейнер перезапустится),
+    # проверяем, что ему есть куда класть задачи — брокер отвечает.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,redis; redis.Redis.from_url(os.environ.get('CELERY_BROKER_URL') or os.environ['REDIS_URL'], socket_timeout=5).ping()"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-broker:
         condition: service_healthy
 
   nginx:
@@ -105,5 +162,6 @@ services:
 
 volumes:
   redisdata:
+  redisbroker:
   media_uploads:
   static_files:

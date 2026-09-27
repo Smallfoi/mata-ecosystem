@@ -542,7 +542,10 @@ else:
     }
 
 # ── Celery: фоновые задачи/очереди/beat (D-07) ──────────────────────────────
-# Брокер — Redis (тот же REDIS_URL, что и кэш; отдельный CELERY_BROKER_URL перекрывает).
+# Брокер — CELERY_BROKER_URL; без него — тот же REDIS_URL, что и кэш (dev-стек).
+# В ПРОДЕ брокер ОБЯЗАН быть отдельным Redis с noeviction (аудит E04): кэш живёт с
+# allkeys-lru и при нехватке памяти молча выкинул бы очереди задач. docker-compose.prod.yml
+# задаёт CELERY_BROKER_URL=redis://redis-broker:6379/0 web/worker/beat — приоритет у него.
 # БЕЗ брокера — EAGER: задачи выполняются синхронно inline (dev/CI/тесты не требуют
 # Redis и работают как раньше). В проде поднимаем `celery worker` + `celery beat`.
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "") or _redis_url
