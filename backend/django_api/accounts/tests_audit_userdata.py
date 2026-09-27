@@ -93,11 +93,16 @@ class EraseEverything(TestCase):
                     "street": "Ленина", "house": "1", "deliveryType": "courier"}
         self.paid = Order.objects.create(
             user_id=self.uid, order_id="SS-1", total=1000, payment_status="paid",
-            status="delivered", payload={"items": [], "checkoutData": checkout},
+            status="delivered", onec_status="delivered",
+            onec_status_at=timezone.now() - datetime.timedelta(days=10),
+            payload={"items": [{"productId": "p1", "productName": "Кроссовки", "size": "42",
+                                "color": "Чёрный", "quantity": 2, "price": 500}],
+                     "checkoutData": checkout},
             courier_note="курьер Пётр")
-        self.unpaid = Order.objects.create(
-            user_id=self.uid, order_id="SS-2", total=500, payment_status="pending",
+        unpaid = Order.objects.create(
+            user_id=self.uid, order_id="SS-2", total=500, payment_status="canceled",
             payload={"items": [], "checkoutData": checkout})
+        self.unpaid_pk = unpaid.pk
         with connection.cursor() as cur:
             for _label, table, cols in userdata.RAW_TABLES:
                 if table == "territory_events":
@@ -144,37 +149,62 @@ class EraseEverything(TestCase):
         for _label, _t, _c in userdata.RAW_TABLES:
             self.assertIn(_label, d)
 
-    def test_delete_leaves_no_trace_but_keeps_financial_record(self):
-        self.assertTrue(self._left())
-        r = self.client.post("/v1/account/delete", data=json.dumps({"confirm": True}),
-                             content_type="application/json", **self.auth)
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(self._left(), {})
-        self.assertFalse(Account.objects.filter(id=self.uid).exists())
+    def _delete(self):
+        return self.client.post("/v1/account/delete", data=json.dumps({"confirm": True}),
+                                content_type="application/json", **self.auth)
 
+    def test_delete_erases_everything_but_keeps_anonymous_sales(self):
+        from analytics.models import SaleLine
         from loyalty.models import LoyaltyTransaction
         from orders.models import Order
 
-        tomb = userdata.tombstone(self.uid)
-        paid = Order.objects.get(pk=self.paid.pk)  # оплаченный заказ сохранён…
-        self.assertEqual(paid.user_id, tomb)
-        self.assertEqual(paid.courier_note, "")
-        co = paid.payload["checkoutData"]
-        for key in ("name", "phone", "email", "street", "house"):
-            self.assertEqual(co[key], "")  # …но без персональных данных
-        self.assertEqual(co["deliveryType"], "courier")
-        self.assertFalse(Order.objects.filter(pk=self.unpaid.pk).exists())
-        self.assertTrue(LoyaltyTransaction.objects.filter(user_id=tomb).exists())
+        # Строки продаж записались при оплате — без покупателя.
+        lines = SaleLine.objects.filter(order_pk=self.paid.pk)
+        self.assertEqual(lines.count(), 1)
+        self.assertEqual((lines[0].size, lines[0].color, lines[0].quantity), ("42", "Чёрный", 2))
+        self.assertTrue(self._left())
 
-    def test_order_in_progress_blocks_deletion(self):
+        self.assertEqual(self._delete().status_code, 200)
+        self.assertEqual(self._left(), {})
+        self.assertFalse(Account.objects.filter(id=self.uid).exists())
+        # Заказы и баллы стёрты полностью…
+        self.assertFalse(Order.objects.filter(pk__in=[self.paid.pk, self.unpaid_pk]).exists())
+        self.assertFalse(LoyaltyTransaction.objects.filter(user_id__startswith="del_").exists())
+        # …а статистика продаж осталась, и в ней нет ничего о человеке.
+        self.assertEqual(SaleLine.objects.filter(order_pk=self.paid.pk).count(), 1)
+        names = {f.name for f in SaleLine._meta.concrete_fields}
+        self.assertFalse(names & {"user_id", "phone", "email", "name_customer", "address"})
+
+    def test_not_received_order_blocks_deletion(self):
         from orders.models import Order
 
         Order.objects.create(user_id=self.uid, order_id="SS-3", total=900,
                              payment_status="paid", status="pending", payload={"items": []})
-        r = self.client.post("/v1/account/delete", data=json.dumps({"confirm": True}),
-                             content_type="application/json", **self.auth)
+        r = self._delete()
         self.assertEqual(r.status_code, 409)
+        self.assertIn("не получен", r.json()["detail"])
         self.assertTrue(Account.objects.filter(id=self.uid).exists())
+
+    def test_return_window_blocks_deletion_for_seven_days(self):
+        from orders.models import Order
+
+        Order.objects.filter(pk=self.paid.pk).update(
+            onec_status_at=timezone.now() - datetime.timedelta(days=3))
+        r = self._delete()
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("срок возврата", r.json()["detail"])
+        Order.objects.filter(pk=self.paid.pk).update(
+            onec_status_at=timezone.now() - datetime.timedelta(days=8))
+        self.assertEqual(self._delete().status_code, 200)
+
+    def test_return_in_progress_blocks_deletion(self):
+        from orders.models import OrderReturn
+
+        OrderReturn.objects.create(order_id=self.paid.pk, lines=[0], amount_kop=100000,
+                                   status="pending")
+        r = self._delete()
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("возврат", r.json()["detail"])
 
     def test_failure_midway_rolls_everything_back(self):
         from unittest import mock

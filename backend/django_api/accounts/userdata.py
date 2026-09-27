@@ -1,4 +1,4 @@
-"""Реестр данных пользователя: что удалить, что обезличить, что выгрузить (аудит A04).
+"""Реестр данных пользователя: что удалить и что выгрузить (аудит A04).
 
 Раньше удаление и выгрузка аккаунта держали каждая свой ручной список моделей.
 Новые модули (друзья, тропы, тренировки, медали, лиги…) в эти списки не попадали:
@@ -10,21 +10,26 @@
 проекте появилась модель с полем пользователя, которой нет ни в реестре, ни в
 исключениях. Забыть новый модуль больше не получится.
 
-Политика (решение для владельца — docs/DECISIONS.md, D-103):
-- DELETE — личные данные: забеги, треки, друзья, позиции, устройства, медали…
-- ANON — финансовый и учётный след: проводки баллов, оплаченные заказы, реестр
-  учтённых тренировок, события аналитики. Строка остаётся (бухгалтерия, 1С,
-  сверка платежей), но связь с человеком рвётся: user_id заменяется меткой
-  `del_<хэш>`, персональные поля заказа стираются. Неоплаченные заказы — удаляются.
+Политика (решение владельца 28.09.2026, docs/DECISIONS.md D-103):
+- Удалить аккаунт можно, только когда все покупки завершены: оплаченный заказ
+  получен и прошёл срок возврата (7 дней после получения), возвратов в работе нет.
+- При удалении стирается ВСЁ: заказы, баллы, забеги, треки, друзья, устройства…
+- Для статистики остаётся только то, что не указывает на человека: строки продаж
+  (`analytics.SaleLine` — что купили, размер, цвет, цена, дата; пишутся при оплате)
+  и события аналитики без id пользователя.
 """
-import hashlib
+from datetime import timedelta
 
 from django.apps import apps
 from django.db import connection, transaction
 from django.db.models import Q
+from django.utils import timezone
 
 DELETE = "delete"
-ANON = "anon"
+ANON = "anon"  # строка остаётся, связь с человеком стирается
+
+# Срок возврата товара при онлайн-продаже (D-73): 7 дней после получения.
+RETURN_WINDOW = timedelta(days=7)
 
 # (метка в выгрузке, модель, поля пользователя, политика).
 MODELS = (
@@ -32,7 +37,7 @@ MODELS = (
     ("trailTracks", "trails.PendingTrack", ("user_id",), DELETE),
     ("trailAttempts", "trails.TrailAttempt", ("user_id",), DELETE),
     ("externalWorkouts", "workouts.ExternalWorkout", ("user_id",), DELETE),
-    ("workoutAwards", "workouts.WorkoutAward", ("user_id",), ANON),
+    ("workoutAwards", "workouts.WorkoutAward", ("user_id",), DELETE),
     ("shoes", "shoes.ShoeAsset", ("user_id",), DELETE),
     ("medals", "medals.MedalAward", ("user_id",), DELETE),
     ("runnerProfile", "league.RunnerProfile", ("user_id",), DELETE),
@@ -50,9 +55,9 @@ MODELS = (
     ("clubJoinRequests", "clubs.ClubJoinRequest", ("user_id",), DELETE),
     # Клубы во владении: удаление решает delete_account (с чужими участниками — 409).
     ("ownedClubs", "clubs.Club", ("owner_id",), DELETE),
-    ("loyaltyTransactions", "loyalty.LoyaltyTransaction", ("user_id",), ANON),
+    ("loyaltyTransactions", "loyalty.LoyaltyTransaction", ("user_id",), DELETE),
+    ("orders", "orders.Order", ("user_id",), DELETE),  # возвраты уходят каскадом
     ("analyticsEvents", "analytics.Event", ("user_id",), ANON),
-    ("orders", "orders.Order", ("user_id",), ANON),  # оплаченные — ANON, прочие — DELETE
 )
 
 # Модели с полем «пользователь», которые сознательно НЕ входят в данные клиента.
@@ -78,19 +83,8 @@ RAW_TABLES = (
     ("territoryEvents", "territory_events", ("victim_owner", "attacker")),
 )
 
-# Персональные поля оформления заказа — стираются при обезличивании.
-CHECKOUT_PII = ("name", "phone", "email", "city", "street", "house", "apartment",
-                "postalCode", "address", "comment", "recipient")
-
-# Заказ с движением денег или уже ушедший в 1С — финансовый документ, его храним.
-PAID_STATUSES = ("paid", "refunded", "partially_refunded")
-
-
-def tombstone(uid: str) -> str:
-    """Метка вместо user_id у обезличенных строк: одна на человека (строки одного
-    бывшего клиента остаются связаны между собой — нужно для сверок), но по ней
-    не восстановить, чей это был аккаунт."""
-    return "del_" + hashlib.sha256(f"mata-erased:{uid}".encode()).hexdigest()[:24]
+# Оплата прошла, деньги у магазина — покупка ещё может вернуться.
+_PAID = ("paid", "partially_refunded")
 
 
 def _model(label):
@@ -109,6 +103,43 @@ def _q(fields, uid):
 
 def _table_exists(table) -> bool:
     return table in connection.introspection.table_names()
+
+
+def _delivered_at(order):
+    """Когда заказ получен — или None, если ещё не получен."""
+    if order.onec_status == "delivered":
+        return order.onec_status_at or order.created_at
+    if order.status == "delivered":
+        return order.onec_status_at or order.created_at
+    return None
+
+
+def blocking_reason(uid, now=None) -> str:
+    """Почему аккаунт пока нельзя удалить (пусто — можно).
+
+    Пока покупка не завершена, заказ нужен и складу (адрес, телефон), и для
+    возврата денег: удалить его сейчас — оставить человека без доставки и возврата.
+    """
+    from orders.models import Order, OrderReturn
+
+    now = now or timezone.now()
+    if OrderReturn.objects.filter(order__user_id=uid).exclude(
+            status__in=("done", "failed", "canceled")).exists():
+        return "Идёт возврат по заказу — удалить аккаунт можно после его завершения"
+    for order in Order.objects.filter(user_id=uid):
+        if order.payment_status == "pending":
+            return "Заказ ждёт оплаты — удалить аккаунт можно после оплаты или отмены"
+        if order.payment_status not in _PAID or order.status == "cancelled":
+            continue
+        got = _delivered_at(order)
+        if got is None:
+            return ("Заказ ещё не получен — удалить аккаунт можно через 7 дней после "
+                    "получения (срок возврата)")
+        if now < got + RETURN_WINDOW:
+            days = max(1, (got + RETURN_WINDOW - now).days + 1)
+            return (f"Идёт срок возврата по заказу — удалить аккаунт можно через "
+                    f"{days} дн.")
+    return ""
 
 
 def export(uid: str) -> dict:
@@ -135,42 +166,26 @@ def export(uid: str) -> dict:
     return out
 
 
-def _anonymize_orders(model, uid, tomb) -> dict:
-    mine = model.objects.filter(user_id=uid)
-    keep = mine.filter(Q(payment_status__in=PAID_STATUSES) | Q(onec_taken_at__isnull=False))
-    kept = 0
-    for order in keep:
-        payload = dict(order.payload or {})
-        checkout = dict(payload.get("checkoutData") or {})
-        for key in CHECKOUT_PII:
-            if key in checkout:
-                checkout[key] = ""
-        payload["checkoutData"] = checkout
-        order.payload = payload
-        order.user_id = tomb
-        order.courier_note = ""
-        order.save(update_fields=["payload", "user_id", "courier_note"])
-        kept += 1
-    deleted = mine.exclude(pk__in=keep.values("pk")).delete()[0]
-    return {"anonymized": kept, "deleted": deleted}
-
-
 def erase(uid: str) -> dict:
-    """Удалить/обезличить всё по реестру. Вызывать внутри transaction.atomic()."""
-    tomb = tombstone(uid)
+    """Удалить всё по реестру. Вызывать внутри transaction.atomic()."""
+    from analytics import sales
+    from orders.models import Order
+
+    # Статистика продаж пишется при оплате; на всякий случай дописываем перед удалением
+    # (заказы, оплаченные до появления статистики и не попавшие в перенос).
+    for order in Order.objects.filter(user_id=uid, payment_status__in=sales.SOLD):
+        sales.record(order)
+
     report = {}
     for label, model_label, fields, policy in MODELS:
         model = _model(model_label)
         if model is None:
             continue
-        if model_label == "orders.Order":
-            report[label] = _anonymize_orders(model, uid, tomb)
-        elif policy == ANON:
-            new = "" if model_label == "analytics.Event" else tomb
-            report[label] = {"anonymized": model.objects.filter(_q(fields, uid))
-                             .update(**{fields[0]: new})}
+        rows = model.objects.filter(_q(fields, uid))
+        if policy == ANON:
+            report[label] = {"anonymized": rows.update(**{fields[0]: ""})}
         else:
-            report[label] = model.objects.filter(_q(fields, uid)).delete()[0]
+            report[label] = rows.delete()[0]
     with connection.cursor() as cur:
         for label, table, cols in RAW_TABLES:
             if not _table_exists(table):

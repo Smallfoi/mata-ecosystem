@@ -452,25 +452,6 @@ def account_export(request):
     return resp
 
 
-# Заказ «в пути»: оплачен, не доставлен и не отменён, и свежий (старые заказы, по
-# которым 1С так и не прислала «доставлен», не должны навсегда запирать удаление).
-_ACTIVE_ORDER_DAYS = 30
-
-
-def _has_order_in_progress(uid) -> bool:
-    from datetime import timedelta
-
-    from django.utils import timezone
-
-    from orders.models import Order
-
-    return (Order.objects.filter(user_id=uid, payment_status="paid",
-                                 created_at__gte=timezone.now() - timedelta(days=_ACTIVE_ORDER_DAYS))
-            .exclude(status__in=("delivered", "cancelled"))
-            .exclude(onec_status__in=("delivered", "canceled"))
-            .exists())
-
-
 @api_view(["POST"])
 def delete_account(request):
     """Удаление аккаунта и всех персональных данных пользователя (152-ФЗ, LR §13).
@@ -501,14 +482,11 @@ def delete_account(request):
                 {"detail": "Вы владелец клуба с участниками — передайте или распустите клуб"},
                 status=409,
             )
-    # Оплаченный заказ ещё в пути: удалить сейчас — оставить склад без адреса и
-    # телефона получателя. Сначала доставка (или отмена), потом удаление.
-    if _has_order_in_progress(uid):
-        return Response(
-            {"detail": "У вас есть оплаченный заказ в пути — удалить аккаунт можно после "
-                       "доставки или отмены заказа"},
-            status=409,
-        )
+    # Покупка не завершена (не получена, идёт срок возврата 7 дней, возврат или
+    # оплата в работе) — заказ ещё нужен складу и для возврата денег (D-103).
+    reason = userdata.blocking_reason(uid)
+    if reason:
+        return Response({"detail": reason}, status=409)
 
     with transaction.atomic():
         deleted = {}

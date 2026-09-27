@@ -301,12 +301,18 @@ class AccountDeletionTests(ApiTestCase):
         self.api_post("/v1/orders", {"id": "o1", "total": 500, "items": []})  # заказ
         self.api_post("/v1/orders/o1/pay", {})  # оплата (dev) — баллы за покупку
         self.assertTrue(LoyaltyTransaction.objects.filter(user_id=self.uid).exists())
-        # Оплаченный заказ в пути запирает удаление (A04) — сначала доставка.
-        Order.objects.filter(user_id=self.uid).update(status="delivered")
+        # Удалить можно после получения и 7 дней срока возврата (D-103).
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        Order.objects.filter(user_id=self.uid).update(
+            status="delivered", onec_status="delivered",
+            onec_status_at=timezone.now() - timedelta(days=8))
         r = self.api_post("/v1/account/delete", {"confirm": True})
         self.assertEqual(r.status_code, 200)
         self.assertFalse(Account.objects.filter(id=self.uid).exists())
-        # Связи с человеком нет; оплаченный заказ и проводки — обезличенный след.
+        # Заказы и проводки удалены целиком (статистика продаж — отдельно, без человека).
         self.assertFalse(LoyaltyTransaction.objects.filter(user_id=self.uid).exists())
         self.assertFalse(Order.objects.filter(user_id=self.uid).exists())
 
