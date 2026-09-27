@@ -301,9 +301,12 @@ class AccountDeletionTests(ApiTestCase):
         self.api_post("/v1/orders", {"id": "o1", "total": 500, "items": []})  # заказ
         self.api_post("/v1/orders/o1/pay", {})  # оплата (dev) — баллы за покупку
         self.assertTrue(LoyaltyTransaction.objects.filter(user_id=self.uid).exists())
+        # Оплаченный заказ в пути запирает удаление (A04) — сначала доставка.
+        Order.objects.filter(user_id=self.uid).update(status="delivered")
         r = self.api_post("/v1/account/delete", {"confirm": True})
         self.assertEqual(r.status_code, 200)
         self.assertFalse(Account.objects.filter(id=self.uid).exists())
+        # Связи с человеком нет; оплаченный заказ и проводки — обезличенный след.
         self.assertFalse(LoyaltyTransaction.objects.filter(user_id=self.uid).exists())
         self.assertFalse(Order.objects.filter(user_id=self.uid).exists())
 
