@@ -5,6 +5,9 @@
 настоящее значит сделать вид, что человек не бежал; второй раз он не проверит.
 """
 from datetime import timedelta
+from io import StringIO
+
+from django.core.management import call_command
 
 from django.db import connection
 from django.utils import timezone
@@ -365,3 +368,53 @@ class ExploreFootprintTests(ApiTestCase):
         self.api_post("/v1/runs/track",
                       {"runId": "fp_6", "points": track_along(line(n=10))})
         self.assertEqual(self._footprint_area(), 0.0)
+
+class CleanSeedTrailsTests(ApiTestCase):
+    """Уборка троп-заготовок: трогаем только сид и только нетронутое (D-102)."""
+
+    phone = "+79990009207"
+
+    def _seed(self, num=1, name="проспект Ленина"):
+        pts = line()
+        min_lat, max_lat, min_lon, max_lon = matching.bbox(pts)
+        return Trail.objects.create(
+            id=f"ykt-trail-0{num}", name=name, points=pts,
+            length_m=matching.line_length_m(pts),
+            min_lat=min_lat, max_lat=max_lat, min_lon=min_lon, max_lon=max_lon,
+        )
+
+    def test_dry_run_deletes_nothing(self):
+        self._seed()
+        call_command("clean_seed_trails", stdout=StringIO())
+        self.assertEqual(Trail.objects.count(), 1)
+
+    def test_apply_removes_seed_trails(self):
+        self._seed(1)
+        self._seed(2, "улица Дзержинского")
+        call_command("clean_seed_trails", "--apply", stdout=StringIO())
+        self.assertEqual(Trail.objects.count(), 0)
+
+    def test_keeps_trails_people_have_run(self):
+        """По тропе бежали — это уже чья-то история, удалять нельзя."""
+        t = self._seed()
+        TrailAttempt.objects.create(
+            id=f"{t.id}:run1", trail_id=t.id, user_id=self.uid, run_id="run1",
+            started_at=timezone.now(), duration_s=300,
+        )
+        call_command("clean_seed_trails", "--apply", stdout=StringIO())
+        self.assertTrue(Trail.objects.filter(id=t.id).exists())
+
+    def test_does_not_touch_human_trails(self):
+        """Тропу, нарисованную человеком, уборка не видит — у неё другой id."""
+        pts = line()
+        min_lat, max_lat, min_lon, max_lon = matching.bbox(pts)
+        Trail.objects.create(
+            id="abc123", name="Круг у дома", points=pts,
+            length_m=matching.line_length_m(pts),
+            min_lat=min_lat, max_lat=max_lat, min_lon=min_lon, max_lon=max_lon,
+            created_by=self.uid,
+        )
+        self._seed()
+        call_command("clean_seed_trails", "--apply", stdout=StringIO())
+        self.assertEqual([t.id for t in Trail.objects.all()], ["abc123"])
+
