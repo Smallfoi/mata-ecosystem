@@ -165,3 +165,108 @@ class FriendsMapTests(ApiTestCase):
         uid3 = Account.objects.get(phone="+79990003204").id
         r = self.api_post("/v1/friends/beacon", {"hours": 2, "trusted": [uid3]}).json()
         self.assertEqual(r["beaconTrusted"], [])
+
+
+def _h(phone: str) -> str:
+    return hashlib.sha256(phone.encode()).hexdigest()
+
+
+class MatchContactsScaleTests(ApiTestCase):
+    """Сопоставление контактов (аудит F02): поиск по индексу, а не перебор всех
+    аккаунтов; запросов к БД не больше, чем при двух совпадениях; вход ограничен."""
+    phone = "+79990003300"
+
+    def _accounts(self, n, start=0):
+        for i in range(start, start + n):
+            Account.objects.create(id=f"u_mc{i}", email=f"mc{i}@x.local",
+                                   phone=f"+7999100{i:04d}", name=f"Контакт {i}")
+
+    def _match(self, hashes, token=None):
+        return self.api_post("/v1/friends/match-contacts", {"hashes": hashes}, token=token)
+
+    def test_contract_kept(self):
+        self._accounts(3)
+        Account.objects.create(id="u_mc_old", email="old@x.local", phone="8 (999) 200-00-01")
+        res = self._match([_h("+79991000001"), _h("+79992000001"), "мусор", 5]).json()
+        got = sorted(res["results"], key=lambda x: x["userId"])
+        self.assertEqual([x["userId"] for x in got], ["u_mc1", "u_mc_old"],
+                         "номер в старом формате (8, скобки) тоже должен находиться")
+        self.assertEqual(set(got[0]), {"userId", "name", "avatarPath", "status"})
+        self.assertEqual(got[0]["status"], "none")
+
+    def test_self_is_not_matched(self):
+        self.assertEqual(self._match([_h(self.phone)]).json()["results"], [])
+
+    def test_relationship_status_in_results(self):
+        self._accounts(2)
+        self.api_post("/v1/friends/request", {"userId": "u_mc0"})
+        res = {x["userId"]: x["status"]
+               for x in self._match([_h("+79991000000"), _h("+79991000001")]).json()["results"]}
+        self.assertEqual(res, {"u_mc0": "outgoing", "u_mc1": "none"})
+
+    def test_queries_do_not_grow_with_accounts_or_matches(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self._accounts(2)
+        self._match([_h("+79991000000")])  # прогрев: разовые запросы первого вызова
+        with CaptureQueriesContext(connection) as small:
+            self._match([_h("+79991000000"), _h("+79991000001")])
+        self._accounts(30, start=2)
+        hashes = [_h(f"+7999100{i:04d}") for i in range(32)]
+        with CaptureQueriesContext(connection) as big:
+            res = self._match(hashes).json()
+        self.assertEqual(len(res["results"]), 32)
+        self.assertEqual(len(big.captured_queries), len(small.captured_queries),
+                         "число запросов растёт с числом совпадений/аккаунтов")
+
+    def test_lookup_uses_indexed_hash(self):
+        """Аккаунты ищутся по индексированному хешу, а не читаются все подряд."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self._accounts(3)
+        with CaptureQueriesContext(connection) as ctx:
+            self._match([_h("+79991000001")])
+        acc_sql = [q["sql"] for q in ctx.captured_queries
+                   if 'FROM "accounts"' in q["sql"] and "phone_hash" in q["sql"]]
+        self.assertTrue(acc_sql, "нет выборки по phone_hash")
+        field = Account._meta.get_field("phone_hash")
+        self.assertTrue(field.db_index, "phone_hash без индекса")
+
+    def test_hash_follows_phone_change(self):
+        acc = Account.objects.create(id="u_mc_ch", email="ch@x.local", phone="")
+        self.assertEqual(self._match([_h("+79993000000")]).json()["results"], [])
+        acc.phone = "+79993000000"
+        acc.save(update_fields=["phone"])
+        ids = [x["userId"] for x in self._match([_h("+79993000000")]).json()["results"]]
+        self.assertEqual(ids, ["u_mc_ch"])
+
+    def test_oversized_list_is_truncated_not_rejected(self):
+        """Старые сборки шлют все контакты без лимита — не отбиваем, а обрезаем."""
+        from friends import views
+        hashes = [_h(f"+7888{i:07d}") for i in range(views._MAX_CONTACT_HASHES + 50)]
+        r = self._match(hashes)
+        self.assertEqual(r.status_code, 200)
+
+    def test_rate_limited(self):
+        from django.conf import settings
+        rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["contacts"]
+        limit = int(rate.split("/")[0])
+        for _ in range(limit):
+            self.assertEqual(self._match([_h("+79991000000")]).status_code, 200)
+        self.assertEqual(self._match([_h("+79991000000")]).status_code, 429)
+
+    def test_migration_backfills_existing_accounts(self):
+        """Миграция заполняет хеш у уже существующих аккаунтов (на проде они есть)."""
+        import importlib
+
+        from django.apps import apps
+
+        mig = importlib.import_module("accounts.migrations.0012_account_phone_hash")
+        Account.objects.create(id="u_mc_bf", email="bf@x.local", phone="8-999-400-00-00")
+        Account.objects.filter(id="u_mc_bf").update(phone_hash="")
+        mig.fill(apps, None)
+        self.assertEqual(Account.objects.get(id="u_mc_bf").phone_hash, _h("+79994000000"))
+        ids = [x["userId"] for x in self._match([_h("+79994000000")]).json()["results"]]
+        self.assertEqual(ids, ["u_mc_bf"])

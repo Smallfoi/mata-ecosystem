@@ -58,6 +58,30 @@ def relationship(uid: str, other: str) -> str:
     return "outgoing" if f.requester_id == uid else "incoming"
 
 
+def relationships(uid: str, others) -> dict:
+    """То же, что `relationship`, но для многих сразу — одним запросом.
+
+    {other_id: none|outgoing|incoming|friends}. Пара уникальна в одну сторону, а
+    встречные строки (A→B и B→A) приём заявки сводит в одну; если всё же обе есть,
+    дружба важнее заявки.
+    """
+    others = [o for o in others if o]
+    out = {o: "none" for o in others}
+    if not others:
+        return out
+    rows = Friendship.objects.filter(
+        Q(requester_id=uid, addressee_id__in=others)
+        | Q(addressee_id=uid, requester_id__in=others)
+    )
+    for f in rows:
+        other = f.addressee_id if f.requester_id == uid else f.requester_id
+        if f.status == Friendship.ACCEPTED:
+            out[other] = "friends"
+        elif out.get(other) != "friends":
+            out[other] = "outgoing" if f.requester_id == uid else "incoming"
+    return out
+
+
 # ── Карта друзей (D-83, этап 2b/2c): позиция + приватность ────────────────────
 # «Гекс» приватности: позицию огрубляем до ячейки ~160 м (на широте Якутска) и
 # ХРАНИМ уже огрублённую — точной точки на сервере нет вовсе. Позицию видят только

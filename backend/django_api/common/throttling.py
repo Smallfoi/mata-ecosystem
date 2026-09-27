@@ -63,6 +63,15 @@ class OtpPollThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
+class ContactsMatchThrottle(UserJWTRateThrottle):
+    """Поиск друзей по контактам (аудит F02) — по пользователю, редко.
+
+    Человек жмёт «найти по контактам» раз-другой; частые вызовы с тысячами хешей —
+    это перебор номеров (хеш телефона подбирается), а не поиск друзей.
+    """
+    scope = "contacts"
+
+
 # Безопасные методы: не меняют состояние, поэтому лимитируются отдельно от записи.
 _SAFE = ("GET", "HEAD", "OPTIONS")
 

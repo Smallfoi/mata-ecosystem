@@ -1,4 +1,21 @@
+import hashlib
+import re
+
 from django.db import models
+
+
+def contact_phone_hash(phone) -> str:
+    """Хеш телефона для поиска друзей по контактам (D-85): sha256('+7XXXXXXXXXX').
+
+    Нормализация ровно та, что у клиента Квартала: только цифры, «8» в начале
+    11-значного номера → «7». Пустой номер — пустой хеш (такие не сопоставляем).
+    """
+    digits = re.sub(r"\D", "", phone or "")
+    if len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
+    if not digits:
+        return ""
+    return hashlib.sha256(("+" + digits).encode()).hexdigest()
 
 
 class Account(models.Model):
@@ -7,12 +24,19 @@ class Account(models.Model):
     name = models.CharField(max_length=200, blank=True, default="", verbose_name="Имя")
     email = models.CharField(max_length=200, unique=True, verbose_name="Email")
     phone = models.CharField(max_length=40, null=True, blank=True, verbose_name="Телефон")
+    # sha256 нормализованного телефона — поиск друзей по контактам идёт по индексу,
+    # а не перебором всех аккаунтов (аудит F02). Пересчитывается в save().
+    phone_hash = models.CharField(max_length=64, blank=True, default="", db_index=True,
+                                  editable=False, verbose_name="Хеш телефона")
     provider = models.CharField(max_length=20, default="email", verbose_name="Способ входа")
     avatar_path = models.CharField(max_length=500, null=True, blank=True, verbose_name="Аватар")
     city = models.CharField(max_length=120, null=True, blank=True, verbose_name="Город")
     # Адреса доставки — единые для всей экосистемы (сайт/приложения). SavedAddress[] или строки.
     addresses = models.JSONField(default=list, blank=True, verbose_name="Адреса доставки")
     password_hash = models.CharField(max_length=200, null=True, blank=True, verbose_name="Хэш пароля")
+    # Версия сессий (аудит A02): смена пароля поднимает её, и все выданные раньше
+    # токены перестают действовать. 0 — токены прежнего формата (без версии).
+    token_version = models.PositiveIntegerField(default=0, verbose_name="Версия сессий")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата регистрации")
 
     # Код лояльности: постоянный 6-значный номер за клиентом (для кассы/QR). Выдаётся
@@ -46,6 +70,17 @@ class Account(models.Model):
 
     def __str__(self) -> str:
         return self.name or self.phone or self.email or self.id
+
+    def save(self, *args, **kwargs):
+        # Хеш держим в согласии с телефоном при любом сохранении модели. Массовый
+        # `.update(phone=...)` мимо save() хеш не обновит — так телефон не меняем.
+        fresh = contact_phone_hash(self.phone)
+        if fresh != self.phone_hash:
+            self.phone_hash = fresh
+            fields = kwargs.get("update_fields")
+            if fields is not None:
+                kwargs["update_fields"] = set(fields) | {"phone_hash"}
+        super().save(*args, **kwargs)
 
     def privacy_json(self) -> dict:
         return {

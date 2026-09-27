@@ -24,6 +24,7 @@ from django.template.response import TemplateResponse
 from django.utils import timezone
 
 from accounts.models import Account
+from common.security import forget_account
 from runs.models import Run
 from runs.review import approve_run, pending_queryset, recalculate, reject_run, runner_context
 from runs.rules import REVIEW_FLAGGED_THRESHOLD, REVIEW_WINDOW
@@ -118,9 +119,11 @@ def _act(request):
         if action == "block":
             reason = (request.POST.get("reason") or "Нарушение правил (анти-чит)")[:300]
             Account.objects.filter(id=uid).update(is_blocked=True, block_reason=reason)
+            forget_account(uid)
             StaffAudit.write(request, f"аккаунт заблокирован: бегун {uid}")
-            return "Аккаунт заблокирован — вход отрежется в течение минуты."
+            return "Аккаунт заблокирован — вход отрезан."
         Account.objects.filter(id=uid).update(is_blocked=False, block_reason="")
+        forget_account(uid)
         StaffAudit.write(request, f"аккаунт разблокирован: бегун {uid}")
         return "Аккаунт разблокирован."
 
