@@ -22,6 +22,8 @@ import '../../../run/data/run_mode_provider.dart';
 import '../../../run/data/run_provider.dart';
 import '../../../territory/data/territory_provider.dart';
 import '../../../trails/data/trails_provider.dart';
+import '../../../trails/data/trails_layer_provider.dart';
+import '../../../../core/config/app_config_provider.dart';
 import '../../../weather/data/weather_provider.dart';
 import '../../../weather/presentation/weather_background.dart';
 import '../../../weather/presentation/weather_view.dart';
@@ -230,10 +232,13 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
         ? (ref.watch(friendPositionsProvider).valueOrNull ??
             const <FriendPosition>[])
         : const <FriendPosition>[];
-    // Тропы — только в режиме «Тропы». В «Захвате» их не рисуем: владелец
-    // (27.09.2026) читал эти линии как «непонятные тропы» поверх захвата —
-    // в захвате карта про территорию, а не про чужие маршруты.
-    final showTrails = mode == RunMode.trails;
+    // Тропы — СЛОЙ карты, а не режим бега (решение владельца 28.09.2026, как
+    // сегменты у Стравы): сверка трека с тропами идёт после любой пробежки, и
+    // отдельный режим для неё не нужен. Переключатель — под легендой; пока
+    // тропы скрыты серверным флагом (D-89), нет ни слоя, ни переключателя.
+    final trailsFeatureOn =
+        ref.watch(appConfigProvider).valueOrNull?.showTrails ?? false;
+    final showTrails = trailsFeatureOn && ref.watch(trailsLayerProvider);
     final trails = showTrails
         ? (ref.watch(trailsProvider).valueOrNull ?? const <Trail>[])
         : const <Trail>[];
@@ -526,6 +531,12 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                       padding: EdgeInsets.only(left: 14, top: 2, bottom: 4),
                       child: _ExploredChip(),
                     ),
+                  // Слой троп: показать/скрыть линии троп в любом режиме.
+                  if (trailsFeatureOn)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 14, top: 2, bottom: 4),
+                      child: _TrailsLayerChip(on: showTrails),
+                    ),
                 ],
               ),
             ),
@@ -663,7 +674,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
     }
     final mode = ref.read(runModeProvider);
     // Тропа под пальцем (тонкая цель) — приоритет над полигонами кварталов.
-    if (mode == RunMode.trails) {
+    if (ref.read(trailsLayerProvider)) {
       final trail = _trailAt(point);
       if (trail != null) {
         context.push('/trails/detail', extra: trail);
@@ -1292,6 +1303,44 @@ class _ExploredChip extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Переключатель слоя троп на карте. Включён — линии видны и по ним можно
+/// тапнуть; выключен — карта чистая. Зачёт троп от него не зависит.
+class _TrailsLayerChip extends ConsumerWidget {
+  final bool on;
+
+  const _TrailsLayerChip({required this.on});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      onTap: () => ref.read(trailsLayerProvider.notifier).toggle(),
+      child: _Glass(
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              on ? CupertinoIcons.eye_fill : CupertinoIcons.eye_slash,
+              size: 13,
+              color: on ? AppColors.lime : AppColors.muted,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Тропы',
+              style: TextStyle(
+                color: on ? AppColors.ink : AppColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

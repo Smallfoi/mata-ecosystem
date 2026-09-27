@@ -6,7 +6,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/config/app_config_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../map/data/zone_provider.dart';
@@ -494,14 +493,10 @@ class _RunModeSwitch extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(runModeProvider);
-    // «Тропы» как режим бега скрыты до готовности (D-89, showTrails) — в Якутске
-    // троп пока нет. Остальные режимы — вопрос §4, здесь их не трогаем.
-    final showTrails =
-        ref.watch(appConfigProvider).valueOrNull?.showTrails ?? false;
-    final modes = [
-      for (final m in RunMode.values)
-        if (m != RunMode.trails || showTrails) m,
-    ];
+    // Режимов три: свободный / захват / исследование. «Тропы» отсюда убраны
+    // (28.09.2026) — зачёт троп идёт после любой пробежки, режим для этого не
+    // нужен; тропы живут слоем на карте и кнопкой «Сделать тропой» на финише.
+    const modes = RunMode.values;
     return Wrap(
       spacing: 8,
       runSpacing: 8,

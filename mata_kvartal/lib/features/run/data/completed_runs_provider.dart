@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
+import '../../trails/data/trails_provider.dart';
 import '../../loyalty/data/loyalty_provider.dart';
 import '../../notifications/data/notifications_provider.dart';
 
@@ -250,7 +251,7 @@ class CompletedRunsNotifier extends StateNotifier<List<CompletedRun>> {
     // троп, его нет — такие пропускаем молча.
     if (run.route.length < 2 || run.routeTimes.length != run.route.length) return;
     try {
-      await _dio.post<dynamic>(
+      final res = await _dio.post<Map<String, dynamic>>(
         '/runs/track',
         data: {
           'runId': run.id,
@@ -261,6 +262,17 @@ class CompletedRunsNotifier extends StateNotifier<List<CompletedRun>> {
         },
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
+      // Ответ — найденные прохождения троп. Отдаём их экрану финиша: человек
+      // ничего не выбирал перед стартом, а на финише видит «Тропа «Набережная»
+      // — 7:42» (как сегменты у Стравы, решение владельца 28.09.2026).
+      final hits = ((res.data ?? const {})['attempts'] as List? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(TrailHit.fromJson)
+          .toList();
+      if (hits.isNotEmpty) {
+        ref.read(lastTrailHitsProvider.notifier).state =
+            LastTrailHits(runId: run.id, hits: hits);
+      }
     } catch (_) {
       // Тропы — не то, ради чего стоит держать забег неотправленным.
     }

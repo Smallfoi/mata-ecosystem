@@ -122,6 +122,41 @@ class TrailApiTests(ApiTestCase):
         self.assertEqual(len(r.json()["attempts"]), 1)
         self.assertEqual(TrailAttempt.objects.filter(trail_id=trail.id).count(), 1)
 
+    def test_first_pass_is_a_personal_best(self):
+        """Первое прохождение — уже рекорд: на финише человек должен это видеть."""
+        trail = self._trail()
+        r = self.api_post("/v1/runs/track", {
+            "runId": "run_pb1",
+            "points": track_along(trail.points),
+        })
+        self.assertTrue(r.json()["attempts"][0]["isPersonalBest"])
+
+    def test_slower_pass_is_not_a_personal_best(self):
+        """Прошёл медленнее прежнего — не рекорд, иначе отметка ничего не стоит."""
+        trail = self._trail()
+        self.api_post("/v1/runs/track", {
+            "runId": "run_pb2",
+            "points": track_along(trail.points, step_s=30),
+        })
+        r = self.api_post("/v1/runs/track", {
+            "runId": "run_pb3",
+            "points": track_along(trail.points, step_s=60),
+        })
+        hit = r.json()["attempts"][0]
+        self.assertFalse(hit["isPersonalBest"])
+
+    def test_faster_pass_is_a_personal_best(self):
+        trail = self._trail()
+        self.api_post("/v1/runs/track", {
+            "runId": "run_pb4",
+            "points": track_along(trail.points, step_s=60),
+        })
+        r = self.api_post("/v1/runs/track", {
+            "runId": "run_pb5",
+            "points": track_along(trail.points, step_s=20),
+        })
+        self.assertTrue(r.json()["attempts"][0]["isPersonalBest"])
+
     def test_track_is_stored_only_temporarily(self):
         """Трек сохраняется — но как материал для разбора, а не навсегда (D-60)."""
         trail = self._trail()
