@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from catalog.models import Product
 from orders.models import Order
+from orders.money import kop_to_float, to_kop
 
 # Статус 1С → наш статус заказа. Часть этапов 1С у нас не имеет пары: «принят» и
 # «собран» — это внутренняя кухня склада, покупателю мы показываем их отдельной
@@ -61,6 +62,15 @@ def _article_index(payload: dict) -> dict:
     return {r["id"]: r for r in rows}
 
 
+def _price(value):
+    """Цена строки — числом с копейками (Decimal, ROUND_HALF_UP → float, как было
+    в контракте). Не число (заказы до серверного снимка) — как есть."""
+    try:
+        return kop_to_float(to_kop(value)) if value not in (None, "") else value
+    except ValueError:
+        return value
+
+
 def order_to_json(order: Order) -> dict:
     """Заказ в виде, описанном в ТЗ для 1С (`docs/INTEGRATION_1C.md` §7)."""
     payload = order.payload or {}
@@ -81,7 +91,7 @@ def order_to_json(order: Order) -> dict:
             "size": raw.get("size") or "",
             "color": raw.get("color") or "",
             "qty": int(raw.get("quantity") or 1),
-            "price": raw.get("price"),
+            "price": _price(raw.get("price")),
         })
 
     address = ", ".join(
@@ -101,7 +111,8 @@ def order_to_json(order: Order) -> dict:
             "email": checkout.get("email") or "",
         },
         "items": items,
-        "total": order.total,
+        # Из копеек (аудит B09): то же число, что в платеже и чеке.
+        "total": kop_to_float(order.amount_kop),
         "deliveryCost": payload.get("deliveryCost"),
         "pointsRedeemed": order.points_redeemed,
         "payment": checkout.get("paymentType") or "",

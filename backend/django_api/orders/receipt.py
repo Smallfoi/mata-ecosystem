@@ -31,6 +31,8 @@
 """
 import os
 
+from .money import rub_str, to_kop
+
 _NAME_LIMIT = 128  # ограничение 54-ФЗ на наименование предмета расчёта
 
 
@@ -68,12 +70,16 @@ def receipts_enabled() -> bool:
 
 
 def _kop(value) -> int:
-    """Рубли → копейки. Считаем в целых, иначе округления разъезжаются."""
-    return int(round(float(value or 0) * 100))
+    """Рубли → копейки. Считаем в целых, иначе округления разъезжаются.
+    Через Decimal и ROUND_HALF_UP — то же правило, что у заказа и платежа (аудит B09)."""
+    try:
+        return to_kop(value)
+    except ValueError:
+        return 0
 
 
 def _rub(kopecks) -> str:
-    return f"{kopecks / 100:.2f}"
+    return rub_str(kopecks)
 
 
 def _name(item) -> str:

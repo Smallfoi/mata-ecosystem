@@ -3,6 +3,8 @@
 from django.db import models
 from django.utils import timezone
 
+from .money import kop_to_float, to_kop
+
 
 class Order(models.Model):
     STATUS_CHOICES = [
@@ -15,7 +17,14 @@ class Order(models.Model):
 
     user_id = models.CharField(max_length=40, db_index=True, verbose_name="Пользователь (ID)")
     order_id = models.CharField(max_length=40, verbose_name="Номер заказа")  # клиентский id (SS-xxxxx)
+    # Устаревшее хранение суммы (float, рубли) — пишется и отдаётся в API как раньше.
+    # Считаем по `total_kop`. Убрать float-поле — отдельный шаг (см. orders/money.py).
     total = models.FloatField(default=0, verbose_name="Сумма, ₽")
+    # Сумма заказа в копейках — основное поле для расчётов (аудит B09): платёж,
+    # чек, возвраты, 1С. Заполняется в save() из `total`, если его записал старый
+    # путь (админка, тесты), — двойная запись держит поля согласованными.
+    total_kop = models.BigIntegerField(null=True, blank=True, editable=False,
+                                       verbose_name="Сумма, коп.")
     status = models.CharField(
         max_length=20, default="pending", choices=STATUS_CHOICES, verbose_name="Статус"
     )
@@ -83,6 +92,30 @@ class Order(models.Model):
         "delivered": "delivered",
         "cancelled": "cancelled",
     }
+
+    def save(self, *args, **kwargs):
+        # Двойная запись (аудит B09): копейки всегда соответствуют рублям. Если
+        # поля расходятся, значит `total` записал старый путь (админка, код до
+        # копеек) — он и прав.
+        kop = to_kop(self.total or 0)
+        if self.total_kop != kop:
+            self.total_kop = kop
+            fields = kwargs.get("update_fields")
+            if fields is not None and "total_kop" not in fields:
+                kwargs["update_fields"] = [*fields, "total_kop"]
+        super().save(*args, **kwargs)
+
+    def set_total_kop(self, kop: int) -> None:
+        """Записать сумму в копейках — и её float-зеркало для старых клиентов."""
+        self.total_kop = int(kop)
+        self.total = kop_to_float(kop)
+
+    @property
+    def amount_kop(self) -> int:
+        """Сумма заказа в копейках — по ней считаются платёж, чек и возвраты."""
+        if self.total_kop is not None:
+            return int(self.total_kop)
+        return to_kop(self.total or 0)
 
     def to_json(self) -> dict:
         """Заказ для приложения: payload (контракт SportStore, Order.fromJson) +

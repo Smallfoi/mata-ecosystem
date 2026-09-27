@@ -142,7 +142,7 @@ class FrozenOrderTests(_YooKassaCase):
         order = self._get("SS-F7")
 
         def racing_http(method, url, payload=None, headers=None):
-            Order.objects.filter(pk=order.pk).update(total=2000)
+            Order.objects.filter(pk=order.pk).update(total=2000, total_kop=200000)
             return _yk(pid="pay_race")
 
         with mock.patch("orders.payment._http", side_effect=racing_http):

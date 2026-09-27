@@ -26,6 +26,8 @@ import os
 import urllib.error
 import urllib.request
 
+from .money import rub_str, to_kop
+
 _API = "https://api.yookassa.ru/v3"
 
 # Способ оплаты — только СБП (D-71, D-72). Не настраивается и не выбирается
@@ -99,8 +101,9 @@ def _request(method, path, payload=None, idempotence_key=None):
 
 
 def _money(amount) -> str:
-    """Сумма в формате ЮKassa: строка с двумя знаками ('1234.00')."""
-    return f"{float(amount):.2f}"
+    """Сумма в формате ЮKassa: строка с двумя знаками ('1234.00').
+    Через Decimal (ROUND_HALF_UP): та же сумма, что у заказа и в чеке (аудит B09)."""
+    return rub_str(to_kop(amount))
 
 
 def _idem_key(*parts) -> str:
@@ -132,9 +135,11 @@ def payment_reference(order) -> str:
 
 def _kop(value):
     """Сумма в копейках (целое) или None, если это не число."""
+    if value in (None, ""):
+        return None
     try:
-        return int(round(float(value) * 100))
-    except (TypeError, ValueError):
+        return to_kop(value)
+    except ValueError:
         return None
 
 
@@ -151,9 +156,9 @@ def payment_mismatch(order, info) -> str:
         return f"платёж {pid} не относится к заказу (ждали {order.payment_id})"
     if info.get("currency") != "RUB":
         return f"валюта платежа «{info.get('currency') or '—'}», ждали RUB"
-    paid, due = _kop(info.get("amount")), _kop(order.total)
+    paid, due = _kop(info.get("amount")), order.amount_kop
     if paid is None or paid != due:
-        return f"сумма платежа {info.get('amount') or '—'} ≠ сумме заказа {_money(order.total)}"
+        return f"сумма платежа {info.get('amount') or '—'} ≠ сумме заказа {rub_str(due)}"
     ref = payment_reference(order)
     if info.get("reference") != ref:
         return f"reference платежа «{info.get('reference') or '—'}», ждали «{ref}»"
