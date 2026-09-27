@@ -35,6 +35,8 @@
     try { return localStorage.getItem(LS_TOKEN); } catch (e) { return null; }
   }
   function setSession(token, user) {
+    // Новый вход: локальные копии адресов других аккаунтов в этом браузере не нужны.
+    purgeAddressCache(addressCacheKey(user));
     try {
       localStorage.setItem(LS_TOKEN, token);
       localStorage.setItem(LS_USER, JSON.stringify(user || {}));
@@ -47,6 +49,27 @@
   function clearSession() {
     try { localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_USER); }
     catch (e) {}
+    purgeAddressCache(null);
+  }
+
+  // Локальная копия адресов доставки живёт под ключом "staw_addresses:<id аккаунта>"
+  // (script.js). При смене сессии убираем чужие копии и старый общий ключ
+  // "staw_addresses", который раньше делили все, кто входил в этом браузере (аудит D02).
+  function addressCacheKey(user) {
+    var id = user && (user.id || user.userId);
+    return id ? "staw_addresses:" + id : null;
+  }
+  function purgeAddressCache(keepKey) {
+    try {
+      var drop = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k === "staw_addresses" || (k && k.indexOf("staw_addresses:") === 0 && k !== keepKey)) {
+          drop.push(k);
+        }
+      }
+      drop.forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) {}
   }
 
   // ── api ──────────────────────────────────────────────────────────────────
@@ -64,7 +87,9 @@
         var data = txt ? JSON.parse(txt) : null;
         if (!r.ok) {
           var msg = (data && data.detail) ? data.detail : "Ошибка сервера";
-          throw new Error(msg);
+          var err = new Error(msg);
+          err.status = r.status; // 401 → сессия недействительна (профиль предлагает войти)
+          throw err;
         }
         return data;
       });
