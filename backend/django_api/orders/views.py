@@ -9,7 +9,7 @@ from common.security import user_id_from_request
 from .awards import redeem_for_order
 from .lifecycle import AWAITING, apply_payment_info, mark_paid, payment_started
 from .models import Order
-from .pricing import all_items_known, total_is_acceptable
+from .pricing import CartError, money, normalize_items, parse_quantity, total_is_acceptable
 from .payment import (
     PaymentError,
     create_payment,
@@ -60,6 +60,34 @@ def _billable(payload, total, points) -> tuple:
 
 def _order_billable(order) -> tuple:
     return _billable(order.payload, order.total, order.points_redeemed)
+
+
+def _qty_key(raw):
+    try:
+        return parse_quantity(raw)
+    except CartError:
+        return str(raw)
+
+
+def _shape(payload, total, points) -> tuple:
+    """Что покупатель заказал: сумма, баллы и строки (товар, размер, цвет, количество).
+
+    Для повтора уже оплачиваемого заказа (аудит B01). Цену строки не сравниваем:
+    её берёт сервер из каталога (аудит B09), а ретрай офлайн-очереди шлёт
+    клиентскую — это тот же заказ, а не попытка его изменить.
+    """
+    total_kop, points, items = _billable(payload, total, points)
+    raw = (payload or {}).get("items") if isinstance(payload, dict) else None
+    lines = []
+    for it, line in zip(raw or [], items):
+        if isinstance(line, tuple):
+            line = line[:3] + (_qty_key(it.get("quantity")),)
+        lines.append(line)
+    return (total_kop, points, tuple(lines))
+
+
+def _order_shape(order) -> tuple:
+    return _shape(order.payload, order.total, order.points_redeemed)
 
 
 def _test_payer(uid: str) -> bool:
@@ -241,12 +269,14 @@ def orders(request):
         oid = str(d.get("id") or "").strip()
         if not oid:
             return Response({"detail": "Нет id заказа"}, status=400)
-        total = float(d.get("total") or 0)
+        try:
+            total = float(money(d.get("total")))
+        except ValueError:
+            return Response({"detail": "Некорректная сумма заказа"}, status=400)
         try:
             points = max(0, int(d.get("pointsRedeemed") or 0))
         except (TypeError, ValueError):
             points = 0
-        items = d.get("items")
 
         with transaction.atomic():
             # Блокируем заказ: иначе переоформление могло бы проскочить между
@@ -259,7 +289,7 @@ def orders(request):
                 # офлайн-очередь) идемпотентен: отдаём, что есть, ничего не меняя —
                 # ни суммы, ни состава, ни статуса. Другой состав или сумма — отказ:
                 # платёж и чек уже построены по прежнему заказу.
-                if _billable(d, total, points) != _order_billable(already):
+                if _shape(d, total, points) != _order_shape(already):
                     return Response(
                         {"detail": "Заказ уже передан в оплату — изменить его нельзя. "
                                    "Оформите новый заказ."},
@@ -267,11 +297,24 @@ def orders(request):
                     )
                 return Response(already.to_json())
 
-            # Приём оплаты включён — сумму обязаны сверить с каталогом (D-37, D-72).
-            # Позиции не из каталога сверить нельзя: такой заказ оплатили бы хоть рублём.
-            if payment_enabled() and not all_items_known(items):
+            # Строки заказа собирает сервер по каталогу (аудит B09): товар продаётся
+            # и есть в наличии, размер и цвет существуют, количество в пределах,
+            # цена и название — из каталога. По этому снимку строятся чек и 1С.
+            # Приём оплаты включён — позиции не из каталога не принимаем (D-37, D-72):
+            # такой заказ оплатили бы хоть рублём.
+            try:
+                cart = normalize_items(d.get("items"), strict=payment_enabled())
+            except CartError as e:
+                return Response(e.body(), status=e.status)
+
+            if already and points != already.points_redeemed:
+                # Баллы списаны при первом оформлении ровно на прежнее число.
+                # Записать в заказ новое, не списав его, нельзя: заказ и реестр
+                # баллов разойдутся (скидка без списания или списание без скидки).
                 return Response(
-                    {"detail": "Не удалось сверить заказ с каталогом"}, status=400
+                    {"detail": "Списание баллов по этому заказу уже проведено — "
+                               "изменить его нельзя. Оформите новый заказ."},
+                    status=409,
                 )
             # Баллы списывает сервер при оформлении (D-72) — до сверки суммы: скидка
             # законно снижает порог, но только реально списанная. Не сошлось —
@@ -282,15 +325,19 @@ def orders(request):
                     return Response({"detail": problem}, status=400)
             # Сумму присылает клиент — сверяем её с ценами каталога (D-37). Иначе
             # корзину на 50 000 ₽ можно оформить с total: 1 и заплатить рубль.
-            if not total_is_acceptable(total, items, uid, oid):
+            if not total_is_acceptable(total, cart, uid, oid):
                 transaction.set_rollback(True)
                 return Response(
                     {"detail": "Сумма заказа не совпадает с ценами каталога"}, status=400
                 )
+            payload = {**d, "items": cart.items}
+            if cart.verified:
+                # Сумма товаров по ценам каталога — та же, что в строках.
+                payload["subtotal"] = float(cart.goods)
             fields = {
                 "total": total,
                 "points_redeemed": points,
-                "payload": d,
+                "payload": payload,
             }
             obj, created = Order.objects.update_or_create(
                 user_id=uid,
@@ -308,7 +355,7 @@ def orders(request):
         # «износа кроссовок» (Квартал затем убавляет километраж). Идемпотентно.
         from shoes.views import create_for_order
 
-        create_for_order(uid, oid, d.get("items") or [])
+        create_for_order(uid, oid, cart.items)
         if created:
             # Аналитика (D-30): покупка (только на создании — повтор POST не задваивает).
             from analytics.models import E_PURCHASE, track
