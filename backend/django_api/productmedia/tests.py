@@ -604,3 +604,52 @@ class DetailsAndPromptVersionTests(TestCase):
         from productmedia import prompts
         self.assertEqual(prompts.with_details(prompts.CATALOG, 0), prompts.CATALOG)
         self.assertIn("close-ups", prompts.with_details(prompts.CATALOG, 2))
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class TestRunsHiddenTests(TestCase):
+    """Прогоны photo_test не попадают на экраны; старые «Готово» без выкладки — «Отклонено»."""
+
+    @classmethod
+    def setUpTestData(cls):
+        Product.objects.create(id="hd1", name="Кроссовки", category_id="c", price=9000,
+                               article="SH-1", colors=["Зелёный"], model_key="SHOE1")
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from common.testutils import login_admin
+        get_user_model().objects.create_superuser("owner_hd", "hd@t.dev", "OwnerPass!2026")
+        login_admin(self.client, "owner_hd", "OwnerPass!2026")
+
+    @mock.patch("productmedia.processing.process")
+    def test_photo_test_batch_not_on_review_screen(self, m_proc):
+        from django.urls import reverse
+        m_proc.return_value = _png_bytes((1, 2, 3), (900, 900))
+        batch = PhotoBatch.objects.create(track="catalog", note=PhotoBatch.NOTE_TEST)
+        job = service.intake(batch, [
+            {"article": "SH-1", "content": _png_bytes(), "filename": "a.png"}])[0]
+        service.generate(job)
+        page = self.client.get(reverse("photo_review")).content.decode()
+        self.assertNotIn('data-job="%s"' % job.pk, page)     # случайно не примут
+        by_batch = self.client.get(reverse("photo_review") + "?batch=%s" % batch.pk)
+        self.assertContains(by_batch, 'data-job="%s"' % job.pk)  # по прямой ссылке — есть
+        listing = self.client.get(reverse("photo_pipeline")).content.decode()
+        self.assertNotIn("#%s<" % batch.pk, listing)
+
+    def test_old_unattached_done_becomes_rejected(self):
+        import importlib
+        from django.apps import apps
+        from django.utils import timezone
+        mig = importlib.import_module("productmedia.migrations.0004_unattached_done_to_rejected")
+        batch = PhotoBatch.objects.create(track="catalog")
+        preview, shown = service.intake(batch, [
+            {"article": "SH-1", "content": _png_bytes(), "filename": "a.png"},
+            {"article": "SH-1", "content": _png_bytes(), "filename": "b.png"}])
+        PhotoJob.objects.filter(pk=preview.pk).update(status="done")
+        PhotoJob.objects.filter(pk=shown.pk).update(status="done", attached_at=timezone.now())
+        mig.forward(apps, None)
+        preview.refresh_from_db()
+        shown.refresh_from_db()
+        self.assertEqual(preview.status, PhotoJob.STATUS_REJECTED)
+        self.assertIn("предпросмотр", preview.note)
+        self.assertEqual(shown.status, PhotoJob.STATUS_DONE)  # настоящая выкладка не тронута

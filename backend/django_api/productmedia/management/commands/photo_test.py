@@ -80,7 +80,7 @@ class Command(BaseCommand):
                              product.colors or [], src_desc))
 
         # 4) один прогон
-        batch = PhotoBatch.objects.create(track=o["track"], note="photo_test")
+        batch = PhotoBatch.objects.create(track=o["track"], note=PhotoBatch.NOTE_TEST)
         job = service.intake(batch, [{
             "article": product.article, "content": source,
             "filename": "source.bin", "attach_as": o["attach"],

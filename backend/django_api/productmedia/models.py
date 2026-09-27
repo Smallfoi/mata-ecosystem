@@ -19,6 +19,9 @@ class PhotoBatch(models.Model):
         (TRACK_CATALOG, "Каталог (товар точь-в-точь)"),
         (TRACK_MODEL, "На модели (маркетинг)"),
     ]
+    # Пометка партий, созданных командой photo_test: технические прогоны, на экраны
+    # фотопайплайна не выводятся.
+    NOTE_TEST = "photo_test"
 
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
