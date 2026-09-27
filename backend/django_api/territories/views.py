@@ -12,6 +12,7 @@
 Один владелец = одна (мульти)территория (owner_id UNIQUE).
 """
 import json
+import math
 import secrets
 from datetime import timedelta
 
@@ -21,6 +22,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from clubs.models import ClubMember
+from common.numeric import BadNumber, finite_float
 from common.security import user_id_from_request
 from loyalty.models import LoyaltyTransaction, add_txn
 
@@ -76,6 +78,27 @@ AREA_PER_POINT_M2 = 100      # 1 балл за каждые 100 м² вперв�
 MAX_TERRITORY_POINTS = 100   # потолок за один захват (≥10 000 м² нового следа)
 
 
+def _parse_ring(pts):
+    """Точки контура → [(lng, lat), ...] или None, если хоть одна некорректна (D04).
+
+    Клиент (territory_provider.dart) шлёт [[lat, lng], ...] числами. Раньше мусор
+    (строка, словарь, «nan», одна координата) ронял захват в 500 или уходил в
+    PostGIS; теперь это понятный 400. Одну битую точку НЕ выбрасываем молча, как в
+    треке тропы: контур территории без неё — уже другая фигура.
+    """
+    ring = []
+    for p in pts:
+        if not isinstance(p, (list, tuple)) or len(p) < 2:
+            return None
+        try:
+            lat = finite_float(p[0], -90, 90)
+            lng = finite_float(p[1], -180, 180)
+        except BadNumber:
+            return None
+        ring.append((lng, lat))
+    return ring
+
+
 def _club_of(uid):
     m = ClubMember.objects.filter(user_id=uid).first()
     return m.club_id if m else None
@@ -86,7 +109,11 @@ def capture(request):
     uid = user_id_from_request(request)
     if not uid:
         return Response({"detail": "Нет токена"}, status=401)
+    if not isinstance(request.data, dict):
+        return Response({"detail": "Ожидается объект"}, status=400)
     pts = request.data.get("points") or []
+    if not isinstance(pts, (list, tuple)):
+        return Response({"detail": "Некорректные точки маршрута"}, status=400)
     if len(pts) < 3:
         return Response({"detail": "Маршрут слишком короткий для территории"}, status=400)
     # Лимит на размер payload (P0 безопасность): защита от DoS-полигона. Даже ультра-забег
@@ -125,7 +152,9 @@ def capture(request):
             status=429,
         )
 
-    ring = [(float(p[1]), float(p[0])) for p in pts]  # (lng, lat)
+    ring = _parse_ring(pts)  # (lng, lat)
+    if ring is None:
+        return Response({"detail": "Некорректные точки маршрута"}, status=400)
     if ring[0] != ring[-1]:
         ring.append(ring[0])
     wkt = "POLYGON((" + ", ".join(f"{lng} {lat}" for lng, lat in ring) + "))"
@@ -400,6 +429,8 @@ def list_territories(request):
         if bbox:
             try:
                 a, b, c, d = (float(x) for x in bbox.split(","))
+                if not all(math.isfinite(v) for v in (a, b, c, d)):
+                    raise ValueError("not finite")
             except Exception:
                 return Response({"detail": "bbox=minLng,minLat,maxLng,maxLat"}, status=400)
             cur.execute(

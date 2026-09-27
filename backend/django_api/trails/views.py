@@ -3,11 +3,12 @@
 Контракт (ECOSYSTEM_API.md → Trails).
 """
 import logging
+import math
 import uuid
 from datetime import datetime
 from datetime import timezone as dt_tz
 
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Min
 from django.utils import timezone
 from rest_framework.decorators import api_view
@@ -56,29 +57,56 @@ MAX_TRAIL_POINTS = 500
 MIN_TRAIL_LENGTH_M = 200    # короче — это не тропа, а перекрёсток
 MAX_TRAIL_LENGTH_M = 42_195
 NEARBY_PAD_DEG = 0.09       # ~10 км по широте: столько ищем «тропы рядом»
+MAX_POINT_TS_MS = 4_102_444_800_000   # 01.01.2100: дальше — не время, а мусор (D04)
 
 
 def _points(raw, with_time=False):
     """Разобрать точки из запроса. Мусор молча отбрасываем: один битый замер
     GPS не повод отклонить весь забег."""
     out = []
-    for p in raw or []:
+    if not isinstance(raw, (list, tuple)):
+        return out
+    for p in raw:
+        if not isinstance(p, (list, tuple)) or len(p) < (3 if with_time else 2):
+            continue
+        if any(isinstance(v, bool) for v in p[:3]):
+            continue
         try:
             lat = float(p[0])
             lon = float(p[1])
-        except (TypeError, ValueError, IndexError):
+        except (TypeError, ValueError, OverflowError):
             continue
+        # NaN не проходит сравнения ниже сам, бесконечность — тоже (аудит D04).
         if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
             continue
         if with_time:
             try:
-                ms = int(p[2])
-            except (TypeError, ValueError, IndexError):
+                t = float(p[2])
+            except (TypeError, ValueError, OverflowError):
                 continue
-            out.append([lat, lon, ms])
+            if not math.isfinite(t) or not (0 <= t <= MAX_POINT_TS_MS):
+                continue
+            out.append([lat, lon, int(t)])
         else:
             out.append([lat, lon])
     return out
+
+
+def _run_owner_conflict(run_id, me):
+    """runId принадлежит другому человеку (аудит C01).
+
+    Трек законно может прийти раньше сводки забега (офлайн-повторы, старые
+    сборки), поэтому «забега ещё нет ни у кого» — не ошибка. Но если забег,
+    трек или попытка тропы с этим runId уже чужие — перезаписывать нельзя:
+    иначе можно подменить чужой трек и увести чужие попытки на себя.
+    """
+    from runs.models import Run
+
+    return (
+        Run.objects.filter(id=run_id).exclude(user_id=me).exists()
+        or PendingTrack.objects.filter(run_id=run_id).exclude(user_id=me).exists()
+        or TrailAttempt.objects.filter(run_id=run_id).exclude(user_id=me).exists()
+    )
 
 
 @api_view(["POST"])
@@ -98,7 +126,9 @@ def submit_track(request):
         # Тропы выключены и резервная копия не нужна — трек не храним вовсе.
         return Response({"attempts": [], "skipped": "trailsDisabled"})
 
-    data = request.data if isinstance(request.data, dict) else {}
+    if not isinstance(request.data, dict):
+        return Response({"detail": "Ожидается объект"}, status=400)
+    data = request.data
     run_id = str(data.get("runId") or "").strip()[:40]
     if not run_id:
         return Response({"detail": "Нет runId"}, status=400)
@@ -109,10 +139,30 @@ def submit_track(request):
     if len(track) > MAX_TRACK_POINTS:
         track = track[:MAX_TRACK_POINTS]
 
-    PendingTrack.objects.update_or_create(
-        run_id=run_id,
-        defaults={"user_id": me, "points": track, "received_at": timezone.now()},
-    )
+    # Владелец трека не меняется (аудит C01). Проверка и запись — под блокировкой
+    # строки трека, чтобы два параллельных запроса разных людей не проскочили оба.
+    with transaction.atomic():
+        pending = PendingTrack.objects.select_for_update().filter(run_id=run_id).first()
+        if _run_owner_conflict(run_id, me):
+            return Response({"detail": "Конфликт id"}, status=409)
+        if pending:
+            pending.points = track
+            pending.received_at = timezone.now()
+            pending.save(update_fields=["points", "received_at"])
+        else:
+            try:
+                with transaction.atomic():
+                    PendingTrack.objects.create(
+                        run_id=run_id, user_id=me, points=track,
+                        received_at=timezone.now(),
+                    )
+            except IntegrityError:
+                # Параллельный запрос успел создать трек первым. Свой — просто
+                # обновляем; чужой — конфликт, владельца не меняем.
+                if not PendingTrack.objects.filter(run_id=run_id, user_id=me).update(
+                    points=track, received_at=timezone.now()
+                ):
+                    return Response({"detail": "Конфликт id"}, status=409)
 
     if not trails_on:
         # Тропы выключены, но включён бэкап (D-86): трек сохранили только для личной
@@ -197,6 +247,8 @@ def trails(request):
         if lat and lon:
             try:
                 lat, lon = float(lat), float(lon)
+                if not (math.isfinite(lat) and math.isfinite(lon)):
+                    raise ValueError("not finite")
                 qs = qs.filter(
                     min_lat__lte=lat + NEARBY_PAD_DEG,
                     max_lat__gte=lat - NEARBY_PAD_DEG,
