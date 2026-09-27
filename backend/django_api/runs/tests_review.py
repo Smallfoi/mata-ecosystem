@@ -174,6 +174,12 @@ class MultiAccountTests(TestCase):
         self.assertEqual(linked[0]["why"], "общее устройство")
 
     def test_shared_phone_links_accounts(self):
+        # Новых дублей номера не бывает (уникальный индекс, аудит A03), но старые,
+        # появившиеся до него, на проде могут быть — их связь и проверяем.
+        from django.db import connection
+
+        with connection.cursor() as cur:
+            cur.execute("DROP INDEX IF EXISTS accounts_phone_uniq_nonempty")
         Account.objects.filter(id="u_b").update(phone=self.a.phone)
         self.assertEqual([r["id"] for r in linked_accounts("u_a")], ["u_b"])
 

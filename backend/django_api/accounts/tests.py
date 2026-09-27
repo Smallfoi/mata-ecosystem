@@ -415,7 +415,8 @@ class PhoneIdentityTests(ApiTestCase):
         from common.security import make_token
 
         acc = Account.objects.create(id="u_nophone", email="nophone@test.local", phone=None)
-        r = self.api_patch("/v1/profile", {"phone": "+79990009003"}, token=make_token(acc.id))
+        r = self.api_patch("/v1/profile", {"phone": "+79990009003", "phoneCode": "1234"},
+                           token=make_token(acc.id))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(Account.objects.get(id=acc.id).phone, "+79990009003")
 
@@ -424,7 +425,8 @@ class PhoneIdentityTests(ApiTestCase):
         from common.security import make_token
 
         acc = Account.objects.create(id="u_nophone2", email="nophone2@test.local", phone=None)
-        r = self.api_patch("/v1/profile", {"phone": self.phone}, token=make_token(acc.id))
+        r = self.api_patch("/v1/profile", {"phone": self.phone, "phoneCode": "1234"},
+                           token=make_token(acc.id))
         self.assertEqual(r.status_code, 409)
 
 

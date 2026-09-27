@@ -13,6 +13,9 @@ class Account(models.Model):
     # Адреса доставки — единые для всей экосистемы (сайт/приложения). SavedAddress[] или строки.
     addresses = models.JSONField(default=list, blank=True, verbose_name="Адреса доставки")
     password_hash = models.CharField(max_length=200, null=True, blank=True, verbose_name="Хэш пароля")
+    # Версия сессий (аудит A02): смена пароля поднимает её, и все выданные раньше
+    # токены перестают действовать. 0 — токены прежнего формата (без версии).
+    token_version = models.PositiveIntegerField(default=0, verbose_name="Версия сессий")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата регистрации")
 
     # Код лояльности: постоянный 6-значный номер за клиентом (для кассы/QR). Выдаётся
