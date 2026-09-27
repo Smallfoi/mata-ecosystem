@@ -141,7 +141,9 @@ def photo_pipeline(request):
         return _err("неизвестное действие")
 
     batches = []
-    for b in PhotoBatch.objects.select_related("created_by").order_by("-created_at")[:20]:
+    # Прогоны командой photo_test — технические проверки, не работа с товарами.
+    for b in (PhotoBatch.objects.exclude(note=PhotoBatch.NOTE_TEST)
+              .select_related("created_by").order_by("-created_at")[:20]):
         c = service.counts(b)
         batches.append({
             "id": b.pk, "created_at": b.created_at, "track": b.get_track_display(),
@@ -214,6 +216,10 @@ def photo_review(request):
     qs = PhotoJob.objects.select_related("product", "batch")
     if batch_id.isdigit():
         qs = qs.filter(batch_id=int(batch_id))
+    else:
+        # Технические прогоны photo_test на экран проверки не выносим: там исходник часто
+        # не от этого товара, и случайное «Принять» повесило бы чужое фото на карточку.
+        qs = qs.exclude(batch__note=PhotoBatch.NOTE_TEST)
     tab_counts = {k: qs.filter(status__in=v[0]).count() for k, v in SHOW.items()}
     qs = qs.filter(status__in=SHOW[show][0]).order_by("-updated_at")
 
