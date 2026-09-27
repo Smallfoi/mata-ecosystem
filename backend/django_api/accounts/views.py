@@ -4,7 +4,7 @@ from rest_framework.response import Response
 
 from common.throttling import AuthEndpointThrottle, OtpPollThrottle
 
-from common.uploads import image_extension
+from common.uploads import prepare_image
 from common.security import (
     forget_account,
     hash_password,
@@ -300,7 +300,8 @@ def profile_avatar(request):
         return Response(acc.to_json())
     f = request.FILES.get("image")
     # Тип определяем по СОДЕРЖИМОМУ: имя файла и Content-Type присылает клиент (D-37).
-    ext, upload_error = image_extension(f)
+    # Храним пересохранённую копию без EXIF/GPS/XMP (аудит D07), а не присланный файл.
+    ext, clean, upload_error = prepare_image(f)
     if upload_error:
         return Response({"detail": upload_error}, status=400)
     import secrets
@@ -308,7 +309,7 @@ def profile_avatar(request):
     from django.core.files.storage import default_storage
 
     saved = default_storage.save(
-        f"uploads/avatars/{uid}_{secrets.token_hex(4)}.{ext}", f
+        f"uploads/avatars/{uid}_{secrets.token_hex(4)}.{ext}", clean
     )
     acc.avatar_path = default_storage.url(saved)  # локально /media/…, в проде S3/CDN (D-31)
     acc.save(update_fields=["avatar_path"])
