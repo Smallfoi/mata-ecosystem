@@ -15,13 +15,15 @@ from common.security import user_id_from_request
 from orders.models import Order
 
 from .models import Banner, Category, Product, Review, SiteContent
+from .preview import is_preview
 
 _TRUE = {"1", "true", "True", "yes"}
 
 
 def _is_preview(request) -> bool:
-    """preview=1 → отдаём и черновики (для админ-превью); иначе только опубликованное."""
-    return request.query_params.get("preview") in _TRUE
+    """preview=1 от сотрудника → отдаём и черновики (превью Конструктора); иначе только
+    опубликованное. Без пропуска сотрудника параметр игнорируется (catalog.preview)."""
+    return is_preview(request)
 
 
 def _visible_products(request):
