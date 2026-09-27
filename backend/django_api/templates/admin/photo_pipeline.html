@@ -7,11 +7,13 @@
   <a class="m-tab on" href="">Загрузка и партии</a>
   <a class="m-tab" href="{{ review_link }}">Проверка фото</a>
   <a class="m-tab" href="{{ prompts_link }}">Промты</a>
+  <a class="m-tab" href="{% url 'photo_guide' %}">Как снимать</a>
 </div>
 
 {% if can_edit %}
 <div class="m-card pad" id="pipeline-upload">
   <div class="m-lead">Новая партия</div>
+  <div class="m-note">Снимаете впервые? Прочитайте <a href="{% url 'photo_guide' %}"><b>как снимать</b></a> — что снять, как назвать папки и файлы, что считать браком.</div>
   <div class="m-hint">
     Каждая папка называется <b>артикулом</b> товара и содержит его снимки: перед, спина.
     Первый по имени файл станет обложкой, остальные уйдут в галерею. Одна вещь в кадре.

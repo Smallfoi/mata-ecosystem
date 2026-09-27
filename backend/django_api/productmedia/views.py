@@ -334,3 +334,22 @@ def photo_prompts(request):
         "review_link": reverse("photo_review"),
         "can_edit": _can_edit(request),
     })
+
+
+# ── «Как снимать» — ТЗ для фотографа ───────────────────────────────────────
+
+@staff_member_required
+@tab_required(TAB)
+def photo_guide(request):
+    """Памятка работнику: что снимать, как называть папки и файлы, что считать браком.
+
+    Лежит рядом с загрузкой (просьба владельца 27.09), чтобы у того, кто снимает и
+    загружает, правила были под рукой.
+    """
+    return TemplateResponse(request, "admin/photo_guide.html", {
+        **admin.site.each_context(request),
+        "title": "Как снимать товары",
+        "pipeline_link": reverse("photo_pipeline"),
+        "review_link": reverse("photo_review"),
+        "prompts_link": reverse("photo_prompts"),
+    })
