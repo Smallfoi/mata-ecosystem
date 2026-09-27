@@ -324,3 +324,85 @@ class SiteImageTests(CleanAssertions, SimpleTestCase):
         out = _webify_image(_file(_phone_jpeg(), "IMG.jpg")).read()
         self.assertClean(out)
         self.assertUpright(out)
+
+
+class StripExifMediaCommandTests(CleanAssertions, TestCase):
+    """Команда strip_exif_media: чистит уже загруженное, имена не меняет, идемпотентна."""
+
+    def setUp(self):
+        import shutil
+        media = tempfile.mkdtemp()               # свой каталог на каждый тест
+        self.addCleanup(shutil.rmtree, media, True)
+        ov = override_settings(MEDIA_ROOT=media)
+        ov.enable()
+        self.addCleanup(ov.disable)
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+
+        from productmedia.images import make_webp
+        self.noisy = Image.effect_noise((32, 32), 80).convert("RGB")
+        png = io.BytesIO()
+        self.noisy.save(png, "PNG", exif=_exif(1))
+        self.files = {
+            "uploads/avatars/u1_ab.jpg": _phone_jpeg(),
+            "races/cover.jpg": _phone_jpeg(),
+            "photopipeline/source/s1.png": png.getvalue(),
+            "uploads/photos/clean.webp": make_webp(_phone_jpeg()),   # уже чистый
+            "uploads/reviews/broken.jpg": b"\xff\xd8\xffnot-an-image",
+            "uploads/site-video/v.mp4": b"not an image at all",
+        }
+        for name, data in self.files.items():
+            self.assertEqual(default_storage.save(name, ContentFile(data)), name)
+
+    def _run(self, *args):
+        from django.core.management import call_command
+        out, err = io.StringIO(), io.StringIO()
+        call_command("strip_exif_media", *args, stdout=out, stderr=err)
+        return out.getvalue(), err.getvalue()
+
+    def _read(self, name):
+        with open(os.path.join(settings.MEDIA_ROOT, name), "rb") as fh:
+            return fh.read()
+
+    def test_dry_run_counts_and_changes_nothing(self):
+        out, _ = self._run()
+        self.assertIn("Сухой прогон", out)
+        self.assertIn("Изображений 4", out)
+        self.assertIn("с метаданными 3", out)
+        self.assertIn("с GPS 3", out)
+        self.assertIn("не прочитано 1", out)
+        for name, data in self.files.items():
+            self.assertEqual(self._read(name), data, name)
+
+    def test_apply_cleans_in_place_and_is_idempotent(self):
+        out, err = self._run("--apply")
+        self.assertIn("очищено 3", out)
+        self.assertIn("ошибок 1", out)
+        self.assertIn("broken.jpg", err)
+        for name in ("uploads/avatars/u1_ab.jpg", "races/cover.jpg"):
+            data = self._read(name)          # то же имя: ссылки в БД не меняются
+            self.assertClean(data)
+            self.assertUpright(data)
+        src = self._read("photopipeline/source/s1.png")
+        self.assertClean(src)
+        self.assertEqual(list(Image.open(io.BytesIO(src)).convert("RGB").getdata()),
+                         list(self.noisy.getdata()), "исходник фотопайплайна — без потерь")
+        self.assertEqual(self._read("uploads/photos/clean.webp"),
+                         self.files["uploads/photos/clean.webp"], "чистый файл не трогаем")
+        self.assertEqual(sorted(os.listdir(os.path.join(settings.MEDIA_ROOT, "uploads/avatars"))),
+                         ["u1_ab.jpg"], "никаких новых/временных файлов рядом")
+        out, _ = self._run("--apply")
+        self.assertIn("с метаданными 0", out)
+        self.assertIn("очищено 0", out)
+
+    def test_s3_overwrites_same_key_via_storage(self):
+        """S3: пишем в тот же ключ через _save хранилища — с его ACL (public/private)."""
+        from core.management.commands.strip_exif_media import overwrite
+        storage = mock.Mock()
+        storage.path.side_effect = NotImplementedError
+        storage._save.return_value = "photopipeline/source/a.jpg"
+        overwrite(storage, "photopipeline/source/a.jpg", b"data")
+        name, content = storage._save.call_args[0]
+        self.assertEqual(name, "photopipeline/source/a.jpg")
+        self.assertEqual(content.read(), b"data")
+        storage.save.assert_not_called()     # save() переименовал бы при занятом имени
