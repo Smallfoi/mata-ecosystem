@@ -25,7 +25,7 @@ from django.utils import timezone
 
 from catalog.models import Product
 from common.testutils import ApiTestCase
-from integrations.onec_orders import order_to_json
+from integrations.onec_orders import mark_taken, order_to_json
 from loyalty.models import add_txn
 from orders import pricing
 from orders.lifecycle import mark_canceled, mark_paid
@@ -199,9 +199,46 @@ class ReserveTests(ApiTestCase):
         mark_canceled(order)
         self.assertEqual(self._second().status_code, 200)
 
-    def test_released_after_payment(self):
+    def _paid(self):
         order = self._first()
+        Order.objects.filter(pk=order.pk).update(payment_id="pay_a1")
+        order.refresh_from_db()
         mark_paid(order)
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, "paid")
+        return order
+
+    def test_paid_not_taken_by_1c_still_holds(self):
+        # Вещь продана, а в остатках 1С ещё числится — второму не продаём.
+        self._paid()
+        r = self._second()
+        self.assertEqual(r.status_code, 409, r.content)
+
+    def test_paid_hold_does_not_expire_by_time(self):
+        order = self._paid()
+        Order.objects.filter(pk=order.pk).update(
+            created_at=timezone.now() - timedelta(hours=5))
+        self.assertEqual(self._second().status_code, 409)
+
+    def test_released_after_1c_took_order(self):
+        order = self._paid()
+        mark_taken([order.order_id])
+        self.assertEqual(self._second().status_code, 200)
+
+    def test_released_after_refund(self):
+        order = self._paid()
+        Order.objects.filter(pk=order.pk).update(payment_status="refunded",
+                                                 status="cancelled")
+        self.assertEqual(self._second().status_code, 200)
+
+    def test_released_after_partial_refund(self):
+        order = self._paid()
+        Order.objects.filter(pk=order.pk).update(payment_status="partially_refunded")
+        self.assertEqual(self._second().status_code, 200)
+
+    def test_released_when_paid_order_cancelled(self):
+        order = self._paid()
+        Order.objects.filter(pk=order.pk).update(status="cancelled")
         self.assertEqual(self._second().status_code, 200)
 
     def test_released_after_hold_expires(self):

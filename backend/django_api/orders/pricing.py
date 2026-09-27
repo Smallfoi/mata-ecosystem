@@ -23,8 +23,9 @@
 заказа хранится ещё и в копейках (`Order.total_kop`); цена товара остаётся
 float — её пишет импорт 1С, а в Decimal она переводится при чтении (`money`).
 
-Резерв остатка (аудит B09): пока заказ ждёт оплату (не дольше HOLD_MINUTES),
-его вещи зарезервированы — второй покупатель последнюю вещь не оформит. Резерв
+Резерв остатка (аудит B09): пока заказ ждёт оплату (не дольше HOLD_MINUTES) и
+после оплаты — пока его не забрала 1С, его вещи зарезервированы — второй
+покупатель последнюю вещь не оформит. Резерв
 не пишется в остаток товара (его ведёт 1С, one-way), а считается по
 неоплаченным заказам — см. `reserved_units`.
 
@@ -137,10 +138,12 @@ def stock_key(product, raw_size):
 def reserved_units(products, exclude=None, now=None) -> dict:
     """Резерв: (товар, размер) → сколько штук держат заказы, ждущие оплату.
 
-    Резерв — не отдельная запись, а сами неоплаченные заказы (оплата «pending»),
-    созданные не раньше HOLD_MINUTES назад. Поэтому он снимается сам: оплата
-    (вещь продана — дальше остаток пересчитает 1С), отмена, истечение срока — без
-    отдельной уборки. В остаток товара ничего не пишется: его ведёт 1С (one-way).
+    Резерв — не отдельная запись, а сами заказы:
+    - ждут оплату (оплата «pending») и созданы не раньше HOLD_MINUTES назад;
+    - оплачены, но ещё не забраны 1С (`onec_taken_at` пуст) и не отменены.
+    Поэтому он снимается сам — отмена, возврат, истечение срока оплаты, приём
+    заказа в 1С — без отдельной уборки. В остаток товара ничего не пишется: его
+    ведёт 1С (one-way).
 
     `products` — {id: Product} (тот же снимок каталога, что у сверки);
     `exclude` — (user_id, order_id) заказа, который сейчас переоформляют: свой
@@ -148,6 +151,7 @@ def reserved_units(products, exclude=None, now=None) -> dict:
     """
     from datetime import timedelta
 
+    from django.db.models import Q
     from django.utils import timezone
 
     from .lifecycle import HOLD_MINUTES
@@ -156,7 +160,15 @@ def reserved_units(products, exclude=None, now=None) -> dict:
     if not products:
         return {}
     since = (now or timezone.now()) - timedelta(minutes=HOLD_MINUTES)
-    rows = Order.objects.filter(payment_status="pending", created_at__gte=since)
+    awaiting = Q(payment_status="pending", created_at__gte=since)
+    # Оплачен, но 1С его ещё не забрала: вещь продана, а в выгруженных остатках
+    # ещё числится (решение владельца 28.09.2026). Условие — ровно очередь 1С
+    # (`integrations.onec_orders.pending_orders`), минус отменённые. Забрала —
+    # резерв снят, остаток дальше ведёт 1С следующей выгрузкой. Возвращённый
+    # (refunded / partially_refunded) и отменённый заказ вещь не держит.
+    sold = (Q(payment_status="paid", onec_taken_at__isnull=True)
+            & ~Q(payment_id="") & ~Q(status="cancelled"))
+    rows = Order.objects.filter(awaiting | sold)
     if exclude:
         rows = rows.exclude(user_id=exclude[0], order_id=exclude[1])
     out = {}
