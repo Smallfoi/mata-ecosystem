@@ -2,6 +2,7 @@
 
 Контракт (ECOSYSTEM_API.md → Trails).
 """
+import logging
 import uuid
 from datetime import datetime
 from datetime import timezone as dt_tz
@@ -18,6 +19,8 @@ from league.models import RunnerProfile
 from league.services import age_group, group_label
 from trails import matching
 from trails.models import PendingTrack, Trail, TrailAttempt
+
+log = logging.getLogger(__name__)
 
 
 def _grow_footprint(user_id, track):
@@ -149,7 +152,9 @@ def submit_track(request):
         try:
             _grow_footprint(me, track)
         except Exception:
-            pass
+            # Молча глотать нельзя: «Исследование» открывается ТОЛЬКО этим следом,
+            # и при сбое режим выглядит нерабочим, а в логах пусто (27.09.2026).
+            log.exception("footprint: не вырос след по треку забега %s", run_id)
 
     return Response({"attempts": found})
 

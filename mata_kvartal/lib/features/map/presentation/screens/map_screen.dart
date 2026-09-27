@@ -189,8 +189,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
 
   @override
   Widget build(BuildContext context) {
-    final zonesAsync = ref.watch(zoneProvider);
-    final zones = zonesAsync.valueOrNull ?? const <BlockZone>[];
+    final zones = ref.watch(zoneProvider).valueOrNull ?? const <BlockZone>[];
     final territories = ref.watch(territoryProvider).territories;
     final posAsync = ref.watch(positionStreamProvider);
     final runState = ref.watch(runProvider);
@@ -231,8 +230,10 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
         ? (ref.watch(friendPositionsProvider).valueOrNull ??
             const <FriendPosition>[])
         : const <FriendPosition>[];
-    // Тропы показываем в «Тропах» и «Захвате» (в захвате это маршруты районов).
-    final showTrails = mode == RunMode.trails || mode == RunMode.capture;
+    // Тропы — только в режиме «Тропы». В «Захвате» их не рисуем: владелец
+    // (27.09.2026) читал эти линии как «непонятные тропы» поверх захвата —
+    // в захвате карта про территорию, а не про чужие маршруты.
+    final showTrails = mode == RunMode.trails;
     final trails = showTrails
         ? (ref.watch(trailsProvider).valueOrNull ?? const <Trail>[])
         : const <Trail>[];
@@ -517,6 +518,14 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                           setState(() => _legendOpen = !_legendOpen),
                     ),
                   ),
+                  // «Исследование» молчит: по тёмной карте не понять, есть ли
+                  // след вообще. Цифра «Открыто …» — видимое доказательство,
+                  // что туман прорезается (владелец, 27.09.2026).
+                  if (mode == RunMode.explore)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 14, top: 2, bottom: 4),
+                      child: _ExploredChip(),
+                    ),
                 ],
               ),
             ),
@@ -560,104 +569,10 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
               ),
             ),
 
-          // ── Loading indicator ────────────────────────────────────────────
-          if (zonesAsync is AsyncLoading)
-            Center(
-              child: _Glass(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.electricBlue,
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Text(
-                      'Загружаем кварталы улиц Якутска...',
-                      style: TextStyle(color: AppColors.ink, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          // ── Error banner (центр экрана) ──────────────────────────────────
-          if (zonesAsync is AsyncError)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: _Glass(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 20,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        CupertinoIcons.wifi_slash,
-                        color: AppColors.error,
-                        size: 24,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Зоны не загружены',
-                        style: TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'GPS работает.\nЗапусти бэкенд и нажми «Повторить».',
-                        style: TextStyle(color: AppColors.muted, fontSize: 11),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      GestureDetector(
-                        onTap: () => ref.read(zoneProvider.notifier).retry(),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.graphite,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                CupertinoIcons.arrow_clockwise,
-                                color: Colors.white,
-                                size: 12,
-                              ),
-                              SizedBox(width: 5),
-                              Text(
-                                'Повторить',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          // Плашки «Загружаем кварталы…»/«Зоны не загружены. Запусти бэкенд»
+          // убраны (27.09.2026): они остались от прототипного сервиса кварталов,
+          // висели поверх карты во ВСЕХ режимах и путали (в «Исследовании»
+          // читались как поломка тумана). Слоя нет — и плашек нет.
 
           // ── Bottom area: buttons + stats ─────────────────────────────────
           if (_baseMapFailed)
@@ -748,7 +663,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
     }
     final mode = ref.read(runModeProvider);
     // Тропа под пальцем (тонкая цель) — приоритет над полигонами кварталов.
-    if (mode == RunMode.trails || mode == RunMode.capture) {
+    if (mode == RunMode.trails) {
       final trail = _trailAt(point);
       if (trail != null) {
         context.push('/trails/detail', extra: trail);
@@ -1350,6 +1265,37 @@ class _RoutePointMarker extends StatelessWidget {
 }
 
 // ── Frosted glass ─────────────────────────────────────────────────────────────
+
+/// Чип «Открыто N км²» режима «Исследование»: сколько карты уже прорезано вечным
+/// следом. Следа нет (0) — чипа нет, работает центральная подсказка про туман.
+class _ExploredChip extends ConsumerWidget {
+  const _ExploredChip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final area = ref.watch(footprintAreaProvider).valueOrNull ?? 0;
+    if (area <= 0) return const SizedBox.shrink();
+    return _Glass(
+      borderRadius: const BorderRadius.all(Radius.circular(12)),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(CupertinoIcons.sparkles, size: 13, color: AppColors.lime),
+          const SizedBox(width: 6),
+          Text(
+            'Открыто ${formatAreaM2(area)}',
+            style: TextStyle(
+              color: AppColors.ink,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _Glass extends StatelessWidget {
   final Widget child;
