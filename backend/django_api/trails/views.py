@@ -134,6 +134,13 @@ def submit_track(request):
         if not hit:
             continue
         started = datetime.fromtimestamp(hit["startedAtMs"] / 1000, tz=dt_tz.utc)
+        # Прежнее лучшее — ДО записи этой попытки: иначе рекорд сравнится сам с
+        # собой. Нужно для «рекорд» на экране финиша (28.09.2026).
+        prev_best = (
+            TrailAttempt.objects.filter(user_id=me, trail_id=trail.id)
+            .exclude(run_id=run_id)
+            .aggregate(best=Min("duration_s"))["best"]
+        )
         attempt, _ = TrailAttempt.objects.update_or_create(
             trail_id=trail.id,
             run_id=run_id,
@@ -144,7 +151,11 @@ def submit_track(request):
                 "duration_s": hit["durationS"],
             },
         )
-        found.append({**attempt.to_json(), "trailName": trail.name})
+        found.append({
+            **attempt.to_json(),
+            "trailName": trail.name,
+            "isPersonalBest": prev_best is None or attempt.duration_s < prev_best,
+        })
 
     # Исследование карты (D-74, A): растим личный след из трека для тумана.
     # Сбой следа не должен ломать ответ по тропам.

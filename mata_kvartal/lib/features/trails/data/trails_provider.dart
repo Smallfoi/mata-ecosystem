@@ -180,6 +180,70 @@ final trailsProvider = FutureProvider.autoDispose<List<Trail>>((ref) async {
       .toList();
 });
 
+/// Прохождение тропы, найденное сервером в только что отправленном треке.
+/// Приходит ответом на `/runs/track` — человек ничего не нажимал, как сегменты
+/// у Стравы: пробежал, и на финише видно «Тропа «Набережная» — 7:42».
+class TrailHit {
+  final String trailId;
+  final String trailName;
+  final int durationS;
+  final bool isPersonalBest;
+
+  const TrailHit({
+    required this.trailId,
+    required this.trailName,
+    required this.durationS,
+    this.isPersonalBest = false,
+  });
+
+  factory TrailHit.fromJson(Map<String, dynamic> j) => TrailHit(
+    trailId: j['trailId']?.toString() ?? '',
+    trailName: j['trailName']?.toString() ?? 'Тропа',
+    durationS: (j['durationS'] as num?)?.toInt() ?? 0,
+    isPersonalBest: j['isPersonalBest'] == true,
+  );
+}
+
+/// Тропы последнего забега: какой забег и что в нём нашлось. Экран финиша ждёт
+/// эту запись (трек уходит уже после показа итогов — ответ приходит секундами
+/// позже) и показывает карточку, когда она появится.
+///
+/// [at] — когда пришёл ответ. Экран финиша показывает только то, что пришло
+/// ПОСЛЕ его забега: иначе на новой церемонии мелькнули бы тропы прошлой.
+class LastTrailHits {
+  final String runId;
+  final List<TrailHit> hits;
+  final DateTime at;
+
+  LastTrailHits({required this.runId, required this.hits, DateTime? at})
+      : at = at ?? DateTime.now();
+}
+
+final lastTrailHitsProvider = StateProvider<LastTrailHits?>((_) => null);
+
+/// Сделать тропу из пробежки: человек рисует тропу сам — клуб отмечает свой
+/// круг, бегун маршрут у дома (D-60). Сервер прореживает точки, считает длину и
+/// отказывает, если короче 200 м или длиннее марафона.
+Future<Trail> createTrail({
+  required String token,
+  required String name,
+  required List<LatLng> points,
+  String city = '',
+}) async {
+  final res = await _trailsDio.post<Map<String, dynamic>>(
+    '/trails/',
+    data: {
+      'name': name,
+      'city': city,
+      'points': [
+        for (final p in points) [p.latitude, p.longitude],
+      ],
+    },
+    options: Options(headers: {'Authorization': 'Bearer $token'}),
+  );
+  return Trail.fromJson(res.data ?? const {});
+}
+
 /// Выбранная доска на открытой тропе.
 final trailBoardProvider = StateProvider<TrailBoard>((_) => TrailBoard.fastest);
 

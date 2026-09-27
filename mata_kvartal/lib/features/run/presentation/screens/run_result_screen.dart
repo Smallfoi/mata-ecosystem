@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:dio/dio.dart' show DioException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
@@ -11,6 +12,9 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../medals/data/medals_provider.dart';
 import '../../../medals/presentation/shtamp_ceremony.dart';
 import '../../../weather/data/weather_provider.dart';
+import '../../../../core/config/app_config_provider.dart';
+import '../../../auth/data/auth_provider.dart';
+import '../../../trails/data/trails_provider.dart';
 import '../../data/completed_runs_provider.dart';
 import '../widgets/run_share.dart';
 
@@ -507,6 +511,11 @@ class _StatsPanel extends ConsumerWidget {
               ),
             ],
           ),
+          // Тропы забега: ничего не выбирали перед стартом — сервер сам нашёл
+          // их в треке и прислал ответом (как сегменты у Стравы).
+          _TrailHitsCard(since: result.finishedAt),
+          // Сделать тропой: пробежал круг — сохрани его как тропу для всех.
+          _MakeTrailButton(result: result),
           // Паспорт пробежки: свежая пробежка уже сохранена — первая в истории.
           Consumer(
             builder: (context, ref, _) {
@@ -527,6 +536,204 @@ class _StatsPanel extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Прохождения троп в этом забеге. Приходят секундами позже итогов (трек уходит
+/// на сервер после сводки) — карточка появляется сама, когда придут.
+class _TrailHitsCard extends ConsumerWidget {
+  /// Момент финиша: всё, что пришло раньше, — от прошлой пробежки.
+  final DateTime since;
+
+  const _TrailHitsCard({required this.since});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final last = ref.watch(lastTrailHitsProvider);
+    if (last == null || last.hits.isEmpty || last.at.isBefore(since)) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final hit in last.hits)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE0DED2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.route_outlined,
+                    size: 18,
+                    color: Color(0xFF20252B),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      hit.trailName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF20252B),
+                      ),
+                    ),
+                  ),
+                  if (hit.isPersonalBest) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDFF45F),
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: const Text(
+                        'рекорд',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF20252B),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    formatDuration(hit.durationS),
+                    style: const TextStyle(
+                      fontFamily: AppTheme.fontDisplay,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: [ui.FontFeature.tabularFigures()],
+                      color: Color(0xFF20252B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// «Сделать тропой»: тропу рисует человек, а не алгоритм — пробежал круг, дал
+/// имя, и теперь на нём соревнуются все (D-60). Короче 200 м сервер всё равно
+/// отклонит, поэтому на таких пробежках кнопки нет.
+class _MakeTrailButton extends ConsumerStatefulWidget {
+  final RunResult result;
+
+  const _MakeTrailButton({required this.result});
+
+  @override
+  ConsumerState<_MakeTrailButton> createState() => _MakeTrailButtonState();
+}
+
+class _MakeTrailButtonState extends ConsumerState<_MakeTrailButton> {
+  bool _busy = false;
+  bool _done = false;
+
+  Future<void> _create() async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => const _TrailNameDialog(),
+    );
+    if (name == null || name.trim().isEmpty || !mounted) return;
+    final token = ref.read(authProvider).token;
+    if (token == null || token.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      await createTrail(
+        token: token,
+        name: name.trim(),
+        points: widget.result.route,
+        city: 'Якутск',
+      );
+      ref.invalidate(trailsProvider);
+      if (!mounted) return;
+      setState(() => _done = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Тропа «${name.trim()}» создана')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      // Причину отказа сервер пишет по-русски («Тропа короче 200 метров») —
+      // показываем её, а не общее «ошибка».
+      final data = e is DioException ? e.response?.data : null;
+      final detail = data is Map ? data['detail']?.toString() : null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(detail ?? 'Не удалось создать тропу')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final on = ref.watch(appConfigProvider).valueOrNull?.showTrails ?? false;
+    if (!on || _done) return const SizedBox.shrink();
+    if (widget.result.route.length < 2 || widget.result.distanceMeters < 200) {
+      return const SizedBox.shrink();
+    }
+    return TextButton.icon(
+      onPressed: _busy ? null : _create,
+      icon: const Icon(Icons.add_road_outlined, size: 18),
+      label: Text(_busy ? 'Создаём…' : 'Сделать тропой'),
+      style: TextButton.styleFrom(foregroundColor: const Color(0xFF20252B)),
+    );
+  }
+}
+
+/// Имя тропы: одно поле и две кнопки — тропу называют коротко («Набережная»).
+class _TrailNameDialog extends StatefulWidget {
+  const _TrailNameDialog();
+
+  @override
+  State<_TrailNameDialog> createState() => _TrailNameDialogState();
+}
+
+class _TrailNameDialogState extends State<_TrailNameDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Название тропы'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 60,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: const InputDecoration(hintText: 'Например: Набережная'),
+        onSubmitted: (v) => Navigator.pop(context, v),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Отмена'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Создать'),
+        ),
+      ],
     );
   }
 }
