@@ -85,10 +85,15 @@ class AuthProvider extends ChangeNotifier {
     if (!email.contains('@')) return 'Некорректный email';
     if (password.length < 6) return 'Минимум 6 символов';
     _setLoading(true);
-    _user = await _repo.login(email, password);
-    _save();
-    _setLoading(false);
-    return null;
+    try {
+      _user = await _repo.login(email, password);
+      _save();
+      return null;
+    } catch (_) {
+      return 'Неверный email или пароль';
+    } finally {
+      _setLoading(false);
+    }
   }
 
   /// Вход/регистрация по телефону (единственный способ входа). [name] —
@@ -218,29 +223,15 @@ class AuthProvider extends ChangeNotifier {
     if (password.length < 6) return 'Минимум 6 символов';
     if (password != confirm) return 'Пароли не совпадают';
     _setLoading(true);
-    _user = await _repo.register(name, email, password);
-    _save();
-    _setLoading(false);
-    return null;
-  }
-
-  Future<String?> sendPasswordReset(String email) async {
-    if (email.trim().isEmpty) return 'Введите email';
-    if (!email.contains('@')) return 'Некорректный email';
-    _setLoading(true);
-    await _repo.sendPasswordReset(email);
-    _setLoading(false);
-    return null;
-  }
-
-  Future<String?> resetPassword(String newPass, String confirm) async {
-    if (newPass.isEmpty || confirm.isEmpty) return 'Заполните все поля';
-    if (newPass.length < 6) return 'Минимум 6 символов';
-    if (newPass != confirm) return 'Пароли не совпадают';
-    _setLoading(true);
-    await _repo.resetPassword(newPass);
-    _setLoading(false);
-    return null;
+    try {
+      _user = await _repo.register(name, email, password);
+      _save();
+      return null;
+    } catch (_) {
+      return 'Не удалось зарегистрироваться';
+    } finally {
+      _setLoading(false);
+    }
   }
 
   Future<String?> updateProfile({
@@ -370,23 +361,6 @@ class AuthProvider extends ChangeNotifier {
     _save();
     notifyListeners();
     await _persistAddresses(list);
-  }
-
-  Future<String?> changePassword(
-    String oldPass,
-    String newPass,
-    String confirm,
-  ) async {
-    if (oldPass.isEmpty || newPass.isEmpty || confirm.isEmpty) {
-      return 'Заполните все поля';
-    }
-    if (oldPass.length < 6) return 'Неверный текущий пароль';
-    if (newPass.length < 6) return 'Минимум 6 символов';
-    if (newPass != confirm) return 'Пароли не совпадают';
-    _setLoading(true);
-    await _repo.changePassword(oldPass, newPass);
-    _setLoading(false);
-    return null;
   }
 
   void logout() {

@@ -118,6 +118,13 @@ class Order {
   final OrderStatus status;
   final DateTime createdAt;
 
+  /// Состояние оплаты с сервера (`none | pending | paid | canceled | refunded`).
+  /// Поле серверное и необязательное: старый backend его не отдаёт (аудит B08).
+  final String? paymentStatus;
+
+  /// Кто везёт и когда ждать — заполняет магазин на сервере (D-92). Необязательное.
+  final String? courierNote;
+
   const Order({
     required this.id,
     required this.items,
@@ -128,6 +135,8 @@ class Order {
     required this.checkoutData,
     required this.status,
     required this.createdAt,
+    this.paymentStatus,
+    this.courierNote,
   });
 
   String get shortId => id.split('-').last;
@@ -142,6 +151,8 @@ class Order {
         checkoutData: checkoutData,
         status: status ?? this.status,
         createdAt: createdAt,
+        paymentStatus: paymentStatus,
+        courierNote: courierNote,
       );
 
   Map<String, dynamic> toJson() => {
@@ -154,7 +165,39 @@ class Order {
         'checkoutData': checkoutData.toJson(),
         'status': status.name,
         'createdAt': createdAt.toIso8601String(),
+        // Серверные поля — только если сервер их прислал (в POST при оформлении
+        // их нет: заказ ещё не существует на сервере).
+        if (paymentStatus != null) 'paymentStatus': paymentStatus,
+        if (courierNote != null) 'courierNote': courierNote,
       };
+
+  /// Статус заказа из ответа сервера. Помимо словаря приложения понимает
+  /// серверные значения (`paid` — оплачен и уже в работе, `canceled`), чтобы
+  /// новые статусы backend не превращались молча в «Принят».
+  static OrderStatus parseStatus(Object? raw) {
+    switch (raw?.toString().trim().toLowerCase()) {
+      case 'processing':
+      case 'paid':
+      case 'accepted':
+      case 'assembled':
+        return OrderStatus.processing;
+      case 'shipped':
+        return OrderStatus.shipped;
+      case 'delivered':
+        return OrderStatus.delivered;
+      case 'cancelled':
+      case 'canceled':
+        return OrderStatus.cancelled;
+      default:
+        return OrderStatus.pending;
+    }
+  }
+
+  static String? _optString(Object? v) {
+    if (v == null) return null;
+    final s = v.toString();
+    return s.isEmpty ? null : s;
+  }
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
         id: j['id'] as String,
@@ -167,9 +210,9 @@ class Order {
         total: (j['total'] as num).toDouble(),
         checkoutData: CheckoutData.fromJson(
             j['checkoutData'] as Map<String, dynamic>),
-        status: OrderStatus.values.firstWhere(
-            (e) => e.name == j['status'],
-            orElse: () => OrderStatus.pending),
+        status: parseStatus(j['status']),
         createdAt: DateTime.parse(j['createdAt'] as String),
+        paymentStatus: _optString(j['paymentStatus'] ?? j['payment_status']),
+        courierNote: _optString(j['courierNote'] ?? j['courier_note']),
       );
 }
