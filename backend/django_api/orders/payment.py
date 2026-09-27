@@ -48,6 +48,15 @@ class PaymentError(Exception):
     """Провайдер недоступен или отказал. Наверх — понятная ошибка, НЕ «оплачено»."""
 
 
+class PaymentUncertain(PaymentError):
+    """Ответа нет (таймаут, обрыв, 5xx) — операция у провайдера МОГЛА пройти.
+
+    Для возврата это не «не прошёл»: считать его неудачным и дать сотруднику
+    повторить значит рискнуть вернуть деньги дважды (аудит B04). Такой исход
+    сверяем повтором с тем же ключом идемпотентности или запросом статуса.
+    """
+
+
 def payment_enabled() -> bool:
     return bool(os.environ.get("PAYMENT_PROVIDER"))
 
@@ -83,9 +92,12 @@ def _http(method, url, payload=None, headers=None):
             detail = json.loads(e.read().decode("utf-8") or "{}").get("description", "")
         except Exception:
             detail = ""
-        raise PaymentError(f"ЮKassa {e.code}: {detail or e.reason}") from e
-    except Exception as e:  # таймаут, DNS, обрыв
-        raise PaymentError(f"ЮKassa недоступна: {e}") from e
+        # 4xx — ЮKassa запрос разобрала и отклонила: операции нет. 5xx — сбой на её
+        # стороне, исход неизвестен.
+        cls = PaymentUncertain if e.code >= 500 else PaymentError
+        raise cls(f"ЮKassa {e.code}: {detail or e.reason}") from e
+    except Exception as e:  # таймаут, DNS, обрыв — запрос мог дойти
+        raise PaymentUncertain(f"ЮKassa недоступна: {e}") from e
 
 
 def _request(method, path, payload=None, idempotence_key=None):
@@ -244,4 +256,24 @@ def create_refund(payment_id, amount, description="", key=None, receipt=None) ->
     data = _request(
         "POST", "/refunds", body, _idem_key("refund", payment_id, key or _money(amount))
     )
-    return {"status": data.get("status") or "", "refundId": data.get("id") or ""}
+    return _refund_result(data)
+
+
+def _refund_result(data) -> dict:
+    """Возврат ЮKassa → {status, refundId, paymentId, amount}.
+
+    status — как у ЮKassa: pending (в обработке), succeeded (деньги ушли),
+    canceled (отклонён). Окончателен только succeeded/canceled.
+    """
+    amount = data.get("amount") or {}
+    return {
+        "status": data.get("status") or "",
+        "refundId": data.get("id") or "",
+        "paymentId": data.get("payment_id") or "",
+        "amount": str(amount.get("value") or ""),
+    }
+
+
+def fetch_refund(refund_id) -> dict:
+    """Актуальный статус возврата ПО ДАННЫМ ЮKassa (тело вебхука не подписано)."""
+    return _refund_result(_request("GET", f"/refunds/{refund_id}"))

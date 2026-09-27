@@ -585,6 +585,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "orders.expire_unpaid_orders",
         "schedule": crontab(minute="*/5"),
     },
+    # Возвраты «в обработке» (аудит B04): подтверждение ЮKassa могло не дойти.
+    "reconcile-order-returns": {
+        "task": "orders.reconcile_returns",
+        "schedule": crontab(minute="*/5"),
+    },
     # Авто-парсер афиши «Стартов»: раз в сутки в 05:00 (Asia/Yakutsk). Идемпотентно
     # (upsert по source+external_id). Источники — races/importers/.
     # Треки живут 14 дней и удаляются (D-60) — это условие всей затеи с тропами.
