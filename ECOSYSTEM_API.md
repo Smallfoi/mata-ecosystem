@@ -215,6 +215,9 @@
 ```
 POST /auth/register            { name, email, password } → { token, user }
 POST /auth/login               { email, password }       → { token, user }
+                                                           ({ phone, password } — основной путь). 429 { detail, retryAfter }
+                                                           + Retry-After — 8 неудач за 15 мин на один телефон/почту с любых
+                                                           адресов (аудит D03); удачный вход обнуляет счётчик
 POST /auth/phone/request       { phone }                 → { ok, smsEnabled, channel }   (шлёт код; dev — всегда 1234)
                                                            429 { detail, retryAfter } + Retry-After — лимит (D-76):
                                                            90 с между кодами на номер, 3 кода на номер в сутки,

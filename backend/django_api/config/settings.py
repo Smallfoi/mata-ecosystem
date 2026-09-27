@@ -199,30 +199,40 @@ if not DEBUG:
     # Referrer наружу не утекает: адрес админки с параметрами — сам по себе улика.
     SECURE_REFERRER_POLICY = "same-origin"
 
-# P0-страховка: НЕ стартуем прод (DEBUG=0) с дефолтными секретами/ALLOWED_HOSTS=*.
-# Защита от катастрофы №1 — выкатить прод с публичным dev-секретом.
-from common.prodcheck import insecure_prod_settings  # noqa: E402
+# P0-страховка: НЕ стартуем прод (DEBUG=0) с дефолтными секретами/ALLOWED_HOSTS=*,
+# без Redis (иначе молча LocMem-кэш + Celery EAGER) и без CORS-списка (аудит D09).
+# Защита от катастрофы №1 — выкатить прод с публичным dev-секретом или в dev-режиме.
+# Что можно законно не иметь (интеграции из Lockbox) — только предупреждение: строка
+# в логе при старте и поле `configWarnings` в /v1/health. См. common/prodcheck.py.
+from common.prodcheck import prod_config_report  # noqa: E402
 
-_insecure = insecure_prod_settings(
-    debug=DEBUG,
-    secret_key=SECRET_KEY,
-    jwt_secret=os.environ.get("JWT_SECRET", "dev-secret-change-in-prod"),
-    db_password=DATABASES["default"]["PASSWORD"],
-    allowed_hosts=ALLOWED_HOSTS,
-)
-if _insecure:
+_prod_report = prod_config_report(os.environ, debug=DEBUG)
+if _prod_report["fatal"]:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
         "Небезопасная прод-конфигурация (DJANGO_DEBUG=0): задайте "
-        + ", ".join(_insecure)
-        + ". Запуск прода с дефолтами запрещён."
+        + ", ".join(_prod_report["fatal"])
+        + ". Запуск прода с дефолтами/в dev-режиме запрещён."
+    )
+if _prod_report["warnings"]:
+    import sys
+
+    sys.stderr.write(
+        "!!! MATA PROD CONFIG WARNING: не заданы "
+        + ", ".join(_prod_report["warnings"])
+        + " — прод работает в неполном режиме (см. common/prodcheck.py, /v1/health)\n"
     )
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     # Аутентификация — свой JWT (common.security), session-auth/CSRF DRF не используем.
     "DEFAULT_AUTHENTICATION_CLASSES": [],
+    # Перед Django ровно один прокси — наш nginx. Наши лимиты берут адрес из
+    # common/clientip.py и этот параметр не читают; он страхует штатные классы DRF,
+    # если их где-то подключат: без него get_ident склеивает весь X-Forwarded-For,
+    # который задаёт клиент (аудит D03).
+    "NUM_PROXIES": 1,
     # Rate-limiting (P0 безопасность): на пользователя (по JWT) + по IP для анонимных.
     # Лимиты щедрые — активное приложение (карта обновляет территории каждые ~12с,
     # синки) не упирается, но брутфорс/накрутка/DoS отсекаются. /auth — отдельно жёстко.
