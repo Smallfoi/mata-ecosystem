@@ -119,6 +119,13 @@ class ServerStillPaysNormally(ApiTestCase):
             "id": "allow_r2", "distanceMeters": 5000, "elapsedSeconds": 1800,
             "finishedAtMs": int(time.time() * 1000),
         })
-        r = self.api_post("/v1/loyalty/redeem", {"amount": 20, "orderId": "o-1"})
+        from orders.models import Order
+
+        # Прежний адрес списывает только на существующий заказ (аудит B02).
+        Order.objects.create(
+            user_id=self.uid, order_id="o-1", total=450, points_redeemed=50,
+            payment_status="pending", status="pending", payload={"id": "o-1"},
+        )
+        r = self.api_post("/v1/loyalty/redeem", {"amount": 50, "orderId": "o-1"})
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(self.balance(), 30)
+        self.assertEqual(self.balance(), 0)
