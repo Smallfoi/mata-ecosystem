@@ -24,6 +24,10 @@ _FIDELITY = (
     "letters and spelling, font style, size and position. Never invent, rephrase, "
     "translate or 'correct' any text. Do not add text or logos that are not in the "
     "reference. If the garment has no print, keep it plain.\n"
+    "- Keep the SAME SIDE of the garment as in the reference: if the reference shows "
+    "the back, show the back (back neckline, back panel); if it shows the front, show "
+    "the front. Never move prints, text or graphics to another side of the garment, "
+    "and do not invent what is on the side that is not visible.\n"
 )
 
 # Трек 1 — каталог: товар без человека, точность важна.
@@ -33,7 +37,8 @@ CATALOG = (
     + _FIDELITY
     + "- Remove any person, mannequin, hanger and the original background.\n"
     "STYLE:\n"
-    "- Ghost-mannequin (invisible mannequin) front view: the garment keeps a natural "
+    "- Ghost-mannequin (invisible mannequin), viewed straight on from the same side "
+    "as in the reference: the garment keeps a natural "
     "worn shape, neatly smoothed, centred with even margins.\n"
     "- Pure white seamless background, soft natural contact shadow under the garment.\n"
     "- Large softbox key light plus fill, high-key, even exposure, crisp detail edge to "
@@ -46,8 +51,10 @@ MODEL = (
     "garment from the reference image.\n"
     + _FIDELITY
     + "STYLE:\n"
-    "- Model: athletic build, neutral expression, standing straight facing the camera, "
-    "arms relaxed along the body, no cap and no glasses. Framing from the thighs up.\n"
+    "- Model: athletic build, neutral expression, standing straight, arms relaxed along "
+    "the body, no cap and no glasses; turned to the camera with the same side of the "
+    "garment as in the reference (back to the camera if the reference shows the back). "
+    "Framing from the thighs up.\n"
     "- Light-grey seamless studio background with a subtle gradient, large softbox key "
     "light and soft rim light, natural skin, sharp focus on the garment, commercial "
     "quality."
