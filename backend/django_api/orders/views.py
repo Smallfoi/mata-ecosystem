@@ -7,11 +7,59 @@ from rest_framework.response import Response
 from common.security import user_id_from_request
 
 from .awards import redeem_for_order
-from .lifecycle import mark_canceled, mark_paid
+from .lifecycle import AWAITING, apply_payment_info, mark_paid, payment_started
 from .models import Order
 from .pricing import all_items_known, total_is_acceptable
-from .payment import PaymentError, create_payment, fetch_payment, payment_enabled
+from .payment import (
+    PaymentError,
+    create_payment,
+    fetch_payment,
+    payment_enabled,
+    payment_reference,
+)
 from .receipt import build_receipt
+
+# Что из ответа провайдера отдаём клиентам — прежний контракт, без служебных полей
+# сверки (сумма/валюта/reference).
+_PAY_FIELDS = ("status", "paymentId", "confirmationUrl", "method")
+
+
+def _kop(value):
+    try:
+        return int(round(float(value or 0) * 100))
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _billable(payload, total, points) -> tuple:
+    """Всё, за что берём деньги: сумма, баллы и позиции (товар, размер, цвет,
+    количество, цена) в исходном порядке — по нему строятся строки чека.
+
+    Имя товара, картинка, контакты сюда не входят: от них сумма не зависит.
+    """
+    items = []
+    raw = (payload or {}).get("items") if isinstance(payload, dict) else None
+    for it in raw or []:
+        if not isinstance(it, dict):
+            items.append(repr(it))
+            continue
+        try:
+            qty = int(it.get("quantity") or 1)
+        except (TypeError, ValueError):
+            qty = str(it.get("quantity"))
+        items.append((
+            str(it.get("productId") or ""), str(it.get("size") or ""),
+            str(it.get("color") or ""), qty, _kop(it.get("price")),
+        ))
+    try:
+        points = int(points or 0)
+    except (TypeError, ValueError):
+        points = str(points)
+    return (_kop(total), points, tuple(items))
+
+
+def _order_billable(order) -> tuple:
+    return _billable(order.payload, order.total, order.points_redeemed)
 
 
 def _test_payer(uid: str) -> bool:
@@ -35,7 +83,7 @@ def pay_order(request, order_id):
         # Уже оплачен — второй платёж не создаём.
         return Response({"status": "paid", "paymentId": order.payment_id,
                          "confirmationUrl": ""})
-    if order.payment_status in ("canceled", "refunded"):
+    if order.payment_status in ("canceled", "refunded", "partially_refunded"):
         return Response(
             {"detail": "Время на оплату истекло — оформите заказ заново"}, status=409
         )
@@ -57,6 +105,9 @@ def pay_order(request, order_id):
             "test": True,
             "note": "Тестовая оплата: деньги не списаны, заказ уйдёт в 1С с пометкой «тест».",
         })
+    # Снимок того, что уходит в оплату: за время запроса к провайдеру заказ не
+    # должен поменяться (аудит B01) — проверим после ответа.
+    snapshot = _order_billable(order)
     try:
         receipt = build_receipt(order.payload, order.total)
     except ValueError as e:
@@ -71,20 +122,45 @@ def pay_order(request, order_id):
             # Номер заказа уникален только в паре с пользователем, провайдеру нужен
             # глобально уникальный — иначе два покупателя с одинаковым SS-… и равной
             # суммой получат один платёж на двоих (см. orders/payment.py).
-            reference=f"{order.order_id}-{order.pk}",
+            reference=payment_reference(order),
             receipt=receipt,
         )
     except PaymentError as e:
         # Провайдер отказал/недоступен — НЕ трогаем статус заказа. Отдать «оплачено»
         # или молча «pending» с пустой ссылкой значит потерять покупателя и деньги.
         return Response({"detail": f"Оплата недоступна: {e}"}, status=502)
-    order.payment_status = result["status"]
-    order.payment_id = result.get("paymentId") or ""
-    order.save(update_fields=["payment_status", "payment_id"])
-    if result["status"] == "paid":
-        order.refresh_from_db()
+    if not payment_enabled():
+        # Разработка без провайдера (create_payment вернул «оплачено» сам): сверять
+        # не с чем — ни суммы, ни номера платежа нет.
         mark_paid(order)
-    return Response(result)
+        return Response({k: result[k] for k in _PAY_FIELDS if k in result})
+
+    with transaction.atomic():
+        locked = Order.objects.select_for_update().get(pk=order.pk)
+        if _order_billable(locked) != snapshot:
+            # Заказ переоформили, пока создавался платёж. Этот платёж не привязываем
+            # и ссылку не отдаём — без оплаты он истечёт у провайдера сам.
+            return Response(
+                {"detail": "Заказ изменился во время оплаты — повторите оплату"},
+                status=409,
+            )
+        if locked.payment_status not in AWAITING:
+            # Параллельно пришёл окончательный исход (оплачен/отменён) — не затираем.
+            if locked.payment_status == "paid":
+                return Response({"status": "paid", "paymentId": locked.payment_id,
+                                 "confirmationUrl": ""})
+            return Response(
+                {"detail": "Время на оплату истекло — оформите заказ заново"}, status=409
+            )
+        locked.payment_status = "pending"
+        locked.payment_id = result.get("paymentId") or ""
+        locked.save(update_fields=["payment_status", "payment_id"])
+    # Провайдер мог сразу ответить «оплачен» или «отменён» — тот же путь, что у
+    # вебхука: «оплачено» только при совпадении суммы, валюты и reference.
+    apply_payment_info(locked, result)
+    out = {k: result[k] for k in _PAY_FIELDS if k in result}
+    out["status"] = locked.payment_status
+    return Response(out)
 
 
 @api_view(["GET"])
@@ -111,10 +187,8 @@ def payment_state(request, order_id):
         except PaymentError:
             # Провайдер недоступен — отдаём, что знаем; это не ошибка заказа.
             info = None
-        if info and info["status"] == "paid":
-            mark_paid(order)
-        elif info and info["status"] == "canceled":
-            mark_canceled(order)
+        if info:
+            apply_payment_info(order, info)
     order.refresh_from_db()
     return Response({
         "orderId": order.order_id,
@@ -148,10 +222,11 @@ def payment_webhook(request):
         # Незнакомый платёж: возможна гонка с сохранением payment_id — пусть повторит.
         return Response({"detail": "Заказ по платежу не найден"}, status=404)
 
-    if info["status"] == "paid":
-        mark_paid(order)
-    elif info["status"] == "canceled":
-        mark_canceled(order)
+    problem = apply_payment_info(order, info)
+    if problem:
+        # Платёж не совпал с заказом — «оплачено» не ставим. Отвечаем 200: повтор
+        # доставки ничего не изменит, а расхождение уже в логе ошибок.
+        return Response({"ok": False, "detail": problem, "status": order.payment_status})
     return Response({"ok": True, "status": order.payment_status})
 
 
@@ -172,15 +247,32 @@ def orders(request):
         except (TypeError, ValueError):
             points = 0
         items = d.get("items")
-        # Приём оплаты включён — сумму обязаны сверить с каталогом (D-37, D-72).
-        # Позиции не из каталога сверить нельзя: такой заказ оплатили бы хоть рублём.
-        if payment_enabled() and not all_items_known(items):
-            return Response(
-                {"detail": "Не удалось сверить заказ с каталогом"}, status=400
-            )
-        already = Order.objects.filter(user_id=uid, order_id=oid).first()
 
         with transaction.atomic():
+            # Блокируем заказ: иначе переоформление могло бы проскочить между
+            # созданием платежа и сохранением его номера (аудит B01).
+            already = (
+                Order.objects.select_for_update().filter(user_id=uid, order_id=oid).first()
+            )
+            if already and payment_started(already):
+                # Оплата начата — заказ заморожен. Повтор того же заказа (ретрай,
+                # офлайн-очередь) идемпотентен: отдаём, что есть, ничего не меняя —
+                # ни суммы, ни состава, ни статуса. Другой состав или сумма — отказ:
+                # платёж и чек уже построены по прежнему заказу.
+                if _billable(d, total, points) != _order_billable(already):
+                    return Response(
+                        {"detail": "Заказ уже передан в оплату — изменить его нельзя. "
+                                   "Оформите новый заказ."},
+                        status=409,
+                    )
+                return Response(already.to_json())
+
+            # Приём оплаты включён — сумму обязаны сверить с каталогом (D-37, D-72).
+            # Позиции не из каталога сверить нельзя: такой заказ оплатили бы хоть рублём.
+            if payment_enabled() and not all_items_known(items):
+                return Response(
+                    {"detail": "Не удалось сверить заказ с каталогом"}, status=400
+                )
             # Баллы списывает сервер при оформлении (D-72) — до сверки суммы: скидка
             # законно снижает порог, но только реально списанная. Не сошлось —
             # откатываем и списание.
@@ -195,13 +287,8 @@ def orders(request):
                 return Response(
                     {"detail": "Сумма заказа не совпадает с ценами каталога"}, status=400
                 )
-            # Оплаченный заказ переоформить нельзя — иначе сумму меняют задним числом.
-            if already and already.payment_status == "paid" and float(already.total) != total:
-                transaction.set_rollback(True)
-                return Response({"detail": "Заказ уже оплачен"}, status=409)
             fields = {
                 "total": total,
-                "status": (d.get("status") or "pending"),
                 "points_redeemed": points,
                 "payload": d,
             }
@@ -210,10 +297,12 @@ def orders(request):
                 order_id=oid,
                 defaults=fields,
                 # Любой заказ рождается «ждёт оплату» (D-72): «оплата не требуется»
-                # не бывает. Статус оплаты — только при создании: повторная отправка
-                # (ретрай, офлайн-очередь) не вернёт оплаченному «ждёт оплату».
+                # не бывает. Статусы заказа и оплаты ведёт только сервер (оплата,
+                # 1С, админка), клиент их не задаёт: иначе повторная отправка
+                # вернула бы оплаченному или отгруженному заказу «принят».
                 # Баллы за покупку — только после подтверждённой оплаты (lifecycle).
-                create_defaults={**fields, "payment_status": "pending"},
+                create_defaults={**fields, "status": "pending",
+                                 "payment_status": "pending"},
             )
         # Связка экосистемы: для каждой пары обуви в заказе заводим ресурс
         # «износа кроссовок» (Квартал затем убавляет километраж). Идемпотентно.
