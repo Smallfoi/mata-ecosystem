@@ -177,6 +177,18 @@ class PrivateStorageTests(TestCase):
         self.assertEqual(st["default"]["OPTIONS"]["default_acl"], "public-read")
         self.assertFalse(st["default"]["OPTIONS"]["querystring_auth"])
 
+    def test_s3_private_url_is_signed(self):
+        """Настоящий бэкенд S3 с приватными опциями выдаёт подписанную ссылку не на CDN."""
+        from storages.backends.s3 import S3Storage
+        from common.media import media_storages
+        env = {"MEDIA_S3_BUCKET": "b", "MEDIA_S3_ACCESS_KEY": "a", "MEDIA_S3_SECRET_KEY": "s",
+               "MEDIA_S3_CUSTOM_DOMAIN": "cdn.mata-club.ru"}
+        storage = S3Storage(**media_storages(env)["private"]["OPTIONS"])
+        url = storage.url("photopipeline/source/a.png")
+        self.assertIn("Signature", url)
+        self.assertIn("Expires", url)
+        self.assertNotIn("cdn.mata-club.ru", url)
+
     def test_review_screen_uses_signed_urls(self):
         from django.contrib.auth import get_user_model
         from django.urls import reverse
