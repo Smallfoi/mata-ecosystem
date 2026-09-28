@@ -485,7 +485,7 @@ def delete_account(request):
                 status=409,
             )
     # Покупка не завершена (не получена, идёт срок возврата 7 дней, возврат или
-    # оплата в работе) — заказ ещё нужен складу и для возврата денег (D-103).
+    # оплата в работе) — заказ ещё нужен складу и для возврата денег (D-104).
     reason = userdata.blocking_reason(uid)
     if reason:
         return Response({"detail": reason}, status=409)

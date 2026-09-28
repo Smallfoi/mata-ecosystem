@@ -239,7 +239,7 @@ class StoreOrderJourneyE2E(_Journey):
                          "без явного confirm аккаунт не удаляется")
         r = self._post("/v1/account/delete", {"confirm": True}, token)
         if r.status_code == 409:
-            # ПОСЛЕ #822 (D-103): удалить можно только когда прошёл 7-дневный срок
+            # ПОСЛЕ #822 (D-104): удалить можно только когда прошёл 7-дневный срок
             # возврата после получения. Проверяем именно это: через 8 дней — можно.
             later = timezone.now() + timedelta(days=8)
             with mock.patch("django.utils.timezone.now", return_value=later):
