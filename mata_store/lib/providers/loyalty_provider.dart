@@ -21,29 +21,45 @@ class LoyaltyProvider extends ChangeNotifier {
   final List<LoyaltyTransaction> _txns = [];
   String _code = '';
   bool _lastLoggedIn = false;
+  String _account = '';
 
   LoyaltyProvider(this._prefs, this._repo, {this.serverBacked = false}) {
     if (!serverBacked) _loadLocal();
     // serverBacked: данные приходят с backend после логина — см. syncAuth().
   }
 
-  /// Вызывается из ProxyProvider при изменении состояния авторизации.
-  Future<void> syncAuth(bool loggedIn) async {
+  /// Вызывается из ProxyProvider при изменении состояния авторизации. [userId] —
+  /// id аккаунта: при выходе ИЛИ смене аккаунта баллы прошлого аккаунта
+  /// убираются (аудит C03), для нового загружаются свои.
+  Future<void> syncAuth(bool loggedIn, {String? userId}) async {
     if (!serverBacked) return;
-    if (loggedIn && !_lastLoggedIn) {
+    final account = userId ?? '';
+    if (loggedIn && (!_lastLoggedIn || account != _account)) {
+      final switched = _lastLoggedIn;
       _lastLoggedIn = true;
+      _account = account;
+      if (switched) _clearAccount();
       await load();
     } else if (!loggedIn && _lastLoggedIn) {
       _lastLoggedIn = false;
-      _txns.clear();
-      notifyListeners();
+      _account = '';
+      _clearAccount();
     }
+  }
+
+  void _clearAccount() {
+    _txns.clear();
+    _code = '';
+    notifyListeners();
   }
 
   /// Загрузка баланса с backend (единый аккаунт экосистемы).
   Future<void> load() async {
+    final account = _account;
     try {
       final acc = await _repo.fetchAccount();
+      // Пока шёл запрос, сменился аккаунт — чужие баллы не показываем.
+      if (account != _account) return;
       _txns
         ..clear()
         ..addAll(acc.transactions);
