@@ -27,6 +27,8 @@ x-django-volumes: &django-volumes
 
 services:
   db:
+    # 16-3.4 — самый точный тег PostGIS (патч-тегов нет); не менялся с 14.10.2024 (digest
+    # sha256:44126d87…). Строку образа НЕ трогаем: её смена = пересоздание БД при автодеплое (F05).
     image: postgis/postgis:16-3.4
     environment:
       POSTGRES_DB: kvartal
@@ -43,7 +45,8 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    # Точная версия (F05): «7-alpine» плавал; 7.4.11 = текущий 7-alpine (сверено по digest 28.09.2026).
+    image: redis:7.4.11-alpine
     ports:
       - "6379:6379"
     healthcheck:

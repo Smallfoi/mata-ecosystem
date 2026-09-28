@@ -4,6 +4,8 @@
 # Подробности и чеклист — docs/DEPLOY.md.
 services:
   db:
+    # 16-3.4 — самый точный тег PostGIS (патч-тегов нет); не менялся с 14.10.2024 (digest
+    # sha256:44126d87…). Строку образа НЕ трогаем: её смена = пересоздание БД при автодеплое (F05).
     image: postgis/postgis:16-3.4
     restart: always
     environment:
@@ -23,7 +25,8 @@ services:
     # Порт наружу НЕ публикуем — доступ к БД только из web-контейнера.
 
   redis:
-    image: redis:7-alpine
+    # Точная версия (F05): «7-alpine» плавал; 7.4.11 = текущий 7-alpine (сверено по digest 28.09.2026).
+    image: redis:7.4.11-alpine
     restart: always
     # Общий кэш для rate-limit/OTP/бана/баланса (D-07/D-28). LRU + лёгкая персистентность.
     # Вытеснение (allkeys-lru) для КЭША — норма; брокер Celery здесь больше НЕ живёт (E04).
@@ -42,7 +45,7 @@ services:
   # молча; AOF — очередь переживает рестарт контейнера. Политика вытеснения — на весь
   # инстанс, поэтому «другая БД в том же Redis» не спасает: нужен свой процесс.
   redis-broker:
-    image: redis:7-alpine
+    image: redis:7.4.11-alpine
     restart: always
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 128mb --maxmemory-policy noeviction
     volumes:
@@ -145,7 +148,8 @@ services:
         condition: service_healthy
 
   nginx:
-    image: nginx:1.27-alpine
+    # Точная версия (F05): 1.27.5 = тот же образ, что 1.27-alpine (одинаковый digest).
+    image: nginx:1.27.5-alpine
     restart: always
     ports:
       - "80:80"

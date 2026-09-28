@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0 (пин по SHA, F05)
         with:
           flutter-version: 3.32.1
           channel: stable
@@ -85,16 +85,60 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          # Тот же Python, что в прод-образе (Dockerfile: python:3.12.14-slim-trixie).
+          python-version: '3.12.14'
 
+      # Ровно те версии, что поедут в прод (F05): requirements.txt — что нужно,
+      # requirements.lock — точные версии (constraints). Так же ставит Dockerfile.
       - name: Install deps
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt -c requirements.lock
+
+      # Добавили пакет в requirements.txt, а lock не обновили — он встал бы «последней
+      # версией» и на проде мог оказаться не тем, что проверено здесь.
+      - name: Lock guard (установлено == requirements.lock)
+        run: python ../../tools/check_requirements_lock.py requirements.lock
 
       - name: Django system check
         run: python manage.py check
 
+      # Модель поменяли, миграцию не сделали — прод (migrate при старте web) разойдётся
+      # со схемой из кода (F06).
+      - name: Missing migrations guard
+        run: python manage.py makemigrations --check --dry-run
+
+      # Прод-настройки (DEBUG=0): HSTS/secure-cookie/SSL-redirect и прод-страховка
+      # common.prodcheck. Значения — фиктивные, генерируются на лету (F06).
+      - name: Deploy settings check (DEBUG=0)
+        env:
+          DJANGO_DEBUG: '0'
+          DJANGO_ALLOWED_HOSTS: api.example.com
+          POSTGRES_PASSWORD: ci-fake-not-used-for-connect
+          # Обязательны в проде (строгая проверка D09): check к ним не подключается.
+          REDIS_URL: redis://localhost:6379/0
+          DJANGO_CORS_ORIGINS: https://example.com
+        run: |
+          DJANGO_SECRET_KEY="ci-$(openssl rand -hex 32)"
+          JWT_SECRET="ci-$(openssl rand -hex 32)"
+          export DJANGO_SECRET_KEY JWT_SECRET
+          python manage.py check --deploy --fail-level WARNING
+
       - name: Tests (анти-чит + эндпоинты)
         run: python manage.py test --verbosity 2
+
+      # Известные уязвимости в зафиксированных версиях (F06). НЕ блокирует сборку:
+      # найденное видно в логе/сводке прогона, обновление — отдельным PR с новым lock.
+      - name: Dependency audit (pip-audit, не блокирует)
+        continue-on-error: true
+        run: |
+          python -m venv /tmp/pip-audit-venv
+          /tmp/pip-audit-venv/bin/pip install -q pip-audit==2.10.1
+          /tmp/pip-audit-venv/bin/pip-audit -r requirements.lock --no-deps --disable-pip \
+            --progress-spinner off --desc on 2>&1 | tee /tmp/pip-audit.txt
+          status=${PIPESTATUS[0]}
+          { echo '### pip-audit (requirements.lock)'; echo '```'; cat /tmp/pip-audit.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
   site-js:
     name: Site · JS
@@ -202,3 +246,35 @@ jobs:
           for f in backend/deploy/*.sh backend/deploy/tests/*.sh; do bash -n "$f"; done
           shellcheck -S error backend/deploy/*.sh backend/deploy/tests/*.sh
           bash backend/deploy/tests/run_all.sh
+
+  # Поиск секретов в НОВЫХ коммитах (F06). Репозиторий публичный — утёкший ключ
+  # виден всем. Отдельная джоба, НЕ в required checks и НЕ блокирует (continue-on-error):
+  # находки видны в логе/сводке прогона. Сканируем только новые коммиты (PR — всё, что
+  # сверх main; push в main — последний коммит): в истории есть известные ложные
+  # срабатывания (тестовые пароли, ключи SharedPreferences, ID секретов Lockbox).
+  secrets-scan:
+    name: Security · Secrets scan
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks (новые коммиты, не блокирует)
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ -n "$BASE_REF" ]; then
+            git fetch --no-tags origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+            range="origin/$BASE_REF..HEAD"
+          else
+            range="HEAD~1..HEAD"
+          fi
+          echo "range: $range"
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            git /repo --redact --no-banner --log-opts="$range" 2>&1 | tee /tmp/gitleaks.txt
+          status=${PIPESTATUS[0]}
+          { echo '### gitleaks'; echo '```'; cat /tmp/gitleaks.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
