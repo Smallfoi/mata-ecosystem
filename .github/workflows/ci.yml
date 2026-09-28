@@ -141,6 +141,27 @@ jobs:
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
           python tools/check_site_cache_bust.py --base origin/main
 
+  # Браузерный smoke сайта (аудит F06): витрина в headless Chromium с подменённым
+  # API — карточка из /v1/models в сетке, фильтр из /v1/categories, без JS-ошибок.
+  # Отдельная джоба, не входит в обязательные проверки защиты main.
+  site-smoke:
+    name: Site · Browser smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Playwright + Chromium
+        run: |
+          pip install playwright==1.63.0
+          python -m playwright install --with-deps chromium
+
+      - name: Catalog smoke (static site + mocked API)
+        run: python tools/site_smoke.py
+
   editable-guard:
     name: CMS · Editable text
     runs-on: ubuntu-latest
