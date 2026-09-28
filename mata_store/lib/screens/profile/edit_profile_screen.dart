@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../data/api/api_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../auth/auth_screen.dart';
 import '../../widgets/remote_text.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -21,12 +22,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _profileCityCtrl;
   late final TextEditingController _emailCtrl;
 
-  // Change password
-  final _oldPassCtrl = TextEditingController();
-  final _newPassCtrl = TextEditingController();
-  final _confPassCtrl = TextEditingController();
-  bool _showPassSection = false;
-
   // Add address inline form
   bool _showAddressForm = false;
   final _labelCtrl = TextEditingController();
@@ -39,7 +34,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _addressError;
 
   String? _error;
-  String? _passError;
   bool _saved = false;
 
   @override
@@ -64,9 +58,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _phoneCtrl,
       _profileCityCtrl,
       _emailCtrl,
-      _oldPassCtrl,
-      _newPassCtrl,
-      _confPassCtrl,
       _labelCtrl,
       _addressCityCtrl,
       _streetCtrl,
@@ -157,6 +148,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
   }
 
+  /// Смена пароля = сброс кодом на телефон аккаунта (тот же экран, что
+  /// «Забыли пароль?» при входе).
+  void _openPasswordReset(String phone) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AuthScreen(startWithReset: true, initialPhone: phone),
+      ),
+    );
+  }
+
   // ── Save profile ─────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
@@ -165,19 +166,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
     final auth = context.read<AuthProvider>();
-
-    if (_showPassSection && _oldPassCtrl.text.isNotEmpty) {
-      final err = await auth.changePassword(
-        _oldPassCtrl.text,
-        _newPassCtrl.text,
-        _confPassCtrl.text,
-      );
-      if (!mounted) return;
-      if (err != null) {
-        setState(() => _passError = err);
-        return;
-      }
-    }
 
     final err = await auth.updateProfile(
       name: _nameCtrl.text,
@@ -192,7 +180,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
     setState(() {
       _error = null;
-      _passError = null;
       _saved = true;
     });
 
@@ -385,12 +372,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     _ErrorBanner(_error!),
                   ],
 
-                  // ── Change password (email only) ───────────────────────────
-                  if (isEmail) ...[
+                  // ── Change password ────────────────────────────────────────
+                  // Пароль меняется только кодом на телефон (POST /auth/password/reset,
+                  // аудит D01): старого маршрута «по текущему паролю» на сервере нет.
+                  if ((user.phone ?? '').isNotEmpty) ...[
                     const SizedBox(height: 24),
                     GestureDetector(
-                      onTap: () =>
-                          setState(() => _showPassSection = !_showPassSection),
+                      onTap: () => _openPasswordReset(user.phone!),
                       child: Row(
                         children: [
                           RemoteText(
@@ -404,44 +392,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ),
                           ),
                           const Spacer(),
-                          Icon(
-                            _showPassSection
-                                ? Icons.keyboard_arrow_up
-                                : Icons.keyboard_arrow_down,
+                          const Icon(
+                            Icons.keyboard_arrow_right,
                             color: AppColors.grey600,
                           ),
                         ],
                       ),
-                    ),
-                    AnimatedCrossFade(
-                      duration: const Duration(milliseconds: 300),
-                      crossFadeState: _showPassSection
-                          ? CrossFadeState.showFirst
-                          : CrossFadeState.showSecond,
-                      firstChild: Column(
-                        children: [
-                          const SizedBox(height: 14),
-                          _PasswordField(
-                            ctrl: _oldPassCtrl,
-                            label: 'Текущий пароль',
-                          ),
-                          const SizedBox(height: 14),
-                          _PasswordField(
-                            ctrl: _newPassCtrl,
-                            label: 'Новый пароль',
-                          ),
-                          const SizedBox(height: 14),
-                          _PasswordField(
-                            ctrl: _confPassCtrl,
-                            label: 'Подтвердите пароль',
-                          ),
-                          if (_passError != null) ...[
-                            const SizedBox(height: 12),
-                            _ErrorBanner(_passError!),
-                          ],
-                        ],
-                      ),
-                      secondChild: const SizedBox.shrink(),
                     ),
                   ],
 
@@ -897,87 +853,6 @@ class _FieldState extends State<_Field> {
                   widget.icon,
                   size: 18,
                   color: _focused ? AppColors.black : AppColors.grey400,
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Password field ───────────────────────────────────────────────────────────
-
-class _PasswordField extends StatefulWidget {
-  final TextEditingController ctrl;
-  final String label;
-  const _PasswordField({required this.ctrl, required this.label});
-
-  @override
-  State<_PasswordField> createState() => _PasswordFieldState();
-}
-
-class _PasswordFieldState extends State<_PasswordField> {
-  bool _obscure = true;
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          widget.label.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
-            color: AppColors.grey600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: _focused ? AppColors.black : AppColors.grey200,
-              width: _focused ? 1.5 : 1,
-            ),
-          ),
-          child: Focus(
-            onFocusChange: (f) => setState(() => _focused = f),
-            child: TextField(
-              controller: widget.ctrl,
-              obscureText: _obscure,
-              style: const TextStyle(fontSize: 15, color: AppColors.black),
-              decoration: InputDecoration(
-                hintText: '••••••••',
-                hintStyle: const TextStyle(
-                  color: AppColors.grey400,
-                  fontSize: 14,
-                ),
-                prefixIcon: Icon(
-                  Icons.lock_outline,
-                  size: 18,
-                  color: _focused ? AppColors.black : AppColors.grey400,
-                ),
-                suffixIcon: Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: GestureDetector(
-                    onTap: () => setState(() => _obscure = !_obscure),
-                    child: Icon(
-                      _obscure
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      size: 20,
-                      color: AppColors.grey400,
-                    ),
-                  ),
                 ),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,

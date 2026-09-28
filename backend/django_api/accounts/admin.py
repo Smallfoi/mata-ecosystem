@@ -89,12 +89,22 @@ class AccountAdmin(ExportCsvMixin, ModelAdmin):
 
     @admin.action(description="Заблокировать (бан входа)")
     def block_accounts(self, request, queryset):
+        from common.security import forget_account
+
+        ids = list(queryset.values_list("id", flat=True))
         n = queryset.update(is_blocked=True)
+        for uid in ids:  # бан действует сразу, не через минуту кэша (аудит A02)
+            forget_account(uid)
         self.message_user(request, f"Заблокировано аккаунтов: {n}")
 
     @admin.action(description="Разблокировать")
     def unblock_accounts(self, request, queryset):
+        from common.security import forget_account
+
+        ids = list(queryset.values_list("id", flat=True))
         n = queryset.update(is_blocked=False, block_reason="")
+        for uid in ids:
+            forget_account(uid)
         self.message_user(request, f"Разблокировано аккаунтов: {n}")
 
     @admin.action(description="Снять отметку «на ревью» (S-04)")

@@ -17,7 +17,20 @@ import '../profile/legal_documents_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   final bool startWithRegister;
-  const AuthScreen({super.key, this.startWithRegister = false});
+
+  /// Открыть сразу сброс пароля по телефону (из профиля: «Сменить пароль»).
+  /// Это единственный способ сменить пароль — сервер другого не знает (аудит D01).
+  final bool startWithReset;
+
+  /// Номер, который подставить в поле (например, телефон аккаунта).
+  final String? initialPhone;
+
+  const AuthScreen({
+    super.key,
+    this.startWithRegister = false,
+    this.startWithReset = false,
+    this.initialPhone,
+  });
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -45,7 +58,13 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void initState() {
     super.initState();
-    _isLogin = !widget.startWithRegister;
+    _isLogin = !widget.startWithRegister || widget.startWithReset;
+    _reset = widget.startWithReset;
+    var digits = (widget.initialPhone ?? '').replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
+      digits = digits.substring(1);
+    }
+    if (digits.length == 10) _phoneCtrl.text = formatPhoneTyped(digits);
   }
 
   @override

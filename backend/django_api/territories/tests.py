@@ -8,6 +8,8 @@ from common.testutils import ApiTestCase
 
 # Прямоугольник ~5800 м² у Якутска (> MIN_CAPTURE_AREA_M2, < MAX).
 _POLY = [[62.000, 129.700], [62.001, 129.700], [62.001, 129.701], [62.000, 129.701]]
+# Как шлёт клиент: дистанция и время пробежки. Без времени захват идёт без баллов (C06).
+_RUN = {"distanceMeters": 1200.0, "elapsedSeconds": 420}
 
 
 class TerritoryAwardTests(ApiTestCase):
@@ -15,7 +17,7 @@ class TerritoryAwardTests(ApiTestCase):
 
     def test_capture_awards_server_side(self):
         r = self.api_post(
-            "/v1/territories/capture", {"points": _POLY, "captureId": "capA"}
+            "/v1/territories/capture", {"points": _POLY, "captureId": "capA", **_RUN}
         ).json()
         self.assertTrue(r["ok"])
         # Баллы = за новый след (~площадь/100). Для ~5800 м² это ~55-60.
@@ -24,7 +26,7 @@ class TerritoryAwardTests(ApiTestCase):
         self.assertLessEqual(self.balance(), 62)
 
     def test_duplicate_capture_no_double(self):
-        body = {"points": _POLY, "captureId": "capA"}
+        body = {"points": _POLY, "captureId": "capA", **_RUN}
         self.api_post("/v1/territories/capture", body)
         awarded = self.balance()
         self.assertGreater(awarded, 0)
@@ -51,7 +53,7 @@ class TerritoryAwardTests(ApiTestCase):
 
     def test_rerun_same_ground_awards_nothing(self):
         # Первый захват — баллы за впервые исследованную землю.
-        self.api_post("/v1/territories/capture", {"points": _POLY, "captureId": "c1"})
+        self.api_post("/v1/territories/capture", {"points": _POLY, "captureId": "c1", **_RUN})
         first = self.balance()
         self.assertGreater(first, 0)
         # Обходим кулдаун и защиту 24ч, состарив метки времени.
@@ -60,7 +62,7 @@ class TerritoryAwardTests(ApiTestCase):
             cur.execute("UPDATE recent_captures SET captured_at = now() - interval '2 days'")
         # Тот же контур снова — нового следа нет → 0 баллов (ферма закрыта).
         r = self.api_post(
-            "/v1/territories/capture", {"points": _POLY, "captureId": "c2"}
+            "/v1/territories/capture", {"points": _POLY, "captureId": "c2", **_RUN}
         ).json()
         self.assertTrue(r["ok"])
         self.assertEqual(r["points"], 0)

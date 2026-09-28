@@ -1,7 +1,7 @@
 import os
 import secrets
 
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Sum
 from django.utils import timezone
 
@@ -34,17 +34,25 @@ class LoyaltyTransaction(models.Model):
 
 
 def add_txn(user_id, amount, source, description="", order_id=None, run_id=None):
-    # Баланс ДО этой транзакции — чтобы поймать пересечение порога уровня.
-    before = balance_of(user_id)
-    txn = LoyaltyTransaction.objects.create(
-        id=f"tx_{secrets.token_hex(8)}",
-        user_id=user_id,
-        amount=amount,
-        source=source,
-        description=description,
-        order_id=order_id,
-        run_id=run_id,
-    )
+    """Записать операцию по кошельку. Под замком кошелька (loyalty.wallet, аудит B03):
+    «баланс до» и запись — без гонки с параллельной операцией того же пользователя.
+    Проверки «не было ли уже» и «хватает ли» делают вызывающие — тоже под замком
+    (wallet.post_once / wallet.redeem), иначе замок здесь их не защитит."""
+    from .wallet import lock_wallet
+
+    with transaction.atomic():
+        lock_wallet(user_id)
+        # Баланс ДО этой транзакции — чтобы поймать пересечение порога уровня.
+        before = balance_of(user_id)
+        txn = LoyaltyTransaction.objects.create(
+            id=f"tx_{secrets.token_hex(8)}",
+            user_id=user_id,
+            amount=amount,
+            source=source,
+            description=description,
+            order_id=order_id,
+            run_id=run_id,
+        )
     if amount > 0:
         _notify_level_up(user_id, before, before + amount)
     # Баллы юзера изменились (баланс/заработано/потрачено; забег/заказ, породившие

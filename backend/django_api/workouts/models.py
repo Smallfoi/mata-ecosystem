@@ -77,3 +77,32 @@ class ExternalWorkout(models.Model):
             "duplicateOfRun": bool(self.run_id),
             "flagged": self.flagged,
         }
+
+
+class WorkoutAward(models.Model):
+    """Реестр учтённых тренировок (аудит C02): переживает отключение источника.
+
+    `ExternalWorkout` человек вправе стереть целиком — отключил источник, данные
+    ушли. Раньше вместе с ними уходила и память «за эту тренировку уже заплатили»:
+    переподключил источник — те же тренировки пришли заново и принесли баллы второй
+    раз. Здесь остаётся только бухгалтерский след решения: чей, сколько баллов
+    и какая транзакция. Сама тренировка (время, дистанция, пульс) и её ID у
+    источника не хранятся — только необратимый хэш, тот же, что `ExternalWorkout.id`.
+
+    Запись есть на КАЖДУЮ принятую тренировку, в том числе без баллов (велосипед,
+    флаг, дубль нашего забега): решение по ней уже принято и после переподключения
+    не пересматривается.
+    """
+
+    # sha1("{user}:{source}:{sourceId}")[:32] — совпадает с ExternalWorkout.id.
+    id = models.CharField(primary_key=True, max_length=80, verbose_name="Ключ тренировки")
+    user_id = models.CharField(max_length=40, db_index=True, verbose_name="Пользователь (ID)")
+    source = models.CharField(max_length=20, verbose_name="Источник")
+    points = models.IntegerField(default=0, verbose_name="Начислено баллов")
+    txn_id = models.CharField(max_length=40, blank=True, default="", verbose_name="Транзакция баллов")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Учтена")
+
+    class Meta:
+        db_table = "workout_awards"
+        verbose_name = "Учтённая тренировка"
+        verbose_name_plural = "Учтённые тренировки (реестр начислений)"

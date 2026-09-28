@@ -66,3 +66,37 @@ def track(name, user_id="", source="server", **props):
         )
     except Exception:
         return None
+
+
+class SaleLine(models.Model):
+    """Строка продажи для статистики — БЕЗ связи с человеком (решение владельца 28.09.2026).
+
+    Что купили, какой размер, цвет, сколько, по какой цене, когда. Кто купил — не
+    хранится: ни id аккаунта, ни имени, ни адреса. Пишется при оплате заказа
+    (`analytics.sales.record`) и живёт отдельно от заказа: когда человек удаляет
+    аккаунт, его заказы удаляются полностью, а статистика продаж остаётся.
+    `order_pk` — только чтобы не записать строку дважды; после удаления заказа он
+    ни на что не указывает.
+    """
+
+    order_pk = models.BigIntegerField(db_index=True, verbose_name="Заказ (служебно)")
+    line = models.PositiveIntegerField(verbose_name="Строка")
+    sold_at = models.DateTimeField(db_index=True, verbose_name="Продано")
+    product_id = models.CharField(max_length=80, blank=True, default="", verbose_name="Товар (ID)")
+    article = models.CharField(max_length=80, blank=True, default="", verbose_name="Артикул")
+    model_key = models.CharField(max_length=200, blank=True, default="", verbose_name="Модель")
+    name = models.CharField(max_length=300, blank=True, default="", verbose_name="Название")
+    brand = models.CharField(max_length=120, blank=True, default="", verbose_name="Бренд")
+    category_id = models.CharField(max_length=80, blank=True, default="", verbose_name="Категория")
+    size = models.CharField(max_length=40, blank=True, default="", verbose_name="Размер")
+    color = models.CharField(max_length=80, blank=True, default="", verbose_name="Цвет")
+    quantity = models.PositiveIntegerField(default=1, verbose_name="Количество")
+    price = models.FloatField(default=0, verbose_name="Цена, ₽")
+    refunded = models.BooleanField(default=False, verbose_name="Возвращено")
+
+    class Meta:
+        db_table = "analytics_sale_lines"
+        verbose_name = "Продажа (статистика)"
+        verbose_name_plural = "Продажи (статистика, без покупателя)"
+        constraints = [models.UniqueConstraint(fields=["order_pk", "line"],
+                                               name="sale_line_once")]
