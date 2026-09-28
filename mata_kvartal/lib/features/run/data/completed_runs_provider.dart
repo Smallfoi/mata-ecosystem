@@ -444,7 +444,7 @@ class CompletedRunsNotifier extends StateNotifier<List<CompletedRun>> {
     return true;
   }
 
-  /// Трек для троп: сервер найдёт прохождения и удалит трек через 14 дней
+  /// Трек для троп: сервер найдёт прохождения и удалит трек через 30 дней
   /// (D-60). Идемпотентно по runId (сервер перезаписывает), баллов не начисляет.
   /// Сетевой сбой — трек остаётся в очереди и уйдёт при следующей досылке.
   Future<void> _sendTrack(CompletedRun run, String owner, String token) async {

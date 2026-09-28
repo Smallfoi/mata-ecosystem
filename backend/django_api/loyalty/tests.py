@@ -130,15 +130,19 @@ class LoyaltyAccountCacheTests(ApiTestCase):
     phone = "+79990002010"
 
     def test_account_returns_balance_level_history(self):
+        add_txn(self.uid, 100, "manual", "начисление")
         add_txn(self.uid, 100, "runnerRun", "бег")
         d = self.api_get("/v1/loyalty/account").json()
+        # balance — тратимое; баллы за бег созревают 3 дня (решение 28.09.2026).
         self.assertEqual(d["balance"], 100)
-        self.assertEqual(d["level"], "basic")
-        self.assertEqual(len(d["transactions"]), 1)
+        self.assertEqual(d["total"], 200)
+        self.assertEqual(d["pending"], 100)
+        self.assertEqual(d["level"], "silver")  # уровень — по всему балансу
+        self.assertEqual(len(d["transactions"]), 2)
 
     def test_account_cache_invalidated_on_txn(self):
         self.assertEqual(self.api_get("/v1/loyalty/account").json()["balance"], 0)  # кэш
-        add_txn(self.uid, 250, "runnerRun")  # add_txn сбрасывает кэш
+        add_txn(self.uid, 250, "manual")  # add_txn сбрасывает кэш
         d = self.api_get("/v1/loyalty/account").json()
         self.assertEqual(d["balance"], 250)
         self.assertEqual(d["level"], "silver")  # пересчитано (баланс+уровень)

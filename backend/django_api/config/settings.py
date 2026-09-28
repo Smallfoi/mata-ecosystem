@@ -605,7 +605,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     # Авто-парсер афиши «Стартов»: раз в сутки в 05:00 (Asia/Yakutsk). Идемпотентно
     # (upsert по source+external_id). Источники — races/importers/.
-    # Треки живут 14 дней и удаляются (D-60) — это условие всей затеи с тропами.
+    # Треки живут 30 дней и удаляются (D-60; 30 вместо 14 — решение 28.09.2026) — это условие всей затеи с тропами.
     "cleanup-tracks-daily": {
         "task": "trails.cleanup_tracks",
         "schedule": crontab(hour=3, minute=50),

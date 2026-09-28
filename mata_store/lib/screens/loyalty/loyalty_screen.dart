@@ -136,6 +136,18 @@ class _Header extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
                 ),
               ),
+              // Баллы за бег созревают 3 дня / заморожены на проверке (сервер).
+              if (loyalty.pendingLine case final line?) ...[
+                const SizedBox(height: 6),
+                Center(
+                  child: Text(
+                    line, // staw-static — служебная строка с числом и датой
+                    textAlign: TextAlign.center,
+                    style:
+                        const TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

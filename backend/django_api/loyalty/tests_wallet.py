@@ -30,7 +30,8 @@ class LegacyRedeemRulesTests(ApiTestCase):
 
     def setUp(self):
         super().setUp()
-        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней — tests_maturation)
 
     def _redeem(self, amount, oid):
         body = {"amount": amount, "description": "Оплата баллами"}
@@ -117,7 +118,8 @@ class RedeemForOrderRulesTests(ApiTestCase):
     def test_existing_redeem_is_still_checked(self):
         from orders.awards import redeem_for_order
 
-        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней — tests_maturation)
         # Списание, сделанное в обход правил (старый путь), — 90% заказа.
         add_txn(self.uid, -900, "redeem", "Оплата баллами", "SS-EX")
         self.assertNotEqual(redeem_for_order(self.uid, "SS-EX", 900, 1000), "")
@@ -125,7 +127,8 @@ class RedeemForOrderRulesTests(ApiTestCase):
     def test_repeat_with_same_amount_is_idempotent(self):
         from orders.awards import redeem_for_order
 
-        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней — tests_maturation)
         self.assertEqual(redeem_for_order(self.uid, "SS-RP", 300, 1000), "")
         self.assertEqual(redeem_for_order(self.uid, "SS-RP", 300, 1000), "")
         self.assertEqual(self.balance(), 700)
@@ -133,7 +136,8 @@ class RedeemForOrderRulesTests(ApiTestCase):
     def test_repeat_with_other_amount_refused(self):
         from orders.awards import redeem_for_order
 
-        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней — tests_maturation)
         self.assertEqual(redeem_for_order(self.uid, "SS-RO", 300, 1000), "")
         self.assertNotEqual(redeem_for_order(self.uid, "SS-RO", 200, 1000), "")
         self.assertEqual(self.balance(), 700)
@@ -184,7 +188,8 @@ class WalletConcurrencyTests(TransactionTestCase):
     def test_parallel_redeems_do_not_overspend(self):
         from orders.awards import redeem_for_order
 
-        add_txn(self.UID, 300, "runnerRun", "Баллы за бег")
+        add_txn(self.UID, 300, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней — tests_maturation)
         with mock.patch("loyalty.models.balance_of", _slow_balance_of):
             results, errors = _run_parallel(
                 5, lambda i: redeem_for_order(self.UID, f"SS-RACE{i}", 300, 1000)
@@ -196,7 +201,8 @@ class WalletConcurrencyTests(TransactionTestCase):
     def test_parallel_redeems_same_order_spend_once(self):
         from orders.awards import redeem_for_order
 
-        add_txn(self.UID, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.UID, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней — tests_maturation)
         with mock.patch("loyalty.models.balance_of", _slow_balance_of):
             results, errors = _run_parallel(
                 5, lambda i: redeem_for_order(self.UID, "SS-SAME", 300, 1000)
@@ -228,7 +234,8 @@ class WalletConcurrencyTests(TransactionTestCase):
         """Отмена оплаты из двух мест сразу — списанные баллы возвращаются один раз."""
         from orders.awards import redeem_for_order, refund_redeemed_points
 
-        add_txn(self.UID, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.UID, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней — tests_maturation)
         self.assertEqual(redeem_for_order(self.UID, "SS-REF", 300, 1000), "")
         order = _order(self.UID, "SS-REF", total=700, points=300)
         with mock.patch("loyalty.models.balance_of", _slow_balance_of), \

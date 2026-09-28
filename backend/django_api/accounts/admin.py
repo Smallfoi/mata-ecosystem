@@ -109,7 +109,12 @@ class AccountAdmin(ExportCsvMixin, ModelAdmin):
 
     @admin.action(description="Снять отметку «на ревью» (S-04)")
     def clear_review(self, request, queryset):
+        from common.cache import invalidate_user
+
+        ids = list(queryset.values_list("id", flat=True))
         n = queryset.update(needs_review=False)
+        for uid in ids:
+            invalidate_user(uid)  # заморозка баллов снята — показ кошелька устарел
         self.message_user(request, f"Снята отметка ревью: {n}")
 
 

@@ -15,7 +15,10 @@ from django.utils import timezone
 from league.models import RunnerProfile
 from trails.models import PendingTrack
 
-TRACK_RETENTION_DAYS = 14
+# 30 дней (решение владельца 28.09.2026; было 14 по D-60): столько живёт трек для
+# разбора спора о накрутке — окно модерации шире окна созревания баллов (3 дня)
+# и реплей-окна забега (30 дней).
+TRACK_RETENTION_DAYS = 30
 
 
 @shared_task(name="trails.cleanup_tracks", ignore_result=True)

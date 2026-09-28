@@ -59,6 +59,10 @@
     </div>
   </div>
 
+  {% if r.needs_review %}
+  <div class="m-strip">Заморожено {{ r.frozen_points }} баллов за активность — до решения (снять метку «на проверке» или заблокировать).</div>
+  {% endif %}
+
   {% if r.linked %}
   <div class="m-strip bad">
     Похоже на второй аккаунт того же человека:

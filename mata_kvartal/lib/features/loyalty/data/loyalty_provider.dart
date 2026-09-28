@@ -43,6 +43,17 @@ class LoyaltyState {
   /// Постоянный 6-значный код лояльности клиента (для кассы/QR). Не меняется.
   final String code;
 
+  /// Баллы за бег, которые ещё нельзя потратить: созревают 3 дня или заморожены
+  /// на время проверки аккаунта (сервер, 28.09.2026). [balance] — тратимые.
+  final int pending;
+
+  /// Ближайшая партия созревающих баллов: сколько и когда станут доступны.
+  final int pendingNextAmount;
+  final DateTime? pendingNextAt;
+
+  /// Аккаунт на проверке — баллы за активность заморожены до решения.
+  final bool frozen;
+
   const LoyaltyState({
     this.balance = 0,
     this.level = 'basic',
@@ -51,6 +62,10 @@ class LoyaltyState {
     this.loaded = false,
     this.error,
     this.code = '',
+    this.pending = 0,
+    this.pendingNextAmount = 0,
+    this.pendingNextAt,
+    this.frozen = false,
   });
 
   LoyaltyState copyWith({
@@ -62,6 +77,11 @@ class LoyaltyState {
     String? error,
     bool clearError = false,
     String? code,
+    int? pending,
+    int? pendingNextAmount,
+    DateTime? pendingNextAt,
+    bool clearPendingNextAt = false,
+    bool? frozen,
   }) => LoyaltyState(
     balance: balance ?? this.balance,
     level: level ?? this.level,
@@ -70,6 +90,12 @@ class LoyaltyState {
     loaded: loaded ?? this.loaded,
     error: clearError ? null : error ?? this.error,
     code: code ?? this.code,
+    pending: pending ?? this.pending,
+    pendingNextAmount: pendingNextAmount ?? this.pendingNextAmount,
+    pendingNextAt: clearPendingNextAt
+        ? null
+        : pendingNextAt ?? this.pendingNextAt,
+    frozen: frozen ?? this.frozen,
   );
 
   /// Русское название уровня по порогам экосистемы (0/200/500/1000).
@@ -124,6 +150,14 @@ class LoyaltyNotifier extends StateNotifier<LoyaltyState> {
         balance: (data['balance'] as num?)?.toInt() ?? 0,
         level: data['level']?.toString() ?? 'basic',
         code: data['code']?.toString() ?? '',
+        // Новые поля сервера (28.09.2026); старый сервер их не шлёт → 0/null.
+        pending: (data['pending'] as num?)?.toInt() ?? 0,
+        pendingNextAmount: (data['pendingNextAmount'] as num?)?.toInt() ?? 0,
+        pendingNextAt: DateTime.tryParse(
+          data['pendingNextAt']?.toString() ?? '',
+        )?.toLocal(),
+        clearPendingNextAt: data['pendingNextAt'] == null,
+        frozen: data['frozen'] == true,
         transactions: txns,
         isLoading: false,
         loaded: true,

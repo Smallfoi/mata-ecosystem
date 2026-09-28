@@ -120,6 +120,10 @@ class ServerStillPaysNormally(ApiTestCase):
             "finishedAtMs": int(time.time() * 1000),
         })
         from orders.models import Order
+        from loyalty.models import LoyaltyTransaction
+
+        # Баллы за бег созревают 3 дня (решение 28.09.2026) — «прошло 3 дня».
+        LoyaltyTransaction.objects.filter(user_id=self.uid).update(available_at=None)
 
         # Прежний адрес списывает только на существующий заказ (аудит B02).
         Order.objects.create(

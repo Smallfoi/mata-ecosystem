@@ -23,6 +23,7 @@ from common.locks import ACTIVITY, lock_user
 from common.numeric import BadNumber, bounded_int, finite_float
 from common.security import user_id_from_request
 from loyalty.models import add_txn
+from runs.budget import grant
 from runs.models import Run
 from runs.views import (
     FUTURE_SKEW,
@@ -169,6 +170,7 @@ def import_workouts(request):
 
     imported = duplicates = skipped = 0
     points_total = 0
+    capped_total, cap_note = 0, ""
     result = []
 
     for raw in items:
@@ -209,6 +211,12 @@ def import_workouts(request):
                 prior = WorkoutAward.objects.select_for_update().filter(id=wid).first()
                 if prior:
                     points = 0
+                # Суточный потолок баллов — общий с забегами и захватами (решение
+                # 28.09.2026, п.1 и п.7): тренировка сохраняется, сверх — 0 баллов.
+                points, cut, cap_reason = grant(me, points)
+                if cut:
+                    capped_total += cut
+                    cap_note = cap_reason
                 workout = ExternalWorkout.objects.create(
                     id=wid,
                     user_id=me,
@@ -241,13 +249,18 @@ def import_workouts(request):
         imported += 1
         result.append(workout.to_json())
 
-    return Response({
+    out = {
         "imported": imported,
         "duplicates": duplicates,
         "skipped": skipped,
         "points": points_total,
         "items": result,
-    })
+    }
+    if capped_total:
+        # Новые поля (старые клиенты их не читают): часть баллов срезал потолок.
+        out.update({"dailyCapReached": True, "pointsCapped": capped_total,
+                    "capReason": cap_note})
+    return Response(out)
 
 
 @api_view(["GET"])

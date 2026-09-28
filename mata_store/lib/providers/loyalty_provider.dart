@@ -20,6 +20,9 @@ class LoyaltyProvider extends ChangeNotifier {
 
   final List<LoyaltyTransaction> _txns = [];
   String _code = '';
+  // Разбивка кошелька с сервера (28.09.2026). null — сервер её не прислал
+  // (старый бэкенд) или офлайн-прототип: тогда считаем по истории, как раньше.
+  LoyaltyAccount? _server;
   bool _lastLoggedIn = false;
   String _account = '';
 
@@ -50,6 +53,7 @@ class LoyaltyProvider extends ChangeNotifier {
   void _clearAccount() {
     _txns.clear();
     _code = '';
+    _server = null;
     notifyListeners();
   }
 
@@ -64,6 +68,7 @@ class LoyaltyProvider extends ChangeNotifier {
         ..clear()
         ..addAll(acc.transactions);
       _code = acc.code;
+      _server = acc.total != null ? acc : null;
       notifyListeners();
     } catch (_) {
       // backend недоступен — оставляем текущее состояние
@@ -72,11 +77,48 @@ class LoyaltyProvider extends ChangeNotifier {
 
   // ── Геттеры ──────────────────────────────────────────────────────────────
   List<LoyaltyTransaction> get transactions => List.unmodifiable(_txns);
-  int get balance => _txns.fold(0, (s, t) => s + t.amount);
+  /// Сколько можно потратить сейчас. С сервера — `balance` (без созревающих и
+  /// замороженных баллов за бег); иначе — сумма истории, как раньше.
+  int get balance => _server?.balance ?? _history;
+  int get _history => _txns.fold(0, (s, t) => s + t.amount);
+
+  /// Всё накопленное (для уровня): созревающие баллы статус не понижают.
+  int get total => _server?.total ?? _history;
+
+  /// Баллы за бег, которые ещё нельзя потратить (созревают/заморожены).
+  int get pending => _server?.pending ?? 0;
+  int get pendingNextAmount => _server?.pendingNextAmount ?? 0;
+  DateTime? get pendingNextAt => _server?.pendingNextAt;
+  bool get frozen => _server?.frozen ?? false;
+
   String get code => _code;
-  LoyaltyLevel get level => LoyaltyLevelX.forPoints(balance);
-  LoyaltyAccount get account =>
-      LoyaltyAccount(balance: balance, transactions: _txns, code: _code);
+  LoyaltyLevel get level => LoyaltyLevelX.forPoints(total);
+  LoyaltyAccount get account => LoyaltyAccount(
+        balance: balance,
+        transactions: _txns,
+        code: _code,
+        pending: pending,
+        total: total,
+        pendingNextAmount: pendingNextAmount,
+        pendingNextAt: pendingNextAt,
+        frozen: frozen,
+      );
+
+  /// Строка о ещё недоступных баллах: «ещё N баллов станут доступны <дата>»
+  /// или о заморозке на время проверки. null — показывать нечего.
+  String? get pendingLine {
+    if (pending <= 0) return null;
+    if (frozen) return '$pending баллов за бег заморожены до проверки аккаунта';
+    final at = pendingNextAt;
+    if (at == null || pendingNextAmount <= 0) {
+      return 'ещё $pending баллов скоро станут доступны';
+    }
+    String two(int v) => v.toString().padLeft(2, '0');
+    final rest =
+        pending > pendingNextAmount ? ' · всего созревает $pending' : '';
+    return 'ещё $pendingNextAmount баллов станут доступны '
+        '${two(at.day)}.${two(at.month)}$rest';
+  }
 
   /// Прогресс к следующему уровню (0..1) и сколько баллов осталось.
   double get levelProgress {
@@ -84,13 +126,13 @@ class LoyaltyProvider extends ChangeNotifier {
     if (nxt == null) return 1;
     final from = level.threshold;
     final to = nxt.threshold;
-    return ((balance - from) / (to - from)).clamp(0.0, 1.0);
+    return ((total - from) / (to - from)).clamp(0.0, 1.0);
   }
 
   int get pointsToNextLevel {
     final nxt = level.next;
     if (nxt == null) return 0;
-    return (nxt.threshold - balance).clamp(0, nxt.threshold);
+    return (nxt.threshold - total).clamp(0, nxt.threshold);
   }
 
   // ── Загрузка / сохранение ────────────────────────────────────────────────

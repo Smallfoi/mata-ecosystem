@@ -50,6 +50,14 @@ class ApiLoyaltyRepository implements LoyaltyRepository {
     return LoyaltyAccount(
       balance: data['balance'] as int? ?? 0,
       code: data['code'] as String? ?? '',
+      // Новые поля сервера (28.09.2026): старый сервер их не шлёт.
+      pending: (data['pending'] as num?)?.toInt() ?? 0,
+      total: (data['total'] as num?)?.toInt(),
+      pendingNextAmount: (data['pendingNextAmount'] as num?)?.toInt() ?? 0,
+      pendingNextAt: DateTime.tryParse(
+        data['pendingNextAt']?.toString() ?? '',
+      )?.toLocal(),
+      frozen: data['frozen'] == true,
       transactions: (data['transactions'] as List? ?? [])
           .map((j) => LoyaltyTransaction.fromJson(j as Map<String, dynamic>))
           .toList(),

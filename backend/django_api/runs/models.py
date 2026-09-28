@@ -23,6 +23,9 @@ class Run(models.Model):
     points_awarded = models.IntegerField(default=0, verbose_name="Начислено баллов")
     flagged = models.BooleanField(default=False, db_index=True, verbose_name="Помечен (чит)")
     flag_reason = models.CharField(max_length=200, blank=True, default="", verbose_name="Причина пометки")
+    # Сколько баллов за этот забег срезал суточный потолок (решение 28.09.2026).
+    # Нужен пересчёту: иначе он «доначислил» бы срезанное как недостачу.
+    points_capped = models.IntegerField(default=0, verbose_name="Срезано потолком, баллов")
 
     # Разбор помеченного забега человеком (S-04, фаза 2). Пока `reviewed_at` пуст —
     # забег висит в очереди «Проверка забегов»; решение модератора проставляет дату

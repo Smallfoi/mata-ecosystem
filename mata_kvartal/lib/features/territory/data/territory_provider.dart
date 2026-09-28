@@ -191,6 +191,7 @@ class TerritoryNotifier extends StateNotifier<TerritoryState> {
     List<LatLng> route, {
     double? distanceMeters,
     int? elapsedSeconds,
+    String? runId,
   }) async {
     final token = _token;
     if (token == null || route.length < 3) return null;
@@ -207,6 +208,9 @@ class TerritoryNotifier extends StateNotifier<TerritoryState> {
       'captureId': captureId, // идемпотентность (S-04): ретрай не задвоит
       if (distanceMeters != null) 'distanceMeters': distanceMeters,
       if (elapsedSeconds != null) 'elapsedSeconds': elapsedSeconds,
+      // id сводки этой же пробежки: баллы за захват сервер даёт только за
+      // засчитанную пробежку и так находит её без догадок (28.09.2026).
+      if (runId != null) 'runId': runId,
     };
     try {
       final response = await _dio.post<Map<String, dynamic>>(

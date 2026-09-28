@@ -40,6 +40,12 @@ class CaptureTrustTests(ApiTestCase):
 
     def test_honest_payload_still_awarded(self):
         """Как шлёт реальный клиент: дистанция и время пробежки — баллы есть."""
+        from django.utils import timezone
+
+        from runs.models import Run
+
+        Run.objects.create(id="run_honest", user_id=self.uid, distance_m=1200.0,
+                           duration_s=420, finished_at=timezone.now())
         r = self._cap("honest", distanceMeters=1200.0, elapsedSeconds=420)
         self.assertEqual(r.status_code, 200, r.content)
         body = r.json()

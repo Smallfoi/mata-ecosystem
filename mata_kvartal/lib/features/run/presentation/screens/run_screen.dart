@@ -769,6 +769,9 @@ class _ActiveRunView extends ConsumerWidget {
                     final captured = zoneNotifier.checkAndCaptureLoop(
                       run.route,
                     );
+                    // Один id на захват и сводку: сервер платит за захват
+                    // только в связке с засчитанной пробежкой.
+                    final runId = newRunId();
                     // Реальный захват на PostGIS-бэке (D-09): отправляем маршрут
                     // + дистанцию/время для серверного античита по скорости.
                     // Карта подписана на territoryProvider и обновится сама,
@@ -780,6 +783,7 @@ class _ActiveRunView extends ConsumerWidget {
                             run.route,
                             distanceMeters: run.distanceMeters,
                             elapsedSeconds: run.elapsed.inSeconds,
+                            runId: runId,
                           ),
                     );
                     final result = RunResult(
@@ -796,6 +800,7 @@ class _ActiveRunView extends ConsumerWidget {
                         .stop(
                           capturedZones: captured.length,
                           capturedTerritory: true,
+                          runId: runId,
                         );
                     Navigator.pop(ctx);
                     context.push('/run/result', extra: result);

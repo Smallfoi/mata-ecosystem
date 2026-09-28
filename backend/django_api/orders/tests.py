@@ -711,7 +711,8 @@ class PointsAtCheckoutTests(ApiTestCase):
         super().setUp()
         from loyalty.models import add_txn
 
-        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней)
 
     def _order(self, oid, goods, points, delivery=0):
         return self.api_post("/v1/orders", {
@@ -770,7 +771,8 @@ class UnpaidOrderExpiryTests(ApiTestCase):
         super().setUp()
         from loyalty.models import add_txn
 
-        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней)
 
     def _order(self, oid, minutes_ago, payment_id=""):
         from datetime import timedelta
