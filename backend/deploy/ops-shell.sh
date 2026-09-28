@@ -23,6 +23,11 @@
 # секретов, SQL, доступ к ключам, проброс портов, интерактивная оболочка.
 set -uo pipefail
 
+# Локаль: без неё sed на сервере работает в C и спотыкается о кириллицу в
+# правилах затирания (проверено на проде 28.09.2026 — падал молча, отдавая
+# пустой вывод). C.UTF-8 есть в любом Ubuntu-образе.
+export LC_ALL=C.UTF-8
+
 APP_DIR=/opt/mata/backend
 COMPOSE=(sudo docker compose -f "$APP_DIR/docker-compose.prod.yml" --env-file "$APP_DIR/.env")
 LOG=/var/log/mata-ops.log
@@ -56,7 +61,7 @@ redact() {
     -e 's/([A-Za-z_]*(SECRET|TOKEN|PASSWORD|PASSWD|APIKEY|API_KEY|KEY)[A-Za-z_]*)[=:][^ "'"'"',;]+/\1=<скрыто>/g' \
     -e 's/[0-9]{14,19}/<длинный номер скрыт>/g' \
     -e 's/(^|[^0-9])(\+?[78])[ (-]?[0-9]{3}[) -]?[0-9]{3}[ -]?[0-9]{2}[ -]?[0-9]{2}([^0-9]|$)/\1<телефон скрыт>\3/g' \
-    -e 's/([Кк]од|[Cc]ode|otp|OTP)([^0-9A-Za-zА-Яа-я]{1,8})[0-9]{4,6}/\1\2<код скрыт>/g'
+    -e 's/(код|Код|КОД|code|Code|otp|OTP)([^0-9]{1,8})[0-9]{4,6}/\1\2<код скрыт>/g'
 }
 
 svc_logs() { case "$1" in web|worker|beat|db|redis|nginx) return 0 ;; *) return 1 ;; esac; }
@@ -132,16 +137,35 @@ for f in F.objects.all():
     fixture='вход +7 914 827 8470 код 4821; user ivan.petrov@mail.ru
 Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcDEF-123_xyz
 YOOKASSA_SECRET_KEY=live_AbCdEf123456 карта 4276380012345678'
-    out="$(printf '%s\n' "$fixture" | redact)"
+    err="$(mktemp)"
+    out="$(printf '%s\n' "$fixture" | redact 2>"$err")"
     printf '%s\n' "$out"
     echo "---"
     bad=0
+    # Пустой вывод — НЕ успех: именно так выглядел сломанный sed на проде
+    # (28.09.2026), и проверка утечек на пустоте молча проходила.
+    if [ -z "$out" ]; then
+      echo "ОШИБКА: затирание вернуло пустоту — вывод логов был бы потерян." >&2
+      bad=1
+    fi
+    if [ -s "$err" ]; then
+      echo "ОШИБКА sed: $(head -2 "$err")" >&2
+      bad=1
+    fi
+    # Уцелеть должно то, ради чего логи и читают.
+    for keep in "Authorization" "карта"; do
+      printf '%s' "$out" | grep -qF "$keep" || {
+        echo "ОШИБКА: «$keep» пропало — затирание съедает нужное." >&2
+        bad=1
+      }
+    done
     for leak in "8470" "ivan.petrov" "eyJzdWIiOiIxIn0" "live_AbCdEf123456" "4276380012345678"; do
       if printf '%s' "$out" | grep -qF "$leak"; then
         echo "УТЕЧКА: «$leak» осталось в выводе" >&2
         bad=1
       fi
     done
+    rm -f "$err"
     [ "$bad" = 0 ] && echo "Затирание работает: телефон, почта, токен, секрет и номер карты скрыты."
     exit "$bad"
     ;;
