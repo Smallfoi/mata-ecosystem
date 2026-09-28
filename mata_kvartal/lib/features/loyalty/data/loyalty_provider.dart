@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_config.dart';
+import '../../../core/storage/account_scope.dart';
 import '../../auth/data/auth_provider.dart';
 
 /// Баллы лояльности — общий счёт экосистемы (тот же backend, что и аккаунт).
@@ -155,7 +156,9 @@ class LoyaltyNotifier extends StateNotifier<LoyaltyState> {
 
   Future<void> _enqueue(Map<String, dynamic> item) async {
     final prefs = await SharedPreferences.getInstance();
-    final list = _readPending(prefs)..add(item);
+    // Владелец — кто вошёл сейчас (C03): под другим аккаунтом не отправится.
+    final list = _readPending(prefs)
+      ..add(withOwner(item, ref.read(authProvider).user?.id));
     await prefs.setString(_pendingKey, jsonEncode(list));
   }
 
@@ -175,14 +178,17 @@ class LoyaltyNotifier extends StateNotifier<LoyaltyState> {
   /// останавливается и сохраняет остаток — повторим при следующем refresh.
   Future<void> _flushPending(String token) async {
     final prefs = await SharedPreferences.getInstance();
-    final pending = _readPending(prefs);
-    if (pending.isEmpty) return;
-    final remaining = <Map<String, dynamic>>[];
+    final all = _readPending(prefs);
+    if (all.isEmpty) return;
+    // Только свои начисления (C03): чужие ждут входа своего владельца.
+    final me = ref.read(authProvider).user?.id;
+    final pending = all.where((e) => isOwnedBy(e, me)).toList();
+    final remaining = all.where((e) => !isOwnedBy(e, me)).toList();
     for (var i = 0; i < pending.length; i++) {
       try {
         await _dio.post<Map<String, dynamic>>(
           '/loyalty/transactions',
-          data: pending[i],
+          data: withoutOwner(pending[i]),
           options: Options(headers: {'Authorization': 'Bearer $token'}),
         );
       } on DioException catch (e) {

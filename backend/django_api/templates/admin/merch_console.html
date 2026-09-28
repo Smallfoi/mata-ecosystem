@@ -4,7 +4,8 @@
 {% block content %}
 <div id="merch-cfg"
      data-site-url="{{ site_preview_url }}"
-     data-app-url="{{ app_preview_url }}"></div>
+     data-app-url="{{ app_preview_url }}"
+     data-preview-token="{{ preview_token }}"></div>
 <form style="display:none">{% csrf_token %}</form>
 
 <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
@@ -331,6 +332,8 @@
   var cfg = document.getElementById("merch-cfg");
   var SITE_URL = cfg.getAttribute("data-site-url");   // .../?preview=1&platform=site
   var APP_URL = cfg.getAttribute("data-app-url");
+  // Пропуск к черновикам каталога для фрейма приложения (сайту он уже вписан в SITE_URL).
+  var PREVIEW_TOKEN = cfg.getAttribute("data-preview-token") || "";
   // Origin фреймов, с которыми конструктору можно разговаривать. Поле `source` внутри
   // сообщения задаёт кто угодно — доверять можно только e.origin, его проставляет браузер.
   function originOf(u) { try { return new URL(u, location.href).origin; } catch (e) { return ""; } }
@@ -424,7 +427,10 @@
     // Анти-кэш: каждая загрузка фрейма тянет СВЕЖУЮ версию (сайт — сразу, приложение —
     // после пересборки web-бандла). Иначе браузер показывает старую сборку из кэша.
     var v = "&_=" + Date.now();
-    if (platform === "app") return APP_URL + "?edit=1" + c + v;
+    if (platform === "app") {
+      var pt = PREVIEW_TOKEN ? "&pt=" + encodeURIComponent(PREVIEW_TOKEN) : "";
+      return APP_URL + "?edit=1" + c + pt + v;
+    }
     // Сайт: держим текущую страницу и включаем правку только в режиме «Редактируем».
     try {
       var u = new URL(SITE_URL, location.href);

@@ -7,8 +7,10 @@
     <application
         android:label="МАТА Store"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true"><!-- dev: backend по http://127.0.0.1 (adb reverse). Для прод — https/убрать -->
+        android:icon="@mipmap/ic_launcher">
+        <!-- Cleartext (http) здесь НЕ разрешён: release ходит только на
+             https://api.mata-club.ru. Локальный http-бэкенд (adb reverse) нужен
+             лишь debug/profile — разрешение в src/debug и src/profile (аудит D06). -->
         <!-- Impeller выключен: на части устройств (Mediatek/Infinix) release-сборка
              с Impeller/Vulkan падает на старте. Как в Квартале. -->
         <meta-data

@@ -9,7 +9,15 @@ graceful degradation, что у SMS/оплаты/пуша: без ключей �
 `storages.backends.s3` импортируется Django ЛЕНИВО (только при первом обращении к
 хранилищу, т.е. фактически лишь в проде) — поэтому в dev/CI без S3 django-storages/boto3
 не трогаются, даже если установлены.
+
+Хранилище `private` (аудит: исходники фотопайплайна) — тот же бакет, но объекты
+кладутся с ACL `private`, а ссылки выдаются ПОДПИСАННЫЕ и живут PRIVATE_URL_TTL секунд.
+Туда идут рабочие файлы фотопайплайна (исходники съёмки, мастер-файлы ИИ, крупные
+планы принтов) — их видит только сотрудник на экране проверки. Витринные снимки
+(catalog) остаются в `default` и публичны. Без S3 (dev/CI) — тот же локальный диск.
 """
+
+PRIVATE_URL_TTL = 3600  # час: хватает на работу с экраном проверки, дальше — перезагрузить
 
 _STATIC = {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}
 _LOCAL = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
@@ -35,7 +43,7 @@ def media_storages(env):
     staticfiles всегда локальные (collectstatic на сервере)."""
     creds = _s3_env(env)
     if not creds:
-        return {"default": dict(_LOCAL), "staticfiles": dict(_STATIC)}
+        return {"default": dict(_LOCAL), "private": dict(_LOCAL), "staticfiles": dict(_STATIC)}
     bucket, access, secret = creds
     options = {
         "bucket_name": bucket,
@@ -50,7 +58,20 @@ def media_storages(env):
     custom = (env.get("MEDIA_S3_CUSTOM_DOMAIN") or "").strip()
     if custom:
         options["custom_domain"] = custom  # CDN-домен для отдачи медиа
+    # Приватные объекты: ACL private + подписанные ссылки. CDN-домен не ставим —
+    # по нему подпись S3 не работает, ссылка идёт прямо на хранилище.
+    private = dict(options, default_acl="private", querystring_auth=True,
+                   querystring_expire=PRIVATE_URL_TTL)
+    private.pop("custom_domain", None)
     return {
         "default": {"BACKEND": "storages.backends.s3.S3Storage", "OPTIONS": options},
+        "private": {"BACKEND": "storages.backends.s3.S3Storage", "OPTIONS": private},
         "staticfiles": dict(_STATIC),
     }
+
+
+def private_storage():
+    """Хранилище для приватных файлов (callable для FileField(storage=...))."""
+    from django.core.files.storage import storages
+
+    return storages["private"]

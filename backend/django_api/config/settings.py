@@ -159,6 +159,10 @@ DATABASES = {
     }
 }
 
+# Заголовки ответа, которые браузер отдаёт скрипту сайта с другого домена:
+# общее число карточек при постраничной витрине `/v1/models?limit=` (аудит F01).
+CORS_EXPOSE_HEADERS = ["X-Total-Count", "X-Offset", "X-Limit"]
+
 # CORS. Прод: DJANGO_CORS_ORIGINS="https://mata-club.ru,https://www.mata-club.ru" — тогда
 # разрешаем только их. Dev (переменная пуста) — разрешаем всё (приложения и сайт
 # ходят с устройства/localhost).
@@ -245,6 +249,9 @@ REST_FRAMEWORK = {
         # способности (581 rps), то есть как защита от перегруза лимит сохраняет смысл.
         # Упрёмся и в это — ответ кэш и CDN (D-31), а не дальнейшее повышение.
         "public": "3000/min",
+        # Поиск друзей по контактам (аудит F02): до 3000 хешей за раз — 20 вызовов
+        # в час на человека хватает с запасом, а перебор номеров становится долгим.
+        "contacts": "20/hour",
     },
 }
 
@@ -581,6 +588,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "orders.expire_unpaid_orders",
         "schedule": crontab(minute="*/5"),
     },
+    # Возвраты «в обработке» (аудит B04): подтверждение ЮKassa могло не дойти.
+    "reconcile-order-returns": {
+        "task": "orders.reconcile_returns",
+        "schedule": crontab(minute="*/5"),
+    },
     # Авто-парсер афиши «Стартов»: раз в сутки в 05:00 (Asia/Yakutsk). Идемпотентно
     # (upsert по source+external_id). Источники — races/importers/.
     # Треки живут 14 дней и удаляются (D-60) — это условие всей затеи с тропами.
@@ -591,6 +603,12 @@ CELERY_BEAT_SCHEDULE = {
     "import-races-daily": {
         "task": "races.import_races",
         "schedule": crontab(hour=5, minute=0),
+    },
+    # Фотопайплайн: задание, зависшее в «Генерируется» (воркер упал), → «Ошибка» с
+    # кнопкой «Повторить». Генерацию сама не запускает (аудит F04).
+    "photo-recover-stuck-jobs": {
+        "task": "productmedia.recover_stuck_jobs",
+        "schedule": crontab(minute="*/10"),
     },
 }
 

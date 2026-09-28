@@ -11,18 +11,18 @@
 
 Позицию/карту тут НЕ отдаём — это этап 2b (только для accepted, огрубление до гекса).
 """
-import hashlib
 import re
 from datetime import timedelta
 
 from django.db.models import Q
 from django.utils import timezone
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, throttle_classes
 from rest_framework.response import Response
 
 from accounts.models import Account
 from clubs.models import ClubMember
 from common.security import user_id_from_request
+from common.throttling import ContactsMatchThrottle, UserJWTRateThrottle
 
 from .models import (
     FriendMapPrefs,
@@ -31,6 +31,7 @@ from .models import (
     coarsen,
     friends_ids,
     relationship,
+    relationships,
 )
 
 _MAX_CONTACT_HASHES = 3000
@@ -51,13 +52,6 @@ def _summary(acc: Account, status: str) -> dict:
 
 def _acc_map(ids):
     return {a.id: a for a in Account.objects.filter(id__in=list(ids))}
-
-
-def _norm_phone(phone: str) -> str:
-    d = re.sub(r"\D", "", phone or "")
-    if len(d) == 11 and d.startswith("8"):
-        d = "7" + d[1:]
-    return d
 
 
 @api_view(["GET"])
@@ -182,30 +176,43 @@ def friend_suggestions(request):
     return Response({"suggestions": out[:20]})
 
 
+_HEX64 = re.compile(r"[0-9a-f]{64}")
+
+
 @api_view(["POST"])
+@throttle_classes([UserJWTRateThrottle, ContactsMatchThrottle])
 def friend_match_contacts(request):
     """Сопоставить контакты по ХЕШУ телефона (сырые номера не шлём — приватность).
-    Клиент нормализует номер и шлёт sha256('+7XXXXXXXXXX'); сервер так же хеширует
-    телефоны аккаунтов и возвращает совпадения."""
+    Клиент нормализует номер и шлёт sha256('+7XXXXXXXXXX'); у аккаунтов тот же хеш
+    лежит в индексированном `phone_hash` — ищем одним запросом по индексу, а не
+    перебором всех аккаунтов (аудит F02). Список длиннее лимита обрезаем, а не
+    отбиваем: выпущенные сборки шлют все контакты без ограничения. Частота —
+    `contacts` (перебор номеров «вслепую» хешами)."""
     uid = _me(request)
     if not uid:
         return Response({"detail": "Нет токена"}, status=401)
-    raw = (request.data or {}).get("hashes") or []
-    hashes = {h for h in raw if isinstance(h, str)}
+    data = request.data if isinstance(request.data, dict) else {}
+    raw = data.get("hashes") or []
+    if not isinstance(raw, list):
+        raw = []
+    hashes = []
+    seen = set()
+    for h in raw:
+        # Хеш — ровно 64 шестнадцатеричных знака; прочее и раньше ни с чем не совпадало.
+        if isinstance(h, str) and h not in seen and _HEX64.fullmatch(h):
+            seen.add(h)
+            hashes.append(h)
+            if len(hashes) >= _MAX_CONTACT_HASHES:
+                break
     if not hashes:
         return Response({"results": []})
-    if len(hashes) > _MAX_CONTACT_HASHES:
-        hashes = set(list(hashes)[:_MAX_CONTACT_HASHES])
-    out = []
-    qs = Account.objects.exclude(id=uid).exclude(phone__isnull=True).exclude(phone="")
-    for a in qs.iterator():
-        digits = _norm_phone(a.phone)
-        if not digits:
-            continue
-        h = hashlib.sha256(("+" + digits).encode()).hexdigest()
-        if h in hashes:
-            out.append(_summary(a, relationship(uid, a.id)))
-    return Response({"results": out})
+    accs = list(
+        Account.objects.filter(phone_hash__in=hashes)
+        .exclude(id=uid)
+        .only("id", "name", "avatar_path")
+    )
+    rel = relationships(uid, [a.id for a in accs])
+    return Response({"results": [_summary(a, rel[a.id]) for a in accs]})
 
 
 _POSITION_FRESH_MIN = 20  # позиция считается «живой» столько минут

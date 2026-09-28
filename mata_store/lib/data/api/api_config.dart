@@ -23,6 +23,18 @@ class ApiConfig {
   /// Каталог запрашивается с ?preview=1 — показываются и черновики (неопубликованные).
   static const bool preview = bool.fromEnvironment('PREVIEW');
 
+  /// Пропуск к черновикам: сервер отдаёт их только сотруднику. Конструктор
+  /// (/admin/merch/) кладёт подписанный токен в адрес фрейма (`?pt=...`), а мы
+  /// пересылаем его API как `preview_token`. Вне превью-сборки — пусто.
+  static String get previewToken {
+    if (!preview) return '';
+    try {
+      return Uri.base.queryParameters['pt'] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   /// Per-service rollout. true → реальный API, false → mock.
   static const bool useApiAuth = true;
   static const bool useApiLoyalty = true;

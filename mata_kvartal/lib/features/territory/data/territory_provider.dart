@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/account_scope.dart';
 import '../../auth/data/auth_provider.dart';
 import '../../loyalty/data/loyalty_provider.dart';
 import '../../run/data/route_cleaner.dart';
@@ -276,7 +277,8 @@ class TerritoryNotifier extends StateNotifier<TerritoryState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_captureQueueKey) ?? <String>[];
-      list.add(jsonEncode(body));
+      // Владелец — кто вошёл сейчас (C03): под другим аккаунтом не отправится.
+      list.add(jsonEncode(withOwner(body, ref.read(authProvider).user?.id)));
       await prefs.setStringList(_captureQueueKey, list);
     } catch (_) {}
   }
@@ -296,6 +298,7 @@ class TerritoryNotifier extends StateNotifier<TerritoryState> {
     }
     if (list.isEmpty) return;
 
+    final me = ref.read(authProvider).user?.id;
     final remaining = <String>[];
     var networkDown = false;
     var deliveredAny = false;
@@ -310,10 +313,14 @@ class TerritoryNotifier extends StateNotifier<TerritoryState> {
       } catch (_) {
         continue; // битая запись — выбрасываем
       }
+      if (!isOwnedBy(body, me)) {
+        remaining.add(raw); // чужой захват (C03) — ждёт входа своего владельца
+        continue;
+      }
       try {
         await _dio.post<Map<String, dynamic>>(
           '/territories/capture',
-          data: body,
+          data: withoutOwner(body),
           options: Options(headers: {'Authorization': 'Bearer $token'}),
         );
         deliveredAny = true; // успех (в т.ч. duplicate) → убираем из очереди

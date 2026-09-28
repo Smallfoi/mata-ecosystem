@@ -144,6 +144,19 @@ class ApiClient {
     }
   }
 
+  /// 401 от проверки кода/пароля (вход, регистрация, сброс пароля) — это
+  /// «неверный код», а не протухшая сессия: из аккаунта из-за опечатки в коде
+  /// не выкидываем (сброс пароля доступен и из профиля — аудит D01).
+  static bool _isCredentialCheck(http.Response res) {
+    final path = res.request?.url.path ?? '';
+    return const [
+      '/auth/login',
+      '/auth/register',
+      '/auth/phone/verify',
+      '/auth/password/reset',
+    ].any(path.endsWith);
+  }
+
   dynamic _decode(http.Response res) {
     _breadcrumb(res);
     if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -153,7 +166,7 @@ class ApiClient {
     // Токен есть, но сервер вернул 401 → он недействителен/протух. Сообщаем
     // подписчику (авто-выход), только когда токен был — иначе это просто
     // запрос гостя к защищённому эндпоинту, а не «истёкшая сессия».
-    if (res.statusCode == 401 && authToken != null) {
+    if (res.statusCode == 401 && authToken != null && !_isCredentialCheck(res)) {
       onUnauthorized?.call();
     }
     throw ApiException(res.statusCode, res.body);

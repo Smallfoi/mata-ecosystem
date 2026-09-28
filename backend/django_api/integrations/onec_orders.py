@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from catalog.models import Product
 from orders.models import Order
+from orders.money import kop_to_float, to_kop
 
 # Статус 1С → наш статус заказа. Часть этапов 1С у нас не имеет пары: «принят» и
 # «собран» — это внутренняя кухня склада, покупателю мы показываем их отдельной
@@ -61,6 +62,15 @@ def _article_index(payload: dict) -> dict:
     return {r["id"]: r for r in rows}
 
 
+def _price(value):
+    """Цена строки — числом с копейками (Decimal, ROUND_HALF_UP → float, как было
+    в контракте). Не число (заказы до серверного снимка) — как есть."""
+    try:
+        return kop_to_float(to_kop(value)) if value not in (None, "") else value
+    except ValueError:
+        return value
+
+
 def order_to_json(order: Order) -> dict:
     """Заказ в виде, описанном в ТЗ для 1С (`docs/INTEGRATION_1C.md` §7)."""
     payload = order.payload or {}
@@ -81,7 +91,7 @@ def order_to_json(order: Order) -> dict:
             "size": raw.get("size") or "",
             "color": raw.get("color") or "",
             "qty": int(raw.get("quantity") or 1),
-            "price": raw.get("price"),
+            "price": _price(raw.get("price")),
         })
 
     address = ", ".join(
@@ -91,6 +101,9 @@ def order_to_json(order: Order) -> dict:
     )
     return {
         "orderId": order.order_id,
+        # Глобальный номер заказа на сервере (аудит B06): `orderId` уникален только
+        # вместе с покупателем. ack и статусы — по нему.
+        "serverId": order.pk,
         "createdAt": order.created_at.isoformat(),
         "customer": {
             "phone": checkout.get("phone") or "",
@@ -98,7 +111,8 @@ def order_to_json(order: Order) -> dict:
             "email": checkout.get("email") or "",
         },
         "items": items,
-        "total": order.total,
+        # Из копеек (аудит B09): то же число, что в платеже и чеке.
+        "total": kop_to_float(order.amount_kop),
         "deliveryCost": payload.get("deliveryCost"),
         "pointsRedeemed": order.points_redeemed,
         "payment": checkout.get("paymentType") or "",
@@ -123,50 +137,152 @@ def pending_orders(limit: int = MAX_ORDERS_PER_PULL):
     )
 
 
-def mark_taken(order_ids) -> dict:
+def _given_to_1c(order: Order) -> bool:
+    """Мог ли этот заказ вообще попасть в 1С: уже забран или стоит в очереди."""
+    if order.onec_taken_at is not None:
+        return True
+    return order.payment_status == "paid" and bool(order.payment_id)
+
+
+def _parse_server_id(value):
+    try:
+        pk = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return pk if pk > 0 else None
+
+
+def _resolve_numbers(numbers) -> tuple[dict, list, list]:
+    """Короткие номера заказов (`orderId`) → заказы (аудит B06).
+
+    Номер придумывает приложение, уникален он только вместе с пользователем. Если
+    под номером один заказ — берём его (старый контракт 1С). Если несколько —
+    смотрим, какой из них 1С вообще могла получить (оплачен ЮKassa или уже забран);
+    один такой — он. Иначе номер неоднозначен: не трогаем ни один заказ, а просим
+    1С прислать `serverId`.
+
+    Возвращает (номер → заказ, неизвестные, неоднозначные).
+    """
+    numbers = list(dict.fromkeys(numbers))
+    by_number: dict = {}
+    for row in Order.objects.filter(order_id__in=numbers):
+        by_number.setdefault(row.order_id, []).append(row)
+    found, unknown, ambiguous = {}, [], []
+    for number in numbers:
+        rows = by_number.get(number) or []
+        if not rows:
+            unknown.append(number)
+            continue
+        if len(rows) > 1:
+            rows = [r for r in rows if _given_to_1c(r)]
+        if len(rows) == 1:
+            found[number] = rows[0]
+        else:
+            ambiguous.append(number)
+    return found, unknown, ambiguous
+
+
+def _ambiguous_error(number: str) -> str:
+    return (f"{number}: номер неоднозначен (есть у нескольких покупателей) — "
+            f"пришлите serverId из выдачи заказов")
+
+
+def mark_taken(order_ids, server_ids=None) -> dict:
     """Снять заказы с очереди. Повторный `ack` не ошибка — связь могла оборваться
-    уже после записи, и 1С честно повторит."""
-    wanted = [str(o).strip() for o in order_ids if str(o or "").strip()]
-    if not wanted:
-        return {"acked": 0, "unknown": []}
-    rows = list(Order.objects.filter(order_id__in=wanted))
-    found = {r.order_id for r in rows}
-    fresh = [r for r in rows if r.onec_taken_at is None]
+    уже после записи, и 1С честно повторит.
+
+    `server_ids` — глобальные номера заказов (`serverId` из выдачи), однозначные.
+    `order_ids` — короткие номера (старый контракт): неоднозначный номер не снимает
+    с очереди ни один заказ и возвращается в `ambiguous`.
+    """
+    wanted = [str(o).strip() for o in (order_ids or []) if str(o or "").strip()]
+    raw_pks = [str(o).strip() for o in (server_ids or []) if str(o or "").strip()]
+    pks = {p for p in (_parse_server_id(v) for v in raw_pks) if p}
+
+    rows = {}
+    unknown, ambiguous = [], []
+    if wanted:
+        found, unknown, ambiguous = _resolve_numbers(wanted)
+        rows.update({r.pk: r for r in found.values()})
+    unknown_pks = []
+    if raw_pks:
+        by_pk = {r.pk: r for r in Order.objects.filter(pk__in=pks)}
+        rows.update(by_pk)
+        unknown_pks = [v for v in dict.fromkeys(raw_pks)
+                       if _parse_server_id(v) not in by_pk]
+
+    fresh = [r for r in rows.values() if r.onec_taken_at is None]
     now = timezone.now()
     for r in fresh:
         r.onec_taken_at = now
     if fresh:
         Order.objects.bulk_update(fresh, ["onec_taken_at"], batch_size=200)
-    return {"acked": len(fresh), "unknown": sorted(set(wanted) - found)}
+    return {"acked": len(fresh), "unknown": sorted(unknown),
+            "ambiguous": sorted(ambiguous), "unknownServerIds": unknown_pks}
 
 
 def apply_statuses(items) -> dict:
-    """Статусы из 1С. Покупатель видит их в приложении и получает уведомление."""
+    """Статусы из 1С. Покупатель видит их в приложении и получает уведомление.
+
+    Заказ ищем по `serverId` (однозначно), а если его нет — по `orderId` (старый
+    контракт). Неоднозначный номер ничего не меняет и возвращается в `ambiguous`.
+    """
     updated = 0
     errors = []
-    wanted = {}
+    parsed = []  # (label, pk | None, number, raw)
     for raw in items:
         if not isinstance(raw, dict):
             errors.append("элемент не объект")
             continue
         oid = str(raw.get("orderId") or "").strip()
+        sid_raw = raw.get("serverId")
+        has_sid = sid_raw not in (None, "")
         status = str(raw.get("status") or "").strip().lower()
-        if not oid:
+        label = oid or (f"serverId {sid_raw}" if has_sid else "")
+        if not oid and not has_sid:
             errors.append("нет orderId")
             continue
+        pk = None
+        if has_sid:
+            pk = _parse_server_id(sid_raw)
+            if pk is None:
+                errors.append(f"{label}: неверный serverId «{sid_raw}»")
+                continue
         if status not in STATUS_MAP:
-            errors.append(f"{oid}: неизвестный статус «{status}»")
+            errors.append(f"{label}: неизвестный статус «{status}»")
             continue
-        wanted[oid] = raw
+        parsed.append((label, pk, oid, raw))
 
-    rows = {o.order_id: o for o in Order.objects.filter(order_id__in=list(wanted))}
+    by_pk = {o.pk: o for o in Order.objects.filter(
+        pk__in=[pk for _, pk, _, _ in parsed if pk])}
+    found, unknown, ambiguous = _resolve_numbers(
+        [oid for _, pk, oid, _ in parsed if pk is None])
+    unknown, ambiguous = set(unknown), set(ambiguous)
+
+    wanted = {}  # pk → (order, raw); последний статус по заказу побеждает
+    for label, pk, oid, raw in parsed:
+        if pk is not None:
+            order = by_pk.get(pk)
+            if order is None:
+                errors.append(f"{label}: заказ не найден (serverId {pk})")
+                continue
+            if oid and order.order_id != oid:
+                errors.append(f"{label}: serverId {pk} — это заказ {order.order_id}, "
+                              f"а не {oid}; статус не применён")
+                continue
+        else:
+            if oid in ambiguous:
+                errors.append(_ambiguous_error(oid))
+                continue
+            order = found.get(oid)
+            if order is None or oid in unknown:
+                errors.append(f"{oid}: заказ не найден")
+                continue
+        wanted[order.pk] = (order, raw)
+
     changed = []
     notify = []
-    for oid, raw in wanted.items():
-        order = rows.get(oid)
-        if order is None:
-            errors.append(f"{oid}: заказ не найден")
-            continue
+    for order, raw in wanted.values():
         status = str(raw["status"]).strip().lower()
         number = str(raw.get("number") or "").strip()[:64]
 
@@ -208,4 +324,5 @@ def apply_statuses(items) -> dict:
             order_id=order.order_id,
         )
 
-    return {"received": len(items), "updated": updated, "errors": errors[:20]}
+    return {"received": len(items), "updated": updated, "errors": errors[:20],
+            "ambiguous": sorted(ambiguous)}

@@ -10,18 +10,20 @@ from common.throttling import PUBLIC_READ
 from rest_framework.response import Response
 
 from accounts.models import Account
-from common.uploads import image_extension
+from common.uploads import prepare_image
 from common.security import user_id_from_request
 from orders.models import Order
 
 from .models import Banner, Category, Product, Review, SiteContent
+from .preview import is_preview
 
 _TRUE = {"1", "true", "True", "yes"}
 
 
 def _is_preview(request) -> bool:
-    """preview=1 → отдаём и черновики (для админ-превью); иначе только опубликованное."""
-    return request.query_params.get("preview") in _TRUE
+    """preview=1 от сотрудника → отдаём и черновики (превью Конструктора); иначе только
+    опубликованное. Без пропуска сотрудника параметр игнорируется (catalog.preview)."""
+    return is_preview(request)
 
 
 def _visible_products(request):
@@ -270,12 +272,13 @@ def review_photo(request):
         return Response({"detail": "Нет токена"}, status=401)
     f = request.FILES.get("image")
     # Тип определяем по СОДЕРЖИМОМУ: имя файла и Content-Type присылает клиент (D-37).
-    ext, upload_error = image_extension(f)
+    # Храним пересохранённую копию без EXIF/GPS/XMP (аудит D07), а не присланный файл.
+    ext, clean, upload_error = prepare_image(f)
     if upload_error:
         return Response({"detail": upload_error}, status=400)
     from django.core.files.storage import default_storage
 
     saved = default_storage.save(
-        f"uploads/reviews/{uid}_{secrets.token_hex(6)}.{ext}", f
+        f"uploads/reviews/{uid}_{secrets.token_hex(6)}.{ext}", clean
     )
     return Response({"url": default_storage.url(saved)})  # локально /media/…, в проде S3/CDN (D-31)

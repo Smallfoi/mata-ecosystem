@@ -85,9 +85,18 @@ def merch_console(request):
     # (объектное хранилище не отдаёт index.html по «каталогу» без website-hosting),
     # тогда слэш в конце не добавляем. В dev это http://localhost:5578 → +"/".
     app_url = app if app.endswith(".html") else app + "/"
+    # Черновики каталога API отдаёт только сотруднику (catalog.preview): фреймы сайта и
+    # приложения живут на другом домене и сессии админки не видят — даём им подписанный
+    # токен в параметре pt, они пересылают его API как preview_token.
+    from urllib.parse import quote
+
+    from catalog.preview import issue_token
+
+    token = issue_token(request.user)
     return render(request, "admin/merch_console.html", {
-        "site_preview_url": site + "/?preview=1&platform=site",
+        "site_preview_url": site + "/?preview=1&platform=site&pt=" + quote(token, safe=""),
         "app_preview_url": app_url,
+        "preview_token": token,
     })
 
 
@@ -291,6 +300,8 @@ def _webify_image(f):
         f.seek(0)
         img = Image.open(f)
         img = ImageOps.exif_transpose(img)  # ориентация с телефона
+        # EXIF/XMP Pillow сюда не пишет, а комментарий JPEG взял бы из info — чистим (D07).
+        img.info = {k: v for k, v in img.info.items() if k == "transparency"}
         has_alpha = img.mode in ("RGBA", "LA") or (
             img.mode == "P" and "transparency" in img.info
         )
