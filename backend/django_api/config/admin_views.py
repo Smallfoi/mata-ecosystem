@@ -300,6 +300,8 @@ def _webify_image(f):
         f.seek(0)
         img = Image.open(f)
         img = ImageOps.exif_transpose(img)  # ориентация с телефона
+        # EXIF/XMP Pillow сюда не пишет, а комментарий JPEG взял бы из info — чистим (D07).
+        img.info = {k: v for k, v in img.info.items() if k == "transparency"}
         has_alpha = img.mode in ("RGBA", "LA") or (
             img.mode == "P" and "transparency" in img.info
         )
