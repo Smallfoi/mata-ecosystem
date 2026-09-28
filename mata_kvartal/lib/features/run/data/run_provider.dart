@@ -37,6 +37,11 @@ const _stopNearbyMeters = 15.0;
 const _locationDistanceFilterMeters = 5;
 const _locationServiceChannel = MethodChannel('kvartal/location_service');
 
+
+/// id пробежки (он же id сводки на сервере). Раньше создавался только при
+/// сохранении; теперь его можно получить заранее и передать в захват.
+String newRunId() => DateTime.now().microsecondsSinceEpoch.toString();
+
 class RunState {
   final RunStatus status;
   final List<LatLng> route;
@@ -383,14 +388,27 @@ class RunNotifier extends StateNotifier<RunState> {
     unawaited(start());
   }
 
-  void stop({int capturedZones = 0, bool capturedTerritory = false}) {
+  /// [runId] — id будущей сводки, если он уже нужен снаружи (захват шлёт его,
+  /// чтобы сервер привязал баллы за территорию к этой пробежке).
+  void stop({
+    int capturedZones = 0,
+    bool capturedTerritory = false,
+    String? runId,
+  }) {
     final completed = state;
     _timer?.cancel();
     unawaited(_foregroundPositionSub?.cancel());
     unawaited(_stopNativeLocationService());
     _foregroundPositionSub = null;
     if (completed.route.length > 1 || completed.distanceMeters > 0) {
-      unawaited(_saveCompletedRun(completed, capturedZones, capturedTerritory));
+      unawaited(
+        _saveCompletedRun(
+          completed,
+          capturedZones,
+          capturedTerritory,
+          runId: runId,
+        ),
+      );
     }
     state = const RunState();
     unawaited(_clearSavedRun());
@@ -408,8 +426,9 @@ class RunNotifier extends StateNotifier<RunState> {
   Future<void> _saveCompletedRun(
     RunState completed,
     int capturedZones,
-    bool capturedTerritory,
-  ) async {
+    bool capturedTerritory, {
+    String? runId,
+  }) async {
     // Финальная чистка трека: срез шипов + Дуглас-Пекер («Идеальный маршрут»).
     // По индексам, чтобы времена точек (тропы, D-60) остались согласованными.
     final kept = cleanRouteKeepIndices(completed.route);
@@ -418,7 +437,7 @@ class RunNotifier extends StateNotifier<RunState> {
         ? [for (final i in kept) completed.routeTimes[i]]
         : completed.routeTimes;
     final run = CompletedRun(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: runId ?? newRunId(),
       finishedAt: DateTime.now(),
       route: cleanedRoute,
       routeTimes: cleanedTimes,

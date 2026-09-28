@@ -945,6 +945,25 @@ class _PointsCard extends ConsumerWidget {
   }
 }
 
+/// Строка о ещё недоступных баллах (сервер с 28.09.2026): «ещё N баллов станут
+/// доступны <дата>» или о заморозке на время проверки. null — показывать нечего.
+String? pendingPointsLine(LoyaltyState l) {
+  if (l.pending <= 0) return null;
+  if (l.frozen) {
+    return '${l.pending} баллов за бег заморожены до проверки аккаунта';
+  }
+  final at = l.pendingNextAt;
+  if (at == null || l.pendingNextAmount <= 0) {
+    return 'ещё ${l.pending} баллов скоро станут доступны';
+  }
+  String two(int v) => v.toString().padLeft(2, '0');
+  final date = '${two(at.day)}.${two(at.month)}';
+  final rest = l.pending > l.pendingNextAmount
+      ? ' · всего созревает ${l.pending}'
+      : '';
+  return 'ещё ${l.pendingNextAmount} баллов станут доступны $date$rest';
+}
+
 /// Источник баллов → иконка и подпись для истории.
 ({IconData icon, String label}) _loyaltySourceMeta(String source) {
   switch (source) {
@@ -1062,6 +1081,18 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
                     const SizedBox(height: 3),
                     Text(
                       '+${stats.earned} заработано · −${stats.spent} потрачено',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFDFF45F),
+                      ),
+                    ),
+                  ],
+                  // Баллы за бег созревают 3 дня / заморожены на проверке.
+                  if (pendingPointsLine(loyalty) case final line?) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      line,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,

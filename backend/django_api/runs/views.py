@@ -17,9 +17,11 @@ from common.numeric import BadNumber, bounded_int, finite_float
 from common.security import user_id_from_request
 from loyalty.models import LoyaltyTransaction, add_txn
 
+from .budget import grant
 from .models import Run
 # Пороги и цена километра — общие для приёма забега, разбора и часов (runs/rules.py).
 from .rules import (  # noqa: F401  (re-export: workouts берёт POINTS_PER_KM отсюда)
+    DAY_CAP_REASON,
     FUTURE_SKEW,
     MAX_DAY_DISTANCE_M,
     MAX_RUN_AGE,
@@ -108,7 +110,11 @@ def _maybe_flag_for_review(uid):
         user_id=uid, flagged=True, created_at__gte=since
     ).count()
     if flagged_count >= REVIEW_FLAGGED_THRESHOLD:
-        Account.objects.filter(id=uid, needs_review=False).update(needs_review=True)
+        if Account.objects.filter(id=uid, needs_review=False).update(needs_review=True):
+            # Баллы за активность теперь заморожены — показ кошелька устарел.
+            from common.cache import invalidate_user
+
+            invalidate_user(uid)
 
 
 def _notify_on_hold(uid):
@@ -170,6 +176,22 @@ def _finish_award(run):
                 f"Пробежка {locked.distance_km:.1f} км", None, locked.id)
 
 
+def _cap_fields(capped, reason=DAY_CAP_REASON):
+    """Новые поля ответа (старые клиенты их не читают): баллы срезал суточный потолок."""
+    return {"dailyCapReached": True, "pointsCapped": capped, "capReason": reason}
+
+
+def _dup_payload(run):
+    out = {
+        "ok": True, "duplicate": True,
+        "flagged": run.flagged, "flagReason": run.flag_reason,
+        "pointsAwarded": run.points_awarded, "run": run.to_json(),
+    }
+    if run.points_capped:
+        out.update(_cap_fields(run.points_capped))
+    return out
+
+
 @api_view(["GET", "POST"])
 def runs(request):
     uid = user_id_from_request(request)
@@ -194,11 +216,7 @@ def runs(request):
         if existing.user_id != uid:
             return Response({"detail": "Конфликт id"}, status=409)
         _finish_award(existing)
-        return Response({
-            "ok": True, "duplicate": True,
-            "flagged": existing.flagged, "flagReason": existing.flag_reason,
-            "pointsAwarded": existing.points_awarded, "run": existing.to_json(),
-        })
+        return Response(_dup_payload(existing))
 
     # Трек забега мог прийти раньше сводки (аудит C01): если этот runId уже занят
     # треком или попыткой тропы другого человека — забег не его.
@@ -235,6 +253,9 @@ def runs(request):
             reason = _validate(uid, distance_m, duration_s, finished, mock=mock)
             flagged = bool(reason)
             points = 0 if flagged else points_for(distance_m)
+            # Суточный потолок баллов (общий с импортом и захватами): забег
+            # засчитан, но сверх потолка — 0 баллов с причиной в ответе.
+            points, capped, cap_reason = grant(uid, points)
             run = Run.objects.create(
                 id=rid,
                 user_id=uid,
@@ -244,6 +265,7 @@ def runs(request):
                 captured_zones=captured_zones,
                 finished_at=finished,
                 points_awarded=points,
+                points_capped=capped,
                 flagged=flagged,
                 flag_reason=reason,
             )
@@ -254,15 +276,17 @@ def runs(request):
             ).exists():
                 add_txn(uid, points, "runnerRun",
                         f"Пробежка {distance_m / 1000.0:.1f} км", None, rid)
+            # Захваты этой пробежки, пришедшие раньше сводки (офлайн-очередь, гонка
+            # запросов на финише), ждали её — довести их баллы или привязать к
+            # помеченному забегу до решения модератора (решение 28.09.2026, п.4).
+            from territories.awards import settle_for_run
+
+            settle_for_run(run)
     except IntegrityError:
         existing = Run.objects.filter(id=rid).first()
         if not existing or existing.user_id != uid:
             return Response({"detail": "Конфликт id"}, status=409)
-        return Response({
-            "ok": True, "duplicate": True,
-            "flagged": existing.flagged, "flagReason": existing.flag_reason,
-            "pointsAwarded": existing.points_awarded, "run": existing.to_json(),
-        })
+        return Response(_dup_payload(existing))
 
     # Вехи пожизненных километров (Квартал 2.0, Ф4) — идемпотентно.
     if not flagged:
@@ -281,11 +305,14 @@ def runs(request):
     track(E_RUN_FINISHED, user_id=uid, source="kvartal",
           km=round(distance_m / 1000.0, 2), points=points, flagged=flagged)
 
-    return Response({
+    out = {
         "ok": True, "duplicate": False,
         "flagged": flagged, "flagReason": reason,
         "pointsAwarded": points, "run": run.to_json(),
-    })
+    }
+    if capped:
+        out.update(_cap_fields(capped, cap_reason))
+    return Response(out)
 
 
 # Разбор помеченных забегов живёт в runs/review.py. Здесь оставлена ссылка:

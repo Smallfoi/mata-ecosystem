@@ -38,6 +38,7 @@ MODELS = (
     ("trailAttempts", "trails.TrailAttempt", ("user_id",), DELETE),
     ("externalWorkouts", "workouts.ExternalWorkout", ("user_id",), DELETE),
     ("workoutAwards", "workouts.WorkoutAward", ("user_id",), DELETE),
+    ("captureAwards", "territories.CaptureAward", ("user_id",), DELETE),
     ("shoes", "shoes.ShoeAsset", ("user_id",), DELETE),
     ("medals", "medals.MedalAward", ("user_id",), DELETE),
     ("runnerProfile", "league.RunnerProfile", ("user_id",), DELETE),

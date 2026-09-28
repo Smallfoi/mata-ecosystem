@@ -382,7 +382,21 @@ POST /devices/register { token, platform }               → { ok }   (токе�
 
 ### Loyalty (единый баланс)
 ```
-GET  /loyalty/account                   → { balance, level, transactions: LoyaltyTransaction[] }
+GET  /loyalty/account                   → { balance, level, code, transactions: LoyaltyTransaction[],
+                                            total?, pending?, pendingNextAt?, pendingNextAmount?, frozen? }
+     balance            ТРАТИМЫЕ баллы (решение владельца 28.09.2026). Выпущенные сборки Store
+                        показывают/списывают его — больше доступного не спишут.
+     total              всё на счету (тратимые + pending); по нему считается level
+     pending            баллы за активность, которые пока нельзя тратить: созревают 3 дня
+                        или заморожены (аккаунт на проверке)
+     pendingNextAt      ISO-время ближайшего созревания (null — нечему созревать или frozen)
+     pendingNextAmount  сколько созреет в тот же день, что pendingNextAt
+     frozen             true — аккаунт на проверке (needs_review): баллы за активность
+                        не тратятся до решения модератора
+     transactions[].availableAt  с какого момента проводка тратится (null — сразу)
+     Созревают (3 дня): runnerRun, runnerTerritory, runnerMilestone, runnerDivision,
+     runnerSeason. Покупки, бонусы, возвраты — сразу. Начисленное до 28.09.2026 — созревшее.
+     Та же разбивка — GET /me/stats → loyalty { balance (тратимые), pending, earned, spent }.
 POST /loyalty/transactions  LoyaltyTransaction → 200   (только redeem/прочее; начисления — серверные)
                             source ∈ {runnerRun, runnerTerritory, purchase, registration} → 403
                             (анти-чит S-04 D-23: начисление считает сервер —
@@ -393,13 +407,19 @@ POST /loyalty/redeem  { amount, orderId, description? }   (прежний адр
                             → { ok, balance, spent, level }    списал: тот же сервис и правила, что /orders
                                (заказ существует и не отменён, amount == его pointsRedeemed, ≥50, ≤30%)
                             → 400/404 { detail, balance }       нет orderId / заказа / нарушены правила
+                               (balance — тратимые; «Сейчас доступно N баллов…» — остальные созревают)
 ```
 
 ### Runs (история пробежек + серверный расчёт очков — анти-чит S-04)
 ```
 GET  /runs                              → Run[]   (сводки забегов пользователя, новые сверху)
 POST /runs  { id, distanceMeters, elapsedSeconds, finishedAtMs, capturedTerritory, capturedZones, mockDetected? }
-                                        → { ok, duplicate, flagged, flagReason, pointsAwarded, run }
+                                        → { ok, duplicate, flagged, flagReason, pointsAwarded, run,
+                                            dailyCapReached?, pointsCapped?, capReason? }
+            dailyCapReached/pointsCapped/capReason (новые, 28.09.2026) — суточный потолок баллов:
+            не больше 1000 в сутки (UTC) на свои забеги + импорт с часов + захваты вместе.
+            Сверх — забег засчитан (не 400, не flagged), pointsAwarded урезан, pointsCapped — сколько
+            срезано, capReason — текст для человека. Дубль отдаёт те же поля.
             mockDetected: bool (опц.) — клиент сообщает о подделке геолокации (Android mock-GPS)
             → сервер флагает забег (0 очков); накопление флагов помечает аккаунт «на ревью» (S-04).
 ```
@@ -416,14 +436,26 @@ POST /runs  { id, distanceMeters, elapsedSeconds, finishedAtMs, capturedTerritor
 
 ### Territories · захват (анти-чит — docs/ANTICHEAT_TRUST.md)
 ```
-POST /territories/capture { points: [[lat,lng],...], captureId, distanceMeters?, elapsedSeconds? }
-     → { ok, areaM2, points, blocksGained, blocksTotal, geojson, holdHoursLeft, unverified? }
+POST /territories/capture { points: [[lat,lng],...], captureId, distanceMeters?, elapsedSeconds?, runId? }
+     → { ok, areaM2, points, blocksGained, blocksTotal, geojson, holdHoursLeft, unverified?,
+         pointsPending?, pendingReason?, dailyCapReached?, pointsCapped?, capReason? }
      дубль captureId → { ok, duplicate: true, areaM2, geojson }
 ```
 Скорость = max(distanceMeters, длина маршрута по points) / elapsedSeconds; > 40 км/ч → 400.
 Без `elapsedSeconds` (нет / не число / ≤ 0) скорость не проверить: зона засчитывается,
 но `points` = 0 и `unverified: true` (аудит C06; mata_kvartal шлёт оба поля).
-Суточный потолок — 20 начисленных захватов за 24 ч (429), под блокировкой на пользователя.
+Суточный потолок — 20 захватов за 24 ч (начисленные + ждущие пробежку; 429), под блокировкой
+на пользователя.
+**Баллы только за засчитанную пробежку** (решение владельца 28.09.2026, `territories/awards.py`):
+зона на карте засчитывается сразу, баллы — если есть принятая (не помеченная) пробежка этого
+захвата. `runId` (новые сборки Квартала) — id сводки `POST /runs` той же пробежки; без него
+(старые сборки) пробежка ищется по цифрам: время ±max(60 с, 5 %), дистанция ±max(100 м, 5 %),
+контур не длиннее пробежки, пробежка завершилась в окне [получение захвата − 7 сут; + 12 ч].
+Одна пробежка — один оплаченный захват. Пробежки ещё нет (захват пришёл раньше сводки —
+гонка на финише, офлайн-очередь) → `points` = 0, `pointsPending` = N, `pendingReason`; баллы
+начисляются ровно один раз, когда придёт сводка. Пробежка помечена → ждёт модератора
+(одобрил — баллы приходят, признал нарушением — не приходят/отзываются).
+Баллы за захват входят в общий суточный потолок 1000 (см. `/runs`).
 
 ### League (зачёты лиги и профиль бегуна — docs/LEAGUE_PLAN.md)
 ```
@@ -456,7 +488,7 @@ POST /runner/profile  { birthYear?, gender?, level?, weeklyGoalKm? }  → тот
 POST /runs/track  { runId, points: [[lat, lon, ms], ...] }
                                         → { attempts: [ {trailId, trailName, durationS, ...} ] }
      Телефон шлёт прорежённый трек (≈точка в 5 с). Сервер сверяет его с тропами
-     района, пишет попытки и УДАЛЯЕТ трек через 14 дней (D-60). Выключен тумблер
+     района, пишет попытки и УДАЛЯЕТ трек через 30 дней (D-60; было 14, решение 28.09.2026). Выключен тумблер
      «участвовать в тропах» → { attempts: [], skipped: "trailsDisabled" }, трек
      не сохраняется вовсе.
      Трек может прийти раньше сводки POST /runs. Если runId уже занят забегом,
@@ -491,7 +523,10 @@ GET  /integrations/coros/status     → проверка «сервис жив»
 
 ### Workouts (тренировки извне: часы, Health Connect, файлы)
 ```
-POST /workouts/import  { source, items[] }  → { imported, duplicates, skipped, points, items[] }
+POST /workouts/import  { source, items[] }  → { imported, duplicates, skipped, points, items[],
+                                                dailyCapReached?, pointsCapped?, capReason? }
+                       (суточный потолок баллов общий со своими забегами и захватами — 1000/сутки;
+                        сверх — тренировка сохраняется, items[].pointsAwarded урезан; 28.09.2026)
 GET  /workouts[?source=]                    → { items[] }
 DELETE /workouts/source/:source             → { removed }   (человек отключил источник)
 ```

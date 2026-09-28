@@ -112,6 +112,13 @@ class _Journey(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         return r.json()["balance"]
 
+    def three_days_pass(self, uid):
+        """Баллы за бег созревают 3 дня (решение 28.09.2026) — «прошло 3 дня»."""
+        LoyaltyTransaction.objects.filter(
+            user_id=uid, available_at__isnull=False
+        ).update(available_at=timezone.now() - timedelta(seconds=1))
+        cache.clear()
+
     def store_order(self, oid, items, points=0, delivery=0.0):
         """Заказ ровно в том виде, как его шлёт mata_store (`Order.toJson`)."""
         subtotal = sum(i["price"] * i["quantity"] for i in items)
@@ -287,6 +294,9 @@ class RunPointsSpentInStoreE2E(_Journey):
         body = r.json()
         self.assertFalse(body["flagged"], body)
         self.assertEqual(body["pointsAwarded"], 100)  # 10 км × 10
+        # Сразу потратить нельзя: баллы за бег созревают 3 дня.
+        self.assertEqual(self.balance(token), start)
+        self.three_days_pass(uid)
         after_run = self.balance(token)
         # Может добавиться веха пожизненных километров — поэтому «не меньше».
         self.assertGreaterEqual(after_run, start + 100)
@@ -318,12 +328,13 @@ class RunPointsSpentInStoreE2E(_Journey):
 
     def test_cannot_spend_more_points_than_earned(self):
         """Баллов меньше, чем хотят списать, — заказ не проходит, баланс цел."""
-        token, _ = self.login()
+        token, uid = self.login()
         r = self._post("/v1/runs", {
             "id": "run-e2e-2", "distanceMeters": 6000, "elapsedSeconds": 2400,
             "finishedAtMs": int(time.time() * 1000),
         }, token)
         self.assertEqual(r.status_code, 200, r.content)
+        self.three_days_pass(uid)
         have = self.balance(token)
         self.assertGreaterEqual(have, 60)
 

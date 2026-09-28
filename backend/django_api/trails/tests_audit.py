@@ -59,7 +59,7 @@ class TrailOwnershipTests(ApiTestCase):
         )
 
     def test_foreign_attempt_after_track_cleanup_is_rejected(self):
-        """Трек удалён через 14 дней (D-60), а попытка осталась — её тоже не перехватить."""
+        """Трек удалён через 30 дней (D-60), а попытка осталась — её тоже не перехватить."""
         self._send("run_c", token=self.other_token)
         PendingTrack.objects.filter(run_id="run_c").delete()
         self.assertEqual(self._send("run_c").status_code, 409)

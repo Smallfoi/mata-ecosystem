@@ -67,8 +67,11 @@ def approve_run(run, by="", notify=True):
                             "reviewed_at", "reviewed_by"])
 
     from runs.milestones import award_milestones
+    from territories.awards import on_run_approved
 
     award_milestones(run.user_id, run.distance_km)
+    # Захват этой пробежки ждал решения — теперь его баллы приходят (п.4).
+    on_run_approved(run)
     if notify and not already:
         _notify(run.user_id, "Забег подтверждён",
                 f"Проверили забег {run.distance_km:.1f} км — всё в порядке. "
@@ -94,6 +97,10 @@ def reject_run(run, by="", notify=True):
     run.flagged = True  # улику не стираем: забег остаётся помеченным
     _stamp(run, by)
     run.save(update_fields=["points_awarded", "flagged", "reviewed_at", "reviewed_by"])
+    # Захват этой пробежки баллов не получит; выплаченные за него — отзываются.
+    from territories.awards import on_run_rejected
+
+    on_run_rejected(run)
     if notify:
         body = "Забег не засчитан: данные не подтвердились."
         if revoked:
@@ -115,7 +122,8 @@ def recalculate(uid):
     """
     fixed, delta = 0, 0
     for run in Run.objects.filter(user_id=uid, flagged=False):
-        should = points_for(run.distance_m)
+        # Срезанное суточным потолком (решение 28.09.2026) — не недостача.
+        should = max(0, points_for(run.distance_m) - run.points_capped)
         has = _awarded_for(run)
         if run.points_awarded != should:
             run.points_awarded = should
@@ -207,9 +215,10 @@ def linked_accounts(uid):
 def runner_context(uid):
     """Всё, что нужно знать модератору о бегуне, одним запросом на страницу."""
     from accounts.models import Account
-    from loyalty.models import balance_of
+    from loyalty.models import wallet_summary
 
     acc = Account.objects.filter(id=uid).first()
+    wallet = wallet_summary(uid)
     since = timezone.now() - RECENT_WINDOW
     agg = Run.objects.filter(user_id=uid).aggregate(
         total=Count("id"), km=Sum("distance_m"),
@@ -234,6 +243,11 @@ def runner_context(uid):
             user_id=uid, flagged=True, created_at__gte=since
         ).count(),
         "flags_total": Run.objects.filter(user_id=uid, flagged=True).count(),
-        "balance": balance_of(uid),
+        "balance": wallet["total"],
+        # Баллы за активность, которые сейчас нельзя потратить: пока аккаунт на
+        # проверке — все начисленные по правилу созревания (заморожены), иначе —
+        # ещё не созревшие (решение 28.09.2026, п.3).
+        "frozen_points": wallet["pending"] if wallet["frozen"] else 0,
+        "maturing_points": 0 if wallet["frozen"] else wallet["pending"],
         "linked": linked_accounts(uid),
     }

@@ -169,9 +169,33 @@ class LoyaltyAccount {
   /// Постоянный 6-значный код лояльности клиента (для кассы/QR). Не меняется.
   final String code;
 
-  const LoyaltyAccount({this.balance = 0, this.transactions = const [], this.code = ''});
+  /// Баллы за бег, которые ещё нельзя потратить: созревают 3 дня или заморожены
+  /// на время проверки аккаунта (сервер, 28.09.2026). [balance] — тратимые.
+  final int pending;
 
-  LoyaltyLevel get level => LoyaltyLevelX.forPoints(balance);
+  /// Всего на счету (тратимые + [pending]); null — сервер старый, не прислал.
+  final int? total;
+
+  /// Ближайшая партия созревающих баллов.
+  final int pendingNextAmount;
+  final DateTime? pendingNextAt;
+
+  /// Аккаунт на проверке — баллы за активность заморожены.
+  final bool frozen;
+
+  const LoyaltyAccount({
+    this.balance = 0,
+    this.transactions = const [],
+    this.code = '',
+    this.pending = 0,
+    this.total,
+    this.pendingNextAmount = 0,
+    this.pendingNextAt,
+    this.frozen = false,
+  });
+
+  /// Уровень — по всему накопленному: созревание не понижает статус.
+  LoyaltyLevel get level => LoyaltyLevelX.forPoints(total ?? balance);
 
   /// Правила списания (Часть 11.5): 1 балл = 1 ₽, макс 30% заказа, мин 50.
   static const int minRedeem = 50;

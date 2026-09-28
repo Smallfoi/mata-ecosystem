@@ -24,6 +24,7 @@ from django.template.response import TemplateResponse
 from django.utils import timezone
 
 from accounts.models import Account
+from common.cache import invalidate_user
 from common.security import forget_account
 from runs.models import Run
 from runs.review import approve_run, pending_queryset, recalculate, reject_run, runner_context
@@ -97,6 +98,8 @@ def _act(request):
     if action == "clear_review":
         need(LEVEL_EDIT)
         Account.objects.filter(id=uid).update(needs_review=False)
+        # Заморозка баллов снята — показ кошелька бегуна устарел.
+        invalidate_user(uid)
         StaffAudit.write(request, f"снята метка «на проверке»: бегун {uid}")
         return "Метка «на проверке» снята."
 

@@ -26,7 +26,10 @@ from clubs.models import ClubMember
 from common.locks import TERRITORY, lock_user
 from common.numeric import BadNumber, finite_float
 from common.security import user_id_from_request
-from loyalty.models import LoyaltyTransaction, add_txn
+from loyalty.models import LoyaltyTransaction
+
+from .awards import claim as claim_capture
+from .models import CaptureAward
 
 # Валидный сглаженный captured-полигон из WKT. Порядок обработки — броня от
 # GPS-игл (03.09.2026, «Идеальный маршрут»):
@@ -183,6 +186,9 @@ def capture(request):
     # Идемпотентность (S-04): клиент шлёт captureId; повтор (ретрай офлайн-очереди)
     # не применяем заново — отдаём текущую территорию.
     capture_id = (str(request.data.get("captureId") or "")).strip()[:64] or None
+    # id пробежки, к которой относится захват (новые сборки Квартала; старые не
+    # шлют — тогда пробежка ищется по времени и цифрам, territories/awards.py).
+    run_hint = (str(request.data.get("runId") or "")).strip()[:40]
     with transaction.atomic():
         # Один захват человека за раз (аудит C06): иначе параллельные запросы
         # оба проходят суточный потолок и кулдаун, а новый след (баллы) у обоих
@@ -193,8 +199,12 @@ def capture(request):
         # истории баллов остаются и врать не могут. Под блокировкой — видим
         # начисления параллельного запроса, который закоммитился раньше.
         since = timezone.now() - timedelta(days=1)
+        # Захваты, ждущие свою пробежку (п.4, territories/awards.py), тоже в счёт:
+        # иначе, не присылая сводку, можно копить неоплаченные захваты без предела.
         if LoyaltyTransaction.objects.filter(
             user_id=uid, source="runnerTerritory", created_at__gte=since
+        ).count() + CaptureAward.objects.filter(
+            user_id=uid, status=CaptureAward.PENDING, created_at__gte=since
         ).count() >= MAX_CAPTURES_PER_DAY:
             return Response(
                 {"detail": "Слишком много захватов за сутки — попробуй завтра."},
@@ -411,13 +421,15 @@ def capture(request):
                     [area, capture_id],
                 )
         # Очки за захват начисляет СЕРВЕР (анти-чит S-04 Phase 2), идемпотентно по
-        # captureId. Дубликаты захвата сюда не доходят (выходят раньше), но проверку
-        # по транзакции оставляем как страховку от рассинхрона.
-        if capture_id and territory_points > 0 and not LoyaltyTransaction.objects.filter(
-            user_id=uid, run_id=capture_id, source="runnerTerritory"
-        ).exists():
-            add_txn(uid, territory_points, "runnerTerritory",
-                    "Захват территории", None, capture_id)
+        # captureId, и только за засчитанную пробежку (решение 28.09.2026, п.4):
+        # пробежки ещё нет — захват ждёт её сводку, помечена — ждёт модератора.
+        # Суточный потолок баллов общий с забегами и импортом (п.1).
+        award = {"points": 0, "pending": 0, "reason": "", "capped": 0}
+        if capture_id and territory_points > 0:
+            award = claim_capture(
+                uid, capture_id, territory_points, run_hint,
+                client_distance, route_m, elapsed,
+            )
     # Аналитика (D-30): успешный захват территории (площадь владения после захвата).
     from analytics.models import E_TERRITORY_CAPTURED, track
 
@@ -425,12 +437,19 @@ def capture(request):
     out = {
         "ok": True,
         "areaM2": round(area or 0),
-        "points": territory_points,
+        "points": award["points"],
         "blocksGained": blocks_gained,
         "blocksTotal": blocks_total,
         "geojson": json.loads(gj) if gj else None,
         "holdHoursLeft": HOLD_HOURS,
     }
+    # Новые поля (старые клиенты их не читают).
+    if award["pending"]:
+        out["pointsPending"] = award["pending"]
+        out["pendingReason"] = award["reason"]
+    if award["capped"]:
+        out.update({"dailyCapReached": True, "pointsCapped": award["capped"],
+                    "capReason": award["reason"]})
     if not speed_verified:
         # Новое поле (старые клиенты его не читают): баллы не начислены, потому что
         # без времени пробежки скорость не проверить.

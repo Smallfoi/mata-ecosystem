@@ -167,7 +167,13 @@ class TrailApiTests(ApiTestCase):
         kept = PendingTrack.objects.get(run_id="run_t2")
         self.assertEqual(kept.user_id, self.uid)
 
+        # 15 дней — ещё хранится (окно разбора 30 дней, решение 28.09.2026).
         kept.received_at = timezone.now() - timedelta(days=15)
+        kept.save()
+        cleanup_tracks()
+        self.assertTrue(PendingTrack.objects.filter(run_id="run_t2").exists())
+        # 31 день — удалён.
+        kept.received_at = timezone.now() - timedelta(days=31)
         kept.save()
         cleanup_tracks()
         self.assertFalse(PendingTrack.objects.filter(run_id="run_t2").exists())
@@ -175,7 +181,7 @@ class TrailApiTests(ApiTestCase):
         self.assertTrue(TrailAttempt.objects.filter(run_id="run_t2").exists())
 
     def test_track_not_accepted_when_trails_disabled(self):
-        """Выключил участие — трек не уходит вовсе, даже на 14 дней."""
+        """Выключил участие — трек не уходит вовсе, даже на 30 дней."""
         RunnerProfile.objects.update_or_create(
             user_id=self.uid, defaults={"trails_enabled": False}
         )
@@ -198,7 +204,7 @@ class TrailApiTests(ApiTestCase):
     # ── резервная копия треков (D-86) ───────────────────────────────────────
 
     def test_backup_keeps_track_past_retention(self):
-        """Включён бэкап — трек не удаляется по 14-дневному правилу (D-86)."""
+        """Включён бэкап — трек не удаляется по 30-дневному правилу (D-86)."""
         RunnerProfile.objects.update_or_create(
             user_id=self.uid, defaults={"track_backup": True}
         )

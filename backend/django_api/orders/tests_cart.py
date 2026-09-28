@@ -122,7 +122,8 @@ class InvalidPositionTests(_CartCase):
         self._refused(r, 400, "SS-C13")
 
     def test_refusal_returns_redeemed_points(self):
-        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней)
         r = self._post("SS-C14", [self._line(size="41")], 900, pointsRedeemed=100)
         self._refused(r, 409, "SS-C14")
         self.assertEqual(self.balance(), 1000)
@@ -257,7 +258,8 @@ class RepeatPointsTests(_CartCase):
     def setUp(self):
         super().setUp()
         _product("pt-1", price=1000)
-        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней)
         self.items = [{"productId": "pt-1", "price": 1000, "quantity": 1}]
 
     def test_changed_points_on_repeat_refused(self):

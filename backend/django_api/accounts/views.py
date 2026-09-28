@@ -358,7 +358,7 @@ def _compute_stats(uid):
     """Тяжёлый расчёт личной статистики (забеги/баллы/заказы). Кэшируется по uid."""
     from django.db.models import Count, Sum
 
-    from loyalty.models import LoyaltyTransaction, balance_of
+    from loyalty.models import LoyaltyTransaction
     from orders.models import Order
     from runs.models import Run
 
@@ -378,7 +378,9 @@ def _compute_stats(uid):
             "totalKm": round((km_agg["d"] or 0) / 1000.0, 1),
         },
         "loyalty": {
-            "balance": balance_of(uid),
+            # Как в /loyalty/account: balance — тратимые, pending — ещё созревают
+            # или заморожены (решение 28.09.2026).
+            **_wallet_block(uid),
             "earned": int(earned),
             "spent": int(-spent),  # положительное число потраченного
         },
@@ -390,6 +392,13 @@ def _compute_stats(uid):
         "milestone": _milestone_block((km_agg["d"] or 0) / 1000.0),
         "streak": _streak_block(uid),
     }
+
+
+def _wallet_block(uid):
+    from loyalty.models import wallet_summary
+
+    w = wallet_summary(uid)
+    return {"balance": w["spendable"], "pending": w["pending"]}
 
 
 def _milestone_block(total_km):

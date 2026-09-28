@@ -235,7 +235,8 @@ class PaymentTransitionTests(_YooKassaCase):
 
     def setUp(self):
         super().setUp()
-        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег")
+        add_txn(self.uid, 1000, "runnerRun", "Баллы за бег",
+                available_at=None)  # созревшие (правило 3 дней)
         self.api_post("/v1/orders", {"id": "SS-T", "total": 700, "pointsRedeemed": 300,
                                      "items": _items(1000)})
         with mock.patch("orders.payment._http", return_value=_yk()):

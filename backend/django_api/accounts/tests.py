@@ -212,7 +212,9 @@ class MeStatsTests(ApiTestCase):
         d = self.api_get("/v1/me/stats").json()
         self.assertEqual(d["runs"]["count"], 1)
         self.assertEqual(d["runs"]["totalKm"], 5.0)
-        self.assertEqual(d["loyalty"]["balance"], 50)
+        # balance — тратимые: баллы за бег ещё созревают (3 дня, 28.09.2026).
+        self.assertEqual(d["loyalty"]["balance"], 0)
+        self.assertEqual(d["loyalty"]["pending"], 50)
         self.assertGreaterEqual(d["loyalty"]["earned"], 50)
         self.assertEqual(d["orders"]["count"], 1)
         self.assertEqual(d["orders"]["totalSpent"], 5000)
@@ -222,7 +224,7 @@ class MeStatsTests(ApiTestCase):
         self.assertEqual(self.api_get("/v1/me/stats").json()["loyalty"]["balance"], 0)
         from loyalty.models import add_txn
 
-        add_txn(self.uid, 100, "runnerRun")  # новая транзакция сбрасывает кэш статистики
+        add_txn(self.uid, 100, "manual")  # новая транзакция сбрасывает кэш статистики
         self.assertEqual(self.api_get("/v1/me/stats").json()["loyalty"]["balance"], 100)
 
     def test_me_stats_requires_auth(self):

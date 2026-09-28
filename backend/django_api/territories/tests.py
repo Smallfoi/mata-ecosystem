@@ -15,6 +15,17 @@ _RUN = {"distanceMeters": 1200.0, "elapsedSeconds": 420}
 class TerritoryAwardTests(ApiTestCase):
     phone = "+79990002003"
 
+    def setUp(self):
+        super().setUp()
+        # Баллы за захват — только за засчитанную пробежку (решение 28.09.2026):
+        # сводка той же пробежки уже на сервере.
+        from django.utils import timezone
+
+        from runs.models import Run
+
+        Run.objects.create(id="run_cap", user_id=self.uid, distance_m=1200.0,
+                           duration_s=420, finished_at=timezone.now())
+
     def test_capture_awards_server_side(self):
         r = self.api_post(
             "/v1/territories/capture", {"points": _POLY, "captureId": "capA", **_RUN}

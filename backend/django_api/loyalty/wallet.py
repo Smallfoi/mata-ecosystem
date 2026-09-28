@@ -115,7 +115,16 @@ def redeem(user_id, order_id, amount, order_sum, description=None) -> str:
         spent = redeemed_on_order(user_id, order_id)
         if spent:
             return "" if spent == amount else "Баллы по этому заказу уже списаны"
-        if amount > models.balance_of(user_id):
+        # Тратить можно только доступные баллы: баллы за активность созревают
+        # 3 дня и замораживаются, пока аккаунт на проверке (решение 28.09.2026).
+        wallet = models.wallet_summary(user_id)
+        if amount > wallet["spendable"]:
+            if amount <= wallet["total"] and wallet["pending"]:
+                return (
+                    f"Сейчас доступно {wallet['spendable']} баллов: баллы за бег "
+                    "становятся доступны для оплаты через 3 дня после начисления"
+                    + (" и после проверки аккаунта" if wallet["frozen"] else "")
+                )
             return "Недостаточно баллов"
         try:
             with transaction.atomic():

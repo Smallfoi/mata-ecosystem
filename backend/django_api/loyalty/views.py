@@ -8,8 +8,9 @@ from .models import (
     LoyaltyPartner,
     LoyaltyTransaction,
     add_txn,
-    balance_of,
     level_for,
+    spendable_of,
+    wallet_summary,
 )
 
 _TX_LIMIT = 200  # история: отдаём последние N (баланс считается по ВСЕМ через SQL)
@@ -27,16 +28,29 @@ def account(request):
 
 
 def _account_payload(uid):
-    """Баланс (SQL-агрегат по всем транзакциям) + уровень + последние N операций + код."""
+    """Баланс + уровень + последние N операций + код.
+
+    `balance` — ТРАТИМЫЕ баллы (решение владельца 28.09.2026): выпущенные сборки
+    Store показывают и списывают именно его. Баллы за активность созревают 3 дня
+    и замораживаются, пока аккаунт на проверке, — они в `pending`. Новые поля
+    необязательны для клиентов: `total` (всё вместе), `pending`, `pendingNextAt`
+    и `pendingNextAmount` (ближайшая партия), `frozen` (аккаунт на проверке).
+    Уровень — по `total`: созревание не понижает статус.
+    """
     from accounts.models import ensure_loyalty_code
 
-    balance = balance_of(uid)
+    w = wallet_summary(uid)
     rows = LoyaltyTransaction.objects.filter(user_id=uid).order_by("-created_at")[
         :_TX_LIMIT
     ]
     return {
-        "balance": balance,
-        "level": level_for(balance),
+        "balance": w["spendable"],
+        "total": w["total"],
+        "pending": w["pending"],
+        "pendingNextAt": w["next_at"].isoformat() if w["next_at"] else None,
+        "pendingNextAmount": w["next_amount"],
+        "frozen": w["frozen"],
+        "level": level_for(w["total"]),
         "code": ensure_loyalty_code(uid),  # постоянный 6-значный код лояльности (для QR/кассы)
         "transactions": [r.to_json() for r in rows],
     }
@@ -77,7 +91,7 @@ def redeem(request):
     order_id = str(d.get("orderId") or "").strip()
 
     def fail(detail, status=400):
-        return Response({"detail": detail, "balance": balance_of(uid)}, status=status)
+        return Response({"detail": detail, "balance": spendable_of(uid)}, status=status)
 
     if not order_id:
         return fail("Баллы списываются только при оформлении заказа")
@@ -88,7 +102,7 @@ def redeem(request):
         spent = redeemed_on_order(uid, order_id)
         if spent:
             return Response(
-                {"ok": True, "deduped": True, "balance": balance_of(uid), "spent": spent}
+                {"ok": True, "deduped": True, "balance": spendable_of(uid), "spent": spent}
             )
         order = Order.objects.filter(user_id=uid, order_id=order_id).first()
         if not order:
@@ -103,9 +117,10 @@ def redeem(request):
         )
         if problem:
             return fail(problem)
-    new_balance = balance_of(uid)
+    w = wallet_summary(uid)
     return Response(
-        {"ok": True, "balance": new_balance, "spent": amount, "level": level_for(new_balance)}
+        {"ok": True, "balance": w["spendable"], "spent": amount,
+         "level": level_for(w["total"])}
     )
 
 
