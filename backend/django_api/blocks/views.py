@@ -2,6 +2,8 @@
 
 GET  /v1/blocks[?bbox=...] — полигоны кварталов с признаком владения (rel:
      mine|club|enemy|free) и флагом дома. Владение пишет захват (territories.capture).
+GET  /v1/blocks/nearest?lat=&lon= — ОДИН ближайший свободный квартал как готовый круг
+     («обеги вот этот контур, 1,2 км»).
 POST /v1/blocks/home {blockId} — назначить домашний квартал (несгораемый, приватный).
 
 Ф3: владение живёт до конца сезона-месяца (старое = свободно), домашний квартал
@@ -21,6 +23,13 @@ from common.security import user_id_from_request
 
 # Упрощение геометрии при отдаче (карте не нужны субметровые изломы улиц).
 SIMPLIFY_TOLERANCE = 0.00003
+
+# Подсказка «обеги этот круг» (D-74): какой квартал вообще предлагать.
+# Периметр — это длина забега по кругу: 300 м не круг, а двор; за 5 км человек
+# идёт осознанно, а не по подсказке. Радиус поиска — пешая доступность от старта.
+SUGGEST_MIN_PERIMETER_M = 300
+SUGGEST_MAX_PERIMETER_M = 5000
+SUGGEST_RADIUS_M = 3000
 
 # Эффективный владелец с учётом сезона и дома (общий для чтения и записи).
 _EFF_OWNER_SQL = (
@@ -103,6 +112,66 @@ def list_blocks(request):
             }
         )
     return Response({"blocks": blocks})
+
+
+@api_view(["GET"])
+def nearest_block(request):
+    """Ближайший свободный квартал как готовый круговой маршрут (D-74).
+
+    Владелец (27.09.2026): «при захвате должен появиться маршрут круговой». До
+    этого человек сам угадывал, где замкнуть петлю, и узнавал результат только на
+    финише. Теперь карта показывает конкретный контур и его длину: обеги — заберёшь.
+
+    Предлагаем ТОЛЬКО свободный квартал: свой уже твой (повтор не даёт баллов —
+    считаются лишь новые метры), чужой — это перехват, отдельный разговор. Слишком
+    мелкие и слишком длинные круги не предлагаем: подсказка должна быть выполнимой.
+    """
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    try:
+        lat = float(request.query_params.get("lat", ""))
+        lon = float(request.query_params.get("lon", ""))
+    except (TypeError, ValueError):
+        return Response({"detail": "Нужны lat и lon"}, status=400)
+    if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+        return Response({"detail": "Координаты вне диапазона"}, status=400)
+
+    point = "ST_SetSRID(ST_MakePoint(%s,%s),4326)"
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT b.block_id, b.district, b.area_m2, "
+            f"ST_AsGeoJSON(ST_SimplifyPreserveTopology(b.geom, {SIMPLIFY_TOLERANCE})), "
+            "ST_Perimeter(b.geom::geography), "
+            f"ST_Distance(b.geom::geography, {point}::geography) "
+            "FROM city_blocks b "
+            "LEFT JOIN block_ownership o ON o.block_id = b.block_id "
+            "LEFT JOIN home_block h ON h.block_id = b.block_id "
+            f"WHERE {_EFF_OWNER_SQL} IS NULL "
+            "AND ST_Perimeter(b.geom::geography) BETWEEN %s AND %s "
+            f"AND ST_DWithin(b.geom::geography, {point}::geography, %s) "
+            f"ORDER BY b.geom <-> {point} LIMIT 1",
+            [lon, lat, SUGGEST_MIN_PERIMETER_M, SUGGEST_MAX_PERIMETER_M,
+             lon, lat, SUGGEST_RADIUS_M, lon, lat],
+        )
+        row = cur.fetchone()
+
+    if not row:
+        # Рядом свободных нет — это нормальный ответ, а не ошибка: подсказки не будет.
+        return Response({"block": None})
+
+    block_id, district, area_m2, gj, perimeter_m, distance_m = row
+    return Response({
+        "block": {
+            "blockId": block_id,
+            "district": district,
+            "areaM2": area_m2,
+            "rel": "free",
+            "loopMeters": round(perimeter_m or 0),
+            "distanceMeters": round(distance_m or 0),
+            "geojson": json.loads(gj),
+        }
+    })
 
 
 @api_view(["POST"])
