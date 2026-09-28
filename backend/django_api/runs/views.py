@@ -7,10 +7,13 @@
 from datetime import datetime, timedelta, timezone as dt_timezone
 
 from django.core.cache import cache
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from common.locks import ACTIVITY, lock_user
+from common.numeric import BadNumber, bounded_int, finite_float
 from common.security import user_id_from_request
 from loyalty.models import LoyaltyTransaction, add_txn
 
@@ -30,6 +33,15 @@ from .rules import (  # noqa: F401  (re-export: workouts берёт POINTS_PER_K
 )
 
 _MAX = 100
+
+# Жёсткие границы разбора (аудит D04). Не античит — тот в _validate и ставит флаг;
+# это защита от значений, которые ломают базу/datetime или пишут в историю
+# бесконечную дистанцию. Клиент (completed_runs_provider.dart) шлёт метры double,
+# секунды int, время в мс — всё это с большим запасом внутри границ.
+_MAX_DISTANCE_M = 10_000_000.0
+_MAX_DURATION_S = 30 * 24 * 3600
+_MAX_TIMESTAMP_MS = 4_102_444_800_000   # 01.01.2100
+_MAX_ZONES = 1_000_000
 
 # Не заваливать человека уведомлениями: о том, что забеги ушли на проверку,
 # сообщаем не чаще раза в сутки (иначе накрутчик получит десяток писем подряд,
@@ -124,6 +136,40 @@ def _notify_on_hold(uid):
         pass
 
 
+def _run_id_taken_by_other(rid, uid):
+    """runId уже принадлежит другому человеку через трек или попытку тропы."""
+    from trails.models import PendingTrack, TrailAttempt
+
+    return (
+        PendingTrack.objects.filter(run_id=rid).exclude(user_id=uid).exists()
+        or TrailAttempt.objects.filter(run_id=rid).exclude(user_id=uid).exists()
+    )
+
+
+def _finish_award(run):
+    """Довести начисление, которое не дошло (аудит C05).
+
+    До этой правки забег и транзакция писались раздельно: обрыв между ними
+    оставлял забег с `points_awarded > 0` без транзакции, а повтор из офлайн-очереди
+    отвечал «дубль» и ничего не чинил. Теперь повтор доначисляет ровно один раз:
+    строка забега блокируется, наличие транзакции по run_id проверяется под
+    блокировкой. Помеченные и отклонённые забеги (flagged) не трогаем — там
+    решение за модератором.
+    """
+    if run.flagged or run.points_awarded <= 0:
+        return
+    with transaction.atomic():
+        locked = Run.objects.select_for_update().filter(id=run.id).first()
+        if not locked or locked.flagged or locked.points_awarded <= 0:
+            return
+        if LoyaltyTransaction.objects.filter(
+            user_id=locked.user_id, run_id=locked.id, source="runnerRun"
+        ).exists():
+            return
+        add_txn(locked.user_id, locked.points_awarded, "runnerRun",
+                f"Пробежка {locked.distance_km:.1f} км", None, locked.id)
+
+
 @api_view(["GET", "POST"])
 def runs(request):
     uid = user_id_from_request(request)
@@ -136,6 +182,8 @@ def runs(request):
 
     # POST — загрузка завершённого забега
     d = request.data
+    if not isinstance(d, dict):
+        return Response({"detail": "Ожидается объект забега"}, status=400)
     rid = (str(d.get("id") or "")).strip()[:40]
     if not rid:
         return Response({"detail": "Нет id забега"}, status=400)
@@ -145,51 +193,76 @@ def runs(request):
     if existing:
         if existing.user_id != uid:
             return Response({"detail": "Конфликт id"}, status=409)
+        _finish_award(existing)
         return Response({
             "ok": True, "duplicate": True,
             "flagged": existing.flagged, "flagReason": existing.flag_reason,
             "pointsAwarded": existing.points_awarded, "run": existing.to_json(),
         })
 
-    distance_m = float(d.get("distanceMeters") or 0)
-    duration_s = int(d.get("elapsedSeconds") or 0)
+    # Трек забега мог прийти раньше сводки (аудит C01): если этот runId уже занят
+    # треком или попыткой тропы другого человека — забег не его.
+    if _run_id_taken_by_other(rid, uid):
+        return Response({"detail": "Конфликт id"}, status=409)
 
-    ms = d.get("finishedAtMs")
     try:
+        distance_m = finite_float(d.get("distanceMeters") or 0, 0, _MAX_DISTANCE_M)
+        duration_s = bounded_int(d.get("elapsedSeconds") or 0, 0, _MAX_DURATION_S)
+        captured_zones = bounded_int(d.get("capturedZones") or 0, 0, _MAX_ZONES)
+        ms = d.get("finishedAtMs")
         finished = (
-            datetime.fromtimestamp(int(ms) / 1000, tz=dt_timezone.utc)
+            datetime.fromtimestamp(
+                bounded_int(ms, 0, _MAX_TIMESTAMP_MS) / 1000, tz=dt_timezone.utc
+            )
             if ms is not None
             else timezone.now()
         )
-    except (TypeError, ValueError, OSError):
-        finished = timezone.now()
+    except BadNumber:
+        return Response({"detail": "Некорректные числа в забеге"}, status=400)
 
-    # Анти-чит: считаем очки на сервере; неправдоподобный забег → флаг + 0 очков.
     mock = bool(d.get("mockDetected"))  # клиент сообщает о mock-GPS (Android)
-    reason = _validate(uid, distance_m, duration_s, finished, mock=mock)
-    flagged = bool(reason)
-    points = 0 if flagged else points_for(distance_m)
 
-    run = Run.objects.create(
-        id=rid,
-        user_id=uid,
-        distance_m=distance_m,
-        duration_s=duration_s,
-        captured_territory=bool(d.get("capturedTerritory")),
-        captured_zones=int(d.get("capturedZones") or 0),
-        finished_at=finished,
-        points_awarded=points,
-        flagged=flagged,
-        flag_reason=reason,
-    )
-
-    # Начисляем за бег ровно один раз на забег (идемпотентность гарантирует Run.id).
-    # Если запись транзакции по этому runId уже есть (защита от рассинхрона) — не дублируем.
-    if points > 0 and not LoyaltyTransaction.objects.filter(
-        user_id=uid, run_id=rid, source="runnerRun"
-    ).exists():
-        add_txn(uid, points, "runnerRun",
-                f"Пробежка {distance_m / 1000.0:.1f} км", None, rid)
+    # Забег и начисление — одно целое (аудит C05): сбой посередине откатывает оба,
+    # и повтор из офлайн-очереди проходит заново. Run.id (PK) — уникальный ключ:
+    # параллельный повтор упрётся в него и получит ответ «дубль».
+    try:
+        with transaction.atomic():
+            # Суточные лимиты (число забегов, дистанция вместе с импортом с часов)
+            # проверяем и записываем под блокировкой на пользователя (аудит C06):
+            # иначе параллельные забеги с разными id все видят «лимит не достигнут».
+            lock_user(ACTIVITY, uid)
+            # Анти-чит: считаем очки на сервере; неправдоподобный забег → флаг + 0 очков.
+            reason = _validate(uid, distance_m, duration_s, finished, mock=mock)
+            flagged = bool(reason)
+            points = 0 if flagged else points_for(distance_m)
+            run = Run.objects.create(
+                id=rid,
+                user_id=uid,
+                distance_m=distance_m,
+                duration_s=duration_s,
+                captured_territory=bool(d.get("capturedTerritory")),
+                captured_zones=captured_zones,
+                finished_at=finished,
+                points_awarded=points,
+                flagged=flagged,
+                flag_reason=reason,
+            )
+            # Начисляем за бег ровно один раз на забег. Если транзакция по этому
+            # runId уже есть (защита от рассинхрона) — не дублируем.
+            if points > 0 and not LoyaltyTransaction.objects.filter(
+                user_id=uid, run_id=rid, source="runnerRun"
+            ).exists():
+                add_txn(uid, points, "runnerRun",
+                        f"Пробежка {distance_m / 1000.0:.1f} км", None, rid)
+    except IntegrityError:
+        existing = Run.objects.filter(id=rid).first()
+        if not existing or existing.user_id != uid:
+            return Response({"detail": "Конфликт id"}, status=409)
+        return Response({
+            "ok": True, "duplicate": True,
+            "flagged": existing.flagged, "flagReason": existing.flag_reason,
+            "pointsAwarded": existing.points_awarded, "run": existing.to_json(),
+        })
 
     # Вехи пожизненных километров (Квартал 2.0, Ф4) — идемпотентно.
     if not flagged:

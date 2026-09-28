@@ -10,6 +10,8 @@
 """
 from collections import OrderedDict
 
+from django.views.decorators.gzip import gzip_page
+from django.views.decorators.http import conditional_page
 from rest_framework.decorators import api_view, throttle_classes
 from rest_framework.response import Response
 
@@ -178,16 +180,60 @@ def build_card(items, photos: dict | None = None) -> dict:
     }
 
 
-def build_cards(queryset):
-    """Сгруппировать позиции в карточки, сохранив порядок витрины."""
+def build_cards(queryset, offset: int = 0, limit: int | None = None):
+    """Сгруппировать позиции в карточки, сохранив порядок витрины.
+
+    Возвращает `(карточки, всего_моделей)`. Страница режется по МОДЕЛЯМ, а не по
+    позициям: иначе размеры одной модели разъехались бы по двум страницам. Фото
+    тянем одним запросом и только для моделей страницы (аудит F01).
+    """
     groups = OrderedDict()
     for product in queryset:
         groups.setdefault(product.shop_model_key or product.id, []).append(product)
-    photos = photolib.by_model(groups.keys())
-    return [build_card(items, photos.get(key))
-            for key, items in groups.items()]
+    total = len(groups)
+    keys = list(groups.keys())
+    keys = keys[offset:] if limit is None else keys[offset:offset + limit]
+    photos = photolib.by_model(keys) if keys else {}
+    return [build_card(groups[key], photos.get(key)) for key in keys], total
 
 
+# Потолок страницы `/v1/models?limit=`. Без `limit` отдаём весь список, как раньше:
+# выпущенные сборки Store и сайт читают его целиком (обратная совместимость).
+MAX_PAGE_LIMIT = 100
+
+
+class _BadPaging(ValueError):
+    pass
+
+
+def _int_param(params, name, minimum):
+    raw = (params.get(name) or "").strip()
+    if not raw:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        raise _BadPaging(f"{name}: нужно целое число")
+    if value < minimum:
+        raise _BadPaging(f"{name}: не меньше {minimum}")
+    return value
+
+
+def _paging(params):
+    """`(offset, limit)` из `limit`/`offset`/`page`; `None` — страница не запрошена."""
+    limit = _int_param(params, "limit", 1)
+    offset = _int_param(params, "offset", 0)
+    page = _int_param(params, "page", 1)
+    if limit is None and offset is None and page is None:
+        return None
+    limit = min(limit or MAX_PAGE_LIMIT, MAX_PAGE_LIMIT)
+    if offset is None:
+        offset = (page - 1) * limit if page else 0
+    return offset, limit
+
+
+@gzip_page
+@conditional_page
 @api_view(["GET"])
 @throttle_classes(PUBLIC_READ)
 def models_list(request):
@@ -196,6 +242,12 @@ def models_list(request):
     `q` — поиск. Он здесь, а не отдельным адресом, потому что результат поиска
     обязан выглядеть как витрина: одна карточка модели, а не шесть одинаковых
     позиций разных размеров.
+
+    Бюджет ответа (аудит F01): 2 запроса к БД при любом размере каталога.
+    Без параметров — весь список массивом, как раньше. `?limit=&offset=` (или
+    `page=` с 1) — страница карточек, тот же массив; общее число моделей —
+    в заголовке `X-Total-Count` (он есть и без пагинации). ETag + `If-None-Match`
+    → 304, gzip — если клиент принимает.
     """
     from django.db.models import Q
 
@@ -219,7 +271,19 @@ def models_list(request):
         qs = qs.filter(is_new=True)
     if request.query_params.get("featured") in ("1", "true", "yes"):
         qs = qs.filter(is_featured=True)
-    return Response(build_cards(qs.order_by(*_platform_order(request))))
+    try:
+        paging = _paging(request.query_params)
+    except _BadPaging as exc:
+        return Response({"error": "bad_paging", "detail": str(exc)}, status=400)
+    offset, limit = paging or (0, None)
+    cards, total = build_cards(qs.order_by(*_platform_order(request)),
+                               offset=offset, limit=limit)
+    response = Response(cards)
+    response["X-Total-Count"] = str(total)
+    if paging:
+        response["X-Offset"] = str(offset)
+        response["X-Limit"] = str(limit)
+    return response
 
 
 @api_view(["GET"])

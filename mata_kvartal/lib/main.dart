@@ -8,12 +8,14 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/config/app_config_provider.dart';
+import 'core/storage/account_scope.dart';
 import 'features/races/data/race_reminders.dart';
 import 'features/run/data/completed_runs_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _clearMapAndRunDataOnStartup();
+  await _scopeLocalDataToAccount();
   await RaceReminders.init(); // локальные напоминания о «Моих стартах»
   await _runWithSentry(const ProviderScope(child: KvartalApp()));
 }
@@ -62,6 +64,19 @@ Future<void> _clearMapAndRunDataOnStartup() async {
   await prefs.setBool(cleanupKey, true);
 }
 
+/// Разовая привязка старых локальных данных к аккаунту (аудит C03). Строго до
+/// runApp: пока никто не успел войти, id сессии в хранилище — тот, кто был в
+/// приложении, когда эти данные копились.
+Future<void> _scopeLocalDataToAccount() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await CompletedRunsNotifier.migrateLegacyStorage(prefs);
+    await migrateOwnerlessQueues(prefs);
+  } catch (_) {
+    // Не блокируем запуск: провайдер забегов повторит миграцию при загрузке,
+    // а элементы очередей без владельца просто не отправятся.
+  }
+}
 
 class KvartalApp extends ConsumerStatefulWidget {
   const KvartalApp({super.key});

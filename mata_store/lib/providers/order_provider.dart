@@ -16,12 +16,38 @@ class OrderProvider extends ChangeNotifier {
   /// true → история заказов синхронизируется с общим backend (по JWT).
   final bool serverBacked;
 
-  static const _key = 'orders';
+  /// Имитация доставки таймерами (статусы «комплектуется → в доставке →
+  /// доставлен» сами по себе). ТОЛЬКО для mock-режима без backend: у реального
+  /// заказа статус меняет лишь сервер (аудит B07).
+  final bool simulateDelivery;
+
+  /// Старый общий ключ истории (до аудита C03) — один на всё устройство, из-за
+  /// чего заказы прошлого аккаунта были видны следующему. Больше не читается.
+  static const legacyKey = 'orders';
+
+  /// История хранится отдельно для каждого аккаунта: `orders.<scope>`.
+  static const keyPrefix = 'orders.';
+  static const _guestScope = 'guest';
 
   final List<Order> _orders = [];
   final List<Timer> _timers = [];
   NotificationsProvider? _notifier;
-  bool _lastLoggedIn = false;
+
+  /// Чья история сейчас открыта: `u:<id>` — аккаунт, `me` — вошли, но id ещё
+  /// неизвестен, `guest` — без входа.
+  String _scope = _guestScope;
+  bool _loggedIn = false;
+
+  String get _key => '$keyPrefix$_scope';
+
+  /// Ключ хранения истории для аккаунта (для тестов/диагностики).
+  static String storageKeyFor(String? userId) =>
+      '$keyPrefix${_scopeFor(true, userId)}';
+
+  static String _scopeFor(bool loggedIn, String? userId) {
+    if (!loggedIn) return _guestScope;
+    return (userId != null && userId.isNotEmpty) ? 'u:$userId' : 'me';
+  }
 
   /// Начать оплату заказа: backend создаёт платёж и отдаёт ссылку для покупателя.
   Future<PaymentStart> startPayment(String orderId) => _repo.startPayment(orderId);
@@ -35,7 +61,12 @@ class OrderProvider extends ChangeNotifier {
   /// дожидается его: показывать «оформлен» и чистить корзину можно ТОЛЬКО при true.
   Future<bool>? lastSubmit;
 
-  OrderProvider(this._prefs, this._repo, {this.serverBacked = false}) {
+  OrderProvider(this._prefs, this._repo,
+      {this.serverBacked = false, bool? simulateDelivery})
+      : simulateDelivery = simulateDelivery ?? !serverBacked {
+    // Общая история без владельца: чья она — неизвестно, показывать нельзя.
+    // Настоящие заказы живут на сервере и вернутся через refresh() после входа.
+    _prefs.remove(legacyKey);
     _load();
   }
 
@@ -44,27 +75,40 @@ class OrderProvider extends ChangeNotifier {
     _notifier = notifier;
   }
 
-  /// Вызывается из ProxyProvider при изменении авторизации.
-  Future<void> syncAuth(bool loggedIn) async {
-    if (!serverBacked) return;
-    if (loggedIn && !_lastLoggedIn) {
-      _lastLoggedIn = true;
-      await refresh();
-    } else if (!loggedIn && _lastLoggedIn) {
-      _lastLoggedIn = false;
+  /// Вызывается из ProxyProvider при изменении авторизации. [userId] — id
+  /// аккаунта: у каждого своя история. При выходе или смене аккаунта история
+  /// прошлого аккаунта убирается и из памяти, и с устройства (аудит C03).
+  Future<void> syncAuth(bool loggedIn, {String? userId}) async {
+    final scope = _scopeFor(loggedIn, userId);
+    if (scope == _scope && loggedIn == _loggedIn) return;
+    final prevScope = _scope;
+    final wasLoggedIn = _loggedIn;
+    _scope = scope;
+    _loggedIn = loggedIn;
+    if (prevScope != scope) {
+      _cancelTimers();
+      _orders.clear();
+      if (wasLoggedIn) _prefs.remove('$keyPrefix$prevScope');
+      _load();
+      notifyListeners();
     }
+    if (loggedIn) await refresh();
   }
 
   /// Подтянуть историю заказов с сервера и слить с локальными.
-  /// Локальные заказы (с «живыми» статусами текущей сессии) имеют приоритет;
-  /// серверные добавляются (история с других устройств / прошлых сессий).
+  /// Сервер — источник правды: его версия заказа ЗАМЕНЯЕТ локальную (статус,
+  /// оплата, пометки магазина меняются только там — аудит B08). Локальные заказы,
+  /// которых на сервере нет (отправка ещё в пути), остаются.
   Future<void> refresh() async {
     if (!serverBacked) return;
+    final scope = _scope;
     try {
       final server = await _repo.fetchOrders();
+      // Пока шёл запрос, сменился аккаунт — чужой ответ не применяем.
+      if (scope != _scope) return;
       final byId = <String, Order>{for (final o in _orders) o.id: o};
       for (final o in server) {
-        byId.putIfAbsent(o.id, () => o);
+        byId[o.id] = o;
       }
       final merged = byId.values.toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -88,11 +132,16 @@ class OrderProvider extends ChangeNotifier {
     }
   }
 
-  @override
-  void dispose() {
+  void _cancelTimers() {
     for (final t in _timers) {
       t.cancel();
     }
+    _timers.clear();
+  }
+
+  @override
+  void dispose() {
+    _cancelTimers();
     super.dispose();
   }
 
@@ -186,7 +235,8 @@ class OrderProvider extends ChangeNotifier {
     }
   }
 
-  /// Заказ принят сервером: первое уведомление + имитация прогресса доставки.
+  /// Заказ принят сервером: первое уведомление. Дальше статус приходит с
+  /// сервера; имитация доставки — только в mock-режиме ([simulateDelivery]).
   void _onSubmitted(String orderId) {
     final i = _orders.indexWhere((o) => o.id == orderId);
     if (i < 0) return;
@@ -199,7 +249,7 @@ class OrderProvider extends ChangeNotifier {
       orderId: order.id,
       createdAt: DateTime.now(),
     ));
-    _scheduleStatusProgress(order.id);
+    if (simulateDelivery) _scheduleStatusProgress(order.id);
   }
 
   /// Отправка не удалась: снимаем локальный заказ, чтобы не создавать «фантом»
@@ -211,7 +261,8 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Имитация жизненного цикла заказа: каждый этап шлёт уведомление.
+  /// Имитация жизненного цикла заказа (mock-режим без backend): каждый этап
+  /// шлёт уведомление. Для реальных заказов не вызывается (аудит B07).
   void _scheduleStatusProgress(String orderId) {
     final steps = <(Duration, OrderStatus, String, String)>[
       (

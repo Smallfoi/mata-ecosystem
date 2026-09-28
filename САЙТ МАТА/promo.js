@@ -71,7 +71,10 @@
 
   function load() {
     // В правке показываем и неопубликованные (preview) — чтобы владелец их видел/правил.
-    var url = API + "/banners?platform=site" + (EDIT ? "&preview=1" : "");
+    // Пропуск сотрудника (?pt=...) кладёт Конструктор; без него API черновики не отдаёт.
+    var pt = EDIT ? new URLSearchParams(location.search).get("pt") || "" : "";
+    var url = API + "/banners?platform=site" + (EDIT ? "&preview=1" : "") +
+      (pt ? "&preview_token=" + encodeURIComponent(pt) : "");
     fetch(url)
       .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
       .then(render)

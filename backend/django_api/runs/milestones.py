@@ -6,8 +6,10 @@
 """
 from __future__ import annotations
 
+from django.db import transaction
 from django.db.models import Sum
 
+from common.locks import ACTIVITY, lock_user
 from loyalty.models import LoyaltyTransaction, add_txn
 from notifications.models import create_notification
 
@@ -33,6 +35,14 @@ def award_milestones(uid: str, added_km: float) -> int:
     """Начислить вехи, пересечённые последней пробежкой. Вернуть сумму баллов."""
     if added_km <= 0:
         return 0
+    # Проверка «веха уже выдана?» и выдача — под блокировкой бегуна (аудит C06):
+    # два параллельных забега, пересёкших одну веху, иначе оба её оплачивают.
+    with transaction.atomic():
+        lock_user(ACTIVITY, uid)
+        return _award_locked(uid, added_km)
+
+
+def _award_locked(uid: str, added_km: float) -> int:
     after = lifetime_km(uid)
     before = max(0.0, after - added_km)
     total = 0
