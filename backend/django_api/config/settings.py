@@ -601,6 +601,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "races.import_races",
         "schedule": crontab(hour=5, minute=0),
     },
+    # Фотопайплайн: задание, зависшее в «Генерируется» (воркер упал), → «Ошибка» с
+    # кнопкой «Повторить». Генерацию сама не запускает (аудит F04).
+    "photo-recover-stuck-jobs": {
+        "task": "productmedia.recover_stuck_jobs",
+        "schedule": crontab(minute="*/10"),
+    },
 }
 
 # Авто-парсер «Стартов»: URL нормализованного JSON-фида забегов (races/importers/jsonfeed).

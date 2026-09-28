@@ -463,7 +463,14 @@ class UploadValidationTests(ApiTestCase):
         self.assertEqual(self._upload("evil.png", evil, "image/png").status_code, 400)
 
     def test_real_png_accepted_regardless_of_name_and_type(self):
-        r = self._upload("whatever.txt", self.PNG_HEAD + bytes(64), "text/plain")
+        # Настоящая картинка: файл целиком декодируется (аудит D07), сигнатуры мало.
+        import io as _io
+
+        from PIL import Image
+
+        buf = _io.BytesIO()
+        Image.new("RGB", (4, 4), (1, 2, 3)).save(buf, "PNG")
+        r = self._upload("whatever.txt", buf.getvalue(), "text/plain")
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.json()["avatarPath"].endswith(".png"))
 
