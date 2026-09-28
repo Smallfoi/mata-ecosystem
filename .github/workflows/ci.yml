@@ -127,6 +127,11 @@ jobs:
           echo "checked $count file(s)"
           test "$count" -gt 0   # страховка: путь с кириллицей нашёлся, файлы проверены
 
+      # Поведенческие тесты сайта без браузера: функции вырезаются из исходника
+      # и гоняются в node с заглушками DOM (профиль: ошибка заказов без демо, адреса по аккаунту).
+      - name: Site behaviour tests (node --test)
+        run: node --test tools/site_tests/*.test.js
+
       # Браузер запоминает styles.css?v=20260702 и при следующем заходе берёт его
       # из своей памяти: адрес не изменился. Меняем файл, не сдвинув метку —
       # владелец на своём телефоне видит СТАРУЮ вёрстку, сколько ни выкатывай
@@ -157,3 +162,22 @@ jobs:
       # из static/admin/mata.css. Иначе разделы снова начнут расходиться в мелочах.
       - name: Admin-style guard (один стиль на всю админку)
         run: python tools/check_admin_styles.py
+
+  deploy-scripts:
+    name: Deploy · scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Скрипты эксплуатации (backend/deploy/*.sh) крутятся на проде кроном и руками
+      # владельца — синтаксис, shellcheck и модельные прогоны с заглушками docker/curl/git
+      # (backend/deploy/tests). Прод/облако НЕ трогаются. DEPLOY_TEST_REAL_PG=1 — restore
+      # дополнительно гоняется на настоящем postgis в одноразовом контейнере.
+      - name: bash -n + shellcheck + модельные прогоны
+        env:
+          DEPLOY_TEST_REAL_PG: '1'
+        run: |
+          set -euo pipefail
+          for f in backend/deploy/*.sh backend/deploy/tests/*.sh; do bash -n "$f"; done
+          shellcheck -S error backend/deploy/*.sh backend/deploy/tests/*.sh
+          bash backend/deploy/tests/run_all.sh

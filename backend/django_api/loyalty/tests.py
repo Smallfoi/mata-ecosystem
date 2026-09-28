@@ -9,6 +9,18 @@ from loyalty.models import LoyaltyTransaction, add_txn, seed_runner_points
 from notifications.models import Notification
 
 
+def _order_with_points(uid, oid, points, total=None):
+    """Заказ, получивший скидку баллами, — прежний /loyalty/redeem списывает только
+    на существующий заказ и ровно его скидку (аудит B02)."""
+    from orders.models import Order
+
+    return Order.objects.create(
+        user_id=uid, order_id=oid, points_redeemed=points,
+        total=points * 10 if total is None else total,
+        payment_status="pending", status="pending", payload={"id": oid},
+    )
+
+
 class LevelUpNotificationTests(TestCase):
     """Уведомление при росте уровня лояльности (бег/территории/покупки → add_txn)."""
 
@@ -62,16 +74,18 @@ class RedeemTests(ApiTestCase):
 
     def test_cannot_redeem_more_than_balance(self):
         self._seed(100)
-        r = self.api_post("/v1/loyalty/redeem", {"amount": 99999, "orderId": "o1"})
+        _order_with_points(self.uid, "o1", 300)  # 300 из 3300 — правила проходят
+        r = self.api_post("/v1/loyalty/redeem", {"amount": 300, "orderId": "o1"})
         self.assertEqual(r.status_code, 400)
         self.assertEqual(self.balance(), 100)  # не списалось
 
     def test_redeem_idempotent_by_order(self):
         self._seed(100)
-        self.api_post("/v1/loyalty/redeem", {"amount": 30, "orderId": "o1"})
-        r = self.api_post("/v1/loyalty/redeem", {"amount": 30, "orderId": "o1"}).json()
+        _order_with_points(self.uid, "o1", 60)
+        self.api_post("/v1/loyalty/redeem", {"amount": 60, "orderId": "o1"})
+        r = self.api_post("/v1/loyalty/redeem", {"amount": 60, "orderId": "o1"}).json()
         self.assertTrue(r["deduped"])
-        self.assertEqual(self.balance(), 70)  # списано один раз
+        self.assertEqual(self.balance(), 40)  # списано один раз
 
 
 class LevelBoundaryTests(TestCase):
@@ -133,6 +147,8 @@ class LoyaltyAccountCacheTests(ApiTestCase):
         # Баланс 100, кэшируем показ. Redeem обязан списывать по РЕАЛЬНОМУ балансу,
         # а не по (потенциально устаревшему) кэшу — иначе можно уйти в минус.
         add_txn(self.uid, 100, "manual")
+        _order_with_points(self.uid, "o1", 100)
+        _order_with_points(self.uid, "o2", 50)
         self.assertEqual(self.api_get("/v1/loyalty/account").json()["balance"], 100)  # кэш
         r = self.api_post("/v1/loyalty/redeem", {"amount": 100, "orderId": "o1"})
         self.assertEqual(r.status_code, 200)

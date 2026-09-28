@@ -15,6 +15,7 @@ class NotificationsProvider extends ChangeNotifier {
 
   final List<AppNotification> _items = [];
   bool _lastLoggedIn = false;
+  String _account = '';
 
   NotificationsProvider(this._prefs, {this.api, this.serverBacked = false}) {
     _load();
@@ -24,25 +25,39 @@ class NotificationsProvider extends ChangeNotifier {
   int get unreadCount => _items.where((n) => !n.read).length;
   bool get hasUnread => unreadCount > 0;
 
-  /// Вызывается из ProxyProvider при изменении авторизации.
-  Future<void> syncAuth(bool loggedIn) async {
+  /// Вызывается из ProxyProvider при изменении авторизации. [userId] — id
+  /// аккаунта: при выходе ИЛИ смене аккаунта лента прошлого аккаунта стирается
+  /// (аудит C03), для нового подтягивается своя.
+  Future<void> syncAuth(bool loggedIn, {String? userId}) async {
     if (!serverBacked) return;
-    if (loggedIn && !_lastLoggedIn) {
+    final account = userId ?? '';
+    if (loggedIn && (!_lastLoggedIn || account != _account)) {
+      final switched = _lastLoggedIn;
       _lastLoggedIn = true;
+      _account = account;
+      if (switched) _clearLocal();
       await refresh();
     } else if (!loggedIn && _lastLoggedIn) {
       _lastLoggedIn = false;
-      _items.clear();
-      _save();
-      notifyListeners();
+      _account = '';
+      _clearLocal();
     }
+  }
+
+  void _clearLocal() {
+    _items.clear();
+    _save();
+    notifyListeners();
   }
 
   /// Лента уведомлений с общего бэкенда (статусы заказов и т.п.).
   Future<void> refresh() async {
     if (!serverBacked || api == null) return;
+    final account = _account;
     try {
       final data = await api!.get('/notifications') as List;
+      // Пока шёл запрос, сменился аккаунт — чужую ленту не показываем.
+      if (account != _account) return;
       _items
         ..clear()
         ..addAll(

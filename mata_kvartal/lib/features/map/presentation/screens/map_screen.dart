@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/location_provider.dart';
 import '../../data/zone_provider.dart';
+import '../../data/loop_suggestion_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../league/data/division_provider.dart';
 import '../../../league/data/league_provider.dart';
@@ -242,6 +243,12 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
     final trails = showTrails
         ? (ref.watch(trailsProvider).valueOrNull ?? const <Trail>[])
         : const <Trail>[];
+    // «Захват»: ближайший свободный квартал как готовый круг (D-74). Владелец
+    // 27.09.2026: «при захвате должен появиться маршрут круговой» — до этого
+    // человек угадывал, где замкнуть петлю, и узнавал результат лишь на финише.
+    final loop = mode == RunMode.capture
+        ? ref.watch(loopSuggestionProvider).valueOrNull
+        : null;
     // «Исследование»: кольца пробеганного (footprints) поверх тумана.
     final footprintRings = mode == RunMode.explore
         ? (ref.watch(footprintRingsProvider).valueOrNull ??
@@ -317,6 +324,20 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
               // ── Слой «Захват»: кварталы и территории ─────────────────────
               // Показываем только в режиме «Захват»; в остальных карта чистая.
               if (mode == RunMode.capture) ...[
+                // Круг-подсказка: контур ближайшего свободного квартала. Рисуем
+                // ПЕРВЫМ, чтобы яркая обводка не тонула под заливками владения.
+                if (loop != null)
+                  PolygonLayer(
+                    polygons: [
+                      for (final ring in loop.rings)
+                        Polygon(
+                          points: ring,
+                          color: AppColors.lime.withValues(alpha: 0.10),
+                          borderColor: AppColors.lime,
+                          borderStrokeWidth: 3,
+                        ),
+                    ],
+                  ),
                 // City block territory polygons
                 PolygonLayer(
                   polygons: zones.map((z) {
@@ -531,6 +552,16 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                       padding: EdgeInsets.only(left: 14, top: 2, bottom: 4),
                       child: _ExploredChip(),
                     ),
+                  // Круг захвата: длина и расстояние до старта. Тап — показать
+                  // его на карте целиком (иначе контур может быть за экраном).
+                  if (loop != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 14, top: 2, bottom: 4),
+                      child: _LoopChip(
+                        loop: loop,
+                        onTap: () => _showLoop(loop),
+                      ),
+                    ),
                   // Слой троп: показать/скрыть линии троп в любом режиме.
                   if (trailsFeatureOn)
                     Padding(
@@ -657,6 +688,20 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
 
   /// Тап по карте: в режимах троп/захвата — открыть тропу под пальцем;
   /// в захвате — иначе паспорт квартала (Ф2): чей, защита, как забрать.
+  /// Показать круг-подсказку целиком: контур может быть в стороне от экрана,
+  /// и «обеги вот этот» без него читается как пустая надпись.
+  void _showLoop(LoopSuggestion loop) {
+    final points = [for (final ring in loop.rings) ...ring];
+    if (points.isEmpty) return;
+    setState(() => _followUser = false);
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds.fromPoints(points),
+        padding: const EdgeInsets.all(48),
+      ),
+    );
+  }
+
   void _onMapTap(LatLng point) {
     // Открыта карточка партнёра — тап по карте её закрывает (D-81).
     if (_selectedPartner != null) {
@@ -1279,6 +1324,46 @@ class _RoutePointMarker extends StatelessWidget {
 
 /// Чип «Открыто N км²» режима «Исследование»: сколько карты уже прорезано вечным
 /// следом. Следа нет (0) — чипа нет, работает центральная подсказка про туман.
+/// «Обеги этот круг · 1,2 км» — подсказка захвата. Длина круга это и есть
+/// дистанция забега, поэтому она стоит первой: по ней человек решает, побежит ли.
+class _LoopChip extends StatelessWidget {
+  final LoopSuggestion loop;
+  final VoidCallback onTap;
+
+  const _LoopChip({required this.loop, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: _Glass(
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.arrow_2_circlepath, size: 13, color: AppColors.lime),
+            const SizedBox(width: 6),
+            Text(
+              'Обеги этот круг · ${loop.loopLabel}',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              loop.distanceLabel,
+              style: TextStyle(color: AppColors.muted, fontSize: 11),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ExploredChip extends ConsumerWidget {
   const _ExploredChip();
 

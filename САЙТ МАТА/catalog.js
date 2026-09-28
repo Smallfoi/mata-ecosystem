@@ -9,6 +9,9 @@
 
   var params = new URLSearchParams(location.search);
   var PREVIEW = params.get("preview") === "1";
+  // Черновики API отдаёт только сотруднику: Конструктор кладёт во фрейм подписанный
+  // пропуск (?pt=...), пересылаем его как preview_token. Без него — обычная витрина.
+  var PREVIEW_TOKEN = PREVIEW ? params.get("pt") || "" : "";
 
   // База API — как в ecosystem.js: dev (localhost) → :8000, иначе прод/override.
   var host = location.hostname;
@@ -263,7 +266,8 @@
   }
 
   function load() {
-    var tail = "?platform=site" + (PREVIEW ? "&preview=1" : "");
+    var tail = "?platform=site" + (PREVIEW ? "&preview=1" : "") +
+      (PREVIEW_TOKEN ? "&preview_token=" + encodeURIComponent(PREVIEW_TOKEN) : "");
     // Витрина показывает МОДЕЛИ: один товар — много цветов и размеров (D-94).
     // Если бэкенд старый и адреса нет — падаем на прежний список позиций.
     fetch(API + "/models" + tail)

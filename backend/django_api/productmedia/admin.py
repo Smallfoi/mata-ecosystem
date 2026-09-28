@@ -55,7 +55,7 @@ class PhotoJobAdmin(ModelAdmin):
         # Только генерация: на витрину снимок попадает после «Принять» на экране проверки.
         review = failed = skipped = 0
         for job in queryset:
-            service.generate(job)
+            service.generate(job, from_statuses=service.CLAIM_MANUAL)
             review += job.status == PhotoJob.STATUS_REVIEW
             failed += job.status == PhotoJob.STATUS_FAILED
             skipped += job.status == PhotoJob.STATUS_SKIPPED

@@ -44,9 +44,26 @@ def _account_payload(uid):
 
 @api_view(["POST"])
 def redeem(request):
-    """Серверная трата баллов (Store-чекаут). Авторитетно проверяет баланс и
-    идемпотентна по orderId — нельзя уйти в минус и нельзя списать дважды.
-    body: {amount: >0, orderId, description}."""
+    """Прежний адрес траты баллов (выпущенные сборки Store зовут его ПОСЛЕ заказа).
+
+    Баллы списывает сервер при оформлении заказа (D-72), поэтому обычно здесь
+    просто подтверждается уже сделанное списание (`deduped`). Если списания по
+    заказу ещё нет — работает тот же единый сервис `loyalty.wallet.redeem`, что и
+    при оформлении (аудит B02): заказ должен существовать, сумма — совпадать со
+    скидкой заказа, минимум и 30% — те же. Без заказа баллы не списываются вовсе:
+    раньше здесь можно было списать сколько угодно на выдуманный orderId, а потом
+    оформить заказ с этим id — и 30% уже не проверялись.
+
+    body: {amount: >0, orderId, description}. Ответ прежний:
+    {ok, balance, spent, level} или {ok, deduped, balance, spent}; ошибка — 400/404
+    c `detail` (Store показывает его текстом) и `balance`.
+    """
+    from django.db import transaction
+
+    from orders.models import Order
+
+    from .wallet import lock_wallet, redeem as wallet_redeem, redeemed_on_order
+
     uid = user_id_from_request(request)
     if not uid:
         return Response({"detail": "Нет токена"}, status=401)
@@ -57,27 +74,36 @@ def redeem(request):
         amount = 0
     if amount <= 0:
         return Response({"detail": "Некорректное количество баллов"}, status=400)
+    order_id = str(d.get("orderId") or "").strip()
 
-    balance = balance_of(uid)
-    order_id = d.get("orderId")
+    def fail(detail, status=400):
+        return Response({"detail": detail, "balance": balance_of(uid)}, status=status)
 
-    # Идемпотентность: повторный redeem того же заказа не списывает второй раз.
-    if order_id:
-        dup = LoyaltyTransaction.objects.filter(
-            user_id=uid, order_id=order_id, source="redeem"
-        ).first()
-        if dup:
+    if not order_id:
+        return fail("Баллы списываются только при оформлении заказа")
+
+    with transaction.atomic():
+        lock_wallet(uid)
+        # Идемпотентность: заказ уже оплачен баллами — второй раз не списываем.
+        spent = redeemed_on_order(uid, order_id)
+        if spent:
             return Response(
-                {"ok": True, "deduped": True, "balance": balance, "spent": -dup.amount}
+                {"ok": True, "deduped": True, "balance": balance_of(uid), "spent": spent}
             )
-
-    if amount > balance:
-        return Response(
-            {"detail": "Недостаточно баллов", "balance": balance}, status=400
+        order = Order.objects.filter(user_id=uid, order_id=order_id).first()
+        if not order:
+            return fail("Заказ не найден", status=404)
+        if order.payment_status == "canceled" or order.status == "cancelled":
+            return fail("Заказ отменён — баллы не списываются")
+        if amount != int(order.points_redeemed or 0):
+            return fail("Сумма списания не совпадает с заказом")
+        order_sum = float(order.total or 0) + int(order.points_redeemed or 0)
+        problem = wallet_redeem(
+            uid, order_id, amount, order_sum, d.get("description") or "Оплата баллами"
         )
-
-    add_txn(uid, -amount, "redeem", d.get("description") or "Оплата баллами", order_id)
-    new_balance = balance - amount
+        if problem:
+            return fail(problem)
+    new_balance = balance_of(uid)
     return Response(
         {"ok": True, "balance": new_balance, "spent": amount, "level": level_for(new_balance)}
     )
@@ -88,7 +114,8 @@ def redeem(request):
 #   runnerTerritory → /v1/territories/capture (после валидной геометрии захвата);
 #   purchase/registration → /v1/orders (по сумме заказа / первому заказу);
 #   runnerMilestone/runnerDivision/runnerSeason → league и runs.milestones;
-#   redeem          → /v1/loyalty/redeem (там проверяется баланс).
+#   redeem          → при оформлении заказа (loyalty.wallet.redeem; прежний
+#                     /v1/loyalty/redeem — тот же сервис).
 #
 # Здесь БЕЛЫЙ список, а не чёрный — и это принципиально. Раньше стоял чёрный из
 # четырёх источников, и он устарел молча: Квартал 2.0 добавил награды за вехи,

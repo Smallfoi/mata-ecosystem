@@ -4,7 +4,7 @@ webp под витрину. Мастер храним как есть (печа�
 """
 import io
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 WEBP_MAX_PX = 1600   # длинная сторона витринного webp
 WEBP_QUALITY = 82
@@ -12,8 +12,12 @@ WEBP_QUALITY = 82
 
 def make_webp(master_bytes: bytes, max_px: int = WEBP_MAX_PX, quality: int = WEBP_QUALITY) -> bytes:
     """Мастер (любой формат) → сжатый webp, вписанный в max_px по длинной стороне.
-    Прозрачность сохраняем (RGBA), иначе RGB."""
-    im = Image.open(io.BytesIO(master_bytes))
+    Прозрачность сохраняем (RGBA), иначе RGB.
+
+    Ориентацию из EXIF применяем к пикселям: сам EXIF в webp не пишем (Pillow берёт его
+    только из явного аргумента), и без поворота снимок с телефона лёг бы на бок (аудит D07).
+    """
+    im = ImageOps.exif_transpose(Image.open(io.BytesIO(master_bytes)))
     if im.mode not in ("RGB", "RGBA"):
         im = im.convert("RGBA" if "A" in im.getbands() else "RGB")
     im.thumbnail((max_px, max_px))  # уменьшает, не увеличивает; сохраняет пропорции

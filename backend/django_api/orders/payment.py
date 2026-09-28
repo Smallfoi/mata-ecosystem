@@ -26,6 +26,8 @@ import os
 import urllib.error
 import urllib.request
 
+from .money import rub_str, to_kop
+
 _API = "https://api.yookassa.ru/v3"
 
 # Способ оплаты — только СБП (D-71, D-72). Не настраивается и не выбирается
@@ -44,6 +46,15 @@ _STATUS_MAP = {
 
 class PaymentError(Exception):
     """Провайдер недоступен или отказал. Наверх — понятная ошибка, НЕ «оплачено»."""
+
+
+class PaymentUncertain(PaymentError):
+    """Ответа нет (таймаут, обрыв, 5xx) — операция у провайдера МОГЛА пройти.
+
+    Для возврата это не «не прошёл»: считать его неудачным и дать сотруднику
+    повторить значит рискнуть вернуть деньги дважды (аудит B04). Такой исход
+    сверяем повтором с тем же ключом идемпотентности или запросом статуса.
+    """
 
 
 def payment_enabled() -> bool:
@@ -81,9 +92,12 @@ def _http(method, url, payload=None, headers=None):
             detail = json.loads(e.read().decode("utf-8") or "{}").get("description", "")
         except Exception:
             detail = ""
-        raise PaymentError(f"ЮKassa {e.code}: {detail or e.reason}") from e
-    except Exception as e:  # таймаут, DNS, обрыв
-        raise PaymentError(f"ЮKassa недоступна: {e}") from e
+        # 4xx — ЮKassa запрос разобрала и отклонила: операции нет. 5xx — сбой на её
+        # стороне, исход неизвестен.
+        cls = PaymentUncertain if e.code >= 500 else PaymentError
+        raise cls(f"ЮKassa {e.code}: {detail or e.reason}") from e
+    except Exception as e:  # таймаут, DNS, обрыв — запрос мог дойти
+        raise PaymentUncertain(f"ЮKassa недоступна: {e}") from e
 
 
 def _request(method, path, payload=None, idempotence_key=None):
@@ -99,8 +113,9 @@ def _request(method, path, payload=None, idempotence_key=None):
 
 
 def _money(amount) -> str:
-    """Сумма в формате ЮKassa: строка с двумя знаками ('1234.00')."""
-    return f"{float(amount):.2f}"
+    """Сумма в формате ЮKassa: строка с двумя знаками ('1234.00').
+    Через Decimal (ROUND_HALF_UP): та же сумма, что у заказа и в чеке (аудит B09)."""
+    return rub_str(to_kop(amount))
 
 
 def _idem_key(*parts) -> str:
@@ -109,12 +124,57 @@ def _idem_key(*parts) -> str:
 
 
 def _result(data) -> dict:
-    """Ответ ЮKassa → наш контракт {status, paymentId, confirmationUrl}."""
+    """Ответ ЮKassa → наш контракт {status, paymentId, confirmationUrl}.
+
+    Плюс то, что сверяется с заказом перед «оплачено» (аудит B01): сумма, валюта
+    и reference из metadata. Наружу (клиентам) эти поля не отдаются — см. views.
+    """
+    amount = data.get("amount") or {}
     return {
         "status": _STATUS_MAP.get(data.get("status"), "pending"),
         "paymentId": data.get("id") or "",
         "confirmationUrl": (data.get("confirmation") or {}).get("confirmation_url") or "",
+        "amount": str(amount.get("value") or ""),
+        "currency": str(amount.get("currency") or ""),
+        "reference": str((data.get("metadata") or {}).get("reference") or ""),
     }
+
+
+def payment_reference(order) -> str:
+    """Глобально уникальный номер заказа для провайдера (см. шапку модуля)."""
+    return f"{order.order_id}-{order.pk}"
+
+
+def _kop(value):
+    """Сумма в копейках (целое) или None, если это не число."""
+    if value in (None, ""):
+        return None
+    try:
+        return to_kop(value)
+    except ValueError:
+        return None
+
+
+def payment_mismatch(order, info) -> str:
+    """Почему этот платёж НЕЛЬЗЯ засчитать заказу; пустая строка — всё сходится.
+
+    «Оплачено» ставим, только если провайдер подтвердил ровно то, что мы просили:
+    тот же платёж, та же сумма до копейки, рубли и наш reference. Иначе (заказ
+    успели поменять, платёж от другого заказа, сбой провайдера) заказ остаётся
+    неоплаченным, а расхождение уходит в лог ошибок — разбирает человек.
+    """
+    pid = info.get("paymentId") or ""
+    if order.payment_id and pid and pid != order.payment_id:
+        return f"платёж {pid} не относится к заказу (ждали {order.payment_id})"
+    if info.get("currency") != "RUB":
+        return f"валюта платежа «{info.get('currency') or '—'}», ждали RUB"
+    paid, due = _kop(info.get("amount")), order.amount_kop
+    if paid is None or paid != due:
+        return f"сумма платежа {info.get('amount') or '—'} ≠ сумме заказа {rub_str(due)}"
+    ref = payment_reference(order)
+    if info.get("reference") != ref:
+        return f"reference платежа «{info.get('reference') or '—'}», ждали «{ref}»"
+    return ""
 
 
 def create_payment(order_id, amount, return_url="", reference=None,
@@ -196,4 +256,24 @@ def create_refund(payment_id, amount, description="", key=None, receipt=None) ->
     data = _request(
         "POST", "/refunds", body, _idem_key("refund", payment_id, key or _money(amount))
     )
-    return {"status": data.get("status") or "", "refundId": data.get("id") or ""}
+    return _refund_result(data)
+
+
+def _refund_result(data) -> dict:
+    """Возврат ЮKassa → {status, refundId, paymentId, amount}.
+
+    status — как у ЮKassa: pending (в обработке), succeeded (деньги ушли),
+    canceled (отклонён). Окончателен только succeeded/canceled.
+    """
+    amount = data.get("amount") or {}
+    return {
+        "status": data.get("status") or "",
+        "refundId": data.get("id") or "",
+        "paymentId": data.get("payment_id") or "",
+        "amount": str(amount.get("value") or ""),
+    }
+
+
+def fetch_refund(refund_id) -> dict:
+    """Актуальный статус возврата ПО ДАННЫМ ЮKassa (тело вебхука не подписано)."""
+    return _refund_result(_request("GET", f"/refunds/{refund_id}"))
