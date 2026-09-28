@@ -45,7 +45,7 @@ services:
   # молча; AOF — очередь переживает рестарт контейнера. Политика вытеснения — на весь
   # инстанс, поэтому «другая БД в том же Redis» не спасает: нужен свой процесс.
   redis-broker:
-    image: redis:7-alpine
+    image: redis:7.4.11-alpine
     restart: always
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 128mb --maxmemory-policy noeviction
     volumes:
