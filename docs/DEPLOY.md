@@ -97,7 +97,7 @@ flutter build apk --release --target-platform android-arm64 \
 | `make backup` | бэкап БД → `backups/mata_<дата>.sql.gz` + выгрузка в Object Storage (ротация 14 дней) |
 | `make tls-issue` | выпустить TLS-сертификат Let's Encrypt (первый раз, nginx встанет на ~минуту) |
 | `make tls-renew` | обновить сертификат без простоя (в cron раз в неделю) |
-| `make restore FILE=backups/mata_….sql.gz` | восстановить БД из бэкапа (спросит подтверждение, сделает контрольный бэкап) |
+| `make restore FILE=backups/mata_….sql.gz` | восстановить БД из бэкапа: контрольный бэкап (обязателен) → загрузка в отдельную БД `<db>_restore_<ts>` с `ON_ERROR_STOP` → проверки → второе подтверждение → атомарная подмена; прежняя БД остаётся `<db>_pre_restore_<ts>`, команды отката скрипт печатает в конце |
 | `make smoke` | проверить health + каталог/баннеры изнутри web-контейнера |
 | `make prod-logs` | логи прод-web | 
 | `make prod-up` / `make prod-down` | поднять / остановить прод-стек |
