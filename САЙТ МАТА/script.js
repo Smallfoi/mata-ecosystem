@@ -870,7 +870,9 @@ function prSetView(view) {
   }
 }
 
-// Демо-заказы (фолбэк, если бэкенд недоступен).
+// Демо-заказы — ТОЛЬКО в явном демо-режиме (window.STAW_DEMO === true). Раньше они
+// подставлялись при любой ошибке API: покупатель при сетевом сбое или истёкшей сессии
+// видел чужие «свои» покупки (аудит D02). Теперь ошибка — это ошибка, с кнопкой повтора.
 const PR_ORDERS_DEMO = [
   { id: "МАТА-205990", source: "Сайт", date: "сегодня", items: "Everyday Training Layer", total: 3190, status: "Принят" },
   { id: "МАТА-198003", source: "Приложение «Квартал»", date: "18 июня", items: "City Motion Tee ×2", total: 2980, status: "Доставлен" },
@@ -945,19 +947,50 @@ function prRenderOrders(orders) {
     .join("");
 }
 
+function prDemoMode() {
+  return window.STAW_DEMO === true;
+}
+
+// Не удалось получить заказы: честно говорим об этом и даём повторить.
+// 401 — сессия истекла/недействительна: старый токен убираем и предлагаем войти.
+function prRenderOrdersError(err) {
+  const list = prModal.querySelector("[data-pr-orders-list]");
+  if (!list) return;
+  const unauthorized = !!(err && err.status === 401);
+  const text = unauthorized
+    ? "Сессия истекла — войдите снова, чтобы увидеть заказы."
+    : "Не удалось загрузить заказы. Проверьте соединение и попробуйте ещё раз.";
+  const btn = unauthorized ? "Войти" : "Повторить";
+  list.innerHTML =
+    '<div role="alert" data-pr-orders-error>' +
+    '<p class="pr-addr-empty">' + escapeHtml(text) + "</p>" +
+    '<button type="button" class="pr-addr-add-btn" data-pr-orders-retry>' + btn + "</button>" +
+    "</div>";
+  const b = list.querySelector("[data-pr-orders-retry]");
+  if (!b) return;
+  if (unauthorized) {
+    if (window.STAW && typeof window.STAW.logout === "function") window.STAW.logout();
+    b.addEventListener("click", function () {
+      if (typeof closeProfile === "function") closeProfile();
+      if (window.STAW && typeof window.STAW.openLogin === "function") window.STAW.openLogin();
+    });
+  } else {
+    b.addEventListener("click", prShowOrders);
+  }
+}
+
 function prShowOrders() {
   prSetView("orders");
   const list = prModal.querySelector("[data-pr-orders-list]");
   if (list) list.innerHTML = '<p class="pr-addr-empty">Загрузка…</p>';
-  if (window.STAW && typeof window.STAW.api === "function") {
-    window.STAW
-      .api("/orders")
-      .then(prRenderOrders)
-      .catch(function () {
-        prRenderOrders(PR_ORDERS_DEMO);
-      });
-  } else {
+  if (prDemoMode()) {
     prRenderOrders(PR_ORDERS_DEMO);
+    return;
+  }
+  if (window.STAW && typeof window.STAW.api === "function") {
+    window.STAW.api("/orders").then(prRenderOrders, prRenderOrdersError);
+  } else {
+    prRenderOrdersError(null);
   }
 }
 
@@ -978,17 +1011,30 @@ function prGetAddresses() {
   if (u && Array.isArray(u.addresses) && u.addresses.length) {
     return u.addresses.slice();
   }
-  // Фолбэк (демо, до первого входа): локально добавленные.
+  // Фолбэк: локальная копия адресов ЭТОГО аккаунта (ключ с id). Общий ключ
+  // "staw_addresses" раньше показывал адреса прошлого пользователя следующему,
+  // вошедшему в том же браузере (аудит D02); его чистит ecosystem.js при смене сессии.
+  const key = prAddressesKey(u);
+  if (!key) return [];
   try {
-    return JSON.parse(localStorage.getItem("staw_addresses") || "[]");
+    const arr = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(arr) ? arr : [];
   } catch (e) {
     return [];
   }
 }
 
+// Ключ локальной копии адресов: по аккаунту. Без входа — не храним вовсе.
+function prAddressesKey(u) {
+  const id = u && (u.id || u.userId);
+  return id ? "staw_addresses:" + id : null;
+}
+
 function prSaveAddresses(arr) {
+  const key = prAddressesKey(prGetUser());
+  if (!key) return;
   try {
-    localStorage.setItem("staw_addresses", JSON.stringify(arr));
+    localStorage.setItem(key, JSON.stringify(arr));
   } catch (e) {}
 }
 
