@@ -18,7 +18,7 @@ from common.security import (
 from loyalty.models import seed_runner_points
 
 from .models import Account
-from . import otp_guard
+from . import login_guard, otp_guard
 from .sms import channel_info, check_code, code_error, request_code, sms_enabled
 
 
@@ -76,6 +76,7 @@ def register(request):
 
 @api_view(["POST"])
 @throttle_classes([AuthEndpointThrottle])
+@login_guard.limit_failures  # + лимит неудач на один аккаунт, с любых адресов (аудит D03)
 def login(request):
     """Вход по паролю: {phone, password} (основной путь) или {email, password} (легаси)."""
     d = request.data

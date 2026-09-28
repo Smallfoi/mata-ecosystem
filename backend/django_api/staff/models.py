@@ -171,8 +171,12 @@ class StaffAudit(models.Model):
 
 
 def _client_ip(request):
-    fwd = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
-    return fwd or request.META.get("REMOTE_ADDR") or None
+    # Раньше брали первый элемент X-Forwarded-For — его задаёт сам клиент, и в журнал
+    # можно было записать любой адрес. Теперь — общий доверенный источник (аудит D03).
+    from common.clientip import client_ip
+
+    ip = client_ip(request)
+    return None if ip == "unknown" else ip
 
 
 class OwnerPin(models.Model):
