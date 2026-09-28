@@ -200,17 +200,25 @@ def onec_orders_ack(request):
         return _reject("orders", "Требуется токен обмена", 401)
     body = request.data if isinstance(request.data, dict) else {}
     ids = body.get("orderIds")
+    # serverIds — глобальные номера заказов (аудит B06), однозначны; orderIds —
+    # короткие номера, старый контракт. Можно прислать любое из двух или оба.
+    server_ids = body.get("serverIds")
     if isinstance(request.data, list):
         ids = request.data
-    if not isinstance(ids, list):
-        return _reject("orders", "Ожидается {\"orderIds\": [...]}", 400)
+    if ids is None and isinstance(server_ids, list):
+        ids = []
+    if not isinstance(ids, list) or not isinstance(server_ids or [], list):
+        return _reject("orders", "Ожидается {\"orderIds\": [...]} или {\"serverIds\": [...]}", 400)
 
     from .log import record
-    from .onec_orders import mark_taken
+    from .onec_orders import _ambiguous_error, mark_taken
 
-    result = mark_taken(ids)
-    record("orders", {"received": len(ids), "updated": result["acked"],
-                      "errors": [f"{o}: заказ не найден" for o in result["unknown"]]},
+    result = mark_taken(ids, server_ids or [])
+    errors = [f"{o}: заказ не найден" for o in result["unknown"]]
+    errors += [f"serverId {o}: заказ не найден" for o in result["unknownServerIds"]]
+    errors += [_ambiguous_error(o) for o in result["ambiguous"]]
+    record("orders", {"received": len(ids) + len(server_ids or []),
+                      "updated": result["acked"], "errors": errors},
            started=started)
     return Response(result)
 

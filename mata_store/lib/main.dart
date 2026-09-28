@@ -93,13 +93,14 @@ void main() async {
         ChangeNotifierProxyProvider<AuthProvider, NotificationsProvider>(
           create: (_) => NotificationsProvider(prefs,
               api: api, serverBacked: ApiConfig.useApiNotifications && api != null),
-          update: (_, auth, notif) => notif!..syncAuth(auth.isLoggedIn),
+          update: (_, auth, notif) =>
+              notif!..syncAuth(auth.isLoggedIn, userId: auth.user?.id),
         ),
         ChangeNotifierProxyProvider<AuthProvider, LoyaltyProvider>(
           create: (_) => LoyaltyProvider(prefs, loyaltyRepo,
               serverBacked: ApiConfig.useApiLoyalty),
           update: (_, auth, loyalty) {
-            loyalty!.syncAuth(auth.isLoggedIn);
+            loyalty!.syncAuth(auth.isLoggedIn, userId: auth.user?.id);
             return loyalty;
           },
         ),
@@ -110,7 +111,8 @@ void main() async {
               serverBacked: ApiConfig.useApiOrder),
           update: (_, auth, notifier, order) {
             order!.attachNotifier(notifier);
-            order.syncAuth(auth.isLoggedIn);
+            // Своя история у каждого аккаунта (аудит C03).
+            order.syncAuth(auth.isLoggedIn, userId: auth.user?.id);
             return order;
           },
         ),

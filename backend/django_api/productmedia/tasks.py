@@ -22,3 +22,9 @@ def regenerate_job(job_id):
         return {"error": "задание %s не найдено" % job_id}
     service.generate(job)
     return {"status": job.status}
+
+
+@shared_task(name="productmedia.recover_stuck_jobs")
+def recover_stuck_jobs():
+    """Зависшие «Генерируется» (воркер умер посреди генерации) → «Ошибка» (аудит F04)."""
+    return {"recovered": service.recover_stuck()}

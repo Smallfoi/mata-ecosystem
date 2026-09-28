@@ -42,29 +42,31 @@ def create_for_order(uid: str, order_id: str, items: list) -> int:
     try:
         from catalog.models import Product
 
-        for it in items or []:
+        lines = [it for it in (items or []) if isinstance(it, dict)]
+        ids = {str(it.get("productId") or "").strip() for it in lines} - {""}
+        # Только обувь (категория 'shoes') — одной выборкой, а не запросом на строку.
+        shoes = {p.pk: p for p in Product.objects.filter(pk__in=ids, category_id="shoes")}
+        for it in lines:
             pid = str(it.get("productId") or "").strip()
-            if not pid:
+            prod = shoes.get(pid)
+            # Неизвестный товар и не обувь пропускаем.
+            if not prod:
                 continue
-            prod = Product.objects.filter(pk=pid).first()
-            # Только обувь (категория 'shoes'); неизвестный товар пропускаем.
-            if not prod or prod.category_id != "shoes":
-                continue
-            qty = int(it.get("quantity") or 1)
             # Фото: загруженное в админке (или старый ассет) → URL по сети.
             image = prod.network_image_url() or _media_url(it.get("imageUrl") or "")
             model = prod.name or it.get("productName") or "Кроссовки"
-            for _ in range(max(1, qty)):
-                # update_or_create по (user, order, product) → без дублей при
-                # повторном POST того же заказа. Статус по умолчанию 'pending'.
-                _, was_created = ShoeAsset.objects.get_or_create(
-                    user_id=uid,
-                    order_id=order_id,
-                    product_id=pid,
-                    defaults={"model": model, "image_url": image},
-                )
-                if was_created:
-                    created += 1
+            # get_or_create по (user, order, product) → без дублей при повторном
+            # POST того же заказа; несколько пар одной позиции — тоже одна запись
+            # (так было и раньше: повтор с тем же ключом ничего не создавал).
+            # Статус по умолчанию 'pending'.
+            _, was_created = ShoeAsset.objects.get_or_create(
+                user_id=uid,
+                order_id=order_id,
+                product_id=pid,
+                defaults={"model": model, "image_url": image},
+            )
+            if was_created:
+                created += 1
     except Exception:
         # трекер — не критичный путь, заказ важнее
         pass

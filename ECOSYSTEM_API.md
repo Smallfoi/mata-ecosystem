@@ -141,9 +141,23 @@
     "paymentType": "card | cash | sbp"
   },
   "status": "pending | processing | shipped | delivered | cancelled",
-  "createdAt": "2026-06-05T13:09:00Z"
+  "createdAt": "2026-06-05T13:09:00Z",
+
+  // ↓ добавляет сервер в ответах /orders (аудит B08) — актуальное состояние
+  "serverId": 5812,                 // глобальный номер заказа на сервере
+  "serverStatus": "pending | paid | shipped | delivered | cancelled",
+  "paymentStatus": "pending | paid | canceled | refunded | partially_refunded | none",
+  "onecStatus": "'' | accepted | assembled | shipped | delivered | canceled",
+  "onecStatusAt": "2026-06-06T10:00:00+00:00",   // null, пока статусов из 1С не было
+  "onecNumber": "УТ-000123",        // номер документа в 1С, '' если нет
+  "courierNote": "Иван, +7…, к 18:00" // кто везёт и когда, '' если нет
 }
 ```
+> **Актуальное состояние (B08).** Сервер хранит присланный при оформлении payload и
+> отдаёт его поля как есть, но `status` берёт из своего состояния (оплата, отмена,
+> статусы 1С). Серверный `paid` в `status` отдаётся как `processing` — это словарь
+> приложения; сырой серверный статус — в `serverStatus`. Клиент должен считать
+> серверные поля главнее локальной копии заказа.
 > В Sport Store уже есть всё, кроме `userId` и `pointsRedeemed` — добавить при подключении backend (см. §6 Пробелы).
 
 ### 2.4 Loyalty (Loyalty) — ЯДРО ЭКОСИСТЕМЫ
@@ -258,6 +272,21 @@ GET /products/price-range               → { min, max }
 GET /banners                            → Banner[]
 ```
 
+**Витрина `/models`: размер ответа и страницы (аудит F01).** Замер прода 27.09.2026:
+208 карточек (780 складских позиций), ~190 КБ JSON одним ответом (gzip — ~15 КБ).
+- Без параметров — **весь список массивом, как раньше** (выпущенные сборки Store и сайт
+  читают его целиком; ломать нельзя).
+- `?limit=N&offset=M` (или `page=K` с 1) — страница карточек, тот же массив `ModelCard[]`.
+  Режется по моделям (размеры одной модели не делятся). `limit` ≤ 100; неверные
+  значения → 400 `{error: "bad_paging"}`. Сочетается с `category`/`q`/`new`/`featured`/`platform`.
+- Заголовки: `X-Total-Count` — всего моделей с учётом фильтров (всегда), `X-Offset`/`X-Limit` —
+  при странице; открыты для сайта через CORS (`Access-Control-Expose-Headers`).
+- `ETag` + `If-None-Match` → 304 без тела; gzip при `Accept-Encoding: gzip`.
+- Бюджет: **2 запроса к БД** (позиции + фото страницы) при любом размере каталога —
+  закреплено тестом `catalog/tests_models_paging.py`.
+- Следующий шаг (клиенты пока не переведены): лента Store и сайт — подгрузка по `limit=24`
+  с `offset` при прокрутке, поиск — первая страница; `X-Total-Count` для «ещё N».
+
 ### Обмен с 1С (D-62) — приём номенклатуры
 
 1С шлёт данные сама, мы у неё ничего не запрашиваем. Авторизация — постоянный
@@ -303,25 +332,36 @@ price?, oldPrice?, description?, sizes?, colors?, images? }`.
 
 ```
 GET  /integrations/1c/orders[?limit=200]              → { orders: [...] }
-POST /integrations/1c/orders/ack     { orderIds: [] } → { acked, unknown[] }
-POST /integrations/1c/orders/status  { orders: [...] }→ { received, updated, errors }
+POST /integrations/1c/orders/ack     { serverIds?: [], orderIds?: [] }
+                                     → { acked, unknown[], ambiguous[], unknownServerIds[] }
+POST /integrations/1c/orders/status  { orders: [...] }→ { received, updated, errors, ambiguous[] }
 ```
+
+**Идентификатор заказа (аудит B06).** `orderId` (`SS-xxxxx`) придумывает клиент, он
+уникален только вместе с пользователем. Глобальный номер — `serverId` (id заказа на
+сервере): он есть в каждом заказе выдачи, по нему 1С подтверждает (`serverIds`) и
+присылает статусы (`serverId`). Старый контракт по `orderId` работает, пока номер
+однозначен; если под номером несколько заказов, из них берётся тот, что вообще мог
+попасть в 1С (оплачен ЮKassa или уже забран). Не удалось однозначно — не трогаем ни
+один заказ: номер в `ambiguous` (+ в `errors` у статусов), строка журнала обмена —
+«частично», текст «номер неоднозначен — пришлите serverId». Прислали и `serverId`, и
+`orderId`, но они от разных заказов — статус не применяется, ошибка в `errors`.
 
 **Заказ остаётся в очереди, пока 1С не подтвердит приём** через `ack`. Оборванная
 связь не должна стоить покупателю заказа, поэтому выдача и подтверждение — разные
 запросы. Повторный `ack` не ошибка (`acked: 0`).
 
-**В очередь попадают только заказы, готовые к сборке:** оплата не требуется
-(`none`) или уже прошла (`paid`). Заказ, ждущий оплаты, в 1С не уходит — иначе там
-копятся брошенные корзины.
+**В очередь попадают только заказы, готовые к сборке:** оплата подтверждена ЮKassa
+(`paid` и есть номер платежа, D-72). Заказ, ждущий оплаты, и «оплаченный» без
+настоящего платежа в 1С не уходят — иначе там копятся брошенные корзины.
 
-Заказ отдаётся в виде: `{ orderId, createdAt, customer{phone,name,email}, items[],
+Заказ отдаётся в виде: `{ orderId, serverId, createdAt, customer{phone,name,email}, items[],
 total, deliveryCost, pointsRedeemed, payment, paymentStatus, delivery, address,
-postalCode }`. Позиция: `{ id, article, productId, name, size, color, qty, price }` —
+postalCode, test }`. Позиция: `{ id, article, productId, name, size, color, qty, price }` —
 `id` и `article` подставляются из карточки товара, чтобы склад не сопоставлял позиции
 по названию.
 
-**Статусы обратно:** `{ orderId, status, number? }`, где `status` — `accepted`,
+**Статусы обратно:** `{ serverId?, orderId?, status, number? }` (нужен хотя бы один из номеров), где `status` — `accepted`,
 `assembled`, `shipped`, `delivered`, `canceled`. `shipped`/`delivered`/`canceled`
 двигают общий статус заказа; `accepted` и `assembled` — этапы склада: их видно
 покупателю отдельной строкой, но общий статус не меняют. Один и тот же статус
@@ -344,6 +384,12 @@ POST /loyalty/transactions  LoyaltyTransaction → 200   (только redeem/п
                             source ∈ {runnerRun, runnerTerritory, purchase, registration} → 403
                             (анти-чит S-04 D-23: начисление считает сервер —
                              бег→/runs, территория→/territories/capture, покупка/рег→/orders)
+POST /loyalty/redeem  { amount, orderId, description? }   (прежний адрес Store; баллы списывает
+                            сам POST /orders по pointsRedeemed — D-72)
+                            → { ok, deduped, balance, spent }  списание по заказу уже есть (обычный путь)
+                            → { ok, balance, spent, level }    списал: тот же сервис и правила, что /orders
+                               (заказ существует и не отменён, amount == его pointsRedeemed, ≥50, ≤30%)
+                            → 400/404 { detail, balance }       нет orderId / заказа / нарушены правила
 ```
 
 ### Runs (история пробежек + серверный расчёт очков — анти-чит S-04)
@@ -358,6 +404,23 @@ POST /runs  { id, distanceMeters, elapsedSeconds, finishedAtMs, capturedTerritor
 (скорость ≤ 40 км/ч, дистанция/время, суточный лимит) и НАЧИСЛЯЕТ очки за бег
 (`runnerRun` = км×10), идемпотентно по `id`. Неправдоподобный забег → `flagged`, 0 очков.
 Клиент очки за бег больше НЕ присылает.
+Забег и начисление пишутся одной транзакцией; повтор того же `id` доводит начисление,
+если оно когда-то не дошло (ровно один раз). `id` чужого забега/трека → 409.
+Некорректные числа (не число, NaN/∞, отрицательные, время вне 1970…2100) → 400,
+ничего не сохраняется.
+Проверка суточных лимитов и запись идут под блокировкой на пользователя (общей с
+импортом тренировок): параллельные забеги не обходят потолок (аудит C06).
+
+### Territories · захват (анти-чит — docs/ANTICHEAT_TRUST.md)
+```
+POST /territories/capture { points: [[lat,lng],...], captureId, distanceMeters?, elapsedSeconds? }
+     → { ok, areaM2, points, blocksGained, blocksTotal, geojson, holdHoursLeft, unverified? }
+     дубль captureId → { ok, duplicate: true, areaM2, geojson }
+```
+Скорость = max(distanceMeters, длина маршрута по points) / elapsedSeconds; > 40 км/ч → 400.
+Без `elapsedSeconds` (нет / не число / ≤ 0) скорость не проверить: зона засчитывается,
+но `points` = 0 и `unverified: true` (аудит C06; mata_kvartal шлёт оба поля).
+Суточный потолок — 20 начисленных захватов за 24 ч (429), под блокировкой на пользователя.
 
 ### League (зачёты лиги и профиль бегуна — docs/LEAGUE_PLAN.md)
 ```
@@ -393,6 +456,10 @@ POST /runs/track  { runId, points: [[lat, lon, ms], ...] }
      района, пишет попытки и УДАЛЯЕТ трек через 14 дней (D-60). Выключен тумблер
      «участвовать в тропах» → { attempts: [], skipped: "trailsDisabled" }, трек
      не сохраняется вовсе.
+     Трек может прийти раньше сводки POST /runs. Если runId уже занят забегом,
+     треком или попыткой тропы ДРУГОГО пользователя → 409 «Конфликт id» (владелец
+     трека не меняется); повтор своего — идемпотентен. Точки с мусором (не число,
+     NaN/∞, вне диапазона, время вне 1970…2100) отбрасываются; меньше двух — 400.
 
 GET  /trails?lat=&lon=                  → { items: [ {id, name, lengthM, points,
                                             createdByMe, attemptedByMe} ] }
@@ -425,6 +492,10 @@ POST /workouts/import  { source, items[] }  → { imported, duplicates, skipped,
 GET  /workouts[?source=]                    → { items[] }
 DELETE /workouts/source/:source             → { removed }   (человек отключил источник)
 ```
+Отключение стирает данные тренировок, но не реестр учтённых (`workout_awards`:
+хэш ключа + баллы): переподключение возвращает тренировки в список без повторного
+начисления. Элемент с нечисловыми/бесконечными/гигантскими числами пропускается
+(`skipped`), остальные принимаются.
 `source`: `healthconnect` | `applehealth` | `file` | `garmin` | `suunto` | `coros`.
 Элемент: `{ sourceId, startedAtMs, durationS, distanceM, sport?, avgHr?, maxHr?, calories? }`.
 
@@ -478,7 +549,7 @@ JWT сохраняется → работает в Квартале, Store и н
               ↓ сервер валидирует забег и САМ начисляет runnerRun = км×10 = 120 (анти-чит S-04)
               ↓ единый баланс на backend
 Открыл Store → GET /loyalty/account → видит 430 баллов
-В корзине применяет → заказ с pointsRedeemed → POST /loyalty/transactions {source:"redeem", amount:-430}
+В корзине применяет → POST /orders {pointsRedeemed:430, ...} — сервер сам списывает (≥50, ≤30%)
 ```
 
 ### 4.3 Покупка → кроссовки (Store → Квартал)

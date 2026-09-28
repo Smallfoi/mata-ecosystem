@@ -176,3 +176,72 @@ class BlockSeasonHomeTests(ApiTestCase):
         self.assertEqual(
             self.api_post("/v1/blocks/home", {"blockId": bid}).status_code, 409
         )
+
+class NearestBlockTests(ApiTestCase):
+    """Подсказка «обеги этот круг» (D-74): один ближайший СВОБОДНЫЙ квартал."""
+
+    phone = "+79990002051"
+
+    # Площадь Ленина — центр Якутска, кварталы вокруг точно есть.
+    LAT, LON = 62.027, 129.732
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("load_blocks")
+
+    def _nearest(self, lat=None, lon=None):
+        return self.api_get(
+            f"/v1/blocks/nearest?lat={lat or self.LAT}&lon={lon or self.LON}"
+        )
+
+    def test_requires_auth(self):
+        self.assertEqual(
+            self.client.get(f"/v1/blocks/nearest?lat={self.LAT}&lon={self.LON}").status_code,
+            401,
+        )
+
+    def test_requires_coordinates(self):
+        self.assertEqual(self.api_get("/v1/blocks/nearest").status_code, 400)
+        self.assertEqual(self.api_get("/v1/blocks/nearest?lat=62&lon=nope").status_code, 400)
+        self.assertEqual(self.api_get("/v1/blocks/nearest?lat=999&lon=0").status_code, 400)
+
+    def test_returns_runnable_loop(self):
+        """Подсказка бесполезна без длины круга: человек решает по ней, побежит ли."""
+        b = self._nearest().json()["block"]
+        self.assertIsNotNone(b)
+        self.assertEqual(b["rel"], "free")
+        self.assertGreaterEqual(b["loopMeters"], 300)
+        self.assertLessEqual(b["loopMeters"], 5000)
+        self.assertEqual(b["geojson"]["type"], "Polygon")
+
+    def test_suggests_the_closest_one(self):
+        """Ближайший — значит ближайший: дальше него свободных быть не должно."""
+        b = self._nearest().json()["block"]
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT MIN(ST_Distance(geom::geography, "
+                "ST_SetSRID(ST_MakePoint(%s,%s),4326)::geography)) FROM city_blocks "
+                "WHERE ST_Perimeter(geom::geography) BETWEEN 300 AND 5000",
+                [self.LON, self.LAT],
+            )
+            closest = cur.fetchone()[0]
+        self.assertAlmostEqual(b["distanceMeters"], round(closest), delta=1)
+
+    def test_owned_block_is_not_suggested(self):
+        """Свой квартал не предлагаем: повтор не даёт баллов, бежать туда незачем."""
+        first = self._nearest().json()["block"]
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO block_ownership (block_id, owner_id, captured_at) "
+                "VALUES (%s,%s,now())",
+                [first["blockId"], self.uid],
+            )
+        again = self._nearest().json()["block"]
+        self.assertNotEqual(again["blockId"], first["blockId"])
+
+    def test_far_away_gets_no_suggestion(self):
+        """В сотне километров от города подсказывать нечего — и это не ошибка."""
+        r = self._nearest(lat=60.0, lon=120.0)
+        self.assertEqual(r.status_code, 200)
+        self.assertIsNone(r.json()["block"])
+

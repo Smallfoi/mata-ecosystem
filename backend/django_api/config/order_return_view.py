@@ -59,12 +59,22 @@ def order_return(request, pk):
                 StaffAudit.write(
                     request,
                     f"возврат по заказу {order.order_id}: {_rub(ret.amount_kop)} ₽, "
-                    f"баллов +{ret.points_returned} / −{ret.points_revoked}",
+                    f"баллов +{ret.points_returned} / −{ret.points_revoked}"
+                    + ("" if ret.status == "done" else " (ждёт подтверждения ЮKassa)"),
                 )
-                request.session["order_return_note"] = (
-                    f"Возврат проведён: {_rub(ret.amount_kop)} ₽. Баллов возвращено "
-                    f"{ret.points_returned}, снято начисленных {ret.points_revoked}."
-                )
+                if ret.status == "done":
+                    request.session["order_return_note"] = (
+                        f"Возврат проведён: {_rub(ret.amount_kop)} ₽. Баллов возвращено "
+                        f"{ret.points_returned}, снято начисленных {ret.points_revoked}."
+                    )
+                else:
+                    # Деньги ещё не подтверждены (аудит B04): баллы и статус заказа
+                    # изменятся, когда ЮKassa подтвердит возврат.
+                    request.session["order_return_note"] = (
+                        f"Возврат {_rub(ret.amount_kop)} ₽ отправлен в ЮKassa и ждёт "
+                        "подтверждения. Баллы и статус заказа изменятся после него — "
+                        "повторять возврат не нужно."
+                    )
                 # POST → redirect → GET: обновление страницы не повторит возврат.
                 return redirect(request.path)
         else:
@@ -111,7 +121,7 @@ def order_return(request, pk):
         "may_edit": may_edit,
         "returnable": order.payment_status in RETURNABLE and bool(order.payment_id),
         "returns": returns,
-        "paid_rub": _rub(round(float(order.total or 0) * 100)),
+        "paid_rub": _rub(order.amount_kop),
         "payment_label": PAYMENT_LABELS.get(order.payment_status, order.payment_status),
         "redeemed": redeemed_for(order),
         "earned": earned_for(order),
