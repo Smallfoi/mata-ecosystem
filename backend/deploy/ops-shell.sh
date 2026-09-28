@@ -12,10 +12,12 @@
 #   health                      проверка API снаружи (HTTPS)
 #   disk                        место на диске
 #   logs <сервис> [строк]       логи web|worker|beat|db|redis|nginx, максимум 1000
+#                               (телефоны, почта, токены и коды затираются)
 #   restart <сервис>            перезапуск web|worker|beat
 #   refresh-env                 пересобрать .env из Lockbox и перезапустить
 #   flags                       показать флаги направлений (D-89)
 #   manage <команда> [--apply]  безопасные management-команды из списка ниже
+#   selftest                    проверка затирания персональных данных
 #
 # Чего НЕЛЬЗЯ по построению: произвольные shell-команды, чтение `.env` и любых
 # секретов, SQL, доступ к ключам, проброс портов, интерактивная оболочка.
@@ -32,7 +34,7 @@ note() { printf '%s  %s\n' "$(date -Is)" "$*" | sudo tee -a "$LOG" >/dev/null 2>
 deny() {
   note "ОТКАЗ: ${CMD:-<пусто>}${1:+ — $1}"
   echo "Отказано: «${CMD:-<пусто>}» не входит в разрешённый список." >&2
-  echo "Разрешено: status | health | disk | logs | restart | refresh-env | flags | manage" >&2
+  echo "Разрешено: status | health | disk | logs | restart | refresh-env | flags | manage | selftest" >&2
   exit 42
 }
 
@@ -42,6 +44,20 @@ case "$CMD" in
 esac
 read -r -a ARGS <<< "$CMD"
 verb="${ARGS[0]:-}"
+
+# Затирание персональных данных и секретов (28.09.2026). Логи прода — это
+# телефоны покупателей, коды входа и токены в заголовках; агенту они не нужны
+# ни для одной задачи, а утекать в переписку не должны. Затираем ДО выдачи.
+redact() {
+  sed -E \
+    -e 's/(eyJ[A-Za-z0-9_-]{6,})\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/<токен скрыт>/g' \
+    -e 's/([Bb]earer )[A-Za-z0-9._~+\/-]{8,}=*/\1<токен скрыт>/g' \
+    -e 's/([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/<почта скрыта>/g' \
+    -e 's/([A-Za-z_]*(SECRET|TOKEN|PASSWORD|PASSWD|APIKEY|API_KEY|KEY)[A-Za-z_]*)[=:][^ "'"'"',;]+/\1=<скрыто>/g' \
+    -e 's/[0-9]{14,19}/<длинный номер скрыт>/g' \
+    -e 's/(^|[^0-9])(\+?[78])[ (-]?[0-9]{3}[) -]?[0-9]{3}[ -]?[0-9]{2}[ -]?[0-9]{2}([^0-9]|$)/\1<телефон скрыт>\3/g' \
+    -e 's/([Кк]од|[Cc]ode|otp|OTP)([^0-9A-Za-zА-Яа-я]{1,8})[0-9]{4,6}/\1\2<код скрыт>/g'
+}
 
 svc_logs() { case "$1" in web|worker|beat|db|redis|nginx) return 0 ;; *) return 1 ;; esac; }
 svc_restart() { case "$1" in web|worker|beat) return 0 ;; *) return 1 ;; esac; }
@@ -78,7 +94,7 @@ case "$verb" in
     lines="${ARGS[2]:-100}"
     svc_logs "$svc" || deny "неизвестный сервис"
     [[ "$lines" =~ ^[0-9]{1,4}$ ]] && [ "$lines" -le 1000 ] || deny "строк: 1..1000"
-    "${COMPOSE[@]}" logs --tail "$lines" --no-color "$svc"
+    "${COMPOSE[@]}" logs --tail "$lines" --no-color "$svc" 2>&1 | redact
     ;;
 
   restart)
@@ -108,12 +124,31 @@ for f in F.objects.all():
         *) deny "аргумент «$a» не разрешён" ;;
       esac
     done
-    "${COMPOSE[@]}" exec -T web python manage.py "$sub" "${extra[@]}"
+    "${COMPOSE[@]}" exec -T web python manage.py "$sub" "${extra[@]}" 2>&1 | redact
+    ;;
+
+  selftest)
+    # Проверяем на заведомо «грязных» строках: что не затёрлось — то утечёт.
+    fixture='вход +7 914 827 8470 код 4821; user ivan.petrov@mail.ru
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcDEF-123_xyz
+YOOKASSA_SECRET_KEY=live_AbCdEf123456 карта 4276380012345678'
+    out="$(printf '%s\n' "$fixture" | redact)"
+    printf '%s\n' "$out"
+    echo "---"
+    bad=0
+    for leak in "8470" "ivan.petrov" "eyJzdWIiOiIxIn0" "live_AbCdEf123456" "4276380012345678"; do
+      if printf '%s' "$out" | grep -qF "$leak"; then
+        echo "УТЕЧКА: «$leak» осталось в выводе" >&2
+        bad=1
+      fi
+    done
+    [ "$bad" = 0 ] && echo "Затирание работает: телефон, почта, токен, секрет и номер карты скрыты."
+    exit "$bad"
     ;;
 
   ""|help|--help)
     echo "Разрешено: status | health | disk | logs <сервис> [строк] | restart <сервис> |"
-    echo "           refresh-env | flags | manage <команда> [--apply]"
+    echo "           refresh-env | flags | manage <команда> [--apply] | selftest"
     ;;
 
   *)
