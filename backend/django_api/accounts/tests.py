@@ -301,7 +301,7 @@ class AccountDeletionTests(ApiTestCase):
         self.api_post("/v1/orders", {"id": "o1", "total": 500, "items": []})  # заказ
         self.api_post("/v1/orders/o1/pay", {})  # оплата (dev) — баллы за покупку
         self.assertTrue(LoyaltyTransaction.objects.filter(user_id=self.uid).exists())
-        # Удалить можно после получения и 7 дней срока возврата (D-103).
+        # Удалить можно после получения и 7 дней срока возврата (D-104).
         from datetime import timedelta
 
         from django.utils import timezone
