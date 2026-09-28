@@ -115,6 +115,9 @@ jobs:
           DJANGO_DEBUG: '0'
           DJANGO_ALLOWED_HOSTS: api.example.com
           POSTGRES_PASSWORD: ci-fake-not-used-for-connect
+          # Обязательны в проде (строгая проверка D09): check к ним не подключается.
+          REDIS_URL: redis://localhost:6379/0
+          DJANGO_CORS_ORIGINS: https://example.com
         run: |
           DJANGO_SECRET_KEY="ci-$(openssl rand -hex 32)"
           JWT_SECRET="ci-$(openssl rand -hex 32)"
