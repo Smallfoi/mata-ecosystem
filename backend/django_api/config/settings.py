@@ -159,6 +159,10 @@ DATABASES = {
     }
 }
 
+# Заголовки ответа, которые браузер отдаёт скрипту сайта с другого домена:
+# общее число карточек при постраничной витрине `/v1/models?limit=` (аудит F01).
+CORS_EXPOSE_HEADERS = ["X-Total-Count", "X-Offset", "X-Limit"]
+
 # CORS. Прод: DJANGO_CORS_ORIGINS="https://mata-club.ru,https://www.mata-club.ru" — тогда
 # разрешаем только их. Dev (переменная пуста) — разрешаем всё (приложения и сайт
 # ходят с устройства/localhost).
@@ -199,30 +203,40 @@ if not DEBUG:
     # Referrer наружу не утекает: адрес админки с параметрами — сам по себе улика.
     SECURE_REFERRER_POLICY = "same-origin"
 
-# P0-страховка: НЕ стартуем прод (DEBUG=0) с дефолтными секретами/ALLOWED_HOSTS=*.
-# Защита от катастрофы №1 — выкатить прод с публичным dev-секретом.
-from common.prodcheck import insecure_prod_settings  # noqa: E402
+# P0-страховка: НЕ стартуем прод (DEBUG=0) с дефолтными секретами/ALLOWED_HOSTS=*,
+# без Redis (иначе молча LocMem-кэш + Celery EAGER) и без CORS-списка (аудит D09).
+# Защита от катастрофы №1 — выкатить прод с публичным dev-секретом или в dev-режиме.
+# Что можно законно не иметь (интеграции из Lockbox) — только предупреждение: строка
+# в логе при старте и поле `configWarnings` в /v1/health. См. common/prodcheck.py.
+from common.prodcheck import prod_config_report  # noqa: E402
 
-_insecure = insecure_prod_settings(
-    debug=DEBUG,
-    secret_key=SECRET_KEY,
-    jwt_secret=os.environ.get("JWT_SECRET", "dev-secret-change-in-prod"),
-    db_password=DATABASES["default"]["PASSWORD"],
-    allowed_hosts=ALLOWED_HOSTS,
-)
-if _insecure:
+_prod_report = prod_config_report(os.environ, debug=DEBUG)
+if _prod_report["fatal"]:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
         "Небезопасная прод-конфигурация (DJANGO_DEBUG=0): задайте "
-        + ", ".join(_insecure)
-        + ". Запуск прода с дефолтами запрещён."
+        + ", ".join(_prod_report["fatal"])
+        + ". Запуск прода с дефолтами/в dev-режиме запрещён."
+    )
+if _prod_report["warnings"]:
+    import sys
+
+    sys.stderr.write(
+        "!!! MATA PROD CONFIG WARNING: не заданы "
+        + ", ".join(_prod_report["warnings"])
+        + " — прод работает в неполном режиме (см. common/prodcheck.py, /v1/health)\n"
     )
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     # Аутентификация — свой JWT (common.security), session-auth/CSRF DRF не используем.
     "DEFAULT_AUTHENTICATION_CLASSES": [],
+    # Перед Django ровно один прокси — наш nginx. Наши лимиты берут адрес из
+    # common/clientip.py и этот параметр не читают; он страхует штатные классы DRF,
+    # если их где-то подключат: без него get_ident склеивает весь X-Forwarded-For,
+    # который задаёт клиент (аудит D03).
+    "NUM_PROXIES": 1,
     # Rate-limiting (P0 безопасность): на пользователя (по JWT) + по IP для анонимных.
     # Лимиты щедрые — активное приложение (карта обновляет территории каждые ~12с,
     # синки) не упирается, но брутфорс/накрутка/DoS отсекаются. /auth — отдельно жёстко.
@@ -245,6 +259,9 @@ REST_FRAMEWORK = {
         # способности (581 rps), то есть как защита от перегруза лимит сохраняет смысл.
         # Упрёмся и в это — ответ кэш и CDN (D-31), а не дальнейшее повышение.
         "public": "3000/min",
+        # Поиск друзей по контактам (аудит F02): до 3000 хешей за раз — 20 вызовов
+        # в час на человека хватает с запасом, а перебор номеров становится долгим.
+        "contacts": "20/hour",
     },
 }
 
@@ -542,7 +559,10 @@ else:
     }
 
 # ── Celery: фоновые задачи/очереди/beat (D-07) ──────────────────────────────
-# Брокер — Redis (тот же REDIS_URL, что и кэш; отдельный CELERY_BROKER_URL перекрывает).
+# Брокер — CELERY_BROKER_URL; без него — тот же REDIS_URL, что и кэш (dev-стек).
+# В ПРОДЕ брокер ОБЯЗАН быть отдельным Redis с noeviction (аудит E04): кэш живёт с
+# allkeys-lru и при нехватке памяти молча выкинул бы очереди задач. docker-compose.prod.yml
+# задаёт CELERY_BROKER_URL=redis://redis-broker:6379/0 web/worker/beat — приоритет у него.
 # БЕЗ брокера — EAGER: задачи выполняются синхронно inline (dev/CI/тесты не требуют
 # Redis и работают как раньше). В проде поднимаем `celery worker` + `celery beat`.
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "") or _redis_url
@@ -578,6 +598,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "orders.expire_unpaid_orders",
         "schedule": crontab(minute="*/5"),
     },
+    # Возвраты «в обработке» (аудит B04): подтверждение ЮKassa могло не дойти.
+    "reconcile-order-returns": {
+        "task": "orders.reconcile_returns",
+        "schedule": crontab(minute="*/5"),
+    },
     # Авто-парсер афиши «Стартов»: раз в сутки в 05:00 (Asia/Yakutsk). Идемпотентно
     # (upsert по source+external_id). Источники — races/importers/.
     # Треки живут 14 дней и удаляются (D-60) — это условие всей затеи с тропами.
@@ -588,6 +613,12 @@ CELERY_BEAT_SCHEDULE = {
     "import-races-daily": {
         "task": "races.import_races",
         "schedule": crontab(hour=5, minute=0),
+    },
+    # Фотопайплайн: задание, зависшее в «Генерируется» (воркер упал), → «Ошибка» с
+    # кнопкой «Повторить». Генерацию сама не запускает (аудит F04).
+    "photo-recover-stuck-jobs": {
+        "task": "productmedia.recover_stuck_jobs",
+        "schedule": crontab(minute="*/10"),
     },
 }
 

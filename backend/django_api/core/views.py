@@ -5,6 +5,8 @@ from django.db import connection
 from rest_framework.decorators import api_view, throttle_classes
 from rest_framework.response import Response
 
+from common.prodcheck import config_warnings
+
 
 def _db_ok():
     try:
@@ -38,6 +40,10 @@ def health(_request):
             "db": db_ok,
             "cache": _cache_ok(),
             "time": datetime.now(timezone.utc).isoformat(),
+            # Аудит D09: чего не хватает в прод-конфигурации (имена переменных, без
+            # значений). Прод с ними работает, но в неполном/опасном режиме — видно
+            # мониторингу и владельцу без захода на сервер. В dev всегда [].
+            "configWarnings": config_warnings(),
         }
     )
 

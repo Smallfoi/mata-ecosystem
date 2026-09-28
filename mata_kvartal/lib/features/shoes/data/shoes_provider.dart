@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_config.dart';
+import '../../../core/storage/account_scope.dart';
 import '../../auth/data/auth_provider.dart';
 
 /// Кроссовки пользователя — связка экосистемы Store ↔ Квартал (ECOSYSTEM_API §2.5).
@@ -230,7 +231,9 @@ class ShoesNotifier extends StateNotifier<ShoesState> {
 
   Future<void> _enqueue(Map<String, dynamic> item) async {
     final prefs = await SharedPreferences.getInstance();
-    final list = _readPending(prefs)..add(item);
+    // Владелец — кто вошёл сейчас (C03): под другим аккаунтом не отправится.
+    final list = _readPending(prefs)
+      ..add(withOwner(item, ref.read(authProvider).user?.id));
     await prefs.setString(_pendingKey, jsonEncode(list));
   }
 
@@ -247,9 +250,12 @@ class ShoesNotifier extends StateNotifier<ShoesState> {
   /// Досылает очередь по порядку; на первой сетевой ошибке стоп и сохраняем остаток.
   Future<void> _flushPending(String token) async {
     final prefs = await SharedPreferences.getInstance();
-    final pending = _readPending(prefs);
-    if (pending.isEmpty) return;
-    final remaining = <Map<String, dynamic>>[];
+    final all = _readPending(prefs);
+    if (all.isEmpty) return;
+    // Только свои пробеги (C03): чужие ждут входа своего владельца.
+    final me = ref.read(authProvider).user?.id;
+    final pending = all.where((e) => isOwnedBy(e, me)).toList();
+    final remaining = all.where((e) => !isOwnedBy(e, me)).toList();
     for (var i = 0; i < pending.length; i++) {
       final item = pending[i];
       final shoeId = item['shoeId']?.toString() ?? '';

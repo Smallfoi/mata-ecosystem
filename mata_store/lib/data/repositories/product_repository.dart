@@ -134,7 +134,11 @@ class ApiProductRepository implements ProductRepository {
   /// (ApiConfig.preview) добавляем ещё ?preview=1 — каталог отдаёт и черновики.
   Map<String, dynamic>? _q([Map<String, dynamic>? base]) {
     final q = <String, dynamic>{...?base, 'platform': 'app'};
-    if (ApiConfig.preview) q['preview'] = '1';
+    if (ApiConfig.preview) {
+      q['preview'] = '1';
+      final token = ApiConfig.previewToken;
+      if (token.isNotEmpty) q['preview_token'] = token;
+    }
     return q;
   }
 

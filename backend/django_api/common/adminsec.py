@@ -25,6 +25,8 @@ from django.core.cache import cache
 from django.dispatch import receiver
 from django.http import HttpResponse
 
+from common.clientip import client_ip
+
 MAX_FAILS = 10          # попыток с одного адреса
 MAX_FAILS_USER = 8      # попыток по одному логину, с любых адресов
 WINDOW_SECONDS = 900    # 15 минут
@@ -34,11 +36,9 @@ _login_path = None
 
 
 def _client_ip(request) -> str:
-    return (
-        request.META.get("HTTP_X_REAL_IP")
-        or request.META.get("REMOTE_ADDR")
-        or "unknown"
-    )
+    # Единый источник адреса (аудит D03): X-Real-IP учитывается, только если запрос
+    # пришёл от нашего прокси. Имя оставлено — его импортирует accounts.otp_guard.
+    return client_ip(request)
 
 
 def _key(ip: str) -> str:

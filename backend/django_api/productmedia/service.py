@@ -12,8 +12,10 @@
 (status=failed, текст в error) и НЕ роняет воркер.
 """
 import re
+from datetime import timedelta
 
 from django.core.files.base import ContentFile
+from django.db.models import Q
 from django.utils import timezone
 
 from catalog.models import Product
@@ -90,17 +92,66 @@ def intake(batch, items):
     return jobs
 
 
+# «Генерируется» дольше этого — обработчик умер (перезапуск воркера, OOM, деплой):
+# задание можно забрать снова, а фоновая чистка переводит его в «Ошибку» (аудит F04).
+# Генерация идёт до ~2 мин, чтение ответа ИИ ограничено 5 мин (providers._TIMEOUT).
+STALE_PROCESSING = timedelta(minutes=30)
+STUCK_ERROR = "генерация прервалась (обработчик остановился) — нажмите «Повторить»"
+
+# Из каких статусов задание берут в работу. Фоновые задачи — только из очереди:
+# повторная доставка той же задачи или двойной «Переделать» не запустит вторую
+# генерацию. Ручной запуск из админки — из любого, кроме уже идущей генерации.
+CLAIM_QUEUED = (PhotoJob.STATUS_PENDING,)
+CLAIM_MANUAL = tuple(code for code, _ in PhotoJob.STATUS_CHOICES
+                     if code != PhotoJob.STATUS_PROCESSING)
+
+
+def claim(job, from_statuses=CLAIM_QUEUED):
+    """Атомарно забрать задание в работу: статус → «Генерируется».
+
+    Один условный UPDATE: из двух обработчиков строку получит ровно один — второй
+    увидит уже изменённый статус и получит 0 строк. Зависшее «Генерируется» (старше
+    STALE_PROCESSING) забрать можно. True — задание наше, False — занято/не в том статусе
+    (тогда job перечитан из базы и его трогать нельзя).
+    """
+    now = timezone.now()
+    cond = Q(status__in=list(from_statuses)) | Q(
+        status=PhotoJob.STATUS_PROCESSING, updated_at__lt=now - STALE_PROCESSING)
+    taken = PhotoJob.objects.filter(cond, pk=job.pk).update(
+        status=PhotoJob.STATUS_PROCESSING, updated_at=now)
+    if taken:
+        job.status = PhotoJob.STATUS_PROCESSING
+        job.updated_at = now
+        return True
+    job.refresh_from_db()
+    return False
+
+
+def recover_stuck(max_age=STALE_PROCESSING):
+    """Зависшие «Генерируется» → «Ошибка» с понятным текстом (кнопка «Повторить»).
+
+    Сама генерацию не запускает: запрос к ИИ платный, повтор решает человек.
+    Возвращает число исправленных заданий.
+    """
+    now = timezone.now()
+    return PhotoJob.objects.filter(
+        status=PhotoJob.STATUS_PROCESSING, updated_at__lt=now - max_age,
+    ).update(status=PhotoJob.STATUS_FAILED, error=STUCK_ERROR, updated_at=now)
+
+
 def _fail(job, text):
     job.status = PhotoJob.STATUS_FAILED
     job.error = str(text)[:2000]
     job.save(update_fields=["status", "error", "updated_at"])
 
 
-def generate(job, note=None):
+def generate(job, note=None, from_statuses=CLAIM_QUEUED):
     """Исходник → мастер (ИИ) → webp на задании → статус «На проверке». Витрину НЕ трогает.
 
     note — замечание к этой попытке (по умолчанию берётся последнее job.note, его ставит
     «Переделать»). Сбой ИИ/сети → «Ошибка» с текстом.
+    from_statuses — из каких статусов можно забрать задание (claim). Не удалось забрать
+    (другой обработчик уже генерирует) — ничего не делаем и возвращаем job как есть.
     """
     if job.product is None:
         job.status = PhotoJob.STATUS_SKIPPED
@@ -109,8 +160,8 @@ def generate(job, note=None):
         job.save(update_fields=["status", "error", "updated_at"])
         return job
 
-    job.status = PhotoJob.STATUS_PROCESSING
-    job.save(update_fields=["status", "updated_at"])
+    if not claim(job, from_statuses):
+        return job
     try:
         # Открываем заново: при повторной генерации файл мог остаться закрытым после
         # прошлого чтения, и read() упал бы на «I/O operation on closed file».
@@ -230,10 +281,12 @@ def _attach(job, data_bytes):
 
 def run_batch(batch):
     """Сгенерировать все задания пакета «в очереди» → «На проверке». На витрину не выкладывает."""
-    summary = {"review": 0, "failed": 0, "skipped": 0}
+    summary = {"review": 0, "failed": 0, "skipped": 0, "busy": 0}
     for job in batch.jobs.filter(status=PhotoJob.STATUS_PENDING):
         generate(job)
-        if job.status == PhotoJob.STATUS_REVIEW:
+        if job.status == PhotoJob.STATUS_PROCESSING:
+            summary["busy"] += 1          # забрал другой обработчик — не трогаем
+        elif job.status == PhotoJob.STATUS_REVIEW:
             summary["review"] += 1
         elif job.status == PhotoJob.STATUS_FAILED:
             summary["failed"] += 1

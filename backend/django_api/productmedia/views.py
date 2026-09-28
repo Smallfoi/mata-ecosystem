@@ -10,6 +10,8 @@
 «Отклонить» — брак. Без «Принять» на витрину ничего не попадает.
 """
 import json
+import os
+import re
 
 from django.contrib import admin
 from django.contrib.admin.views.decorators import staff_member_required
@@ -20,6 +22,7 @@ from django.urls import reverse
 
 from catalog import photos as photolib
 from catalog.models import Product, ProductPhoto
+from common.uploads import prepare_image
 from productmedia import processing, service, tasks
 from productmedia.matching import _norm, match_folders_to_products
 from productmedia.models import PhotoBatch, PhotoDetail, PhotoJob, PhotoPrompt
@@ -45,6 +48,14 @@ def _url(field):
         return field.url if field else ""
     except Exception:                            # noqa: BLE001 — нет файла в хранилище
         return ""
+
+
+def _safe_name(name, ext, fallback):
+    """Имя файла для хранилища: основа из имени клиента без опасных символов,
+    расширение — по содержимому (клиентскому «.html» в хранилище не бывать)."""
+    stem = os.path.splitext(os.path.basename(name or ""))[0]
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", stem).strip(".-")[:60] or fallback
+    return "%s.%s" % (stem, ext)
 
 
 def _color(product):
@@ -98,17 +109,22 @@ def _upload(request):
         return _err("файл больше %d МБ" % (MAX_BYTES // 1024 // 1024))
     if photo.content_type not in ALLOWED:
         return _err("нужен JPEG, PNG или WEBP")
+    # Тип — по содержимому с полным декодированием (D-37/D07): заголовок и имя шлёт клиент.
+    # Дальше идёт копия без EXIF/GPS/XMP; archival — без потерь, её ещё обрабатывает ИИ.
+    ext, clean, bad = prepare_image(photo, allowed={"jpg", "png", "webp"}, archival=True)
+    if bad:
+        return _err(bad)
     attach_as = request.POST.get("attach_as") or PhotoJob.ATTACH_GALLERY
     if attach_as == "detail":
         # Крупный план принта: не снимок витрины, а справка для генерации этого артикула.
-        row = service.add_detail(batch, request.POST.get("article") or "", photo,
-                                 photo.name or "detail.jpg")
+        row = service.add_detail(batch, request.POST.get("article") or "", clean,
+                                 _safe_name(photo.name, ext, "detail"))
         return JsonResponse({"ok": True, "detail": row.pk})
     if attach_as not in dict(PhotoJob.ATTACH_CHOICES):
         attach_as = PhotoJob.ATTACH_GALLERY
     job = service.intake(batch, [{
         "article": request.POST.get("article") or "",
-        "content": photo, "filename": photo.name or "source.jpg",
+        "content": clean, "filename": _safe_name(photo.name, ext, "source"),
         "attach_as": attach_as, "text": request.POST.get("text") or "",
     }])[0]
     return JsonResponse({"ok": True, "job": job.pk, "status": job.status})

@@ -15,10 +15,11 @@ abstract class AuthRepository {
   /// Чем подтверждается вход прямо сейчас: канал может смениться сам (D-78).
   Future<SmsCodeInfo> channelInfo(String phone);
   Future<AuthUser> registerByPhone(String phone, String code, String password, String name);
+  /// Единственный способ сменить/восстановить пароль (аудит D01): код на
+  /// телефон (`POST /auth/phone/request`), затем `POST /auth/password/reset`
+  /// {phone, code, password}. Маршрутов «сброс по email» и «смена по старому
+  /// паролю» на сервере нет — в клиенте их тоже нет.
   Future<AuthUser> resetPasswordByPhone(String phone, String code, String password);
-  Future<void> sendPasswordReset(String email);
-  Future<void> resetPassword(String newPassword);
-  Future<void> changePassword(String oldPassword, String newPassword);
 
   /// Обновление профиля на backend (источник правды). Возвращает актуального юзера.
   Future<AuthUser> updateProfile(
@@ -106,21 +107,6 @@ class MockAuthRepository implements AuthRepository {
   Future<AuthUser> resetPasswordByPhone(String phone, String code, String password) async {
     await Future.delayed(const Duration(milliseconds: 1000));
     return AuthUser(name: 'Гость', email: 'u_$phone@mata.local', phone: phone, provider: LoginProvider.phone);
-  }
-
-  @override
-  Future<void> sendPasswordReset(String email) async {
-    await Future.delayed(const Duration(milliseconds: 1200));
-  }
-
-  @override
-  Future<void> resetPassword(String newPassword) async {
-    await Future.delayed(const Duration(milliseconds: 1000));
-  }
-
-  @override
-  Future<void> changePassword(String oldPassword, String newPassword) async {
-    await Future.delayed(const Duration(milliseconds: 800));
   }
 
   @override
@@ -263,24 +249,6 @@ class ApiAuthRepository implements AuthRepository {
     final map = data as Map<String, dynamic>;
     _client.authToken = map['token'] as String?;
     return AuthUser.fromJson(map['user'] as Map<String, dynamic>);
-  }
-
-  @override
-  Future<void> sendPasswordReset(String email) async {
-    await _client.post('/auth/password/forgot', body: {'email': email});
-  }
-
-  @override
-  Future<void> resetPassword(String newPassword) async {
-    await _client.post('/auth/password/reset', body: {'password': newPassword});
-  }
-
-  @override
-  Future<void> changePassword(String oldPassword, String newPassword) async {
-    await _client.put(
-      '/auth/password',
-      body: {'old': oldPassword, 'new': newPassword},
-    );
   }
 
   @override

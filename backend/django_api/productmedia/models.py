@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db import models
 
 from catalog.models import Product
+from common.media import private_storage
 
 
 class PhotoBatch(models.Model):
@@ -77,9 +78,15 @@ class PhotoJob(models.Model):
     attach_as = models.CharField("Куда", max_length=8,
                                  choices=ATTACH_CHOICES, default=ATTACH_MAIN)
 
-    source = models.FileField("Исходник", upload_to="photopipeline/source/")
-    master = models.FileField("Мастер (ИИ)", upload_to="photopipeline/master/", blank=True)
-    webp = models.FileField("Витринный webp", upload_to="photopipeline/webp/", blank=True)
+    # Рабочие файлы фотопайплайна — в приватном хранилище (ACL private, подписанные
+    # ссылки): исходники съёмки и мастер-файлы не должны лежать в открытом доступе.
+    # На витрину снимок попадает копией через catalog.photos (публично) после «Принять».
+    source = models.FileField("Исходник", upload_to="photopipeline/source/",
+                              storage=private_storage)
+    master = models.FileField("Мастер (ИИ)", upload_to="photopipeline/master/", blank=True,
+                              storage=private_storage)
+    webp = models.FileField("Витринный webp", upload_to="photopipeline/webp/", blank=True,
+                            storage=private_storage)
 
     status = models.CharField("Статус", max_length=12, choices=STATUS_CHOICES,
                               default=STATUS_PENDING, db_index=True)
@@ -121,7 +128,8 @@ class PhotoDetail(models.Model):
     batch = models.ForeignKey(PhotoBatch, on_delete=models.CASCADE, related_name="details",
                               verbose_name="Пакет")
     article = models.CharField("Артикул (папка)", max_length=64, db_index=True)
-    image = models.FileField("Крупный план", upload_to="photopipeline/detail/")
+    image = models.FileField("Крупный план", upload_to="photopipeline/detail/",
+                             storage=private_storage)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

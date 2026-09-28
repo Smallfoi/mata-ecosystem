@@ -13,13 +13,26 @@
 Витрину throttle всё равно не защищает от скрейпинга — он обходится сменой адреса; там
 работают кэш и CDN (D-31).
 
-Прод: общий кэш (Redis) для счётчиков на нескольких воркерах — см. план D-07."""
+Прод: общий кэш (Redis) для счётчиков на нескольких воркерах — см. план D-07.
+
+**Адрес клиента** — только `common.clientip.client_ip` (аудит D03). Штатный `get_ident`
+DRF без `NUM_PROXIES` клеил в ключ весь `X-Forwarded-For`, который клиент задаёт сам:
+новый заголовок — новый счётчик, лимит входа не работал. Все классы ниже наследуют
+`_ClientIPMixin`, поэтому ни один из них этот заголовок не читает."""
 from rest_framework.throttling import SimpleRateThrottle
 
+from common.clientip import client_ip
 from common.security import user_id_from_request
 
 
-class UserJWTRateThrottle(SimpleRateThrottle):
+class _ClientIPMixin:
+    """Ключ «по адресу» — из доверенного источника, а не из заголовков клиента."""
+
+    def get_ident(self, request):
+        return client_ip(request)
+
+
+class UserJWTRateThrottle(_ClientIPMixin, SimpleRateThrottle):
     """Лимит на пользователя (по JWT sub). Анонимные — пропускаем (их ловит AnonIP)."""
     scope = "user"
 
@@ -30,7 +43,7 @@ class UserJWTRateThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": uid}
 
 
-class AnonIPRateThrottle(SimpleRateThrottle):
+class AnonIPRateThrottle(_ClientIPMixin, SimpleRateThrottle):
     """Лимит по IP для НЕаутентифицированных (каталог Store, вход). С токеном — пропускаем
     (чтобы не штрафовать многих пользователей за одним NAT/прокси оператора)."""
     scope = "anon"
@@ -41,7 +54,7 @@ class AnonIPRateThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
-class AuthEndpointThrottle(SimpleRateThrottle):
+class AuthEndpointThrottle(_ClientIPMixin, SimpleRateThrottle):
     """Жёсткий лимит по IP на /auth (вход/регистрация) — анти-брутфорс."""
     scope = "auth"
 
@@ -49,7 +62,7 @@ class AuthEndpointThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
-class OtpPollThrottle(SimpleRateThrottle):
+class OtpPollThrottle(_ClientIPMixin, SimpleRateThrottle):
     """Опрос канала входа (`phone/channel`) — свой мягкий лимит по IP.
 
     Жёсткий `auth` (20/мин) сюда не годится: пока человек ждёт код, клиент спрашивает
@@ -63,11 +76,20 @@ class OtpPollThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
+class ContactsMatchThrottle(UserJWTRateThrottle):
+    """Поиск друзей по контактам (аудит F02) — по пользователю, редко.
+
+    Человек жмёт «найти по контактам» раз-другой; частые вызовы с тысячами хешей —
+    это перебор номеров (хеш телефона подбирается), а не поиск друзей.
+    """
+    scope = "contacts"
+
+
 # Безопасные методы: не меняют состояние, поэтому лимитируются отдельно от записи.
 _SAFE = ("GET", "HEAD", "OPTIONS")
 
 
-class PublicReadThrottle(SimpleRateThrottle):
+class PublicReadThrottle(_ClientIPMixin, SimpleRateThrottle):
     """Витринное чтение (каталог/баннеры/контент/юр-документы) — щедрый лимит по IP.
 
     Считает ТОЛЬКО безопасные методы: если тот же URL принимает и POST (например,

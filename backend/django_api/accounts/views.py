@@ -4,7 +4,7 @@ from rest_framework.response import Response
 
 from common.throttling import AuthEndpointThrottle, OtpPollThrottle
 
-from common.uploads import image_extension
+from common.uploads import prepare_image
 from common.security import (
     forget_account,
     hash_password,
@@ -18,7 +18,7 @@ from common.security import (
 from loyalty.models import seed_runner_points
 
 from .models import Account
-from . import otp_guard
+from . import login_guard, otp_guard
 from .sms import channel_info, check_code, code_error, request_code, sms_enabled
 
 
@@ -76,6 +76,7 @@ def register(request):
 
 @api_view(["POST"])
 @throttle_classes([AuthEndpointThrottle])
+@login_guard.limit_failures  # + лимит неудач на один аккаунт, с любых адресов (аудит D03)
 def login(request):
     """Вход по паролю: {phone, password} (основной путь) или {email, password} (легаси)."""
     d = request.data
@@ -300,7 +301,8 @@ def profile_avatar(request):
         return Response(acc.to_json())
     f = request.FILES.get("image")
     # Тип определяем по СОДЕРЖИМОМУ: имя файла и Content-Type присылает клиент (D-37).
-    ext, upload_error = image_extension(f)
+    # Храним пересохранённую копию без EXIF/GPS/XMP (аудит D07), а не присланный файл.
+    ext, clean, upload_error = prepare_image(f)
     if upload_error:
         return Response({"detail": upload_error}, status=400)
     import secrets
@@ -308,7 +310,7 @@ def profile_avatar(request):
     from django.core.files.storage import default_storage
 
     saved = default_storage.save(
-        f"uploads/avatars/{uid}_{secrets.token_hex(4)}.{ext}", f
+        f"uploads/avatars/{uid}_{secrets.token_hex(4)}.{ext}", clean
     )
     acc.avatar_path = default_storage.url(saved)  # локально /media/…, в проде S3/CDN (D-31)
     acc.save(update_fields=["avatar_path"])
@@ -405,7 +407,11 @@ def _streak_block(uid):
 @api_view(["GET"])
 def account_export(request):
     """Выгрузка ВСЕХ персональных данных пользователя (152-ФЗ, LR §2 «портируемость»).
-    Зеркало delete_account: всё, что удаляется, — экспортируется. Отдаём JSON-файлом."""
+
+    Состав берётся из реестра `accounts.userdata` — того же, по которому работает
+    удаление (аудит A04): новый модуль, добавленный в реестр, сам попадает и сюда.
+    Отдаём JSON-файлом.
+    """
     uid = user_id_from_request(request)
     if not uid:
         return Response({"detail": "Нет токена"}, status=401)
@@ -415,43 +421,17 @@ def account_export(request):
 
     from django.db import connection
 
-    from analytics.models import Event
-    from clubs.models import Club, ClubJoinRequest, ClubMember
-    from legal.models import UserConsent
-    from loyalty.models import LoyaltyTransaction, balance_of
-    from notifications.models import Notification
-    from orders.models import Order
-    from runs.models import Run
-    from shoes.models import ShoeAsset
+    from loyalty.models import balance_of
 
-    def rows(qs):
-        return list(qs.values())  # DRF-JSON сериализует datetime/Decimal сам
+    from . import userdata
 
-    data = {
-        "userId": uid,
-        "profile": acc.to_json(),
-        "loyalty": {
-            "balance": balance_of(uid),
-            "transactions": [
-                t.to_json() for t in
-                LoyaltyTransaction.objects.filter(user_id=uid).order_by("created_at")
-            ],
-        },
-        "orders": [
-            o.to_json() for o in Order.objects.filter(user_id=uid).order_by("created_at")
-        ],
-        "runs": rows(Run.objects.filter(user_id=uid).order_by("created_at")),
-        "shoes": rows(ShoeAsset.objects.filter(user_id=uid)),
-        "notifications": rows(Notification.objects.filter(user_id=uid).order_by("created_at")),
-        "consents": rows(UserConsent.objects.filter(user_id=uid)),
-        "clubMemberships": rows(ClubMember.objects.filter(user_id=uid)),
-        "clubJoinRequests": rows(ClubJoinRequest.objects.filter(user_id=uid)),
-        "ownedClubs": rows(Club.objects.filter(owner_id=uid)),
-        "analyticsEvents": [
-            e.to_json() for e in Event.objects.filter(user_id=uid).order_by("created_at")
-        ],
+    data = {"userId": uid, "profile": acc.to_json(), **userdata.export(uid)}
+    # Прежняя форма выгрузки сохраняется: баллы — баланс + проводки.
+    data["loyalty"] = {
+        "balance": balance_of(uid),
+        "transactions": data.pop("loyaltyTransactions", []),
     }
-    # Гео (PostGIS, raw SQL): суммарная площадь территорий + вечный след.
+    # Гео (PostGIS): площади территорий и вечного следа — в понятных единицах.
     with connection.cursor() as cur:
         cur.execute(
             "SELECT COALESCE(SUM(ST_Area(geom::geography)),0) FROM territories WHERE owner_id=%s",
@@ -477,7 +457,11 @@ def account_export(request):
 @api_view(["POST"])
 def delete_account(request):
     """Удаление аккаунта и всех персональных данных пользователя (152-ФЗ, LR §13).
-    Требует Bearer + тело {"confirm": true}. Необратимо."""
+    Требует Bearer + тело {"confirm": true}. Необратимо.
+
+    Что удаляется, а что обезличивается — реестр `accounts.userdata` (аудит A04);
+    всё — одной транзакцией: сбой посередине не оставит полуудалённый аккаунт.
+    """
     uid = user_id_from_request(request)
     if not uid:
         return Response({"detail": "Нет токена"}, status=401)
@@ -487,14 +471,9 @@ def delete_account(request):
     if request.data.get("confirm") is not True:
         return Response({"detail": "Требуется подтверждение: {confirm: true}"}, status=400)
 
-    from django.db import connection
     from clubs.models import Club, ClubJoinRequest, ClubMember
-    from legal.models import UserConsent
-    from loyalty.models import LoyaltyTransaction
-    from notifications.models import Notification
-    from orders.models import Order
-    from runs.models import Run
-    from shoes.models import ShoeAsset
+
+    from . import userdata
 
     # Клуб во владении с другими участниками — нельзя удалить «молча».
     owned = Club.objects.filter(owner_id=uid)
@@ -505,32 +484,22 @@ def delete_account(request):
                 {"detail": "Вы владелец клуба с участниками — передайте или распустите клуб"},
                 status=409,
             )
+    # Покупка не завершена (не получена, идёт срок возврата 7 дней, возврат или
+    # оплата в работе) — заказ ещё нужен складу и для возврата денег (D-103).
+    reason = userdata.blocking_reason(uid)
+    if reason:
+        return Response({"detail": reason}, status=409)
 
-    deleted = {}
-    # Клубы во владении (без чужих участников) — распускаем целиком.
-    owned_ids = list(owned.values_list("id", flat=True))
-    if owned_ids:
-        ClubMember.objects.filter(club_id__in=owned_ids).delete()
-        ClubJoinRequest.objects.filter(club_id__in=owned_ids).delete()
-        deleted["clubs"] = owned.delete()[0]
-    # Членство/заявки пользователя в чужих клубах.
-    deleted["clubMemberships"] = ClubMember.objects.filter(user_id=uid).delete()[0]
-    deleted["clubRequests"] = ClubJoinRequest.objects.filter(user_id=uid).delete()[0]
-    # Личные данные по сервисам.
-    deleted["loyalty"] = LoyaltyTransaction.objects.filter(user_id=uid).delete()[0]
-    deleted["orders"] = Order.objects.filter(user_id=uid).delete()[0]
-    deleted["runs"] = Run.objects.filter(user_id=uid).delete()[0]  # история забегов = ПДн (GPS)
-    deleted["shoes"] = ShoeAsset.objects.filter(user_id=uid).delete()[0]
-    deleted["notifications"] = Notification.objects.filter(user_id=uid).delete()[0]
-    deleted["consents"] = UserConsent.objects.filter(user_id=uid).delete()[0]
-    # Гео (PostGIS, raw SQL): территории + вечный след.
-    with connection.cursor() as cur:
-        cur.execute("DELETE FROM territories WHERE owner_id=%s", [uid])
-        deleted["territories"] = cur.rowcount
-        cur.execute("DELETE FROM footprints WHERE owner_id=%s", [uid])
-        deleted["footprints"] = cur.rowcount
-    # Сам аккаунт.
-    acc.delete()
+    with transaction.atomic():
+        deleted = {}
+        # Клубы во владении (без чужих участников) — распускаем целиком.
+        owned_ids = list(owned.values_list("id", flat=True))
+        if owned_ids:
+            ClubMember.objects.filter(club_id__in=owned_ids).delete()
+            ClubJoinRequest.objects.filter(club_id__in=owned_ids).delete()
+        deleted.update(userdata.erase(uid))
+        # Сам аккаунт.
+        acc.delete()
     # Аудит A02: токены удалённого аккаунта перестают работать сразу, а не через
     # минуту кэша.
     forget_account(uid)
