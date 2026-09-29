@@ -358,7 +358,8 @@ def orders(request):
             # законно снижает порог, но только реально списанная. Не сошлось —
             # откатываем и списание.
             if not already:
-                problem = redeem_for_order(uid, oid, points, float(kop_to_rub(total_kop) + points))
+                problem = redeem_for_order(uid, oid, points, float(kop_to_rub(total_kop) + points),
+                                           items=cart.items)
                 if problem:
                     return Response({"detail": problem}, status=400)
             # Сумму присылает клиент — сверяем её с ценами каталога (D-37). Иначе

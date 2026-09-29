@@ -100,7 +100,8 @@ def add_txn(user_id, amount, source, description="", order_id=None, run_id=None,
             created_at=now,
             available_at=available_at,
         )
-    if amount > 0:
+    if amount > 0 and not _v1_enabled():
+        # При включённой v1 уровни и их уведомления ведёт loyalty.v1.
         _notify_level_up(user_id, before, before + amount)
     # Баллы юзера изменились (баланс/заработано/потрачено; забег/заказ, породившие
     # транзакцию, уже в БД) → сбрасываем его пер-юзерные кэши: статистика + лояльность (D-29).
@@ -108,6 +109,12 @@ def add_txn(user_id, amount, source, description="", order_id=None, run_id=None,
 
     invalidate_user(user_id)
     return txn
+
+
+def _v1_enabled() -> bool:
+    from .config import enabled
+
+    return enabled()
 
 
 _LEVEL_RANK = {"basic": 0, "silver": 1, "gold": 2, "platinum": 3}
@@ -142,7 +149,8 @@ def seed_runner_points(user_id):
     """Демо-баллы при создании аккаунта. По умолчанию ВЫКЛ — новый пользователь
     начинает с нуля (реальный лидерборд/экономика, не засоряем фейковыми 16 км).
     Включить можно флагом SEED_DEMO_POINTS=1 (например для демо в dev)."""
-    if os.environ.get("SEED_DEMO_POINTS", "0") != "1":
+    if os.environ.get("SEED_DEMO_POINTS", "0") != "1" or _v1_enabled():
+        # При включённой программе v1 демо-баллы не начисляются (решение координатора).
         return
     demo = [
         (20, "registration", "Бонус за регистрацию"),
@@ -187,7 +195,23 @@ def wallet_summary(user_id, now=None) -> dict:
 
     Тратимое не бывает меньше нуля: если замороженные баллы уже потрачены,
     тратить просто нечего.
+
+    При включённой программе v1 (loyalty.config LOYALTY_V1_ENABLED) — те же ключи
+    по лотам v1: total = доступно + ожидает, spendable = можно списать, pending =
+    лоты в удержании. Так прежние клиенты и экраны видят баланс новой программы.
     """
+    if _v1_enabled():
+        from . import v1
+
+        w = v1.wallet(user_id, now)
+        return {
+            "total": w["available"] + w["held"],
+            "spendable": w["redeemable"],
+            "pending": w["held"],
+            "frozen": w["frozen"],
+            "next_at": w["next_at"],
+            "next_amount": w["next_amount"],
+        }
     now = now or timezone.now()
     frozen = on_review(user_id)
     qs = LoyaltyTransaction.objects.filter(user_id=user_id)
@@ -303,3 +327,17 @@ class LoyaltyPartner(models.Model):
             "lng": self.lng,
             "pointsPercent": self.points_percent,
         }
+
+
+# Программа лояльности v1 (ТЗ 30.09.2026): лоты, уровень, списания, журнал, настройки.
+from .models_v1 import (  # noqa: E402,F401
+    LoyaltyEvent,
+    LoyaltyLot,
+    LoyaltyRedemption,
+    LoyaltyRedemptionPart,
+    LoyaltyReserve,
+    LoyaltyRuleSnapshot,
+    LoyaltySetting,
+    LoyaltySettingChange,
+    LoyaltyStatus,
+)

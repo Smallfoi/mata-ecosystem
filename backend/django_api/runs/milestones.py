@@ -11,6 +11,7 @@ from django.db.models import Sum
 
 from common.locks import ACTIVITY, lock_user
 from loyalty.models import LoyaltyTransaction, add_txn
+from loyalty.v1 import legacy_award_allowed
 from notifications.models import create_notification
 
 from .models import Run
@@ -53,6 +54,9 @@ def _award_locked(uid: str, added_km: float) -> int:
         if LoyaltyTransaction.objects.filter(
             user_id=uid, run_id=dedup_key, source=SOURCE
         ).exists():
+            continue
+        if not legacy_award_allowed(SOURCE):
+            # Программа v1: баллы за вехи больше не начисляются (решение координатора).
             continue
         add_txn(uid, MILESTONE_POINTS, SOURCE, f"Веха {m} км", None, dedup_key)
         create_notification(

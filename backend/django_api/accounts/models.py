@@ -42,6 +42,11 @@ class Account(models.Model):
     # Код лояльности: постоянный 6-значный номер за клиентом (для кассы/QR). Выдаётся
     # один раз, не меняется. QR карты лояльности кодирует именно его.
     loyalty_code = models.CharField(max_length=6, blank=True, default="", db_index=True, verbose_name="Код лояльности")
+    # Псевдоним для журнала лояльности v1 (ТЗ §5): случайный, постоянный, выдаётся
+    # при первом событии. Журнал хранит только его — удаление аккаунта стирает связь
+    # «псевдоним → человек», журнал остаётся обезличенным (D-104).
+    loyalty_pseudonym = models.CharField(max_length=40, blank=True, default="", db_index=True,
+                                         verbose_name="Псевдоним в журнале лояльности")
 
     # Приватность (privacy by design, LAUNCH_READINESS §2): по умолчанию закрыто.
     profile_public = models.BooleanField(default=False, verbose_name="Профиль публичный")

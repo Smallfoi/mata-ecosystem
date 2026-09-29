@@ -16,7 +16,8 @@
 from django.db import transaction
 from django.db.models import Sum
 
-from loyalty import wallet
+from loyalty import config as loyalty_config
+from loyalty import v1, wallet
 from loyalty.models import LoyaltyTransaction, add_txn
 
 # Правила списания живут в loyalty.wallet — одни на все пути (аудит B02).
@@ -32,6 +33,12 @@ def accrue_purchase_points(order) -> None:
     Однократно под замком кошелька (B03): вебхук ЮKassa, перепроверка статуса и
     фоновая сверка могут прийти одновременно — начисление всё равно одно.
     """
+    # Программа v1: заблокированные при оформлении бонусы списываются окончательно,
+    # при включённой v1 — лот покупки (held). Старое начисление и бонус первого
+    # заказа при включённой v1 не делаются (решение координатора).
+    v1.on_order_paid(order)
+    if loyalty_config.enabled():
+        return
     uid, oid = order.user_id, order.order_id
     total = float(order.total or 0)
 
@@ -46,7 +53,7 @@ def accrue_purchase_points(order) -> None:
     )
 
 
-def redeem_for_order(user_id, order_id, amount, order_sum) -> str:
+def redeem_for_order(user_id, order_id, amount, order_sum, items=None) -> str:
     """Списать баллы на заказ. Возвращает текст ошибки или пустую строку.
 
     Списывает сервер в момент оформления, а не отдельный запрос клиента: сайт
@@ -58,7 +65,13 @@ def redeem_for_order(user_id, order_id, amount, order_sum) -> str:
     правила (минимум, 30%) и для повтора — существующее списание не отменяет
     проверок; другая сумма при повторе — ошибка. `order_sum` — сумма до скидки
     (товары и доставка).
+
+    Программа v1 включена — блок бонусов по её правилам (`loyalty.v1.block_for_order`):
+    потолок по уровню от суммы допущенных позиций `items` (серверный снимок
+    корзины), минимум REDEEM_MIN.
     """
+    if loyalty_config.enabled():
+        return v1.block_for_order(user_id, order_id, amount, items or [])
     return wallet.redeem(user_id, order_id, amount, order_sum)
 
 
@@ -69,13 +82,25 @@ def _sum(order, source) -> int:
 
 
 def redeemed_for(order) -> int:
-    """Сколько баллов списано на заказ при оформлении."""
+    """Сколько баллов списано на заказ при оформлении (v1 — по списанию v1)."""
+    red = v1.redemption_for(order.user_id, order.order_id)
+    if red is not None:
+        return red.amount
     return -_sum(order, "redeem")
 
 
 def earned_for(order) -> int:
-    """Сколько баллов начислено за покупку (без бонуса за первый заказ)."""
+    """Сколько баллов начислено за покупку (без бонуса за первый заказ; v1 — лот покупки)."""
+    lot = v1.purchase_lot(order)
+    if lot is not None:
+        return lot.amount
     return _sum(order, "purchase")
+
+
+def redeemed_share(order, chosen_indexes):
+    """Доля списанных бонусов на возвращаемые позиции по правилам v1 (доля в
+    eligible_total) или None — у заказа старое списание."""
+    return v1.points_share(order, chosen_indexes)
 
 
 def return_redeemed_points(order, amount, description) -> int:
@@ -83,6 +108,9 @@ def return_redeemed_points(order, amount, description) -> int:
 
     Частями (D-73) или целиком. Возвращает, сколько баллов вернули.
     """
+    back = v1.return_redeemed(order, amount)
+    if back is not None:
+        return back  # списание v1: бонусы вернулись в исходные лоты
     # Остаток и запись — под замком кошелька (B03): две отмены сразу не вернут дважды.
     with transaction.atomic():
         wallet.lock_wallet(order.user_id)
@@ -100,7 +128,13 @@ def revoke_earned_points(order, amount, description) -> int:
     возвратов; решение про минус владелец отложил (D-73, на паузе). Деньгами из
     возврата не удерживаем.
     Возвращает, сколько баллов сняли.
+
+    Лот покупки v1: held — отменяется, available — доля списывается с баланса,
+    при нехватке баланс уходит в минус (ТЗ §4, решение координатора).
     """
+    off = v1.revoke_purchase(order, amount)
+    if off is not None:
+        return off
     with transaction.atomic():
         wallet.lock_wallet(order.user_id)
         left = earned_for(order) + _sum(order, "purchase_revoke")
@@ -126,4 +160,6 @@ def refund_redeemed_points(order) -> None:
     Покупатель списал баллы на чекауте, а платёж отменился — баллы обязаны
     вернуться, иначе они сгорают ни за что.
     """
+    if v1.release_for_order(order) is not None:
+        return  # списание v1: разблокировано в исходные лоты
     return_redeemed_points(order, redeemed_for(order), "Возврат баллов: оплата не прошла")

@@ -57,6 +57,13 @@ MODELS = (
     # Клубы во владении: удаление решает delete_account (с чужими участниками — 409).
     ("ownedClubs", "clubs.Club", ("owner_id",), DELETE),
     ("loyaltyTransactions", "loyalty.LoyaltyTransaction", ("user_id",), DELETE),
+    # Программа лояльности v1: лоты, уровень, списания на заказы (части — каскадом).
+    # Журнал `loyalty.LoyaltyEvent` поля пользователя не имеет — только псевдоним из
+    # Account.loyalty_pseudonym; он стирается вместе с аккаунтом, и журнал остаётся
+    # обезличенным (ТЗ §5, решение координатора).
+    ("loyaltyLots", "loyalty.LoyaltyLot", ("user_id",), DELETE),
+    ("loyaltyLevel", "loyalty.LoyaltyStatus", ("user_id",), DELETE),
+    ("loyaltyRedemptions", "loyalty.LoyaltyRedemption", ("user_id",), DELETE),
     ("orders", "orders.Order", ("user_id",), DELETE),  # возвраты уходят каскадом
     ("analyticsEvents", "analytics.Event", ("user_id",), ANON),
 )

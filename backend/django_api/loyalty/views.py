@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from common.cache import LOYALTY_TTL, cache_json, loyalty_key
 from common.security import user_id_from_request
 
+from . import config, v1
 from .models import (
     LoyaltyPartner,
     LoyaltyTransaction,
@@ -43,7 +44,7 @@ def _account_payload(uid):
     rows = LoyaltyTransaction.objects.filter(user_id=uid).order_by("-created_at")[
         :_TX_LIMIT
     ]
-    return {
+    data = {
         "balance": w["spendable"],
         "total": w["total"],
         "pending": w["pending"],
@@ -53,7 +54,88 @@ def _account_payload(uid):
         "level": level_for(w["total"]),
         "code": ensure_loyalty_code(uid),  # постоянный 6-значный код лояльности (для QR/кассы)
         "transactions": [r.to_json() for r in rows],
+        # Включена ли программа v1 (ТЗ 30.09.2026). Старые клиенты поле не читают.
+        "programV1": False,
     }
+    if config.enabled():
+        # Программа v1: баланс и уровень — по лотам; подробности — в `v1`.
+        v = v1.wallet(uid)
+        data["level"] = v["level_name"]
+        data["programV1"] = True
+        data["v1"] = _v1_block(uid, v)
+    return data
+
+
+def _iso(dt):
+    return dt.isoformat() if dt else None
+
+
+def _v1_block(uid, v) -> dict:
+    """Кошелёк программы v1 для клиентов (этап 3 — экраны)."""
+    from .models_v1 import LoyaltyLot
+
+    lots = LoyaltyLot.objects.filter(user_id=uid, state__in=("held", "available")).exclude(
+        remaining=0).order_by("expires_at", "accrued_at")[:100]
+    return {
+        "available": v["available"],          # может быть < 0 (долг после возврата)
+        "redeemable": v["redeemable"],
+        "held": v["held"],
+        "statusPoints": v["status_points"],
+        "purchases365": v["purchases_rub"],
+        "level": v["level_name"],
+        "levelIndex": v["level"],
+        "levelUntil": _iso(v["level_until"]),
+        "nextLevelThreshold": v["next_level_threshold"],
+        "platinumMinSpend": v["platinum_min_spend"],
+        "redeemMin": v["redeem_min"],
+        "redeemCeiling": v["redeem_ceiling"],
+        "heldNextAt": _iso(v["next_at"]),
+        "heldNextAmount": v["next_amount"],
+        "expiringAt": _iso(v["expiring_at"]),
+        "expiringAmount": v["expiring_amount"],
+        "lots": [{
+            "id": lot.pk, "amount": lot.amount, "remaining": lot.remaining,
+            "state": lot.state, "source": lot.source, "accruedAt": _iso(lot.accrued_at),
+            "availableAt": _iso(lot.available_at) if lot.state == "held" else None,
+            "expiresAt": _iso(lot.expires_at),
+        } for lot in lots],
+    }
+
+
+@api_view(["POST"])
+def redeem_preview(request):
+    """Сколько бонусов можно списать в этой корзине (превью кассы).
+
+    body: {items: [{productId, quantity, price?}], deliveryCost?}. Доставка на
+    списание не влияет никогда. Программа v1 выключена — прежние правила
+    (минимум 50, до 30% суммы заказа с доставкой).
+    """
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    d = request.data if isinstance(request.data, dict) else {}
+    items = d.get("items")
+    if not isinstance(items, list):
+        return Response({"detail": "Позиции корзины должны быть списком"}, status=400)
+    if not config.enabled():
+        from .wallet import MAX_REDEEM_PERCENT, MIN_REDEEM
+
+        return Response({"programV1": False, "available": spendable_of(uid),
+                         "redeemMin": MIN_REDEEM, "maxPercent": MAX_REDEEM_PERCENT})
+    q = v1.quote(uid, items[:200])
+    return Response({
+        "programV1": True,
+        "level": q["levelName"],
+        "available": q["available"],
+        "eligibleTotal": q["eligibleTotal"],
+        "ceiling": q["ceiling"],
+        "redeemMax": q["redeemMax"],
+        "redeemMin": q["redeemMin"],
+        "canRedeem": q["canRedeem"],
+        "reason": q["reason"],
+        "lines": [{"index": ln["index"], "productId": ln["productId"],
+                   "eligible": ln["eligible"], "reason": ln["reason"]} for ln in q["lines"]],
+    })
 
 
 @api_view(["POST"])
@@ -118,9 +200,9 @@ def redeem(request):
         if problem:
             return fail(problem)
     w = wallet_summary(uid)
+    level = v1.wallet(uid)["level_name"] if config.enabled() else level_for(w["total"])
     return Response(
-        {"ok": True, "balance": w["spendable"], "spent": amount,
-         "level": level_for(w["total"])}
+        {"ok": True, "balance": w["spendable"], "spent": amount, "level": level}
     )
 
 

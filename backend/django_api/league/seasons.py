@@ -17,6 +17,7 @@ from django.db import transaction
 
 from common.people import names_of
 from loyalty.models import LoyaltyTransaction, add_txn
+from loyalty.v1 import legacy_award_allowed
 from notifications.models import create_notification
 
 from .models import SeasonClose, SeasonResult
@@ -67,6 +68,15 @@ def close_season_if_needed(now: datetime | None = None) -> str:
         for i, (uid, km) in enumerate(ranked[: len(SEASON_REWARDS)]):
             points = SEASON_REWARDS[i]
             dedup_key = f"season:{month}:{uid}"
+            if not legacy_award_allowed(REWARD_SOURCE):
+                # Программа v1: баллы за сезон не начисляются (решение координатора).
+                create_notification(
+                    uid,
+                    f"Сезон закрыт: ты #{i + 1}",
+                    f"{km:.1f} км за месяц. Новый сезон начался!",
+                    type="system",
+                )
+                continue
             if LoyaltyTransaction.objects.filter(
                 user_id=uid, run_id=dedup_key, source=REWARD_SOURCE
             ).exists():

@@ -6,5 +6,6 @@ urlpatterns = [
     path("account", views.account),
     path("transactions", views.transactions),
     path("redeem", views.redeem),
+    path("redeem-preview", views.redeem_preview),
     path("partners", views.partners),
 ]
