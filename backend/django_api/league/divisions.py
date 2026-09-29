@@ -21,6 +21,7 @@ from django.db import transaction
 
 from common.people import club_names_of, names_of
 from loyalty.models import LoyaltyTransaction, add_txn
+from loyalty.v1 import legacy_award_allowed
 from notifications.models import create_notification
 from runs.models import Run
 
@@ -212,6 +213,16 @@ def close_division(div: Division) -> None:
                 continue
             points = WEEK_REWARDS[i]
             dedup_key = f"div:{locked.id}:{u}"
+            if not legacy_award_allowed(REWARD_SOURCE):
+                # Программа v1: баллы за дивизион не начисляются (решение координатора);
+                # сам итог недели и место остаются.
+                create_notification(
+                    u,
+                    f"Итоги недели: #{i + 1} в дивизионе",
+                    f"«{TIER_LABELS[locked.tier]}-{locked.seq}» — {km:.1f} км.",
+                    type="system",
+                )
+                continue
             if LoyaltyTransaction.objects.filter(
                 user_id=u, run_id=dedup_key, source=REWARD_SOURCE
             ).exists():

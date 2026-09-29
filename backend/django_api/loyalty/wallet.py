@@ -79,10 +79,20 @@ def check_redeem_rules(amount, order_sum) -> str:
 
 
 def redeemed_on_order(user_id, order_id) -> int:
-    """Сколько баллов списано на заказ при оформлении (по реестру)."""
+    """Сколько баллов списано на заказ при оформлении (по реестру).
+
+    Заказ со списанием программы v1 — по нему (`LoyaltyRedemption`), иначе по
+    старому реестру: так прежний `/loyalty/redeem` видит «уже списано» и не
+    списывает второй раз."""
     from django.db.models import Sum
 
     from .models import LoyaltyTransaction
+    from .models_v1 import LoyaltyRedemption
+
+    red = LoyaltyRedemption.objects.filter(user_id=user_id, order_id=order_id).exclude(
+        state=LoyaltyRedemption.RELEASED).first()
+    if red is not None:
+        return red.amount
 
     s = LoyaltyTransaction.objects.filter(
         user_id=user_id, order_id=order_id, source="redeem"

@@ -34,8 +34,14 @@ TABS = (
 
     Tab("orders", "Заказы", "Магазин", ("orders.order", "orders.orderreturn"),
         hint="Заказы покупателей, статусы, состав, возвраты."),
-    Tab("loyalty", "Баллы", "Магазин", ("loyalty.loyaltytransaction",),
-        hint="Начисления и списания баллов."),
+    Tab("loyalty", "Баллы", "Магазин",
+        ("loyalty.loyaltytransaction", "loyalty.loyaltylot", "loyalty.loyaltystatus",
+         "loyalty.loyaltyredemption", "loyalty.loyaltyevent", "loyalty.loyaltyrulesnapshot"),
+        hint="Начисления и списания баллов; лоты, уровни и журнал программы v1."),
+    Tab("loyalty_settings", "Настройки лояльности", "Магазин",
+        ("loyalty.loyaltysetting", "loyalty.loyaltysettingchange"),
+        hint="Числа программы лояльности v1 (ставки, пороги, сроки, исключённые группы 1С) "
+             "и выключатель программы. Каждое изменение — в истории."),
     Tab("shoes", "Кроссовки", "Магазин", ("shoes.shoeasset",)),
 
     Tab("clubs", "Клубы", "Сообщество",

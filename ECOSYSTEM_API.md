@@ -410,6 +410,45 @@ POST /loyalty/redeem  { amount, orderId, description? }   (прежний адр
                                (balance — тратимые; «Сейчас доступно N баллов…» — остальные созревают)
 ```
 
+#### Программа лояльности v1 (ТЗ 30.09.2026) — **при включённой программе v1**
+Выключатель — настройка `LOYALTY_V1_ENABLED` (админка «Настройки лояльности»), по умолчанию
+ВЫКЛ: пока выключена, всё выше работает как раньше. Включена — одна валюта «бонус» (1 = 1 ₽),
+баланс = лоты с датами сгорания, 4 уровня. Прежние поля и адреса НЕ меняются, добавлены новые:
+```
+GET  /loyalty/account   + programV1: bool   (false — старые правила; поле есть всегда)
+                        при programV1 = true:
+     balance   = можно списать сейчас (доступно − замороженная активность, ≥ 0)
+     total     = доступно + ожидает (удержание), pending = ожидает
+     level     = уровень v1: basic | silver | gold | platinum (по статусным, не по балансу)
+     v1: { available (может быть < 0 — долг после возврата товара), redeemable, held,
+           statusPoints, purchases365, level, levelIndex 0..3, levelUntil,
+           nextLevelThreshold (null у Платины), platinumMinSpend, redeemMin, redeemCeiling,
+           heldNextAt, heldNextAmount, expiringAt, expiringAmount,
+           lots: [{ id, amount, remaining, state: held|available, source, accruedAt,
+                    availableAt (для held; null — ждёт получения заказа), expiresAt }] }
+     transactions — прежний реестр (история до v1 и начисления за бег/захват до этапа 2).
+POST /loyalty/redeem-preview  { items: [{ productId, quantity }], deliveryCost? }
+                        → программа выключена: { programV1: false, available, redeemMin: 50, maxPercent: 30 }
+                        → включена: { programV1: true, level, available, eligibleTotal, ceiling,
+                                      redeemMax, redeemMin, canRedeem, reason,
+                                      lines: [{ index, productId, eligible, reason }] }
+                          redeemMax = min(доступно, floor(eligibleTotal × ceiling)); ceiling по уровню
+                          0,15/0,20/0,25/0,30 и никогда не выше 0,30. eligibleTotal — цены витрины без
+                          исключённых групп 1С (с подгруппами; сертификаты там же), уценки
+                          (oldPrice > price), товаров не из каталога; доставка не участвует.
+                          reason позиции: excluded_category | markdown | not_in_catalog.
+                          canRedeem = redeemMax ≥ redeemMin (300); иначе reason — текст для кнопки.
+POST /orders  pointsRedeemed — при v1: от redeemMin и ≤ redeemMax, иначе 400 { detail } с текстом.
+              Бонусы блокируются при создании заказа (FIFO по дате сгорания), списываются при
+              оплате, возвращаются в свои лоты при отмене/истечении 15-минутного окна оплаты.
+              За оплату — лот floor((сумма − бонусы − доставка) × ставка уровня) в удержании
+              до max(оплата + 14 дней, получение + 7 дней); не получен — держится.
+              Бонус за первый заказ при v1 не начисляется.
+Возврат товара (админка): списанные бонусы — в исходные лоты по доле позиции в eligibleTotal;
+              начисленные за покупку: в удержании — отменяются, уже доступные — списываются
+              (при нехватке баланс уходит в минус и гасится следующими начислениями).
+```
+
 ### Runs (история пробежек + серверный расчёт очков — анти-чит S-04)
 ```
 GET  /runs                              → Run[]   (сводки забегов пользователя, новые сверху)

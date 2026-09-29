@@ -320,12 +320,20 @@ def normalize_items(items, strict: bool, lock: bool = False, exclude=None) -> Ca
 
 def redeemed_rub(user_id, order_id) -> Decimal:
     """Сколько баллов РЕАЛЬНО списано за этот заказ — по реестру, а не по словам клиента."""
-    from loyalty.models import LoyaltyTransaction
+    from loyalty.models import LoyaltyRedemption, LoyaltyTransaction
 
-    txn = LoyaltyTransaction.objects.filter(
+    # Одним запросом (F03): списание программы v1 (сумма > 0) и старого реестра
+    # (сумма < 0). Есть списание v1 — действует оно.
+    v1 = LoyaltyRedemption.objects.filter(user_id=user_id, order_id=order_id).exclude(
+        state=LoyaltyRedemption.RELEASED).order_by().values_list("amount", flat=True)
+    legacy = LoyaltyTransaction.objects.filter(
         user_id=user_id, order_id=order_id, source="redeem"
-    ).first()
-    return abs(Decimal(txn.amount)) * _POINT_RUB if txn else Decimal(0)
+    ).order_by().values_list("amount", flat=True)
+    amounts = list(v1.union(legacy, all=True))
+    chosen = next((a for a in amounts if a > 0), None)
+    if chosen is None:
+        chosen = next((a for a in amounts if a < 0), 0)
+    return abs(Decimal(chosen)) * _POINT_RUB
 
 
 def minimum_for(cart: Cart, user_id, order_id):

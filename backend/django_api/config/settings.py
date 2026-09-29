@@ -412,6 +412,12 @@ UNFOLD = {
                      # Клиенты с операциями за выбранные дни; журнал — ссылкой со страницы.
                      "link": reverse_lazy("points_clients"),
                      "permission": _tab("loyalty")},
+                    {"title": "Журнал лояльности", "icon": "receipt_long",
+                     "link": reverse_lazy("admin:loyalty_loyaltyevent_changelist"),
+                     "permission": _tab("loyalty")},
+                    {"title": "Настройки лояльности", "icon": "tune",
+                     "link": reverse_lazy("admin:loyalty_loyaltysetting_changelist"),
+                     "permission": _tab("loyalty_settings")},
                     {"title": "Кроссовки", "icon": "directions_run",
                      "link": reverse_lazy("admin:shoes_shoeasset_changelist"),
                      "permission": _tab("shoes")},
@@ -619,6 +625,17 @@ CELERY_BEAT_SCHEDULE = {
     "photo-recover-stuck-jobs": {
         "task": "productmedia.recover_stuck_jobs",
         "schedule": crontab(minute="*/10"),
+    },
+    # Программа лояльности v1 (выключена — задачи ничего не делают): выход бонусов
+    # из удержания — дважды в час; сгорание, предупреждения, понижение уровней —
+    # раз в сутки после полуночи по Якутску.
+    "loyalty-release-holds": {
+        "task": "loyalty.release_holds",
+        "schedule": crontab(minute="7,37"),
+    },
+    "loyalty-daily": {
+        "task": "loyalty.daily",
+        "schedule": crontab(hour=0, minute=20),
     },
 }
 
