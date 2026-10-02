@@ -5,18 +5,29 @@
 /// карточек незачем.
 class ProductPhoto {
   final String url;
+
+  /// Средний размер (900 px) — для плитки каталога. Миниатюрой 400 плитку
+  /// затягивало в мыло: на телефоне она ~180 точек, а пикселей втрое больше.
+  final String card;
   final String thumb;
 
-  const ProductPhoto({required this.url, required this.thumb});
+  const ProductPhoto({
+    required this.url,
+    required this.thumb,
+    this.card = '',
+  });
 
   factory ProductPhoto.fromJson(Map<String, dynamic> j) {
     final url = (j['url'] ?? '').toString();
-    return ProductPhoto(url: url, thumb: (j['thumb'] ?? '').toString().isEmpty
-        ? url
-        : (j['thumb']).toString());
+    String pick(String key) {
+      final v = (j[key] ?? '').toString();
+      return v.isEmpty ? url : v;
+    }
+
+    return ProductPhoto(url: url, card: pick('card'), thumb: pick('thumb'));
   }
 
-  Map<String, dynamic> toJson() => {'url': url, 'thumb': thumb};
+  Map<String, dynamic> toJson() => {'url': url, 'card': card, 'thumb': thumb};
 }
 
 /// Вариант модели: сочетание цвета и размера — это отдельная позиция на складе.
@@ -82,6 +93,7 @@ class Product {
   final List<ProductVariant> variants;
 
   /// Миниатюра обложки — её показывает карточка в ленте каталога (D-99).
+  final String cardUrl;
   final String thumbUrl;
 
   /// Снимки по цветам: выбрал чёрный — смотришь чёрный. Ключ «» — общие снимки
@@ -106,6 +118,7 @@ class Product {
     this.inStock = true,
     this.stockBySize = const {},
     this.variants = const [],
+    this.cardUrl = '',
     this.thumbUrl = '',
     this.photosByColor = const {},
   });
@@ -166,12 +179,22 @@ class Product {
   /// Первое фото или '' (безопасно при пустом списке — напр. данные из API).
   String get firstImage => imageUrls.isNotEmpty ? imageUrls.first : '';
 
-  /// Картинка для ленты каталога и корзины: миниатюра, если она есть (D-99).
+  /// Картинка для корзины и мелких превью: миниатюра, если она есть (D-99).
   String get coverThumb {
     if (thumbUrl.isNotEmpty) return thumbUrl;
     final common = photosByColor.values.where((l) => l.isNotEmpty);
     if (common.isNotEmpty) return common.first.first.thumb;
     return firstImage;
+  }
+
+  /// Картинка для плитки каталога: средний размер. Миниатюра там растягивалась и
+  /// выглядела мылом (владелец, 02.10.2026); полноразмерный снимок в ленту брать
+  /// тоже нельзя — это мегабайты трафика на две сотни карточек.
+  String get coverCard {
+    if (cardUrl.isNotEmpty) return cardUrl;
+    final common = photosByColor.values.where((l) => l.isNotEmpty);
+    if (common.isNotEmpty) return common.first.first.card;
+    return coverThumb;
   }
 
   int get discountPercent {
@@ -198,6 +221,7 @@ class Product {
         inStock: inStock,
         stockBySize: stockBySize,
         variants: variants,
+        cardUrl: cardUrl,
         thumbUrl: thumbUrl,
         photosByColor: photosByColor,
       );
@@ -220,6 +244,7 @@ class Product {
         'inStock': inStock,
         'stockBySize': stockBySize,
         'variants': variants.map((v) => v.toJson()).toList(),
+        'cardUrl': cardUrl,
         'thumbUrl': thumbUrl,
         'photosByColor': photosByColor.map(
             (k, v) => MapEntry(k, v.map((p) => p.toJson()).toList())),
@@ -244,6 +269,7 @@ class Product {
         stockBySize: ((j['stockBySize'] as Map?) ?? const {}).map(
           (k, v) => MapEntry(k.toString(), (v as num?)?.toInt() ?? 0),
         ),
+        cardUrl: (j['cardUrl'] ?? '').toString(),
         thumbUrl: (j['thumbUrl'] ?? '').toString(),
         variants: (j['variants'] as List? ?? const [])
             .map((e) => ProductVariant.fromJson(
@@ -293,6 +319,7 @@ class Product {
       reviewCount: (j['reviewCount'] as num?)?.toInt() ?? 0,
       inStock: j['inStock'] as bool? ?? true,
       variants: variants,
+      cardUrl: (j['cardUrl'] ?? '').toString(),
       thumbUrl: (j['thumbUrl'] ?? '').toString(),
       photosByColor: photos,
     );

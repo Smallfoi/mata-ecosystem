@@ -109,8 +109,11 @@
       price: card.price,
       oldPrice: card.oldPrice,
       imageUrl: card.imageUrl,
-      // В ленту каталога — миниатюра (400 px): две сотни полноразмерных снимков
-      // качать незачем, полный размер берётся уже в карточке товара (D-99).
+      // В ленту каталога — средний размер (900 px). Миниатюрой 400 карточку
+      // затягивало в мыло: она занимает треть ширины экрана, а на экране с
+      // удвоенной плотностью это 900 px (владелец, 02.10.2026). Полноразмерные
+      // снимки в ленту не берём — две сотни по 1600 px это мегабайты трафика.
+      cardUrl: card.cardUrl || card.thumbUrl || card.imageUrl,
       thumbUrl: card.thumbUrl || card.imageUrl,
       photos: photosByColor(colors),
       variants: variantsByColor(colors),
@@ -143,9 +146,16 @@
     return abs(p.thumbUrl || p.imageUrl || (p.imageUrls && p.imageUrls[0]) || "");
   }
 
+  // Снимок для ленты: средний размер, если он есть. У старых карточек (фото из 1С,
+  // снимки до 02.10.2026) среднего нет — тогда полноразмерный: лучше лишние
+  // килобайты, чем мыло в ленте.
+  function cardImgUrl(p) {
+    return abs(p.cardUrl || p.imageUrl || p.thumbUrl || "");
+  }
+
   function cardHtml(p) {
     var img = imgUrl(p);
-    var thumb = thumbUrl(p) || img;
+    var thumb = cardImgUrl(p) || img;
     var gallery = p.photos && Object.keys(p.photos).length
       ? JSON.stringify(p.photos) : "";
     var variants = p.variants && Object.keys(p.variants).length

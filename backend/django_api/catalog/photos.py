@@ -10,8 +10,12 @@ from productmedia.images import make_webp
 
 from .models import ProductPhoto
 
-# Длинная сторона: витринный снимок и миниатюра для ленты каталога и кружков цвета.
+# Длинная сторона каждого размера.
 FULL_PX = 1600
+# Лента каталога: карточка занимает треть ширины (≈450 px), на экране с удвоенной
+# плотностью — 900. Миниатюрой 400 её затягивало в мыло (владелец, 02.10.2026).
+CARD_PX = 900
+# Кружки выбора цвета и мелкие превью.
 THUMB_PX = 400
 
 
@@ -34,9 +38,28 @@ def store_photo(model_key: str, color: str, data: bytes, base: str) -> ProductPh
 
     photo = ProductPhoto(model_key=model_key, color=color, order=used)
     photo.image.save(f"{base}.webp", ContentFile(make_webp(data, FULL_PX)), save=False)
+    photo.card.save(f"{base}-c.webp", ContentFile(make_webp(data, CARD_PX)), save=False)
     photo.thumb.save(f"{base}-t.webp", ContentFile(make_webp(data, THUMB_PX)), save=False)
     photo.save()
     return photo
+
+
+def ensure_card(photo: ProductPhoto) -> bool:
+    """Дорисовать средний размер снимку, залитому до его появления.
+
+    Берём исходником витринный файл (1600): оригинал камеры мы не храним, а 1600 → 900
+    без потерь качества для ленты.
+    """
+    if photo.card or not photo.image:
+        return False
+    photo.image.open("rb")
+    try:
+        data = photo.image.read()
+    finally:
+        photo.image.close()
+    base = photo.image.name.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    photo.card.save(f"{base}-c.webp", ContentFile(make_webp(data, CARD_PX)), save=True)
+    return True
 
 
 def renumber(model_key: str, color: str) -> None:

@@ -120,7 +120,7 @@ def build_card(items, photos: dict | None = None) -> dict:
     for product in items:
         for color in _variant_colors(product):
             entry = colors.setdefault(color, {"name": color, "imageUrl": "",
-                                              "thumbUrl": "", "photos": [],
+                                              "cardUrl": "", "thumbUrl": "", "photos": [],
                                               "sizes": [], "inStock": False})
             if not entry["photos"]:
                 entry["photos"] = [p.to_json() for p in photolib.pick(photos, color)]
@@ -128,8 +128,11 @@ def build_card(items, photos: dict | None = None) -> dict:
                 # Обложка цвета: первый снимок галереи, иначе старое фото позиции.
                 entry["imageUrl"] = (entry["photos"][0]["url"] if entry["photos"]
                                      else product.network_image_url())
-                # Миниатюра — для ленты каталога и кружков выбора цвета: две сотни
-                # полноразмерных снимков в списке качать незачем.
+                # Средний размер — для ленты каталога, миниатюра — для кружков
+                # цвета. Полноразмерные снимки в списке качать незачем, но и
+                # миниатюру туда ставить нельзя: растягивается в мыло.
+                entry["cardUrl"] = (entry["photos"][0]["card"] if entry["photos"]
+                                    else entry["imageUrl"])
                 entry["thumbUrl"] = (entry["photos"][0]["thumb"] if entry["photos"]
                                      else entry["imageUrl"])
             for size in _variant_sizes(product):
@@ -153,6 +156,7 @@ def build_card(items, photos: dict | None = None) -> dict:
     sizes_all = sorted({v["size"] for c in colors.values() for v in c["sizes"] if v["size"]},
                        key=_size_sort)
     image = next((c["imageUrl"] for c in colors.values() if c["imageUrl"]), "")
+    card_img = next((c["cardUrl"] for c in colors.values() if c["cardUrl"]), image)
     thumb = next((c["thumbUrl"] for c in colors.values() if c["thumbUrl"]), image)
     rating, review_count = _model_rating(items)
 
@@ -167,6 +171,7 @@ def build_card(items, photos: dict | None = None) -> dict:
         "price": min(all_prices) if all_prices else 0,
         "oldPrice": first.old_price,
         "imageUrl": image,
+        "cardUrl": card_img,
         "thumbUrl": thumb,
         "description": first.description,
         "rating": rating,

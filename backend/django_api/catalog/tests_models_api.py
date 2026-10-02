@@ -243,10 +243,12 @@ class ModelPhotoTests(TestCase):
              stock_count=5)
         self.key = Product.objects.get(pk="ph1").shop_model_key
 
-    def _photo(self, color, order=0, name="a"):
+    def _photo(self, color, order=0, name="a", card=True):
         return ProductPhoto.objects.create(
             model_key=self.key, color=color, order=order,
-            image=f"uploads/photos/{name}.webp", thumb=f"uploads/photos/{name}-t.webp")
+            image=f"uploads/photos/{name}.webp",
+            card=f"uploads/photos/{name}-c.webp" if card else "",
+            thumb=f"uploads/photos/{name}-t.webp")
 
     def _card(self):
         return self.client.get(f"/v1/models/{self.key}").json()
@@ -271,6 +273,27 @@ class ModelPhotoTests(TestCase):
         card = self._card()
         self.assertIn("cover.webp", card["imageUrl"])
         self.assertIn("cover-t.webp", card["thumbUrl"], "в ленту уходит полноразмерный снимок")
+
+    def test_feed_gets_the_middle_size_not_the_thumbnail(self):
+        """В ленту каталога уходит снимок 900, а не миниатюра 400.
+
+        Миниатюру там растягивало вдвое — владелец увидел это как «в ленте фото
+        ужасного качества, а в карточке нормального» (02.10.2026).
+        """
+        self._photo("ЧЕРНЫЙ", 0, "cover")
+        card = self._card()
+        self.assertIn("cover-c.webp", card["cardUrl"])
+        self.assertIn("cover-c.webp", card["colors"][0]["cardUrl"])
+        self.assertIn("cover-c.webp", card["colors"][0]["photos"][0]["card"])
+        # Миниатюра остаётся — она для кружков выбора цвета и корзины.
+        self.assertIn("cover-t.webp", card["thumbUrl"])
+
+    def test_old_photo_without_middle_size_falls_back_to_full(self):
+        """Снимок залит до появления среднего размера: лучше тяжёлый, чем мыльный."""
+        self._photo("ЧЕРНЫЙ", 0, "legacy", card=False)
+        card = self._card()
+        self.assertIn("legacy.webp", card["cardUrl"])
+        self.assertNotIn("-t.webp", card["cardUrl"])
 
     def test_colour_without_photos_stays_empty(self):
         """У мятного снимков нет — чужие подставлять нельзя."""
