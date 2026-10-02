@@ -122,6 +122,20 @@ def _move(request):
     return JsonResponse({"ok": True, "moved": moved})
 
 
+def _reorder(request):
+    """Сохранить порядок снимков одной галереи после перетаскивания."""
+    ids = [v for v in (request.POST.get("ids") or "").split(",") if v.strip()]
+    if not ids:
+        return JsonResponse({"ok": False, "error": "пустой порядок"}, status=400)
+    first = ProductPhoto.objects.filter(pk=ids[0]).first()
+    if first is None:
+        return JsonResponse({"ok": False, "error": "снимок не найден"}, status=404)
+    changed = photolib.reorder(first.model_key, first.color, ids)
+    if changed:
+        StaffAudit.write(request, "фото: порядок изменён (%s %s)" % (first.model_key, first.color))
+    return JsonResponse({"ok": True, "changed": changed})
+
+
 @staff_member_required
 @tab_required("product_photos")
 def product_photos(request):
@@ -133,6 +147,8 @@ def product_photos(request):
             return _main(request)
         if action == "move":
             return _move(request)
+        if action == "reorder":
+            return _reorder(request)
         return _upload(request)
 
     query = (request.GET.get("q") or "").strip()

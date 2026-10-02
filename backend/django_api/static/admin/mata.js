@@ -139,6 +139,7 @@
     var box = document.createElement("div");
     box.className = "m-slot is-filled";
     box.dataset.id = data.id;
+    box.draggable = true;
     var img = document.createElement("img");
     img.src = data.thumb || data.url;
     box.appendChild(img);
@@ -234,10 +235,64 @@
     }
   });
 
+  // ── Порядок снимков перетаскиванием (владелец, 02.10.2026) ──────────────
+  // Берём снимок и роняем на место, где он должен стоять: плитка встаёт туда
+  // сразу, а на сервер уходит весь ряд целиком — так клиент и сервер не
+  // разойдутся, если быстро переставить несколько снимков подряд.
+  var dragged = null;
+
+  // Куда встать перетаскиваемому снимку: правее соседа или левее — решает,
+  // в какую половину его ширины попал курсор. Отдельной функцией, чтобы правило
+  // проверялось тестом без браузера (tools/site_tests/admin_photo_order.test.js).
+  function dropAnchor(over, clientX) {
+    var box = over.getBoundingClientRect();
+    return (clientX - box.left) > box.width / 2 ? over.nextSibling : over;
+  }
+
+  function saveOrder(gal) {
+    var ids = [];
+    gal.querySelectorAll(".m-slot.is-filled").forEach(function (s) { ids.push(s.dataset.id); });
+    if (!ids.length) return;
+    var body = new FormData();
+    body.append("action", "reorder");
+    body.append("ids", ids.join(","));
+    post(body).then(function (data) {
+      if (!data.ok) fail(gal, data.error || "порядок не сохранился");
+    });
+  }
+
+  grid.addEventListener("dragstart", function (e) {
+    var slot = e.target.closest(".m-slot.is-filled");
+    if (!slot) return;
+    dragged = slot;
+    slot.classList.add("is-drag");
+    // Что-то положить обязательно, иначе Firefox не начнёт перетаскивание.
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", slot.dataset.id); } catch (err) { /* IE */ }
+    }
+  });
+
+  grid.addEventListener("dragend", function () {
+    if (!dragged) return;
+    dragged.classList.remove("is-drag");
+    dragged = null;
+  });
+
   grid.addEventListener("dragover", function (e) {
     var gal = e.target.closest(".m-gal");
     if (!gal) return;
     e.preventDefault();
+
+    if (dragged) {
+      // Перетаскивают снимок, а не файл: показываем место сразу, подсветку
+      // «бросьте файлы сюда» не включаем.
+      if (dragged.closest(".m-gal") !== gal) return;      // в чужую галерею нельзя
+      var over = e.target.closest(".m-slot.is-filled");
+      if (!over || over === dragged) return;
+      over.parentNode.insertBefore(dragged, dropAnchor(over, e.clientX));
+      return;
+    }
     gal.classList.add("is-over");
   });
   grid.addEventListener("dragleave", function (e) {
@@ -249,6 +304,13 @@
     if (!gal) return;
     e.preventDefault();
     gal.classList.remove("is-over");
+    if (dragged) {                       // уронили снимок — сохраняем новый порядок
+      var home = dragged.closest(".m-gal") || gal;
+      dragged.classList.remove("is-drag");
+      dragged = null;
+      saveOrder(home);
+      return;
+    }
     upload(gal, Array.prototype.slice.call(e.dataTransfer.files || []));
   });
   grid.addEventListener("change", function (e) {

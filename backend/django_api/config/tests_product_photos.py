@@ -202,6 +202,29 @@ class ProductPhotosTests(TestCase):
         self.client.post(PAGE, {"action": "move", "id": ids[2], "dir": "-1"})
         self.assertEqual(sorted(ProductPhoto.objects.values_list("order", flat=True)), [0, 1, 2])
 
+    # ── Перетаскивание: порядок приходит рядом целиком ──────────────────────
+    def test_reorder_sets_the_whole_row(self):
+        """Снимок перетащили в середину — сохраняется весь ряд, как его видно."""
+        ids = [self._upload().json()["id"] for _ in range(3)]
+        order = [ids[2], ids[0], ids[1]]
+        r = self.client.post(PAGE, {"action": "reorder", "ids": ",".join(map(str, order))})
+        self.assertTrue(r.json()["ok"])
+        self.assertEqual(self._order(ids), order)
+
+    def test_reorder_ignores_strangers_and_keeps_the_gallery_whole(self):
+        """Чужой id в списке не должен ни сломать порядок, ни потерять снимок."""
+        ids = [self._upload().json()["id"] for _ in range(3)]
+        self.client.post(PAGE, {"action": "reorder", "ids": f"{ids[1]},999999,{ids[0]}"})
+        self.assertEqual(self._order(ids), [ids[1], ids[0], ids[2]])
+        self.assertEqual(sorted(ProductPhoto.objects.values_list("order", flat=True)), [0, 1, 2])
+
+    def test_reorder_without_ids_is_refused(self):
+        self.assertEqual(self.client.post(PAGE, {"action": "reorder", "ids": ""}).status_code, 400)
+
+    def test_reorder_of_unknown_photo_is_404(self):
+        self.assertEqual(
+            self.client.post(PAGE, {"action": "reorder", "ids": "999999"}).status_code, 404)
+
     def test_move_with_bad_direction_is_refused(self):
         pid = self._upload().json()["id"]
         self.assertEqual(self.client.post(PAGE, {"action": "move", "id": pid, "dir": "5"}).status_code, 400)
