@@ -22,8 +22,9 @@
 
 <div class="m-hint">
   Перетащите файлы на плитку — можно сразу несколько, они займут свободные места.
-  До {{ max_photos }} снимков на цвет; первый идёт обложкой в каталоге, поменять —
-  звёздочка. Снимки видны у всех размеров этого цвета. JPEG, PNG или WEBP до {{ max_mb }} МБ.
+  До {{ max_photos }} снимков на цвет. Порядок слева направо — такой же, как у
+  покупателя в карточке: двигайте снимки стрелками «‹» и «›», звёздочка сразу делает
+  обложкой. Снимки видны у всех размеров этого цвета. JPEG, PNG или WEBP до {{ max_mb }} МБ.
 </div>
 
 {% csrf_token %}
@@ -46,6 +47,7 @@
               <img src="{{ ph.thumb }}" alt="">
               <button type="button" class="m-slot-main" title="Сделать обложкой">★</button>
               <button type="button" class="m-slot-del" title="Удалить">×</button>
+              <button type="button" class="m-slot-left" title="Левее">‹</button><button type="button" class="m-slot-right" title="Правее">›</button>
             </div>
           {% endfor %}
           {% for _ in it.free %}

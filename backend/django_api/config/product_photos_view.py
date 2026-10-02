@@ -105,6 +105,23 @@ def _main(request):
     return JsonResponse({"ok": True})
 
 
+def _move(request):
+    """Переставить снимок на одну позицию влево или вправо."""
+    row = ProductPhoto.objects.filter(pk=request.POST.get("id")).first()
+    if row is None:
+        return JsonResponse({"ok": False, "error": "снимок не найден"}, status=404)
+    try:
+        delta = int(request.POST.get("dir") or 0)
+    except (TypeError, ValueError):
+        delta = 0
+    if delta not in (-1, 1):
+        return JsonResponse({"ok": False, "error": "направление: -1 или 1"}, status=400)
+    moved = photolib.move(row, delta)
+    if moved:
+        StaffAudit.write(request, "фото: порядок изменён (%s %s)" % (row.model_key, row.color))
+    return JsonResponse({"ok": True, "moved": moved})
+
+
 @staff_member_required
 @tab_required("product_photos")
 def product_photos(request):
@@ -114,6 +131,8 @@ def product_photos(request):
             return _drop(request)
         if action == "main":
             return _main(request)
+        if action == "move":
+            return _move(request)
         return _upload(request)
 
     query = (request.GET.get("q") or "").strip()
