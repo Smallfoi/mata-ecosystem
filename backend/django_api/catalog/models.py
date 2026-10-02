@@ -350,9 +350,13 @@ class ProductPhoto(models.Model):
     Цвет пустой — снимки общие для всей модели: пока 1С не заполнила строку цвета,
     показывать что-то всё равно нужно.
 
-    Храним два файла: витринный webp (длинная сторона 1600) и миниатюру (400) для
-    ленты каталога и кружков выбора цвета — чтобы в списке из двух сотен карточек не
-    качать полноразмерные снимки.
+    Храним ТРИ размера: витринный webp (длинная сторона 1600), снимок для ленты
+    каталога (900) и миниатюру (400) для кружков выбора цвета. Средний появился
+    02.10.2026: карточка в ленте занимает треть ширины экрана — это 450 px, а на
+    экране с удвоенной плотностью все 900, и миниатюра в 400 растягивалась вдвое.
+    Владелец это и увидел: «в ленте фотографии ужасного качества, а в карточке
+    нормального». Полноразмерный снимок в ленту не годится — две сотни карточек по
+    1600 px это мегабайты мобильного трафика.
     """
 
     # Решение владельца 24.09.2026: шесть снимков на цвет. Первый — каталожный на
@@ -363,6 +367,8 @@ class ProductPhoto(models.Model):
     color = models.CharField(max_length=80, blank=True, default="", verbose_name="Цвет")
     order = models.IntegerField(default=0, verbose_name="Порядок")
     image = models.ImageField(upload_to="uploads/photos/", verbose_name="Фото (webp)")
+    card = models.ImageField(upload_to="uploads/photos/", blank=True,
+                             verbose_name="Снимок для ленты (webp)")
     thumb = models.ImageField(upload_to="uploads/photos/", blank=True,
                               verbose_name="Миниатюра (webp)")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Загружено")
@@ -378,7 +384,11 @@ class ProductPhoto(models.Model):
         return f"{self.model_key} · {self.color or 'без цвета'} · {self.order + 1}"
 
     def to_json(self) -> dict:
+        full = self.image.url if self.image else ""
+        # Нет среднего (снимок залит до 02.10.2026) — отдаём полноразмерный: лучше
+        # лишний трафик, чем мыло. Команда backfill_photo_cards дорисует недостающие.
         return {
-            "url": self.image.url if self.image else "",
-            "thumb": self.thumb.url if self.thumb else (self.image.url if self.image else ""),
+            "url": full,
+            "card": self.card.url if self.card else full,
+            "thumb": self.thumb.url if self.thumb else full,
         }
