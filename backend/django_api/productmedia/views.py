@@ -185,6 +185,7 @@ SHOW = {
     "work": ([PhotoJob.STATUS_PENDING, PhotoJob.STATUS_PROCESSING], "В работе"),
     "failed": ([PhotoJob.STATUS_FAILED], "Ошибки"),
     "done": ([PhotoJob.STATUS_DONE], "На витрине"),
+    "marketing": ([PhotoJob.STATUS_MARKETING], "Маркетинг"),
     "rejected": ([PhotoJob.STATUS_REJECTED], "Отклонено"),
 }
 
@@ -204,6 +205,11 @@ def _decide(request):
         if err:
             return _err(err)
         StaffAudit.write(request, "фотопайплайн: принят снимок %s" % label)
+    elif action == "marketing":
+        err = service.approve_marketing(job, request.user)
+        if err:
+            return _err(err)
+        StaffAudit.write(request, "фотопайплайн: в маркетинг %s" % label)
     elif action in ("redo", "retry"):
         if job.status not in (PhotoJob.STATUS_REVIEW, PhotoJob.STATUS_FAILED,
                               PhotoJob.STATUS_REJECTED):
@@ -257,6 +263,9 @@ def photo_review(request):
             "color": _color(p), "attach": j.get_attach_as_display(),
             "attempts": j.attempts, "note": j.note, "error": j.error, "text": j.text,
             "source": _url(j.source), "result": _url(j.webp),
+            # Мастер-файл (полный размер, без сжатия под витрину) — его и скачивают
+            # для рекламы: баннеру нужен исходник, а не витринный webp.
+            "master": _url(j.master),
             "details": [u for u in details.get((j.batch_id, _norm(j.article)), []) if u],
             "prompt": ("версия #%s" % j.prompt_id) if j.prompt_id else "встроенный",
             "tokens": usage.get("total_tokens"),

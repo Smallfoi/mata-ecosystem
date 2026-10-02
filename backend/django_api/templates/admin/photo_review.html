@@ -19,7 +19,9 @@
 
 {% if show == "review" %}
 <div class="m-hint">
-  «Принять» — снимок уходит на витрину в галерею своего цвета. «Переделать» — напишите,
+  «Принять» — снимок уходит на витрину в галерею своего цвета. «В маркетинг» —
+  остаётся у нас для рекламы и на витрину НЕ попадает (вкладка «Маркетинг», там же
+  кнопка скачивания). «Переделать» — напишите,
   что исправить («принт перенесён на перед», «не та ткань»): замечание уйдёт в промт новой
   попытки. «Отклонить» — брак, причина сохранится в журнале.
 </div>
@@ -55,11 +57,19 @@
         {% if it.text %}<div class="m-small m-muted">Текст принта: {{ it.text }}</div>{% endif %}
         {% if it.note %}<div class="m-small">Замечание: {{ it.note }}</div>{% endif %}
         {% if it.error %}<div class="m-gal-error">{{ it.error }}</div>{% endif %}
+        {% if it.status == "marketing" and it.master %}
+          <div class="m-acts">
+            <a class="m-btn" href="{{ it.master }}" target="_blank" download>Скачать для рекламы</a>
+          </div>
+        {% endif %}
         {% if can_edit %}
           {% if it.status == "review" %}
             <textarea class="m-input" rows="2" data-role="note" placeholder="Что исправить (для «Переделать» / «Отклонить»)"></textarea>
             <div class="m-acts">
               <button type="button" class="m-btn ok" data-act="approve">Принять</button>
+              <button type="button" class="m-btn" data-act="marketing"
+                      title="Снимок останется у нас для рекламы, но на витрину не пойдёт"
+                      >В маркетинг</button>
               <button type="button" class="m-btn" data-act="redo">Переделать</button>
               <button type="button" class="m-btn bad" data-act="reject">Отклонить</button>
             </div>
