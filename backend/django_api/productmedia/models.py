@@ -48,6 +48,7 @@ class PhotoJob(models.Model):
     STATUS_PROCESSING = "processing"
     STATUS_REVIEW = "review"            # ИИ отработал, ждёт решения человека
     STATUS_DONE = "done"                # принято и выложено на витрину
+    STATUS_MARKETING = "marketing"      # принято для рекламы, на витрину НЕ выкладываем
     STATUS_REJECTED = "rejected"        # брак: не выкладываем
     STATUS_FAILED = "failed"
     STATUS_SKIPPED = "skipped"          # артикул папки не найден в каталоге
@@ -56,6 +57,7 @@ class PhotoJob(models.Model):
         (STATUS_PROCESSING, "Генерируется"),
         (STATUS_REVIEW, "На проверке"),
         (STATUS_DONE, "На витрине"),
+        (STATUS_MARKETING, "В маркетинге"),
         (STATUS_REJECTED, "Отклонено"),
         (STATUS_FAILED, "Ошибка"),
         (STATUS_SKIPPED, "Без товара"),

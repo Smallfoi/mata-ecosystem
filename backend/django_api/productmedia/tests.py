@@ -403,6 +403,25 @@ class ReviewCycleTests(TestCase):
         self.assertEqual(ProductPhoto.objects.filter(model_key="LONGSLEEVE",
                                                      color="Оливковый").count(), 1)
 
+    @mock.patch("productmedia.processing.process")
+    def test_marketing_keeps_photo_off_the_showcase(self, m_proc):
+        """«В маркетинг»: снимок принят и сохранён, но в карточку товара не идёт.
+
+        Трек «на модели» даёт рекламный кадр: он хорош для баннера, а в карточке
+        покупателю нужна вещь, а не человек (владелец, 02.10.2026).
+        """
+        m_proc.return_value = _png_bytes((1, 2, 3), (900, 900))
+        job = service.generate(self._job())
+        self.assertEqual(service.approve_marketing(job), "")
+        job.refresh_from_db()
+        self.assertEqual(job.status, PhotoJob.STATUS_MARKETING)
+        self.assertIsNotNone(job.reviewed_at)
+        self.assertEqual(ProductPhoto.objects.count(), 0, "рекламный снимок уехал на витрину")
+        self.assertTrue(job.master, "файл должен остаться — его скачивают для рекламы")
+
+    def test_marketing_needs_review_status(self):
+        self.assertTrue(service.approve_marketing(self._job()))
+
     def test_approve_needs_review_status(self):
         self.assertTrue(service.approve(self._job()))        # «в очереди» — принять нечего
 

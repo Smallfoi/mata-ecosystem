@@ -217,6 +217,28 @@ def approve(job, user=None):
     return ""
 
 
+def approve_marketing(job, user=None):
+    """«В маркетинг»: снимок принят, но на витрину НЕ идёт.
+
+    Трек «на модели» даёт рекламный кадр: он хорош для баннера, поста и рассылки,
+    но в карточке товара покупателю нужна вещь, а не человек. Раньше выбор был
+    только «Принять» (значит, на витрину) или «Отклонить» (значит, выбросить) —
+    владелец попросил третий путь (02.10.2026).
+
+    Файл уже лежит в хранилище (`job.master` и webp), поэтому «принять» здесь —
+    это пометить задание: снимок остаётся доступен на вкладке «Маркетинг»,
+    откуда его скачивают для рекламы.
+    """
+    if job.status != PhotoJob.STATUS_REVIEW or not job.master:
+        return "снимок не на проверке"
+    job.status = PhotoJob.STATUS_MARKETING
+    job.error = ""
+    job.reviewed_by = user if getattr(user, "pk", None) else None
+    job.reviewed_at = timezone.now()
+    job.save()
+    return ""
+
+
 def redo(job, note="", user=None):
     """«Переделать»: запомнить замечание и вернуть задание в очередь.
 
