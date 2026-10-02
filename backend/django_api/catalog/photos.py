@@ -107,6 +107,39 @@ def move(photo: ProductPhoto, delta: int) -> bool:
     return True
 
 
+def reorder(model_key: str, color: str, ids) -> int:
+    """Записать порядок снимков списком: ids идут слева направо.
+
+    Перетаскивание задаёт сразу весь ряд, поэтому принимаем ряд целиком, а не
+    пару перестановок: иначе при быстром перетаскивании нескольких снимков
+    клиент и сервер разошлись бы в порядке.
+
+    Чужие id молча игнорируем, пропущенные дописываем в конец в прежнем порядке —
+    пересчёт обязан оставить галерею целой при любом входе. Возвращает число
+    снимков, которым порядок поменяли.
+    """
+    rows = {r.pk: r for r in ProductPhoto.objects.filter(model_key=model_key, color=color)}
+    wanted, seen = [], set()
+    for raw in ids or []:
+        try:
+            pk = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if pk in rows and pk not in seen:
+            seen.add(pk)
+            wanted.append(rows[pk])
+    for pk, row in rows.items():                    # не названные — в конец, как были
+        if pk not in seen:
+            wanted.append(row)
+    changed = 0
+    for i, row in enumerate(wanted):
+        if row.order != i:
+            row.order = i
+            row.save(update_fields=["order"])
+            changed += 1
+    return changed
+
+
 def by_model(keys) -> dict:
     """{ключ модели: {ЦВЕТ: [фото, ...]}} одним запросом.
 

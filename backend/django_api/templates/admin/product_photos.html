@@ -23,8 +23,9 @@
 <div class="m-hint">
   Перетащите файлы на плитку — можно сразу несколько, они займут свободные места.
   До {{ max_photos }} снимков на цвет. Порядок слева направо — такой же, как у
-  покупателя в карточке: двигайте снимки стрелками «‹» и «›», звёздочка сразу делает
-  обложкой. Снимки видны у всех размеров этого цвета. JPEG, PNG или WEBP до {{ max_mb }} МБ.
+  покупателя в карточке: перетащите снимок на нужное место мышью, звёздочка сразу
+  делает обложкой. На телефоне вместо перетаскивания — стрелки «‹» и «›».
+  Снимки видны у всех размеров этого цвета. JPEG, PNG или WEBP до {{ max_mb }} МБ.
 </div>
 
 {% csrf_token %}
@@ -43,7 +44,7 @@
         </div>
         <div class="m-gal-slots">
           {% for ph in it.photos %}
-            <div class="m-slot is-filled" data-id="{{ ph.id }}">
+            <div class="m-slot is-filled" data-id="{{ ph.id }}" draggable="true">
               <img src="{{ ph.thumb }}" alt="">
               <button type="button" class="m-slot-main" title="Сделать обложкой">★</button>
               <button type="button" class="m-slot-del" title="Удалить">×</button>
