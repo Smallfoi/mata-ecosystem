@@ -169,6 +169,47 @@ class ProductPhotosTests(TestCase):
         self.assertEqual(sorted(ProductPhoto.objects.values_list("order", flat=True)),
                          [0, 1, 2], "порядок разъехался")
 
+    # ── Очерёдность снимков (владелец, 02.10.2026) ──────────────────────────
+    def _order(self, ids):
+        """Порядок снимков так, как увидит покупатель: слева направо."""
+        rows = {r.pk: r.order for r in ProductPhoto.objects.all()}
+        return sorted(ids, key=lambda pk: rows[pk])
+
+    def test_move_right_swaps_with_the_neighbour(self):
+        ids = [self._upload().json()["id"] for _ in range(3)]
+        r = self.client.post(PAGE, {"action": "move", "id": ids[0], "dir": "1"})
+        self.assertTrue(r.json()["ok"])
+        self.assertTrue(r.json()["moved"])
+        self.assertEqual(self._order(ids), [ids[1], ids[0], ids[2]])
+
+    def test_move_left_swaps_back(self):
+        ids = [self._upload().json()["id"] for _ in range(3)]
+        self.client.post(PAGE, {"action": "move", "id": ids[2], "dir": "-1"})
+        self.assertEqual(self._order(ids), [ids[0], ids[2], ids[1]])
+
+    def test_move_beyond_the_edge_changes_nothing(self):
+        """Крайний снимок двигать некуда — это не ошибка, просто ничего не меняется."""
+        ids = [self._upload().json()["id"] for _ in range(2)]
+        r = self.client.post(PAGE, {"action": "move", "id": ids[0], "dir": "-1"})
+        self.assertTrue(r.json()["ok"])
+        self.assertFalse(r.json()["moved"])
+        self.assertEqual(self._order(ids), ids)
+
+    def test_move_keeps_numbering_tight(self):
+        """После перестановок порядок остаётся 0,1,2 — без дыр и повторов."""
+        ids = [self._upload().json()["id"] for _ in range(3)]
+        self.client.post(PAGE, {"action": "move", "id": ids[0], "dir": "1"})
+        self.client.post(PAGE, {"action": "move", "id": ids[2], "dir": "-1"})
+        self.assertEqual(sorted(ProductPhoto.objects.values_list("order", flat=True)), [0, 1, 2])
+
+    def test_move_with_bad_direction_is_refused(self):
+        pid = self._upload().json()["id"]
+        self.assertEqual(self.client.post(PAGE, {"action": "move", "id": pid, "dir": "5"}).status_code, 400)
+
+    def test_move_of_unknown_photo_is_404(self):
+        self.assertEqual(
+            self.client.post(PAGE, {"action": "move", "id": 999, "dir": "1"}).status_code, 404)
+
     def test_delete_of_unknown_photo_is_404(self):
         self.assertEqual(self.client.post(PAGE, {"action": "delete", "id": 999}).status_code, 404)
 

@@ -84,6 +84,29 @@ def make_main(photo: ProductPhoto) -> None:
             row.save(update_fields=["order"])
 
 
+def move(photo: ProductPhoto, delta: int) -> bool:
+    """Сдвинуть снимок на одну позицию: delta -1 влево, +1 вправо.
+
+    Порядок снимков — это порядок показа в карточке слева направо, и владельцу
+    нужно расставлять его самому: «сделать главным» двигает только обложку, а
+    остальные пять остаются в том порядке, в каком их залили (02.10.2026).
+
+    Возвращает False, если двигать некуда (снимок с краю) — вызывающий покажет
+    это как «ничего не произошло», а не как ошибку.
+    """
+    rows = list(ProductPhoto.objects.filter(model_key=photo.model_key, color=photo.color))
+    at = next((i for i, row in enumerate(rows) if row.pk == photo.pk), -1)
+    to = at + delta
+    if at < 0 or to < 0 or to >= len(rows):
+        return False
+    rows[at], rows[to] = rows[to], rows[at]
+    for i, row in enumerate(rows):
+        if row.order != i:
+            row.order = i
+            row.save(update_fields=["order"])
+    return True
+
+
 def by_model(keys) -> dict:
     """{ключ модели: {ЦВЕТ: [фото, ...]}} одним запросом.
 

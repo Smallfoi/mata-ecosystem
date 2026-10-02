@@ -144,7 +144,9 @@
     box.appendChild(img);
     box.insertAdjacentHTML("beforeend",
       '<button type="button" class="m-slot-main" title="Сделать обложкой">★</button>' +
-      '<button type="button" class="m-slot-del" title="Удалить">×</button>');
+      '<button type="button" class="m-slot-del" title="Удалить">×</button>' +
+      '<button type="button" class="m-slot-left" title="Левее">‹</button>' +
+      '<button type="button" class="m-slot-right" title="Правее">›</button>');
     return box;
   }
 
@@ -209,6 +211,25 @@
       post(main).then(function (data) {
         if (!data.ok) { fail(gal, data.error || "не вышло"); return; }
         slot.parentNode.prepend(slot);       // обложка всегда первая
+      });
+    }
+
+    // Порядок снимков — это порядок показа в карточке покупателя, поэтому его
+    // расставляют вручную (владелец, 02.10.2026). Двигаем на одну позицию и
+    // переставляем плитку рядом, не перезагружая страницу.
+    var left = e.target.classList.contains("m-slot-left");
+    if (left || e.target.classList.contains("m-slot-right")) {
+      var near = left ? slot.previousElementSibling : slot.nextElementSibling;
+      if (!near || !near.classList.contains("is-filled")) return;   // снимок с краю
+      var body2 = new FormData();
+      body2.append("action", "move");
+      body2.append("id", slot.dataset.id);
+      body2.append("dir", left ? "-1" : "1");
+      post(body2).then(function (data) {
+        if (!data.ok) { fail(gal, data.error || "не вышло"); return; }
+        if (!data.moved) return;
+        if (left) { near.parentNode.insertBefore(slot, near); }
+        else { near.parentNode.insertBefore(near, slot); }
       });
     }
   });
