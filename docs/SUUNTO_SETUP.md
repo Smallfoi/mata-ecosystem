@@ -21,16 +21,45 @@ Suunto приняли нас в **Partner Program** 05.10.2026 (заявка о�
 
 ## Шаг 2. Настроить приложение (OAuth)
 
-Войти в [API Zone](https://apizone.suunto.com) → свой профиль → **OAuth settings**.
-Заполняются три поля ([их инструкция](https://apizone.suunto.com/how-to-start)):
+Войти в [API Zone](https://apizone.suunto.com) → свой профиль → **OAuth application settings**.
+Страница из трёх блоков; ниже — что в каждом поле.
+
+### Блок «Authorization»
 
 | Поле | Что вписать |
 |---|---|
-| Название приложения | `MATA Квартал` |
-| Client secret | длинная случайная строка (или кнопка «сгенерировать») — **сохранить сразу** |
-| Redirect URL | `https://api.mata-club.ru/v1/integrations/suunto/callback` |
+| Client ID | создан сам: `25971e6a-55bf-44fa-b2f0-26b2b30fe385` (не секретный, менять нельзя) |
+| Client name | `MATA Kvartal` (по умолчанию стоит почта — заменить) |
+| Client secret | «leave empty to keep current»: если значение известно — не трогать; если нет — задать новое и **сразу сохранить** |
+| Redirect URI(s) | `https://api.mata-club.ru/v1/integrations/suunto/callback` (по одному адресу на строку) |
 
-**Client ID** создаётся сам — он не секретный, его можно прислать в переписке.
+### Блок «Notifications» — это и есть вебхуки
+
+Suunto присылает POST с двумя полями: `username` и `workoutid` (их
+[FAQ](https://apizone.suunto.com/faq)). По этому «пингу» мы сами идём в их API и забираем
+тренировку своим токеном — поэтому подделать уведомление бессмысленно, и подпись нам не нужна.
+
+| Поле | Что вписать |
+|---|---|
+| Workout notification URL **(legacy form data)** | пусто — это старый формат |
+| **Workout notification URL** | `https://api.mata-club.ru/v1/integrations/suunto/push` |
+| Route notification URL | пусто (маршруты мы пока только отправляем, события не слушаем) |
+| 247 activity / sleep / recovery notification URL | пусто (суточные данные — следующий этап) |
+| Notification access token / secret | пусто: в документации они не описаны, а наша схема от них не зависит |
+
+### Блок «Application / service description» — карточка для пользователей Suunto
+
+| Поле | Что вписать |
+|---|---|
+| Name | `MATA Квартал` |
+| Description | «Беговой трекер и игра: захватывай кварталы города своими пробежками, собирай баллы и трать их в магазине МАТА. Подключите часы Suunto — тренировки попадут в Квартал с маршрутом.» |
+| Read more URL | `https://mata-club.ru` |
+| Connect URL | оставить пустым до появления кнопки «Подключить Suunto» в приложении |
+| Icon (300×300) | `mata-suunto-icon-300.png` — знак приложения на фирменном графите |
+| Image (1135 px) | `mata-suunto-image-1135.png` |
+
+Картинки собраны из иконки приложения (`ic_launcher_foreground`, фон `#2A302C`) и лежат в
+`D:\mata-temp\suunto\`. Это не новый дизайн — ровно то, что стоит на телефоне.
 
 Наши адреса подняты и отвечают с 05.10.2026:
 
@@ -52,6 +81,8 @@ Production пока НЕ нужен: его просят, когда интег�
 > ограничений нет.
 
 ## Шаг 4. Ключи — в Lockbox, не в переписку
+
+Client ID уже известен и не секретен: `25971e6a-55bf-44fa-b2f0-26b2b30fe385`.
 
 Репозиторий публичный, поэтому секреты не попадают ни в код, ни в чат. В секрет
 `mata-prod-secrets` (Yandex Lockbox) добавить:
