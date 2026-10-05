@@ -1,4 +1,4 @@
-"""Точки подключения часов COROS.
+"""Точки подключения часов: COROS и Suunto.
 
 Заявка в COROS требует указать три адреса ещё до выдачи ключей: куда вернуть
 пользователя после разрешения доступа, куда присылать готовые тренировки и как
@@ -60,6 +60,54 @@ def coros_push(request):
 @permission_classes([AllowAny])
 def coros_status(request):
     """Проверка «сервис жив» — её COROS опрашивает сам."""
+    return Response({"status": "ok", "service": "MATA integrations", "time": timezone.now().isoformat()})
+
+
+# ─────────────────────────── Часы Suunto ─────────────────────────────────
+# Suunto приняли нас в партнёрскую программу 05.10.2026 и дали доступ к Cloud API.
+# При настройке приложения в их кабинете спрашивают адрес возврата, а у вебхуков —
+# адрес приёма тренировок. Адреса должны отвечать уже в момент настройки, поэтому
+# они здесь в минимальном виде, как это было сделано для COROS.
+#
+# Разбор данных появится вместе с ключами (Client ID/Secret и subscription key):
+# до этого проверить подпись запроса нечем, а принимать чужие тренировки без
+# проверки нельзя.
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def suunto_callback(request):
+    """Куда Suunto возвращает человека после разрешения доступа (OAuth redirect)."""
+    code = request.query_params.get("code", "")
+    return Response({
+        "ok": True,
+        "received": bool(code),
+        "detail": "Подключение Suunto готовится. Вернитесь в приложение.",
+    })
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def suunto_push(request):
+    """Сюда Suunto присылает события о завершённых тренировках (вебхук).
+
+    Отвечаем 200 на любой корректный запрос — для отправителя это подтверждение
+    доставки. Содержимое пока не разбираем: Suunto подписывает тело запроса
+    (HMAC-SHA256), а ключа для проверки подписи у нас ещё нет.
+    """
+    try:
+        body = request.data if isinstance(request.data, (dict, list)) else json.loads(request.body or b"{}")
+    except (ValueError, TypeError):
+        return Response({"detail": "Некорректный JSON"}, status=400)
+    count = len(body) if isinstance(body, list) else 1
+    print(f"Suunto push: получено записей {count} в {timezone.now().isoformat()}.")
+    return Response({"ok": True, "received": count})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def suunto_status(request):
+    """Проверка «сервис жив»."""
     return Response({"status": "ok", "service": "MATA integrations", "time": timezone.now().isoformat()})
 
 
