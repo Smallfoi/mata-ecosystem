@@ -37,6 +37,9 @@ MODELS = (
     ("trailTracks", "trails.PendingTrack", ("user_id",), DELETE),
     ("trailAttempts", "trails.TrailAttempt", ("user_id",), DELETE),
     ("externalWorkouts", "workouts.ExternalWorkout", ("user_id",), DELETE),
+    # Токены подключённых часов: удаление аккаунта обязано отзывать доступ к
+    # чужому сервису, иначе мы продолжим ходить за данными удалённого человека.
+    ("watchAccounts", "integrations.WatchAccount", ("user_id",), DELETE),
     ("workoutAwards", "workouts.WorkoutAward", ("user_id",), DELETE),
     ("captureAwards", "territories.CaptureAward", ("user_id",), DELETE),
     ("shoes", "shoes.ShoeAsset", ("user_id",), DELETE),

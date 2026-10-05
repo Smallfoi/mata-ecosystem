@@ -1,4 +1,4 @@
-"""Журнал обмена с 1С (D-62).
+"""Журнал обмена с 1С (D-62) и подключённые аккаунты часов.
 
 Каждый приход каталога или цен оставляет запись: когда, что пришло, сколько
 товаров добавлено и обновлено, чем закончилось. Это нужно, чтобы владелец мог
@@ -80,3 +80,51 @@ class OneCExchange(models.Model):
         """Убрать записи старше KEEP_DAYS. Вызывается при записи не чаще раза в сутки."""
         edge = timezone.now() - timedelta(days=cls.KEEP_DAYS)
         return cls.objects.filter(created_at__lt=edge).delete()[0]
+
+class WatchAccount(models.Model):
+    """Подключённый аккаунт часов: чьи тренировки мы вправе забирать.
+
+    Одна таблица на все марки: у Suunto, COROS и Garmin разные API, но одна и та
+    же суть — человек разрешил доступ, у нас лежит его токен. Разводить по таблице
+    на производителя значит трижды писать продление токена и отключение.
+
+    Токен — это доступ к данным человека, поэтому: отключил источник — строка
+    удаляется целиком (см. `workouts.disconnect`), а не помечается «неактивной».
+    """
+
+    SOURCES = [
+        ("suunto", "Suunto"),
+        ("coros", "COROS"),
+        ("garmin", "Garmin"),
+    ]
+
+    user_id = models.CharField(max_length=40, db_index=True, verbose_name="Пользователь (ID)")
+    source = models.CharField(max_length=20, choices=SOURCES, db_index=True, verbose_name="Источник")
+    # Идентификатор человека у источника. Suunto присылает его в уведомлении о
+    # тренировке (`username`) — по нему и находим, чей это аккаунт.
+    external_id = models.CharField(max_length=120, db_index=True, verbose_name="ID у источника")
+
+    access_token = models.TextField(verbose_name="Токен доступа")
+    refresh_token = models.TextField(blank=True, default="", verbose_name="Токен продления")
+    expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Токен действует до")
+
+    connected_at = models.DateTimeField(default=timezone.now, verbose_name="Подключён")
+    last_sync_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя синхронизация")
+
+    class Meta:
+        db_table = "watch_accounts"
+        ordering = ["-connected_at"]
+        verbose_name = "Аккаунт часов"
+        verbose_name_plural = "Аккаунты часов"
+        # Один аккаунт одной марки на пользователя: повторное подключение
+        # обновляет токены, а не плодит записи.
+        unique_together = [("user_id", "source")]
+        indexes = [models.Index(fields=["source", "external_id"])]
+
+    def __str__(self):
+        return f"{self.get_source_display()} · {self.user_id}"
+
+    @property
+    def expired(self) -> bool:
+        return bool(self.expires_at and self.expires_at <= timezone.now())
+

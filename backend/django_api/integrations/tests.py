@@ -54,13 +54,16 @@ class SuuntoEndpointsTests(ApiTestCase):
         self.assertEqual(r.json()["status"], "ok")
 
     def test_callback_is_public_and_survives_empty_call(self):
+        """Человек передумал на странице Suunto — вернулся без кода, это не ошибка."""
         r = self.client.get("/v1/integrations/suunto/callback")
         self.assertEqual(r.status_code, 200)
-        self.assertFalse(r.json()["received"])
+        self.assertFalse(r.json()["ok"])
 
-    def test_callback_sees_code(self):
+    def test_callback_without_valid_signature_is_refused(self):
+        """Код без нашей подписи не подключает никого: иначе чужой аккаунт
+        можно было бы привязать к любому пользователю (см. tests_suunto)."""
         r = self.client.get("/v1/integrations/suunto/callback?code=abc&state=xyz")
-        self.assertTrue(r.json()["received"])
+        self.assertEqual(r.status_code, 400)
 
     def test_push_accepts_event(self):
         r = self.client.post(

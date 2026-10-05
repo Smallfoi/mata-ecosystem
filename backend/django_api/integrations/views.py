@@ -16,9 +16,14 @@ from django.conf import settings
 from django.core.cache import cache
 
 from django.utils import timezone
+from django.core import signing
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
+from common.security import user_id_from_request
+from integrations import suunto
+from integrations.models import WatchAccount
 
 
 @api_view(["GET"])
@@ -64,6 +69,11 @@ def coros_status(request):
 
 
 # ─────────────────────────── Часы Suunto ─────────────────────────────────
+# Подпись `state`: своя соль, чтобы ссылка подключения не годилась больше нигде.
+SUUNTO_STATE_SALT = "mata.suunto.connect"
+# Полчаса на то, чтобы разрешить доступ. Дольше — это уже чужая вкладка.
+SUUNTO_STATE_MAX_AGE = 30 * 60
+
 # Suunto приняли нас в партнёрскую программу 05.10.2026 и дали доступ к Cloud API.
 # При настройке приложения в их кабинете спрашивают адрес возврата, а у вебхуков —
 # адрес приёма тренировок. Адреса должны отвечать уже в момент настройки, поэтому
@@ -75,15 +85,75 @@ def coros_status(request):
 
 
 @api_view(["GET"])
+def suunto_connect(request):
+    """Начало подключения: отправляем человека разрешать доступ.
+
+    Отдаём ССЫЛКУ, а не редирект: приложение открывает её во внешнем браузере,
+    иначе вход в чужой аккаунт шёл бы внутри нашего окна — так делать не принято,
+    и Suunto этого не любит.
+
+    В `state` кладём подписанный идентификатор пользователя: когда Suunto вернёт
+    человека, мы должны знать, чей это аккаунт, и не поверить подставленному id.
+    """
+    me = user_id_from_request(request)
+    if not me:
+        return Response({"detail": "Нет токена"}, status=401)
+    if not suunto.configured():
+        return Response({"detail": "Подключение Suunto ещё не настроено"}, status=503)
+    state = signing.dumps({"uid": me}, salt=SUUNTO_STATE_SALT)
+    return Response({"url": suunto.authorize_url(state)})
+
+
+@api_view(["GET"])
 @permission_classes([AllowAny])
 def suunto_callback(request):
-    """Куда Suunto возвращает человека после разрешения доступа (OAuth redirect)."""
-    code = request.query_params.get("code", "")
-    return Response({
-        "ok": True,
-        "received": bool(code),
-        "detail": "Подключение Suunto готовится. Вернитесь в приложение.",
-    })
+    """Куда Suunto возвращает человека после разрешения доступа (OAuth redirect).
+
+    Страница открыта во внешнем браузере, без нашего токена — поэтому доступ
+    публичный, а кто именно подключается, узнаём из подписанного `state`.
+    Отвечаем человеческим текстом: сюда смотрит живой человек, а не программа.
+    """
+    code = (request.query_params.get("code") or "").strip()
+    state = (request.query_params.get("state") or "").strip()
+    if not code or not state:
+        # Сюда попадают и при отказе («я передумал») — это не ошибка.
+        return Response({"ok": False, "detail": "Подключение отменено."})
+    try:
+        uid = signing.loads(state, salt=SUUNTO_STATE_SALT, max_age=SUUNTO_STATE_MAX_AGE)["uid"]
+    except (signing.BadSignature, KeyError, TypeError):
+        return Response({"ok": False, "detail": "Ссылка устарела. Начните подключение заново."},
+                        status=400)
+
+    try:
+        tokens = suunto.exchange_code(code)
+    except suunto.SuuntoError as e:
+        return Response({"ok": False, "detail": "Suunto не подтвердила доступ: %s" % e}, status=502)
+
+    access = (tokens.get("access_token") or "").strip()
+    if not access:
+        return Response({"ok": False, "detail": "Suunto не вернула токен."}, status=502)
+
+    WatchAccount.objects.update_or_create(
+        user_id=uid, source="suunto",
+        defaults={
+            "external_id": str(tokens.get("user") or tokens.get("username") or "")[:120],
+            "access_token": access,
+            "refresh_token": (tokens.get("refresh_token") or "").strip(),
+            "expires_at": suunto.expires_at(tokens),
+            "connected_at": timezone.now(),
+        },
+    )
+    return Response({"ok": True, "detail": "Часы Suunto подключены. Вернитесь в приложение."})
+
+
+@api_view(["DELETE"])
+def suunto_disconnect(request):
+    """Отключить часы: токен удаляем целиком, а не помечаем неактивным."""
+    me = user_id_from_request(request)
+    if not me:
+        return Response({"detail": "Нет токена"}, status=401)
+    removed, _ = WatchAccount.objects.filter(user_id=me, source="suunto").delete()
+    return Response({"ok": True, "removed": bool(removed)})
 
 
 @api_view(["POST"])
