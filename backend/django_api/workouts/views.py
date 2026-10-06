@@ -10,20 +10,15 @@
   3. импорт проходит тот же античит, что и свой забег: снаружи данные приходят
      от приложения, которое мы не контролируем.
 """
-import hashlib
 from datetime import datetime, timedelta
 from datetime import timezone as dt_tz
 
-from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from common.locks import ACTIVITY, lock_user
 from common.numeric import BadNumber, bounded_int, finite_float
 from common.security import user_id_from_request
-from loyalty.models import add_txn
-from runs.budget import grant
 from runs.models import Run
 from runs.views import (
     FUTURE_SKEW,
@@ -33,7 +28,19 @@ from runs.views import (
     MAX_SPEED_MS,
     POINTS_PER_KM,
 )
-from workouts.models import ExternalWorkout, WorkoutAward
+from workouts.models import ExternalWorkout
+from workouts.service import accept as _accept
+
+def accept_workout(user_id, source, data):
+    """Принять тренировку общим путём, передав ему наши правила проверки."""
+    return _accept(
+        user_id, source, data,
+        validate=_validate,
+        find_same_run=_find_same_run,
+        running_sports=RUNNING_SPORTS,
+        points_per_km=POINTS_PER_KM,
+    )
+
 
 MAX_ITEMS_PER_REQUEST = 200
 # Насколько тренировка с часов может разойтись во времени с нашим забегом и всё
@@ -179,73 +186,16 @@ def import_workouts(request):
             skipped += 1
             continue
 
-        existing = ExternalWorkout.objects.filter(
-            user_id=me, source=source, source_id=data["source_id"]
-        ).first()
-        if existing:
+        workout, outcome = accept_workout(me, source, data)
+        if outcome == "duplicate":
             duplicates += 1
-            result.append(existing.to_json())
+            if workout:
+                result.append(workout.to_json())
             continue
-
-        # Идентификатор детерминированный: одна и та же тренировка одного источника
-        # даёт одну и ту же запись даже при гонке двух параллельных запросов.
-        wid = hashlib.sha1(f"{me}:{source}:{data['source_id']}".encode()).hexdigest()[:32]
-
-        # Тренировка, реестр и начисление — одно целое (аудит C05): сбой посередине
-        # откатывает всё, и повтор той же присылки доводит начисление ровно один раз.
-        try:
-            with transaction.atomic():
-                # Суточный потолок дистанции общий со своими забегами — проверка и
-                # запись под той же блокировкой на пользователя (аудит C06).
-                lock_user(ACTIVITY, me)
-                flag_reason = _validate(me, data)
-                same_run = None if flag_reason else _find_same_run(me, data)
-
-                points = 0
-                if not flag_reason and not same_run and data["sport"] in RUNNING_SPORTS:
-                    points = round(data["distance_m"] / 1000.0 * POINTS_PER_KM)
-
-                # Реестр переживает отключение источника (аудит C02): если по этой
-                # тренировке решение уже принималось, второй раз не платим —
-                # показываем то, что было начислено тогда.
-                prior = WorkoutAward.objects.select_for_update().filter(id=wid).first()
-                if prior:
-                    points = 0
-                # Суточный потолок баллов — общий с забегами и захватами (решение
-                # 28.09.2026, п.1 и п.7): тренировка сохраняется, сверх — 0 баллов.
-                points, cut, cap_reason = grant(me, points)
-                if cut:
-                    capped_total += cut
-                    cap_note = cap_reason
-                workout = ExternalWorkout.objects.create(
-                    id=wid,
-                    user_id=me,
-                    source=source,
-                    run_id=same_run.id if same_run else "",
-                    points_awarded=prior.points if prior else points,
-                    flagged=bool(flag_reason),
-                    flag_reason=flag_reason,
-                    **data,
-                )
-                if not prior:
-                    txn = None
-                    if points:
-                        txn = add_txn(
-                            me, points, "runnerRun",
-                            f"Тренировка из внешнего источника: {workout.distance_km:.1f} км",
-                        )
-                    WorkoutAward.objects.create(
-                        id=wid, user_id=me, source=source, points=points,
-                        txn_id=txn.id if txn else "",
-                    )
-        except IntegrityError:
-            # Параллельный запрос с той же тренировкой успел первым — это дубль.
-            duplicates += 1
-            existing = ExternalWorkout.objects.filter(id=wid).first()
-            if existing:
-                result.append(existing.to_json())
-            continue
-        points_total += points
+        if getattr(workout, "points_capped", 0):
+            capped_total += workout.points_capped
+            cap_note = workout.cap_reason
+        points_total += getattr(workout, "points_this_time", 0)
         imported += 1
         result.append(workout.to_json())
 
