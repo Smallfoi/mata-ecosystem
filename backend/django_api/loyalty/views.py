@@ -70,6 +70,25 @@ def _iso(dt):
     return dt.isoformat() if dt else None
 
 
+def _levels_table() -> list:
+    """Пороги и привилегии уровней из настроек: статусные для входа, покупки за
+    365 дней (только Платина), ставка начисления за покупку, потолок оплаты
+    бонусами, срок жизни бонусов. Процентных скидок у уровней нет (ТЗ §6)."""
+    th = config.get("LEVEL_THRESHOLD")
+    out = []
+    for i, key in enumerate(config.LEVELS):
+        out.append({
+            "key": key,
+            "title": config.LEVEL_TITLES[i],
+            "threshold": 0 if i == 0 else int(th[i - 1]),
+            "minSpend": int(config.get("PLATINUM_MIN_SPEND")) if i == len(config.LEVELS) - 1 else 0,
+            "purchaseRate": float(config.by_level("RATE_PURCHASE", i)),
+            "redeemCeiling": config.redeem_ceiling(i),
+            "expiryMonths": int(config.by_level("EXPIRY_MONTHS", i)),
+        })
+    return out
+
+
 def _v1_block(uid, v) -> dict:
     """Кошелёк программы v1 для клиентов (этап 3 — экраны)."""
     from .models_v1 import LoyaltyLot
@@ -93,6 +112,9 @@ def _v1_block(uid, v) -> dict:
         "heldNextAmount": v["next_amount"],
         "expiringAt": _iso(v["expiring_at"]),
         "expiringAmount": v["expiring_amount"],
+        # Все уровни с действующими настройками (этап 3): клиенты показывают
+        # привилегии отсюда, а не зашитыми в сборку цифрами.
+        "levels": _levels_table(),
         "lots": [{
             "id": lot.pk, "amount": lot.amount, "remaining": lot.remaining,
             "state": lot.state, "source": lot.source, "accruedAt": _iso(lot.accrued_at),
@@ -133,8 +155,12 @@ def redeem_preview(request):
         "redeemMin": q["redeemMin"],
         "canRedeem": q["canRedeem"],
         "reason": q["reason"],
+        # reasonText / accrues / accrualReason — добавлены к прежним полям позиции
+        # (исключения владельца «Товары в программе»); старые клиенты их не читают.
         "lines": [{"index": ln["index"], "productId": ln["productId"],
-                   "eligible": ln["eligible"], "reason": ln["reason"]} for ln in q["lines"]],
+                   "eligible": ln["eligible"], "reason": ln["reason"],
+                   "reasonText": ln["reasonText"], "accrues": ln["accrues"],
+                   "accrualReason": ln["accrualReason"]} for ln in q["lines"]],
     })
 
 
@@ -272,6 +298,30 @@ def transactions(request):
         run_id,
     )
     return Response({"ok": True})
+
+
+@api_view(["GET", "POST"])
+def referral(request):
+    """Приглашения (программа v1, этап 2).
+
+    GET — мой постоянный код и состояние: {programV1, code, bonus, capMonth,
+    invitedBy, canBind, bindUntil, invited, rewarded}.
+    POST {code} — ввести код пригласившего (для сборок, где его нет в регистрации):
+    только в первые 7 дней после регистрации и один раз; самоприглашение (тот же
+    телефон или устройство) отклоняется. Ответ {ok, detail, ...состояние}; 400 при
+    отказе.
+    """
+    from . import activity
+
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    if request.method == "GET":
+        return Response(activity.referral_info(uid))
+    d = request.data if isinstance(request.data, dict) else {}
+    ok, detail = activity.bind_referral(uid, d.get("code") or d.get("referralCode"))
+    body = {"ok": ok, "detail": detail, **activity.referral_info(uid)}
+    return Response(body, status=200 if ok else 400)
 
 
 @api_view(["GET"])

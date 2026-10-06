@@ -45,6 +45,21 @@ class ExternalWorkout(models.Model):
     # Наш забег, если это одно и то же событие. Тогда очки уже начислены за него.
     run_id = models.CharField(max_length=40, blank=True, default="", verbose_name="Наш забег (ID)")
 
+    # Достоверность записи (D-108). Пусто — тренировка пришла не с часов (ручной
+    # импорт из приложения), оценивать там нечего.
+    TRUST_CHOICES = [
+        ("high", "Высокая — засчитываем всё"),
+        ("medium", "Средняя — километры сразу, захват после разбора"),
+        ("low", "Низкая — не засчитываем"),
+    ]
+    trust_level = models.CharField(max_length=10, blank=True, default="",
+                                   choices=TRUST_CHOICES, verbose_name="Достоверность")
+    trust_score = models.IntegerField(default=0, verbose_name="Оценка достоверности")
+    trust_note = models.CharField(max_length=300, blank=True, default="",
+                                  verbose_name="Чего не хватило")
+    # Сколько точек трека получили: нет трека — нечем подтверждать захват.
+    track_points = models.IntegerField(default=0, verbose_name="Точек трека")
+
     points_awarded = models.IntegerField(default=0, verbose_name="Начислено баллов")
     flagged = models.BooleanField(default=False, db_index=True, verbose_name="Помечен (чит)")
     flag_reason = models.CharField(max_length=200, blank=True, default="", verbose_name="Причина пометки")

@@ -17,6 +17,7 @@ from integrations import suunto
 from integrations.models import WatchAccount
 from integrations.tasks import fetch_suunto_workout
 from workouts.models import ExternalWorkout
+from workouts.tests_trust import _drawn_track, _recorded_track
 
 PUSH = "/v1/integrations/suunto/push"
 
@@ -151,3 +152,49 @@ class SuuntoShapeTests(ApiTestCase):
     def test_empty_payload_gives_nothing(self):
         self.assertIsNone(suunto.to_workout({}, "w-6"))
         self.assertIsNone(suunto.to_workout(None, "w-7"))
+
+class SuuntoTrustTests(ApiTestCase):
+    """Достоверность записи (D-108) доезжает до тренировки, а не остаётся в голове."""
+
+    phone = "+79990009306"
+
+    def setUp(self):
+        super().setUp()
+        self.account = WatchAccount.objects.create(
+            user_id=self.uid, source="suunto", external_id="suunto-user-2",
+            access_token="acc", expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+    @mock.patch("integrations.suunto.fetch_workout", return_value=WORKOUT)
+    @mock.patch("integrations.suunto.download_fit", return_value=b"fit-bytes")
+    @mock.patch("integrations.fit.parse")
+    def test_real_recording_is_marked_trusted(self, m_parse, m_fit, m_fetch):
+        m_parse.return_value = _recorded_track()
+        fetch_suunto_workout(self.account.pk, "w-10")
+        w = ExternalWorkout.objects.get(user_id=self.uid)
+        self.assertEqual(w.trust_level, "high")
+        self.assertGreater(w.track_points, 50)
+        self.assertFalse(w.flagged)
+
+    @mock.patch("integrations.suunto.fetch_workout", return_value=WORKOUT)
+    @mock.patch("integrations.suunto.download_fit", return_value=b"fit-bytes")
+    @mock.patch("integrations.fit.parse")
+    def test_drawn_track_is_flagged_with_a_reason(self, m_parse, m_fit, m_fetch):
+        m_parse.return_value = _drawn_track()
+        fetch_suunto_workout(self.account.pk, "w-11")
+        w = ExternalWorkout.objects.get(user_id=self.uid)
+        self.assertEqual(w.trust_level, "low")
+        self.assertTrue(w.flagged)
+        self.assertIn("не похожа на часы", w.flag_reason)
+
+    @mock.patch("integrations.suunto.fetch_workout", return_value=WORKOUT)
+    @mock.patch("integrations.suunto.download_fit",
+                side_effect=suunto.SuuntoError("404"))
+    def test_missing_fit_does_not_break_the_import(self, m_fit, m_fetch):
+        """Трек не отдали — километры всё равно засчитываем, захват придержим."""
+        self.assertEqual(fetch_suunto_workout(self.account.pk, "w-12"), "imported")
+        w = ExternalWorkout.objects.get(user_id=self.uid)
+        self.assertEqual(w.trust_level, "medium")
+        self.assertEqual(w.track_points, 0)
+        self.assertFalse(w.flagged)
+

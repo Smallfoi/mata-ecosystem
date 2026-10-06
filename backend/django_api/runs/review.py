@@ -66,16 +66,23 @@ def approve_run(run, by="", notify=True):
     run.save(update_fields=["flagged", "flag_reason", "points_awarded",
                             "reviewed_at", "reviewed_by"])
 
+    from loyalty import activity
     from runs.milestones import award_milestones
     from territories.awards import on_run_approved
 
+    # Программа лояльности v1 (этап 2): бонус за пробежку — по правилам ТЗ, ДО
+    # захватов (их бонус — только за валидную пробежку).
+    act = activity.on_run_approved(run)
     award_milestones(run.user_id, run.distance_km)
     # Захват этой пробежки ждал решения — теперь его баллы приходят (п.4).
     on_run_approved(run)
+    if act is not None:
+        points = act.amount  # программа v1: в деньги идёт бонус, а не игровые баллы
     if notify and not already:
         _notify(run.user_id, "Забег подтверждён",
                 f"Проверили забег {run.distance_km:.1f} км — всё в порядке. "
-                f"Баллы начислены: +{points}.")
+                + (f"Баллы начислены: +{points}." if act is None
+                   else f"Бонусов начислено: +{points}."))
     return points
 
 
@@ -98,9 +105,11 @@ def reject_run(run, by="", notify=True):
     _stamp(run, by)
     run.save(update_fields=["points_awarded", "flagged", "reviewed_at", "reviewed_by"])
     # Захват этой пробежки баллов не получит; выплаченные за него — отзываются.
+    from loyalty import activity
     from territories.awards import on_run_rejected
 
     on_run_rejected(run)
+    activity.on_run_rejected(run)  # программа v1: бонусы пробежки и её захватов
     if notify:
         body = "Забег не засчитан: данные не подтвердились."
         if revoked:

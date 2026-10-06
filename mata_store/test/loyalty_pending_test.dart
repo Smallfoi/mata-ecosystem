@@ -20,6 +20,9 @@ class _Repo implements LoyaltyRepository {
     String description = '',
   }) async =>
       0;
+  @override
+  Future<RedeemPreview?> redeemPreview(List<Map<String, dynamic>> items) async =>
+      null;
 }
 
 LoyaltyTransaction _tx(int amount) => LoyaltyTransaction(

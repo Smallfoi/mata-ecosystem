@@ -24,6 +24,7 @@ PAGE_URLS = {
     "onec_log": "onec_log",
     # У вкладки «Забеги» рабочая страница — разбор помеченных, а не список.
     "runs": "runs_review",
+    "loyalty_settings": "loyalty_program",
 }
 
 

@@ -102,7 +102,7 @@ class LoyaltySettingForm(forms.ModelForm):
         if value is None:
             return None  # «как в ТЗ»
         try:
-            return loyalty_config.validate(self.instance.key, value)
+            return loyalty_config.validate(self.instance.key, value, strict=True)
         except loyalty_config.ConfigError as e:
             raise forms.ValidationError(str(e)) from e
 
@@ -233,3 +233,27 @@ class LoyaltyRedemptionAdmin(UserRefMixin, _ReadOnlyAdmin):
                     "ceiling", "created_at")
     list_filter = ("state",)
     search_fields = ("user_id", "order_id")
+
+
+# ── Этап 2: бонусы за активность, приглашения ────────────────────────────────
+from .models import LoyaltyActivity, LoyaltyReferral  # noqa: E402
+
+
+@admin.register(LoyaltyActivity)
+class LoyaltyActivityAdmin(UserRefMixin, _ReadOnlyAdmin):
+    """Решения по бонусам за активность. Подтвердить/отклонить «на проверке» —
+    на странице «Проверка забегов», вкладка «Бонусы на проверке»."""
+
+    list_display = ("user_ref", "kind", "ref", "status", "amount", "month", "validated_by",
+                    "reason", "created_at")
+    list_filter = ("kind", "status", "validated_by", "month")
+    search_fields = ("user_id", "ref", "run_ref")
+    date_hierarchy = "created_at"
+
+
+@admin.register(LoyaltyReferral)
+class LoyaltyReferralAdmin(UserRefMixin, _ReadOnlyAdmin):
+    list_display = ("user_ref", "inviter_id", "code", "status", "note", "created_at",
+                    "rewarded_at")
+    list_filter = ("status",)
+    search_fields = ("user_id", "inviter_id", "code")
