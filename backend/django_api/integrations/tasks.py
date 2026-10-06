@@ -16,8 +16,10 @@ import logging
 from celery import shared_task
 from django.utils import timezone
 
+from integrations import fit as fitlib
 from integrations import suunto
 from integrations.models import WatchAccount
+from workouts import trust
 
 log = logging.getLogger(__name__)
 
@@ -63,11 +65,37 @@ def fetch_suunto_workout(self, account_pk: int, workout_id: str):
         log.info("Suunto: тренировка %s без дистанции или времени — пропуск", workout_id)
         return "нечего импортировать"
 
+    # Трек нужен для захвата кварталов и для оценки достоверности (D-108). Если
+    # файл не отдали — это не повод отказывать: километры засчитаем, а захват
+    # придержим. Поэтому сбой скачивания не роняет импорт.
+    verdict = trust.unknown()
+    track = 0
+    try:
+        fit_bytes = suunto.download_fit(token, workout_id)
+        parsed = fitlib.parse(fit_bytes)
+        verdict = trust.score(parsed)
+        track = len(parsed.get("points") or [])
+    except (suunto.SuuntoError, fitlib.FitError) as e:
+        log.info("Suunto: трек тренировки %s не получен (%s)", workout_id, e)
+
     # Импорт — тем же путём, что и всё остальное: дедуп, склейка с нашим забегом,
     # суточный потолок, начисление (workouts.service).
     from workouts.views import accept_workout
 
     workout, outcome = accept_workout(account.user_id, "suunto", data)
+    if outcome == "imported" and workout is not None:
+        workout.trust_level = verdict["level"]
+        workout.trust_score = verdict["score"]
+        workout.trust_note = "; ".join(verdict["reasons"])[:300]
+        workout.track_points = track
+        fields = ["trust_level", "trust_score", "trust_note", "track_points"]
+        # Низкая достоверность — тренировка сохраняется, но в зачёт не идёт и
+        # ждёт разбора: человеку видно причину, а не молчаливый отказ.
+        if verdict["level"] == trust.LOW and not workout.flagged:
+            workout.flagged = True
+            workout.flag_reason = ("Запись не похожа на часы: " + workout.trust_note)[:200]
+            fields += ["flagged", "flag_reason"]
+        workout.save(update_fields=fields)
     account.last_sync_at = timezone.now()
     account.save(update_fields=["last_sync_at"])
     log.info("Suunto: тренировка %s — %s", workout_id, outcome)
