@@ -146,6 +146,28 @@ def suunto_callback(request):
     return Response({"ok": True, "detail": "Часы Suunto подключены. Вернитесь в приложение."})
 
 
+@api_view(["GET"])
+def suunto_account(request):
+    """Подключены ли часы у этого человека — для экрана «Часы и приложения».
+
+    `configured` отдаём отдельно: пока ключей на сервере нет, кнопку показывать
+    незачем — она приведёт в тупик.
+    """
+    me = user_id_from_request(request)
+    if not me:
+        return Response({"detail": "Нет токена"}, status=401)
+    account = WatchAccount.objects.filter(user_id=me, source="suunto").first()
+    return Response({
+        "configured": suunto.configured(),
+        "connected": account is not None,
+        "connectedAtMs": int(account.connected_at.timestamp() * 1000) if account else None,
+        "lastSyncAtMs": (
+            int(account.last_sync_at.timestamp() * 1000)
+            if account and account.last_sync_at else None
+        ),
+    })
+
+
 @api_view(["DELETE"])
 def suunto_disconnect(request):
     """Отключить часы: токен удаляем целиком, а не помечаем неактивным."""

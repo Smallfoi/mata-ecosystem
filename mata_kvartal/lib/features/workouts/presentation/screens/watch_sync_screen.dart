@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/health_sync.dart';
+import '../../data/suunto_provider.dart';
 
 /// «Часы и приложения» — подключение Health Connect.
 ///
@@ -112,6 +113,10 @@ class _WatchSyncScreenState extends ConsumerState<WatchSyncScreen> {
                 onDisconnect: _confirmDisconnect,
               ),
             },
+            // Suunto — прямое подключение, без Health Connect: партнёрский
+            // доступ даёт трек и присылает тренировку сама (D-108).
+            const SizedBox(height: 12),
+            const _SuuntoCard(),
             if (state.error != null) ...[
               const SizedBox(height: 12),
               Text(
@@ -326,6 +331,73 @@ class _ConnectedCard extends StatelessWidget {
     if (last == 1) return 'тренировку';
     if (last >= 2 && last <= 4) return 'тренировки';
     return 'тренировок';
+  }
+}
+
+/// Прямое подключение часов Suunto: без Health Connect и без телефона на бегу.
+class _SuuntoCard extends ConsumerStatefulWidget {
+  const _SuuntoCard();
+
+  @override
+  ConsumerState<_SuuntoCard> createState() => _SuuntoCardState();
+}
+
+class _SuuntoCardState extends ConsumerState<_SuuntoCard>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
+    // Разрешение выдают во внешнем браузере — узнать о нём можно только когда
+    // человек вернулся в приложение. Поэтому перечитываем состояние на возврате.
+    if (lifecycle == AppLifecycleState.resumed) {
+      ref.read(suuntoProvider.notifier).refresh();
+    }
+  }
+
+  String _lastSync(DateTime? at) {
+    if (at == null) return 'тренировок ещё не приходило';
+    final ago = DateTime.now().difference(at);
+    if (ago.inMinutes < 60) return 'последняя тренировка ${ago.inMinutes} мин назад';
+    if (ago.inHours < 24) return 'последняя тренировка ${ago.inHours} ч назад';
+    return 'последняя тренировка ${ago.inDays} дн назад';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(suuntoProvider);
+    // Ключей на сервере нет — кнопка привела бы в тупик, карточку не показываем.
+    if (!state.available) return const SizedBox.shrink();
+
+    if (!state.connected) {
+      return _Card(
+        icon: CupertinoIcons.link,
+        title: 'Подключить Suunto',
+        text: 'Тренировки с часов придут сами, с маршрутом и пульсом — '
+            'даже если телефон остался дома.',
+        action: 'Подключить',
+        busy: state.busy,
+        onAction: () => ref.read(suuntoProvider.notifier).connect(),
+      );
+    }
+    return _Card(
+      icon: CupertinoIcons.check_mark_circled_solid,
+      title: 'Suunto подключена',
+      text: _lastSync(state.lastSyncAt),
+      action: 'Отключить',
+      busy: state.busy,
+      onAction: () => ref.read(suuntoProvider.notifier).disconnect(),
+    );
   }
 }
 
