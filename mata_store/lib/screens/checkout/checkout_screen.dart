@@ -45,6 +45,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // Списание баллов лояльности
   int _pointsToRedeem = 0;
 
+  // Программа v1: максимум списания считает сервер по корзине
+  // (POST /v1/loyalty/redeem-preview). null — прежние правила (старый сервер,
+  // офлайн-прототип или превью не загрузилось).
+  RedeemPreview? _preview;
+  bool _previewLoading = false;
+
+  Future<void> _loadPreview() async {
+    final cart = context.read<CartProvider>();
+    final loyalty = context.read<LoyaltyProvider>();
+    final items = [
+      for (final it in cart.items)
+        {'productId': it.product.id, 'quantity': it.quantity},
+    ];
+    setState(() => _previewLoading = true);
+    final p = await loyalty.redeemPreview(items);
+    if (!mounted) return;
+    setState(() {
+      _previewLoading = false;
+      _preview = (p != null && p.programV1) ? p : null;
+      if (_preview case final pv?) _pointsToRedeem = pv.snap(_pointsToRedeem);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -113,6 +136,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _stepError = null;
       _step++;
     });
+    if (_step == 3) _loadPreview();
     _pageCtrl.animateToPage(
       _step,
       duration: const Duration(milliseconds: 350),
@@ -181,7 +205,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // Лояльность: ограничиваем списание актуальным максимумом на момент заказа
     final loyalty = context.read<LoyaltyProvider>();
     final orderTotal = cart.total + _deliveryCost;
-    final redeem = _pointsToRedeem.clamp(0, loyalty.maxRedeemable(orderTotal));
+    // v1 — максимум и минимум из превью сервера по этой корзине.
+    final redeem = _preview != null
+        ? _preview!.snap(_pointsToRedeem)
+        : _pointsToRedeem.clamp(0, loyalty.maxRedeemable(orderTotal));
 
     final order = orders.placeOrder(
       cart.items.toList(),
@@ -319,6 +346,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   deliveryCost: _deliveryCost,
                   pointsToRedeem: _pointsToRedeem,
                   onRedeemChanged: (v) => setState(() => _pointsToRedeem = v),
+                  preview: _preview,
+                  previewLoading: _previewLoading,
                 ),
               ],
             ),
@@ -941,6 +970,8 @@ class _ReviewStep extends StatelessWidget {
   final double deliveryCost;
   final int pointsToRedeem;
   final ValueChanged<int> onRedeemChanged;
+  final RedeemPreview? preview;
+  final bool previewLoading;
 
   const _ReviewStep({
     required this.nameCtrl,
@@ -955,6 +986,8 @@ class _ReviewStep extends StatelessWidget {
     required this.deliveryCost,
     required this.pointsToRedeem,
     required this.onRedeemChanged,
+    this.preview,
+    this.previewLoading = false,
   });
 
   String get _address {
@@ -973,10 +1006,17 @@ class _ReviewStep extends StatelessWidget {
     final cart = context.watch<CartProvider>();
     final loyalty = context.watch<LoyaltyProvider>();
     final orderTotal = cart.total + deliveryCost;
-    final maxRedeem = loyalty.maxRedeemable(orderTotal);
+    final pv = preview;
+    // v1: максимум — из превью сервера по корзине; прежняя программа — как было.
+    final maxRedeem = pv != null
+        ? (pv.canRedeem ? pv.redeemMax : 0)
+        : (previewLoading ? 0 : loyalty.maxRedeemable(orderTotal));
     // Если выбранное списание больше доступного (изменился состав) — обрезаем.
-    final redeem = pointsToRedeem > maxRedeem ? maxRedeem : pointsToRedeem;
+    final redeem = pv != null
+        ? pv.snap(pointsToRedeem)
+        : (pointsToRedeem > maxRedeem ? maxRedeem : pointsToRedeem);
     final total = orderTotal - redeem;
+    final items = cart.items.toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
@@ -987,8 +1027,8 @@ class _ReviewStep extends StatelessWidget {
           const SizedBox(height: 20),
 
           // Cart items
-          ...cart.items.map(
-            (item) => Padding(
+          for (final (i, item) in items.indexed)
+            Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
@@ -1023,6 +1063,15 @@ class _ReviewStep extends StatelessWidget {
                             color: AppColors.grey600,
                           ),
                         ),
+                        // v1: позиция не участвует в оплате бонусами.
+                        if (pv?.lineNote(i) case final note?)
+                          Text(
+                            note, // staw-static — причина с сервера
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.grey400,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -1036,7 +1085,6 @@ class _ReviewStep extends StatelessWidget {
                 ],
               ),
             ),
-          ),
 
           const Divider(height: 24),
 
@@ -1057,8 +1105,42 @@ class _ReviewStep extends StatelessWidget {
             value: OrderProvider.paymentLabel(payment),
           ),
 
-          // Списание баллов лояльности
-          if (maxRedeem > 0) ...[
+          // Списание бонусов программы v1: ползунок 0..redeemMax по превью.
+          if (pv != null) ...[
+            if (pv.canRedeem && pv.redeemMax > 0) ...[
+              const Divider(height: 24),
+              _RedeemSliderTile(
+                preview: pv,
+                value: redeem,
+                onChanged: (v) => onRedeemChanged(pv.snap(v)),
+              ),
+            ] else if (pv.available > 0 || pv.reason.isNotEmpty) ...[
+              const Divider(height: 24),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.stars_rounded,
+                    size: 16,
+                    color: AppColors.grey400,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      pv.disabledText, // staw-static — пояснение с сервера
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.grey600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ]
+          // Списание баллов лояльности (прежняя программа)
+          else if (previewLoading) ...[
+            const SizedBox.shrink(),
+          ] else if (maxRedeem > 0) ...[
             const Divider(height: 24),
             _RedeemPointsTile(
               balance: loyalty.balance,
@@ -1140,6 +1222,15 @@ class _ReviewStep extends StatelessWidget {
               ),
             ],
           ),
+          // v1: цена заказа целиком — «5 250 ₽ + 2 250 бонусов».
+          if (pv != null && redeem > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              priceWithBonuses(total.toInt(), redeem),
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 13, color: AppColors.grey600),
+            ),
+          ],
         ],
       ),
     ).animate().fadeIn(duration: 300.ms);
@@ -1220,6 +1311,79 @@ class _RedeemPointsTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Списание бонусов программы v1: ползунок от 0 до максимума по корзине.
+/// Меньше минимума списать нельзя — ползунок прыгает к 0 или к минимуму.
+/// Оформление — как у плитки прежней программы.
+class _RedeemSliderTile extends StatelessWidget {
+  final RedeemPreview preview;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _RedeemSliderTile({
+    required this.preview,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final max = preview.redeemMax;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border.all(
+          color: value > 0 ? AppColors.black : AppColors.grey200,
+          width: value > 0 ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.stars_rounded, size: 22, color: AppColors.black),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value > 0
+                          ? 'Списать $value ${bonusWord(value)}'
+                          : 'Оплатить часть бонусами',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.black,
+                      ),
+                    ),
+                    Text(
+                      'от ${preview.redeemMin} до $max · доступно ${preview.available}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.grey600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: value.clamp(0, max).toDouble(),
+            min: 0,
+            max: max.toDouble(),
+            activeColor: AppColors.black,
+            inactiveColor: AppColors.grey200,
+            onChanged: (v) => onChanged(v.round()),
+          ),
+        ],
       ),
     );
   }

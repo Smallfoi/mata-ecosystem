@@ -441,7 +441,9 @@ class _LoyaltyCard extends StatelessWidget {
                   // Expanded + ellipsis: длинная строка уровня («Платина ·
                   // = 3852 ₽ скидки») переполняла Row (жёлто-чёрные полосы).
                   Expanded(
-                    child: Column(
+                    child: loyalty.v1 != null
+                        ? _LoyaltyV1Summary(v1: loyalty.v1!)
+                        : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -474,6 +476,52 @@ class _LoyaltyCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Программа v1 (ТЗ 30.09.2026): «Доступно N бонусов», уровень и шкала —
+/// до минимума списания, пока его не накопили, иначе до следующего уровня.
+/// Тексты и цвета — те же, что у прежней карточки.
+class _LoyaltyV1Summary extends StatelessWidget {
+  final LoyaltyV1 v1;
+  const _LoyaltyV1Summary({required this.v1});
+
+  @override
+  Widget build(BuildContext context) {
+    final toMin = v1.belowRedeemMin;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          v1.availableText,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.5,
+            color: AppColors.black,
+          ),
+        ),
+        Text(
+          'Уровень: ${v1.level.label} · '
+          '${toMin ? v1.redeemMinText : v1.levelScaleText}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, color: Color(0xB32A302C)),
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: LinearProgressIndicator(
+            value: toMin ? v1.redeemMinProgress : v1.levelProgress,
+            minHeight: 4,
+            backgroundColor: const Color(0x332A302C),
+            valueColor: const AlwaysStoppedAnimation(AppColors.black),
+          ),
+        ),
+      ],
     );
   }
 }

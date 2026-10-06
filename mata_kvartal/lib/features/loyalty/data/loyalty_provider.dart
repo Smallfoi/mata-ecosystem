@@ -7,6 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_config.dart';
 import '../../../core/storage/account_scope.dart';
 import '../../auth/data/auth_provider.dart';
+import 'loyalty_v1.dart';
+
+export 'loyalty_v1.dart';
 
 /// Баллы лояльности — общий счёт экосистемы (тот же backend, что и аккаунт).
 /// Квартал начисляет баллы за бег/территории, Store их тратит. Здесь — чтение
@@ -54,6 +57,10 @@ class LoyaltyState {
   /// Аккаунт на проверке — баллы за активность заморожены до решения.
   final bool frozen;
 
+  /// Программа v1 (ТЗ 30.09.2026): кошелёк с лотами, уровни по статусным.
+  /// null — сервер на прежней программе, всё как раньше.
+  final LoyaltyV1? v1;
+
   const LoyaltyState({
     this.balance = 0,
     this.level = 'basic',
@@ -66,7 +73,10 @@ class LoyaltyState {
     this.pendingNextAmount = 0,
     this.pendingNextAt,
     this.frozen = false,
+    this.v1,
   });
+
+  bool get programV1 => v1 != null;
 
   LoyaltyState copyWith({
     int? balance,
@@ -82,6 +92,8 @@ class LoyaltyState {
     DateTime? pendingNextAt,
     bool clearPendingNextAt = false,
     bool? frozen,
+    LoyaltyV1? v1,
+    bool clearV1 = false,
   }) => LoyaltyState(
     balance: balance ?? this.balance,
     level: level ?? this.level,
@@ -96,6 +108,7 @@ class LoyaltyState {
         ? null
         : pendingNextAt ?? this.pendingNextAt,
     frozen: frozen ?? this.frozen,
+    v1: clearV1 ? null : v1 ?? this.v1,
   );
 
   /// Русское название уровня по порогам экосистемы (0/200/500/1000).
@@ -158,6 +171,9 @@ class LoyaltyNotifier extends StateNotifier<LoyaltyState> {
         )?.toLocal(),
         clearPendingNextAt: data['pendingNextAt'] == null,
         frozen: data['frozen'] == true,
+        // Программа v1: старый сервер блока не шлёт → прежний экран.
+        v1: LoyaltyV1.fromAccount(data),
+        clearV1: LoyaltyV1.fromAccount(data) == null,
         transactions: txns,
         isLoading: false,
         loaded: true,

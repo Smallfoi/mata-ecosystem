@@ -339,6 +339,24 @@ class Acceptance(V1Case):
         self.assertEqual((d["balance"], d["level"]), (500, "silver"))
         self.assertEqual(d["v1"]["statusPoints"], 500)
         self.assertEqual(d["v1"]["lots"][0]["remaining"], 500)
+        # Уровни с привилегиями — из настроек, без процентных скидок (этап 3, клиенты).
+        levels = d["v1"]["levels"]
+        self.assertEqual([lv["key"] for lv in levels], ["basic", "silver", "gold", "platinum"])
+        self.assertEqual([lv["threshold"] for lv in levels], [0, 500, 2000, 5000])
+        self.assertEqual(levels[3]["minSpend"], 60000)
+        self.assertEqual(levels[0]["minSpend"], 0)
+        self.assertEqual([lv["purchaseRate"] for lv in levels], [0.05, 0.06, 0.07, 0.09])
+        self.assertEqual([lv["redeemCeiling"] for lv in levels], [0.15, 0.20, 0.25, 0.30])
+        self.assertEqual([lv["expiryMonths"] for lv in levels], [6, 12, 12, 18])
+        # Выше 30% сохранить нельзя (#853); значение в таблице в обход — код срезает.
+        LoyaltySetting.objects.update_or_create(
+            key="REDEEM_CEILING", defaults={"value": [0.15, 0.2, 0.25, 0.5]})
+        config.invalidate()
+        from django.core.cache import cache
+
+        cache.clear()  # карточка лояльности кэшируется по пользователю
+        d = self.api_get("/v1/loyalty/account").json()
+        self.assertEqual(d["v1"]["levels"][3]["redeemCeiling"], 0.30)  # потолок кодом
 
     def test_reserve_counter(self):
         self.give(1000)
