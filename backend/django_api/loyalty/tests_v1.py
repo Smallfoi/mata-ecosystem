@@ -348,7 +348,10 @@ class Acceptance(V1Case):
         self.assertEqual([lv["purchaseRate"] for lv in levels], [0.05, 0.06, 0.07, 0.09])
         self.assertEqual([lv["redeemCeiling"] for lv in levels], [0.15, 0.20, 0.25, 0.30])
         self.assertEqual([lv["expiryMonths"] for lv in levels], [6, 12, 12, 18])
-        config.set_value("REDEEM_CEILING", [0.15, 0.2, 0.25, 0.5], by="test")
+        # Выше 30% сохранить нельзя (#853); значение в таблице в обход — код срезает.
+        LoyaltySetting.objects.update_or_create(
+            key="REDEEM_CEILING", defaults={"value": [0.15, 0.2, 0.25, 0.5]})
+        config.invalidate()
         from django.core.cache import cache
 
         cache.clear()  # карточка лояльности кэшируется по пользователю
