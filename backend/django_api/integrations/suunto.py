@@ -16,7 +16,8 @@ import json
 import os
 import urllib.parse
 import urllib.request
-from datetime import timedelta
+from datetime import datetime, timedelta
+from datetime import timezone as dt_tz
 
 from django.utils import timezone
 
@@ -28,6 +29,14 @@ API_BASE = "https://cloudapi.suunto.com"
 # разбора тренировки.
 REFRESH_MARGIN = timedelta(minutes=5)
 TIMEOUT_S = 20
+
+# Пути их API. Портал отдаёт их только скриптом, в открытой документации версия
+# указана по-разному (v2 и v3), поэтому держим в настройках: первый живой прогон
+# покажет верный, и менять придётся переменную окружения, а не код.
+# Проверить, какой отвечает, можно командой `manage.py suunto_probe`.
+WORKOUT_PATH = os.environ.get("SUUNTO_WORKOUT_PATH") or "/v2/workout/{id}"
+WORKOUTS_PATH = os.environ.get("SUUNTO_WORKOUTS_PATH") or "/v2/workouts"
+FIT_PATH = os.environ.get("SUUNTO_FIT_PATH") or "/v2/workout/exportFit/{id}"
 
 
 class SuuntoError(RuntimeError):
@@ -127,6 +136,85 @@ def api_get(path: str, access_token: str, params: dict | None = None):
         raise SuuntoError(f"Suunto {e.code}: {detail}") from e
     except Exception as e:
         raise SuuntoError(f"Suunto недоступна: {e}") from e
+
+
+def fetch_workout(access_token: str, workout_id: str) -> dict:
+    """Сводка одной тренировки: дистанция, время, пульс, вид спорта."""
+    data = api_get(WORKOUT_PATH.format(id=urllib.parse.quote(str(workout_id))), access_token)
+    if isinstance(data, dict):
+        # У них ответ встречается и «как есть», и завёрнутым в payload.
+        return data.get("payload") if isinstance(data.get("payload"), dict) else data
+    return {}
+
+
+def download_fit(access_token: str, workout_id: str) -> bytes:
+    """FIT-файл тренировки: в нём лежит полный трек с координатами."""
+    raw = api_get(FIT_PATH.format(id=urllib.parse.quote(str(workout_id))), access_token)
+    return raw if isinstance(raw, (bytes, bytearray)) else b""
+
+
+def _num(raw, *names):
+    """Первое число из перечисленных полей: названия у них разнятся по версиям."""
+    for name in names:
+        value = raw.get(name)
+        if value in (None, ""):
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def to_workout(raw: dict, workout_id: str) -> dict | None:
+    """Ответ Suunto → вид, который принимает наш импорт (`workouts.service`).
+
+    Возвращает None, если тренировку нечего засчитывать: без дистанции и времени
+    это не пробежка, а, например, запись сна.
+    """
+    if not isinstance(raw, dict):
+        return None
+    distance = _num(raw, "totalDistance", "distance") or 0
+    duration = _num(raw, "totalTime", "duration", "movingTime") or 0
+    started_ms = _num(raw, "startTime", "startTimeMillis", "timestamp") or 0
+    if distance <= 0 or duration <= 0 or started_ms <= 0:
+        return None
+    # Время у них в миллисекундах; секунды тоже встречаются — отличаем по порядку.
+    if started_ms < 1e11:
+        started_ms *= 1000
+    avg_hr = _num(raw, "hrAvg", "avgHr", "averageHeartRate")
+    max_hr = _num(raw, "hrMax", "maxHr", "maxHeartRate")
+    calories = _num(raw, "energyConsumption", "calories")
+    # Пульс приходит и в ударах в минуту, и в ударах в секунду (их «hrAvg»).
+    if avg_hr is not None and avg_hr < 10:
+        avg_hr *= 60
+    if max_hr is not None and max_hr < 10:
+        max_hr *= 60
+    return {
+        "source_id": str(workout_id)[:120],
+        "started_at": datetime.fromtimestamp(started_ms / 1000, tz=dt_tz.utc),
+        "duration_s": int(duration),
+        "distance_m": float(distance),
+        "sport": _sport(raw),
+        "avg_hr": int(avg_hr) if avg_hr else None,
+        "max_hr": int(max_hr) if max_hr else None,
+        "calories": int(calories) if calories else None,
+    }
+
+
+# Их вид спорта приходит числом (activityId) или строкой. Нас интересует одно:
+# бег это или нет — за бег начисляются баллы, остальное просто показываем.
+RUNNING_ACTIVITY_IDS = {1, 2, 3, 11, 13}       # бег, трейл, беговая дорожка, ходьба
+
+
+def _sport(raw: dict) -> str:
+    value = raw.get("activityId")
+    if isinstance(value, (int, float)):
+        return "run" if int(value) in RUNNING_ACTIVITY_IDS else "other"
+    text = str(raw.get("activityType") or raw.get("sport") or "").strip().lower()
+    if not text:
+        return ""
+    return "run" if "run" in text or "walk" in text else text[:30]
 
 
 def expires_at(token_response: dict):
