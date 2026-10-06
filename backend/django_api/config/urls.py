@@ -204,6 +204,11 @@ urlpatterns = [
     # Заказы Store (D-13)
     path("v1/orders", orders_views.orders),
     path("v1/shipping-options", orders_views.shipping_options),  # способы доставки (D-110)
+    # Заявки покупателей на возврат (D-112).
+    path("v1/orders/<str:order_id>/return-options", orders_views.return_options),
+    path("v1/orders/<str:order_id>/return-requests", orders_views.order_return_requests),
+    path("v1/return-requests", orders_views.my_return_requests),
+    path("v1/return-requests/<int:pk>/cancel", orders_views.cancel_return_request),
     path("v1/orders/<str:order_id>/pay", orders_views.pay_order),  # инициировать оплату
     # Статус оплаты с перепроверкой у провайдера: страховка от потерянного вебхука.
     path("v1/orders/<str:order_id>/payment", orders_views.payment_state),

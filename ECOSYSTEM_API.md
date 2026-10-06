@@ -387,6 +387,20 @@ POST /orders     { items, checkoutData, pointsRedeemed, total } → Order   (з�
                  Неизвестный способ → 400, выключенный → 409. В payload заказа: deliveryCost (серверный), deliveryOption { code, name }.
 GET  /shipping-options[?goods=<сумма товаров>]           → { options: [{ code, name, kind: pickup|delivery, zone, description, price, freeFrom, requiresAddress, cost? }] }
                  публично; способы ведёт владелец в админке «Магазин → Доставка» (D-110); code = checkoutData.deliveryType (pickup, courier).
+
+Заявки покупателя на возврат (D-112) — Bearer, только свои заказы:
+GET  /orders/:id/return-options   → { canReturn, reason, lines:[{index, name, paid, available, status: available|requested|returned}],
+                                      reasons:{size, style, defect, not_as_described, wrong_item, other}, returnDays, bringDays,
+                                      standardUntil, standardOpen, defectUntil, store:{name, description} }
+GET  /orders/:id/return-requests  → ReturnRequest[]
+POST /orders/:id/return-requests  { method: store|parcel, lines:[{index, reason, comment?}] } → 201 ReturnRequest
+                 400 — нет причины / defect|other без описания / срок истёк; 409 — вещь уже вернули или заявлена.
+                 Без брака — RETURN_DAYS (7) со дня получения; брак/не тот товар/не по описанию — до 2 лет.
+GET  /return-requests             → ReturnRequest[] (все свои)
+POST /return-requests/:pk/cancel  → ReturnRequest   (только пока status=awaiting; иначе 409)
+ReturnRequest = { id, number «В-N», orderId, status: awaiting|received|approved|rejected|canceled|expired, statusLabel,
+                  method, lines, bringUntil, decisionNote, refundRub, createdAt }
+                 Решение — в админке «Заявки на возврат»: товар получен → одобрить (деньги по строкам чека, D-73) / отказать с причиной.
 GET  /orders                                             → Order[] (текущего пользователя)
 GET  /orders/:id                                         → Order
 POST /orders/:id/pay  { returnUrl? }  → { status, paymentId, confirmationUrl, method: "sbp" }  (только СБП, D-72; 409 — время на оплату истекло; 502 — оплата недоступна; dev без провайдера — status=paid без paymentId, на сборку не уходит)

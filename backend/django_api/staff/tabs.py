@@ -32,8 +32,9 @@ TABS = (
     Tab("catalog.reviews", "Отзывы", "Каталог", ("catalog.review",),
         hint="Модерация отзывов покупателей."),
 
-    Tab("orders", "Заказы", "Магазин", ("orders.order", "orders.orderreturn", "orders.shippingoption"),
-        hint="Заказы покупателей, статусы, состав, возвраты; способы доставки и их цены."),
+    Tab("orders", "Заказы", "Магазин", ("orders.order", "orders.orderreturn", "orders.shippingoption",
+         "orders.returnrequest"),
+        hint="Заказы покупателей, статусы, состав, возвраты и заявки на возврат; способы доставки и их цены."),
     Tab("loyalty", "Баллы", "Магазин",
         ("loyalty.loyaltytransaction", "loyalty.loyaltylot", "loyalty.loyaltystatus",
          "loyalty.loyaltyredemption", "loyalty.loyaltyevent", "loyalty.loyaltyrulesnapshot",

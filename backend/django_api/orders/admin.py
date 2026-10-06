@@ -2,13 +2,13 @@ from django.contrib import admin, messages
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin, TabularInline
 
 from common.adminutils import ExportCsvMixin, UserRefMixin
 from staff.models import StaffAudit
 
-from .models import Order, OrderReturn, ShippingOption
+from .models import Order, OrderReturn, ReturnRequest, ShippingOption
 from .returns import RETURNABLE, ReturnError, make_return, return_plan
 
 
@@ -202,3 +202,100 @@ class ShippingOptionAdmin(ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         # Удалённый код ломает старые сборки и разбор прошлых заказов — выключайте.
         return False
+
+
+@admin.register(ReturnRequest)
+class ReturnRequestAdmin(UserRefMixin, ModelAdmin):
+    """Заявки покупателей на возврат (D-112).
+
+    Порядок работы магазина: покупатель принёс/прислал вещи → «Товар получен» →
+    осмотр (срок, вид, ярлыки, упаковка, «Честный знак»; по браку — проверка
+    качества) → «Одобрить» (деньги по строкам чека) или «Отказать» с причиной в
+    поле «Решение». Брак подтверждён — отметьте это и внесите расходы покупателя
+    на доставку по квитанции: их выплачивают отдельно.
+    """
+
+    list_display = ("number_label", "order_link", "user_ref", "status", "method",
+                    "defect_claimed", "bring_until", "created_at")
+    list_filter = ("status", "method", "defect_claimed")
+    search_fields = ("order__order_id", "user_id")
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+    actions = ("act_received", "act_approve", "act_reject")
+    fields = ("order_link", "user_id", "status", "method", "items_view", "bring_until",
+              "defect_claimed", "defect_confirmed", "customer_shipping_kop", "shipping_paid",
+              "decision_note", "order_return", "created_at", "received_at", "decided_at",
+              "decided_by")
+    readonly_fields = ("order_link", "user_id", "status", "method", "items_view",
+                       "bring_until", "defect_claimed", "order_return", "created_at",
+                       "received_at", "decided_at", "decided_by")
+
+    def has_add_permission(self, request):
+        return False  # заявку оформляет покупатель
+
+    def has_delete_permission(self, request, obj=None):
+        return False  # история возвратов — документ
+
+    @admin.display(description="Заявка", ordering="pk")
+    def number_label(self, obj):
+        return obj.number
+
+    @admin.display(description="Заказ")
+    def order_link(self, obj):
+        return format_html('<a href="{}">{}</a>',
+                           reverse("admin:orders_order_change", args=[obj.order_id]),
+                           obj.order.order_id)
+
+    @admin.display(description="Вещи и причины")
+    def items_view(self, obj):
+        from .return_requests import REASONS
+
+        try:
+            names = {row["index"]: row["name"] for row in return_plan(obj.order)}
+        except ReturnError:
+            names = {}
+        rows = format_html_join(
+            "", "<li><b>{}</b> — {}{}</li>",
+            ((names.get(line["index"], f"позиция {line['index']}"),
+              REASONS.get(line["reason"], line["reason"]),
+              f": {line['comment']}" if line.get("comment") else "")
+             for line in obj.lines))
+        return format_html("<ul>{}</ul>", rows)
+
+    def _run(self, request, queryset, fn, done):
+        from .return_requests import RequestError
+
+        ok = 0
+        for req in queryset:
+            try:
+                fn(req)
+            except RequestError as e:
+                self.message_user(request, f"{req.number}: {e.detail}", messages.ERROR)
+            else:
+                ok += 1
+                StaffAudit.write(request, f"заявка на возврат {req.number}: {done}")
+        if ok:
+            self.message_user(request, f"{done}: {ok}", messages.SUCCESS)
+
+    @admin.action(description="Товар получен — на проверку", permissions=["change"])
+    def act_received(self, request, queryset):
+        from .return_requests import mark_received
+
+        self._run(request, queryset, lambda r: mark_received(r, request.user.get_username()),
+                  "товар получен")
+
+    @admin.action(description="Одобрить и вернуть деньги", permissions=["change"])
+    def act_approve(self, request, queryset):
+        from .return_requests import approve
+
+        self._run(request, queryset, lambda r: approve(r, request.user.get_username()),
+                  "одобрено, деньги возвращаются")
+
+    @admin.action(description="Отказать (причина — в поле «Решение»)",
+                  permissions=["change"])
+    def act_reject(self, request, queryset):
+        from .return_requests import reject
+
+        self._run(request, queryset,
+                  lambda r: reject(r, r.decision_note, request.user.get_username()),
+                  "отказано")
