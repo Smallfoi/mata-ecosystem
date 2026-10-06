@@ -16,3 +16,11 @@ def reconcile_returns():
     from .returns import reconcile_returns as run
 
     return run()
+
+
+@shared_task(name="orders.expire_return_requests", ignore_result=True)
+def expire_return_requests():
+    """Заявки на возврат, по которым товар не сдали в срок, — в «истекла» (D-112)."""
+    from .return_requests import expire_stale
+
+    return expire_stale()

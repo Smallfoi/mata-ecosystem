@@ -408,6 +408,9 @@ UNFOLD = {
                     {"title": "Заказы", "icon": "shopping_cart",
                      "link": reverse_lazy("admin:orders_order_changelist"),
                      "permission": _tab("orders")},
+                    {"title": "Заявки на возврат", "icon": "assignment_return",
+                     "link": reverse_lazy("admin:orders_returnrequest_changelist"),
+                     "permission": _tab("orders")},
                     {"title": "Доставка", "icon": "local_shipping",
                      "link": reverse_lazy("admin:orders_shippingoption_changelist"),
                      "permission": _tab("orders")},
@@ -641,6 +644,11 @@ CELERY_BEAT_SCHEDULE = {
     "reconcile-order-returns": {
         "task": "orders.reconcile_returns",
         "schedule": crontab(minute="*/5"),
+    },
+    # Заявки на возврат, по которым товар не сдали в срок (D-112).
+    "expire-return-requests": {
+        "task": "orders.expire_return_requests",
+        "schedule": crontab(minute=15),
     },
     # Авто-парсер афиши «Стартов»: раз в сутки в 05:00 (Asia/Yakutsk). Идемпотентно
     # (upsert по source+external_id). Источники — races/importers/.

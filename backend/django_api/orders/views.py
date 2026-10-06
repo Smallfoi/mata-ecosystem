@@ -466,3 +466,77 @@ def shipping_options(request):
     except (ArithmeticError, ValueError, TypeError):
         return Response({"detail": "Некорректная сумма товаров"}, status=400)
     return Response({"options": [shipping.to_json(o, goods) for o in shipping.active_options()]})
+
+
+def _my_order(request, order_id):
+    """(uid, заказ) текущего пользователя или (uid, None)."""
+    uid = user_id_from_request(request)
+    if not uid:
+        return None, None
+    return uid, Order.objects.filter(user_id=uid, order_id=order_id).first()
+
+
+@api_view(["GET"])
+def return_options(request, order_id):
+    """Что из заказа можно вернуть, причины, сроки и адрес магазина (D-112)."""
+    from .return_requests import options
+
+    uid, order = _my_order(request, order_id)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    if not order:
+        return Response({"detail": "Заказ не найден"}, status=404)
+    return Response(options(order))
+
+
+@api_view(["GET", "POST"])
+def order_return_requests(request, order_id):
+    """Заявки на возврат по заказу: GET — список, POST — оформить новую (D-112)."""
+    from . import return_requests as rr
+
+    uid, order = _my_order(request, order_id)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    if not order:
+        return Response({"detail": "Заказ не найден"}, status=404)
+    if request.method == "POST":
+        try:
+            req = rr.create(order, uid, request.data.get("lines"),
+                            str(request.data.get("method") or ""))
+        except rr.RequestError as e:
+            return Response({"detail": e.detail}, status=e.status)
+        return Response(rr.to_json(req), status=201)
+    return Response([rr.to_json(r) for r in order.return_requests.all()])
+
+
+@api_view(["GET"])
+def my_return_requests(request):
+    """Все заявки на возврат текущего пользователя (D-112)."""
+    from .models import ReturnRequest
+    from .return_requests import to_json
+
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    rows = ReturnRequest.objects.select_related("order", "order_return").filter(
+        user_id=uid)[:100]
+    return Response([to_json(r) for r in rows])
+
+
+@api_view(["POST"])
+def cancel_return_request(request, pk):
+    """Покупатель передумал — пока товар не сдан (D-112)."""
+    from . import return_requests as rr
+    from .models import ReturnRequest
+
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    req = ReturnRequest.objects.filter(pk=pk, user_id=uid).first()
+    if not req:
+        return Response({"detail": "Заявка не найдена"}, status=404)
+    try:
+        req = rr.cancel(req)
+    except rr.RequestError as e:
+        return Response({"detail": e.detail}, status=e.status)
+    return Response(rr.to_json(req))
