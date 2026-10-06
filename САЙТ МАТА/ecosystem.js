@@ -1047,6 +1047,9 @@
         window.STAW = window.STAW || {};
         window.STAW.ecoPoints = bal;
         window.STAW.ecoLevel = (acc && acc.level) ? acc.level : null;
+        // Программа лояльности v1 (ТЗ 30.09.2026): кошелёк, уровень, пороги —
+        // с сервера. Нет programV1 — прежняя программа, профиль как раньше.
+        window.STAW.ecoV1 = (acc && acc.programV1 === true && acc.v1) ? acc.v1 : null;
         renderLoggedIn(getUser(), bal);
       })
       .catch(function (e) {
@@ -1147,6 +1150,7 @@
     window.STAW.logout = function () {
       clearSession();
       window.STAW.ecoPoints = 0;
+      window.STAW.ecoV1 = null;
       renderLoggedOut();
     };
     window.STAW.setUser = function (u) {

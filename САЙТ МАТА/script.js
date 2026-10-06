@@ -528,6 +528,8 @@ if (pvModal) {
 const coModal = document.querySelector("[data-co-modal]");
 const checkoutBtn = document.querySelector("[data-checkout]");
 let coPointsApplied = 0;
+// Превью кассы программы v1 (POST /v1/loyalty/redeem-preview). null — прежние правила.
+let coPreview = null;
 // Нажали «Оформить», не войдя: после входа форма заказа откроется сама (D-72).
 let checkoutAfterLogin = false;
 
@@ -556,9 +558,11 @@ function coRecompute() {
   const avail = availablePoints();
   const toggle = coModal.querySelector("[data-co-points-toggle]");
   const wantPoints = toggle && toggle.checked;
-  // Правила списания — как на сервере (D-72): от 50 баллов, не больше 30% заказа.
+  // v1: максимум по корзине считает сервер (потолок уровня, исключённые группы,
+  // уценка, минимум списания). Иначе — прежние правила (D-72): от 50, до 30%.
+  const plan = loyCheckoutPlan(coPreview, wantPoints);
   const canApply = Math.min(avail, maxByOrder);
-  coPointsApplied = wantPoints && canApply >= 50 ? canApply : 0;
+  coPointsApplied = plan ? plan.applied : wantPoints && canApply >= 50 ? canApply : 0;
   const total = goods - coPointsApplied;
 
   coModal.querySelector("[data-co-goods]").textContent = formatPrice(goods);
@@ -573,9 +577,31 @@ function coRecompute() {
 
   const note = coModal.querySelector("[data-co-points-note]");
   if (note) {
-    note.textContent =
-      "Списываем до 30% заказа — максимум " + formatPrice(Math.min(avail, maxByOrder));
+    note.textContent = plan
+      ? plan.note
+      : "Списываем до 30% заказа — максимум " + formatPrice(Math.min(avail, maxByOrder));
   }
+  // v1: redeemMax меньше минимума — переключатель неактивен, в подписи причина.
+  if (toggle) toggle.disabled = !!plan && !plan.can;
+}
+
+// Превью кассы с сервера: программа v1 — максимум списания по корзине.
+function coLoadPreview() {
+  coPreview = null;
+  const api = window.STAW && window.STAW.api;
+  if (!isLoggedIn() || typeof api !== "function" || !loyV1()) return;
+  const items = cart.map((i) => ({ productId: i.id, quantity: i.qty }));
+  api("/loyalty/redeem-preview", { method: "POST", body: { items: items } })
+    .then((p) => {
+      if (!p || p.programV1 !== true) return;
+      coPreview = p;
+      const pb = coModal.querySelector("[data-co-points-block]");
+      if (pb) pb.hidden = !(Number(p.available) > 0 || p.reason);
+      const av = coModal.querySelector("[data-co-points-avail]");
+      if (av) av.textContent = Math.max(0, Number(p.available) || 0);
+      coRecompute();
+    })
+    .catch(() => {});
 }
 
 function openCheckout() {
@@ -592,6 +618,7 @@ function openCheckout() {
   coModal.querySelector('[data-co-view="success"]').hidden = true;
   coModal.querySelector("[data-co-err]").textContent = "";
   coRecompute();
+  coLoadPreview();
   coModal.classList.add("is-open");
   coModal.setAttribute("aria-hidden", "false");
 }
@@ -1087,11 +1114,33 @@ function prCurrentLevelKey(points) {
 }
 
 function prShowLevels() {
-  const points = (window.STAW && window.STAW.ecoPoints) || 0;
-  const cur = prCurrentLevelKey(points);
+  const v1 = loyV1();
+  const points = v1
+    ? Math.max(0, Number(v1.redeemable) || 0)
+    : (window.STAW && window.STAW.ecoPoints) || 0;
+  const cur = v1 ? loyV1View(v1).key : prCurrentLevelKey(points);
   prRenderCard(points);
+  const byKey = {};
+  ((v1 && v1.levels) || []).forEach((l) => {
+    if (l && l.key) byKey[l.key] = l;
+  });
+  const sub = prModal.querySelector(".pr-levels-sub");
+  if (sub && v1) {
+    sub.textContent =
+      "Уровень — по статусным бонусам за год. Привилегии уровня: ставка начисления за покупки и доля заказа, которую можно оплатить бонусами.";
+  }
   prModal.querySelectorAll("[data-level-key]").forEach((el) => {
-    el.classList.toggle("is-current", el.getAttribute("data-level-key") === cur);
+    const key = el.getAttribute("data-level-key");
+    el.classList.toggle("is-current", key === cur);
+    // v1: условие и привилегии — из настроек сервера, а не из вёрстки.
+    const info = byKey[key];
+    if (info) {
+      const t = loyLevelTexts(info);
+      const range = el.querySelector(".pr-level-range");
+      const p = el.querySelector("p");
+      if (range) range.textContent = t.range;
+      if (p) p.textContent = t.perk;
+    }
   });
   prSetView("levels");
 }
@@ -1124,7 +1173,8 @@ const LC_METAL =
 function prRenderCard(points) {
   const slot = prModal && prModal.querySelector("[data-pr-card]");
   if (!slot) return;
-  const lv = prComputeLevel(points);
+  const v1 = loyV1();
+  const lv = v1 ? loyV1View(v1) : prComputeLevel(points);
   const u = prGetUser();
   const esc = (s) =>
     String(s).replace(/[&<>"']/g, (c) =>
@@ -1141,7 +1191,7 @@ function prRenderCard(points) {
     '<div class="lc-rowTop">' + LC_WM +
     '<span class="lc-lvl">' + esc(lv.name.toUpperCase()) + "</span></div>" +
     '<div class="lc-pts"><span class="n">' + points + '</span><span class="l">' +
-    prPtsWord(points) + "</span></div>" +
+    (v1 ? loyBonusWord(points) : prPtsWord(points)) + "</span></div>" +
     '<div class="lc-rowBot"><span class="lc-holder"><span class="cap">ДЕРЖАТЕЛЬ</span>' +
     '<span class="nm">' + name + "</span></span>" +
     '<span class="lc-uni">ЕДИНАЯ КАРТА</span></div>' +
@@ -1167,6 +1217,123 @@ const PR_TIERS = [
   { key: "gold", name: "Золото", min: 500 },
   { key: "platinum", name: "Платина", min: 1000 },
 ];
+
+// ── Программа лояльности v1 (ТЗ 30.09.2026): всё с сервера ───────────────────
+// /v1/loyalty/account → v1 (ecosystem.js кладёт его в window.STAW.ecoV1).
+// Пороги, ставки, потолок и минимум списания — настройки сервера, не зашиваем.
+function loyV1() {
+  return (window.STAW && window.STAW.ecoV1) || null;
+}
+
+function loyGroup(n) {
+  return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0");
+}
+
+function loyBonusWord(n) {
+  const a = Math.abs(n) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return "бонусов";
+  if (b === 1) return "бонус";
+  if (b >= 2 && b <= 4) return "бонуса";
+  return "бонусов";
+}
+
+function loyPct(share) {
+  const p = Math.round((Number(share) || 0) * 1000) / 10;
+  return String(p).replace(".", ",");
+}
+
+function loyDate(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d.getTime())) return "";
+  const two = (v) => String(v).padStart(2, "0");
+  return two(d.getDate()) + "." + two(d.getMonth() + 1) + "." + d.getFullYear();
+}
+
+// Что показать в профиле по блоку v1: доступно, шкала до минимума списания
+// (пока не накоплен), шкала уровня по статусным, у пути к Платине — покупки.
+function loyV1View(v) {
+  const titles = { basic: "Базовый", silver: "Серебро", gold: "Золото", platinum: "Платина" };
+  const gen = { basic: "Базового", silver: "Серебра", gold: "Золота", platinum: "Платины" };
+  const nextOf = { basic: "silver", silver: "gold", gold: "platinum", platinum: null };
+  const key = titles[v.level] ? v.level : "basic";
+  const spendable = Math.max(0, Number(v.redeemable) || 0);
+  const rmin = Number(v.redeemMin) || 0;
+  const status = Number(v.statusPoints) || 0;
+  const th = v.nextLevelThreshold == null ? null : Number(v.nextLevelThreshold);
+  const next = th == null ? null : nextOf[key];
+  const toMin = rmin > 0 && spendable < rmin;
+  let levelText;
+  if (next && th) {
+    levelText = "до " + gen[next] + ": " + loyGroup(status) + " из " + loyGroup(th) + " статусных";
+  } else {
+    const until = loyDate(v.levelUntil);
+    levelText = "Максимальный уровень" + (until ? " · до " + until : "");
+  }
+  const minSpend = Number(v.platinumMinSpend) || 0;
+  const buys = Number(v.purchases365) || 0;
+  const spendShow = next === "platinum" && minSpend > 0;
+  let info = null;
+  (v.levels || []).forEach((l) => {
+    if (l && l.key === key) info = l;
+  });
+  const rate = info ? Number(info.purchaseRate) || 0 : 0;
+  const ceiling = info ? Number(info.redeemCeiling) || 0 : Number(v.redeemCeiling) || 0;
+  const perk = [
+    rate > 0 ? loyPct(rate) + "% бонусами с покупок" : "",
+    ceiling > 0 ? "оплата бонусами до " + loyPct(ceiling) + "% заказа" : "",
+  ].filter(Boolean).join(" · ");
+  return {
+    key: key,
+    name: titles[key],
+    spendable: spendable,
+    word: loyBonusWord(spendable),
+    availableText: "Доступно " + spendable + " " + loyBonusWord(spendable),
+    toMin: toMin,
+    minProgress: rmin > 0 ? Math.min(100, (spendable / rmin) * 100) : 100,
+    minText: "Списание от " + rmin + ": накоплено " + spendable + " из " + rmin,
+    levelProgress: next && th ? Math.min(100, (status / th) * 100) : 100,
+    levelText: levelText,
+    spendShow: spendShow,
+    spendProgress: minSpend > 0 ? Math.min(100, (buys / minSpend) * 100) : 100,
+    spendText: "покупки за год: " + loyGroup(buys) + " из " + loyGroup(minSpend) + " ₽",
+    perk: perk,
+  };
+}
+
+// Условие и привилегии уровня из таблицы сервера (v1.levels).
+function loyLevelTexts(l) {
+  const th = Number(l.threshold) || 0;
+  const spend = Number(l.minSpend) || 0;
+  const range = th <= 0
+    ? "с первого бонуса"
+    : "от " + loyGroup(th) + " статусных" + (spend > 0 ? " и " + loyGroup(spend) + " ₽ покупок за год" : "");
+  const rate = Number(l.purchaseRate) || 0;
+  const ceiling = Number(l.redeemCeiling) || 0;
+  const perk = [
+    rate > 0 ? loyPct(rate) + "% бонусами с покупок" : "",
+    ceiling > 0 ? "оплата бонусами до " + loyPct(ceiling) + "% заказа" : "",
+  ].filter(Boolean).join(" · ");
+  return { range: range, perk: perk };
+}
+
+// Касса: сколько списать по превью сервера (POST /v1/loyalty/redeem-preview).
+// null — превью нет или прежняя программа: считаем по старым правилам.
+function loyCheckoutPlan(preview, want) {
+  if (!preview || preview.programV1 !== true) return null;
+  const max = Math.max(0, Number(preview.redeemMax) || 0);
+  const min = Number(preview.redeemMin) || 0;
+  const can = preview.canRedeem === true || (preview.canRedeem == null && max >= min && max > 0);
+  const avail = Math.max(0, Number(preview.available) || 0);
+  return {
+    can: can,
+    available: avail,
+    applied: want && can ? max : 0,
+    note: can
+      ? "Можно списать до " + max + " " + loyBonusWord(max) + " — от " + min
+      : preview.reason || "Списать бонусы можно от " + min + ": сейчас доступно " + avail,
+  };
+}
 
 function prPtsWord(n) {
   const a = Math.abs(n) % 100;
@@ -1253,12 +1420,43 @@ function prPopulate() {
 
   // Реальные баллы пользователя (из /loyalty/account через ecosystem.js).
   const points = (window.STAW && window.STAW.ecoPoints) || 0;
+  const v1 = loyV1();
+  const cur = prModal.querySelector(".pr-points-cur");
+  const bar = prModal.querySelector("[data-pr-progress]");
+  const nextEl = prModal.querySelector("[data-pr-next]");
+  // Вторая шкала (покупки к Платине) — копия той же полоски, только в v1.
+  let bar2 = prModal.querySelector("[data-pr-progress2]");
+  if (v1) {
+    const w = loyV1View(v1);
+    prModal.querySelector("[data-pr-points]").textContent = w.spendable;
+    if (cur) cur.textContent = "доступно " + w.word;
+    prModal.querySelector("[data-pr-level]").textContent = w.name;
+    if (bar) bar.style.setProperty("--p", (w.toMin ? w.minProgress : w.levelProgress) + "%");
+    if (nextEl) nextEl.textContent = w.toMin ? w.minText : w.levelText;
+    const track = bar && bar.parentElement;
+    if (w.spendShow && !w.toMin && track) {
+      if (!bar2) {
+        const extra = track.cloneNode(true);
+        const span = extra.querySelector("span");
+        span.removeAttribute("data-pr-progress");
+        span.setAttribute("data-pr-progress2", "");
+        track.parentNode.insertBefore(extra, track.nextSibling);
+        bar2 = span;
+      }
+      bar2.parentElement.hidden = false;
+      bar2.style.setProperty("--p", w.spendProgress + "%");
+      if (nextEl) nextEl.textContent = w.levelText + " · " + w.spendText;
+    } else if (bar2) {
+      bar2.parentElement.hidden = true;
+    }
+    return;
+  }
+  if (bar2) bar2.parentElement.hidden = true;
+  if (cur) cur.textContent = "баллов";
   const lv = prComputeLevel(points);
   prModal.querySelector("[data-pr-points]").textContent = points;
   prModal.querySelector("[data-pr-level]").textContent = lv.name;
-  const bar = prModal.querySelector("[data-pr-progress]");
   if (bar) bar.style.setProperty("--p", lv.progress + "%");
-  const nextEl = prModal.querySelector("[data-pr-next]");
   if (nextEl) {
     nextEl.textContent = lv.next
       ? "До уровня «" + lv.next.name + "» — ещё " + lv.toNext + " " + prPtsWord(lv.toNext)
@@ -1418,10 +1616,10 @@ window.STAW.openProfile = openProfile;
     window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const LEVELS = [
-    { name: "Базовый", range: "0–199 баллов", cashback: "Кэшбэк 1%", color: "#b9856b", p: 18, num: 120 },
-    { name: "Серебро", range: "200–499 баллов", cashback: "Кэшбэк 2% · ранний доступ", color: "#c7ccd4", p: 45, num: 430 },
-    { name: "Золото", range: "500–999 баллов", cashback: "Кэшбэк 3% · бесплатная доставка", color: "#e3c06a", p: 73, num: 760 },
-    { name: "Платина", range: "1000+ баллов", cashback: "Кэшбэк 5% · VIP-поддержка", color: "#9fb4c9", p: 100, num: 1200 },
+    { name: "Базовый", range: "0–199 баллов", cashback: "1 балл = 1 ₽ скидки", color: "#b9856b", p: 18, num: 120 },
+    { name: "Серебро", range: "200–499 баллов", cashback: "1 балл = 1 ₽ скидки", color: "#c7ccd4", p: 45, num: 430 },
+    { name: "Золото", range: "500–999 баллов", cashback: "1 балл = 1 ₽ скидки", color: "#e3c06a", p: 73, num: 760 },
+    { name: "Платина", range: "1000+ баллов", cashback: "1 балл = 1 ₽ скидки", color: "#9fb4c9", p: 100, num: 1200 },
   ];
   const DEFAULT = 1;
   const elLevel = card.querySelector("[data-lc-level]");
@@ -1520,10 +1718,10 @@ window.STAW.openProfile = openProfile;
   const QR = '<rect width="29" height="29" fill="#fff"/><path fill="#111" d="M0 0h7v7H0zM2 2h3v3H2zM22 0h7v7h-7zM24 2h3v3h-3zM0 22h7v7H0zM2 24h3v3H2zM10 0h2v2h-2zM14 2h2v2h-2zM10 6h4v2h-4zM18 4h2v4h-2zM9 9h3v3H9zM14 10h4v2h-4zM20 9h3v3h-3zM25 10h2v4h-2zM10 14h2v4h-2zM14 14h3v3h-3zM19 15h4v2h-4zM9 20h4v2H9zM15 19h2v4h-2zM22 20h3v3h-3zM26 18h2v3h-2zM10 24h3v3h-3zM15 25h4v2h-4zM21 25h2v2h-2zM25 24h3v3h-3z"/>';
 
   const CARDS = [
-    { cls: "ml-platinum", name: "Платина", pts: "3 852", cash: "кэшбэк 5%", range: "от 1000 баллов", sign: true },
-    { cls: "ml-gold",     name: "Золото",  pts: "742",   cash: "кэшбэк 3%", range: "от 500 баллов",  sign: true },
-    { cls: "ml-silver",   name: "Серебро", pts: "368",   cash: "кэшбэк 2%", range: "от 200 баллов",  sign: true },
-    { cls: "ml-basic",    name: "Базовый", pts: "140",   cash: "кэшбэк 1%", range: "0–199 баллов",   sign: false },
+    { cls: "ml-platinum", name: "Платина", pts: "3 852", cash: "1 балл = 1 ₽", range: "от 1000 баллов", sign: true },
+    { cls: "ml-gold",     name: "Золото",  pts: "742",   cash: "1 балл = 1 ₽", range: "от 500 баллов",  sign: true },
+    { cls: "ml-silver",   name: "Серебро", pts: "368",   cash: "1 балл = 1 ₽", range: "от 200 баллов",  sign: true },
+    { cls: "ml-basic",    name: "Базовый", pts: "140",   cash: "1 балл = 1 ₽", range: "0–199 баллов",   sign: false },
   ];
 
   function faces(c) {
