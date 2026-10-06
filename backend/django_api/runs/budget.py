@@ -35,6 +35,13 @@ def grant(uid, points, now=None):
     """Сколько из `points` можно выплатить сейчас: (выплатить, срезано, причина)."""
     if points <= 0:
         return 0, 0, ""
+    from loyalty import config as loyalty_config
+
+    if loyalty_config.enabled():
+        # Программа v1 (решение координатора к D-107): суточный потолок для
+        # активности заменён месячными капами бонусов (loyalty.activity). Игровые
+        # баллы (км рейтингов) потолком больше не режутся — деньгами они не являются.
+        return points, 0, ""
     left = max(0, MAX_DAY_ACTIVITY_POINTS - points_used_today(uid, now))
     granted = min(points, left)
     cut = points - granted

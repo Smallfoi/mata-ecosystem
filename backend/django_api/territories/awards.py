@@ -134,6 +134,11 @@ def _settle(award, run, *, cap=True):
     award.note = reason
     award.settled_at = timezone.now()
     award.save()
+    # Программа лояльности v1 (этап 2): бонус за захват — за валидную пробежку,
+    # с месячными капами (loyalty.activity). Игровые баллы выше — только счёт игры.
+    from loyalty import activity
+
+    award.bonus_act = activity.on_capture(award, run)
     return granted, reason
 
 
@@ -166,8 +171,15 @@ def claim(uid, capture_id, points, run_hint, distance_m, route_m, elapsed_s):
         return {"points": 0, "pending": points, "reason": reason, "capped": 0}
     if award.status == CaptureAward.REJECTED:
         return {"points": 0, "pending": 0, "reason": reason, "capped": 0}
-    return {"points": granted, "pending": 0, "reason": reason,
-            "capped": max(0, award.points - granted)}
+    out = {"points": granted, "pending": 0, "reason": reason,
+           "capped": max(0, award.points - granted)}
+    act = getattr(award, "bonus_act", None)
+    if act is not None:
+        # Программа v1: «+N» на экране — начисленный бонус, а не игровые баллы.
+        from loyalty import activity
+
+        out.update(points=act.amount, capped=0, bonus=activity.payload(act))
+    return out
 
 
 def settle_for_run(run):
