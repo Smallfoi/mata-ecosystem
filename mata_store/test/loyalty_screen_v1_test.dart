@@ -70,7 +70,7 @@ void main() {
         ],
         'lots': [
           {'id': 1, 'amount': 250, 'remaining': 250, 'state': 'available',
-           'source': 'migration', 'expiresAt': '2027-03-01T00:00:00+09:00'},
+           'source': 'migration', 'expiresAt': '2027-03-01T12:00:00+09:00'},
         ],
       },
     })!;

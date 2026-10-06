@@ -27,7 +27,7 @@ Map<String, dynamic> _account({bool v1 = true}) => {
           'levelIndex': 2, 'nextLevelThreshold': 5000,
           'platinumMinSpend': 60000, 'redeemMin': 300, 'redeemCeiling': 0.25,
           'heldNextAt': '2026-10-20T12:00:00+09:00', 'heldNextAmount': 375,
-          'expiringAt': '2027-03-01T00:00:00+09:00', 'expiringAmount': 250,
+          'expiringAt': '2027-03-01T12:00:00+09:00', 'expiringAmount': 250,
           'levels': [
             {'key': 'gold', 'title': 'Золото', 'threshold': 2000,
              'purchaseRate': 0.07, 'redeemCeiling': 0.25, 'expiryMonths': 12},
@@ -35,7 +35,7 @@ Map<String, dynamic> _account({bool v1 = true}) => {
           'lots': [
             {'id': 7, 'amount': 300, 'remaining': 250, 'state': 'available',
              'source': 'legacy_activity',
-             'expiresAt': '2027-03-01T00:00:00+09:00'},
+             'expiresAt': '2027-03-01T12:00:00+09:00'},
           ],
         },
     };
