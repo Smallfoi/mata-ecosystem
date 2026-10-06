@@ -279,9 +279,12 @@ def to_json(req) -> dict:
 
 def _notify(req, title, body):
     try:
+        from notifications.email import recipient_for
         from notifications.models import create_notification
 
-        create_notification(req.user_id, title, body, "order", req.order.order_id)
+        # Ход возврата — и письмом (D-111): покупатель хранит его как документ.
+        create_notification(req.user_id, title, body, "order", req.order.order_id,
+                            email_to=recipient_for(req.user_id, req.order))
     except Exception:
         # Уведомление — не часть заявки: решение уже записано.
         pass

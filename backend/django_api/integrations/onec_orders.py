@@ -313,6 +313,7 @@ def apply_statuses(items) -> dict:
 
     # Уведомляем сами: `bulk_update` не поднимает сигналы модели, а через них
     # обычно и уходит уведомление о смене статуса заказа (orders/signals.py).
+    from notifications.email import recipient_for
     from notifications.models import create_notification
 
     for order, status in notify:
@@ -322,6 +323,9 @@ def apply_statuses(items) -> dict:
             f"Заказ №{order.order_id}",
             type="order",
             order_id=order.order_id,
+            # Письмом — то, что покупатель ждёт (D-111); «принят/собран» — только в ленту.
+            email_to=(recipient_for(order.user_id, order)
+                      if status in ("shipped", "delivered", "canceled", "cancelled") else ""),
         )
 
     return {"received": len(items), "updated": updated, "errors": errors[:20],

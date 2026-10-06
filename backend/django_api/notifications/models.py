@@ -113,11 +113,17 @@ class DeviceAccount(models.Model):
         ).delete()
 
 
-def create_notification(user_id, title, body="", type="system", order_id=None):
+def create_notification(user_id, title, body="", type="system", order_id=None,
+                        email_to=""):
     """Создать уведомление пользователю + (если настроено) отправить пуш.
-    Безопасно (без user_id — ничего не делает)."""
+    Безопасно (без user_id — ничего не делает).
+
+    `email_to` — продублировать письмом (D-111): один вызов — все каналы.
+    Без EMAIL_PROVIDER или без настоящего адреса письмо не уходит.
+    """
     if not user_id:
         return None
+    _send_email(email_to, title, body)
     n = Notification.objects.create(
         user_id=user_id, title=title, body=body, type=type, order_id=order_id,
     )
@@ -133,3 +139,19 @@ def create_notification(user_id, title, body="", type="system", order_id=None):
 
         send_push(user_id, title, body)  # no-op без PUSH_PROVIDER
     return n
+
+
+def _send_email(to, subject, text):
+    """Письмо фоновой задачей (D-111); брокер недоступен — синхронно, как пуш."""
+    from .email import email_enabled, real_address
+
+    if not email_enabled() or not real_address(to):
+        return
+    from .tasks import send_email_task
+
+    try:
+        send_email_task.delay(to, subject, text)
+    except Exception:
+        from .email import send_email
+
+        send_email(to, subject, text)

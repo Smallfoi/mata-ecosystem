@@ -349,12 +349,14 @@ def reconcile_returns(now=None) -> dict:
 
 def _notify_partial(order, ret):
     try:
+        from notifications.email import recipient_for
         from notifications.models import create_notification
 
         text = f"По заказу №{order.order_id} вернём {ret.amount_kop / 100:.2f} ₽"
         if ret.points_returned:
             text += f", на счёт вернутся {ret.points_returned} баллов"
-        create_notification(order.user_id, "Возврат оформлен", text + ".", "order", order.order_id)
+        create_notification(order.user_id, "Возврат оформлен", text + ".", "order", order.order_id,
+                            email_to=recipient_for(order.user_id, order))
     except Exception:
         # Уведомление — не часть возврата: деньги и баллы уже проведены.
         pass
