@@ -537,6 +537,38 @@ function cartTotalValue() {
   return cart.reduce((s, i) => s + i.price * i.qty, 0);
 }
 
+// Цены доставки с сервера (D-110): способы ведёт владелец в админке, итог заказа
+// считает сервер. Пока не загрузились — 0 ₽, как раньше (D-92); если сервер
+// насчитает больше показанного, он откажет в заказе, а не спишет лишнее.
+let coShipping = {};
+
+function coLoadShipping() {
+  const api = window.STAW && window.STAW.api;
+  if (typeof api !== "function") return;
+  api("/shipping-options")
+    .then((r) => {
+      const map = {};
+      ((r && r.options) || []).forEach((o) => {
+        map[o.code] = o;
+      });
+      coShipping = map;
+      coRecompute();
+    })
+    .catch(() => {});
+}
+
+function coDeliveryCode() {
+  if (!coModal) return "courier";
+  return (coModal.querySelector('input[name="co-delivery"]:checked') || {}).value || "courier";
+}
+
+function coDeliveryCost(goods) {
+  const o = coShipping[coDeliveryCode()];
+  if (!o) return 0;
+  if (o.freeFrom != null && goods >= o.freeFrom) return 0;
+  return Number(o.price) || 0;
+}
+
 function isLoggedIn() {
   try {
     return !!localStorage.getItem("staw_jwt");
@@ -563,9 +595,12 @@ function coRecompute() {
   const plan = loyCheckoutPlan(coPreview, wantPoints);
   const canApply = Math.min(avail, maxByOrder);
   coPointsApplied = plan ? plan.applied : wantPoints && canApply >= 50 ? canApply : 0;
-  const total = goods - coPointsApplied;
+  const delivery = coDeliveryCost(goods);
+  const total = goods + delivery - coPointsApplied;
 
   coModal.querySelector("[data-co-goods]").textContent = formatPrice(goods);
+  const delivEl = coModal.querySelector("[data-co-delivery]");
+  if (delivEl) delivEl.textContent = delivery > 0 ? formatPrice(delivery) : "бесплатно";
   const discRow = coModal.querySelector("[data-co-discount-row]");
   if (coPointsApplied > 0) {
     discRow.hidden = false;
@@ -619,6 +654,7 @@ function openCheckout() {
   coModal.querySelector("[data-co-err]").textContent = "";
   coRecompute();
   coLoadPreview();
+  coLoadShipping();
   coModal.classList.add("is-open");
   coModal.setAttribute("aria-hidden", "false");
 }
@@ -635,6 +671,9 @@ if (coModal) {
   );
   const ptoggle = coModal.querySelector("[data-co-points-toggle]");
   if (ptoggle) ptoggle.addEventListener("change", coRecompute);
+  coModal.querySelectorAll('input[name="co-delivery"]').forEach((r) =>
+    r.addEventListener("change", coRecompute),
+  );
 
   coModal.querySelector("[data-co-submit]").addEventListener("click", () => {
     const name = (coModal.querySelector("[data-co-name]").value || "").trim();
@@ -658,14 +697,15 @@ if (coModal) {
     const submitBtn = coModal.querySelector("[data-co-submit]");
     const orderId = "МАТА-" + String(Math.floor(Math.random() * 900000) + 100000);
     const goods = cartTotalValue();
-    const delivery = (coModal.querySelector('input[name="co-delivery"]:checked') || {}).value || "courier";
+    const delivery = coDeliveryCode();
+    const deliveryCost = coDeliveryCost(goods);
     const pay = "sbp"; // единственный способ оплаты (D-72)
     const address = (coModal.querySelector("[data-co-address]").value || "").trim();
     const payload = {
       id: orderId,
-      total: goods - coPointsApplied,
+      total: goods + deliveryCost - coPointsApplied,
       subtotal: goods,
-      deliveryCost: 0,
+      deliveryCost: deliveryCost,
       pointsRedeemed: coPointsApplied,
       status: "pending",
       items: cart.map((i) => ({

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/repositories/order_repository.dart';
+import '../data/shipping_rates.dart';
 import '../models/app_notification.dart';
 import '../models/cart_item.dart';
 import '../models/order.dart';
@@ -176,7 +177,7 @@ class OrderProvider extends ChangeNotifier {
         .toList();
 
     final subtotal = cartItems.fold<double>(0, (s, i) => s + i.total);
-    final deliveryCost = costFor(data.deliveryType);
+    final deliveryCost = costFor(data.deliveryType, subtotal);
     final total = (subtotal + deliveryCost - pointsRedeemed)
         .clamp(0, subtotal + deliveryCost)
         .toDouble();
@@ -310,16 +311,10 @@ class OrderProvider extends ChangeNotifier {
     ));
   }
 
-  /// Доставка в оплату не входит (D-92): служб у нас пока нет, о доставке
-  /// договариваемся отдельно. Брать деньги за услугу, которой нет, нельзя.
-  static double costFor(DeliveryType type) {
-    switch (type) {
-      case DeliveryType.pickup:
-        return 0;
-      case DeliveryType.courier:
-        return 0;
-    }
-  }
+  /// Цена доставки для суммы товаров [goods] — по ценам сервера (D-110):
+  /// способы ведёт владелец в админке, итог заказа считает сервер.
+  static double costFor(DeliveryType type, [double goods = 0]) =>
+      ShippingRates.costFor(type, goods);
 
   static String deliveryLabel(DeliveryType type) {
     switch (type) {

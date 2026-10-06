@@ -127,10 +127,15 @@ class ReceiptMatchesPaymentTests(ApiTestCase):
             {"productId": "m-odd", "productName": "x", "price": 1, "quantity": 3},
             {"productId": "m-cap", "productName": "y", "price": 1, "quantity": 1},
         ]
-        # 999.99 + 1999.99 + доставка 299.995 (≈300.00) − 150 баллов = 3149.98
+        # Платная доставка — способ из админки (D-110), цену считает сервер.
+        from orders.models import ShippingOption
+
+        ShippingOption.objects.filter(code="courier").update(price=300)
+        # 999.99 + 1999.99 + доставка 300.00 − 150 баллов = 3149.98
         body = {"id": "SS-R1", "total": 3149.98, "items": items, "deliveryCost": 299.995,
                 "pointsRedeemed": 150,
-                "checkoutData": {"email": "b@example.test", "phone": "+79990000000"}}
+                "checkoutData": {"email": "b@example.test", "phone": "+79990000000",
+                                 "deliveryType": "courier"}}
         r = self.api_post("/v1/orders", body)
         self.assertEqual(r.status_code, 200, r.content)
         order = Order.objects.get(user_id=self.uid, order_id="SS-R1")

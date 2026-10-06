@@ -382,6 +382,11 @@ postalCode, test }`. Позиция: `{ id, article, productId, name, size, colo
 ### Order
 ```
 POST /orders     { items, checkoutData, pointsRedeemed, total } → Order   (заказ «ждёт оплату»; баллы списывает сервер: от 50, ≤30% заказа с доставкой, ≤ баланса; 400 — нарушены лимиты, сумма ниже каталога или при включённой оплате заказ не сверить с каталогом; + ShoeAsset для обуви)
+                 итог считает сервер (D-110): товары по каталогу + доставка по способу checkoutData.deliveryType − списанные баллы; в оплату идёт он.
+                 Клиентская total ниже серверной → 400 { detail, expectedTotal, deliveryCost }; deliveryCost клиента игнорируется.
+                 Неизвестный способ → 400, выключенный → 409. В payload заказа: deliveryCost (серверный), deliveryOption { code, name }.
+GET  /shipping-options[?goods=<сумма товаров>]           → { options: [{ code, name, kind: pickup|delivery, zone, description, price, freeFrom, requiresAddress, cost? }] }
+                 публично; способы ведёт владелец в админке «Магазин → Доставка» (D-110); code = checkoutData.deliveryType (pickup, courier).
 GET  /orders                                             → Order[] (текущего пользователя)
 GET  /orders/:id                                         → Order
 POST /orders/:id/pay  { returnUrl? }  → { status, paymentId, confirmationUrl, method: "sbp" }  (только СБП, D-72; 409 — время на оплату истекло; 502 — оплата недоступна; dev без провайдера — status=paid без paymentId, на сборку не уходит)
