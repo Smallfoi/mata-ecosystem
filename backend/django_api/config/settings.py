@@ -622,6 +622,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "core.cleanup_old_data",
         "schedule": crontab(hour=4, minute=0),
     },
+    # Часы COROS: вебхуков у них нет, о новой тренировке узнаём только опросом.
+    # Раз в полчаса — с большим запасом под их лимит (50 файлов на человека в
+    # сутки) и достаточно часто, чтобы пробежка появлялась почти сразу (D-108).
+    "poll-coros-watches": {
+        "task": "integrations.poll_coros_all",
+        "schedule": crontab(minute="*/30"),
+    },
     # Неоплаченные заказы (D-72): не оплатили за 15 минут — отмена и возврат баллов.
     "expire-unpaid-orders": {
         "task": "orders.expire_unpaid_orders",

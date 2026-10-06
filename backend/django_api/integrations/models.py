@@ -128,3 +128,28 @@ class WatchAccount(models.Model):
     def expired(self) -> bool:
         return bool(self.expires_at and self.expires_at <= timezone.now())
 
+class McpClient(models.Model):
+    """Наше приложение, зарегистрированное у партнёра программно (RFC 7591).
+
+    COROS не выдаёт ключи руками: сервер сам заводит приложение через их точку
+    саморегистрации и получает client_id/secret. Хранить их негде, кроме как у
+    себя — в Lockbox им взяться неоткуда, потому что владелец их в глаза не видит.
+
+    Одна строка на источник: повторная регистрация означала бы новое приложение
+    и отвалившиеся подключения всех людей.
+    """
+
+    source = models.CharField(max_length=20, primary_key=True, verbose_name="Источник")
+    client_id = models.CharField(max_length=200, verbose_name="Client ID")
+    client_secret = models.TextField(blank=True, default="", verbose_name="Client secret")
+    redirect_uri = models.CharField(max_length=300, verbose_name="Адрес возврата")
+    registered_at = models.DateTimeField(default=timezone.now, verbose_name="Зарегистрировано")
+
+    class Meta:
+        db_table = "mcp_clients"
+        verbose_name = "Приложение у партнёра"
+        verbose_name_plural = "Приложения у партнёров"
+
+    def __str__(self):
+        return f"{self.source}: {self.client_id[:12]}…"
+
