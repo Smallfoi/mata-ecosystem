@@ -10,8 +10,10 @@
 
 Как совмещены два реестра (без двойного счёта):
 - `LoyaltyTransaction` — прежний реестр. При включённой v1 он становится историей
-  и продолжает получать записи от кода, который ещё не переведён (бег, захват —
-  этап 2).
+  и ИГРОВЫМ счётом: бег и захват (`runnerRun`, `runnerTerritory` и их отзывы)
+  по-прежнему пишутся туда — по ним считаются километры рейтингов, клубов,
+  челленджей и лимит захватов, — но в лоты НЕ зеркалятся (`GAME_SOURCES`): деньги
+  за активность при включённой v1 — только бонусы этапа 2 (`loyalty.activity`).
 - Человек попадает в v1 ПЕРЕНОСОМ (`migrate_user`: команда `loyalty_migrate_v1`
   или лениво при первом обращении к v1): его баланс по старому реестру на этот
   момент становится лотом `migration`, начисления за 365 дней — статусными
@@ -66,6 +68,9 @@ LEGACY = "legacy"                # зеркало записи старого р
 LEGACY_ACTIVITY = "legacy_activity"  # зеркало начисления за бег/захват
 DEBT = "debt"                    # отрицательный остаток после возврата товара
 MANUAL = "manual"
+# Этап 2 (loyalty.activity): бонусы за активность, приглашение, регистрацию.
+RUN, CAPTURE, STAGE = "run", "capture", "stage"
+REFERRAL, SIGNUP = "referral", "signup"
 # Лоты за активность: пока аккаунт на проверке (needs_review), их не тратят
 # (D-107, «заморозка при needs_review остаётся»).
 ACTIVITY_LOTS = frozenset({LEGACY_ACTIVITY, "run", "capture", "stage"})
@@ -91,6 +96,12 @@ _LEGACY_EVENT = {
 # координатора: вехи/медали, дивизион, сезон, бонус первого заказа, демо).
 STOPPED_LEGACY_SOURCES = frozenset({
     "runnerMilestone", "runnerDivision", "runnerSeason",
+})
+# Игровой счёт старого реестра: при включённой v1 эти записи продолжают писаться
+# (км в рейтингах, клубах, челленджах, лимит захватов), но в лоты не зеркалятся —
+# иначе бег оплачивался бы дважды: игровыми баллами и бонусами этапа 2.
+GAME_SOURCES = frozenset({
+    "runnerRun", "runnerTerritory", "runnerRunRevoked", "runnerTerritoryRevoked",
 })
 
 _LEVEL_TEXT = {
@@ -593,6 +604,7 @@ def release_holds(now=None) -> dict:
     stats = {"released": 0, "waiting": 0}
     hold = timedelta(days=config.get("HOLD_DAYS"))
     window = timedelta(days=config.get("DELIVERY_RETURN_DAYS"))
+    released_purchases = []
     for lot in LoyaltyLot.objects.filter(state=HELD).order_by("id"):
         when = lot.available_at
         if when is None and lot.source == PURCHASE:
@@ -622,8 +634,19 @@ def release_holds(now=None) -> dict:
             if lot.source == PURCHASE:
                 _notify(lot.user_id, "Бонусы доступны",
                         f"{lot.remaining} бонусов за покупку можно тратить в МАТА Store.")
+                released_purchases.append(lot.pk)
         _invalidate(lot.user_id)
         stats["released"] += 1
+    if released_purchases and config.enabled():
+        # Первый заказ приглашённого вышел из удержания — бонус пригласившему
+        # (этап 2). Вне замка кошелька приглашённого: у пригласившего свой замок.
+        from . import activity
+
+        for lot_id in released_purchases:
+            try:
+                activity.on_purchase_released(LoyaltyLot.objects.get(pk=lot_id), now=now)
+            except Exception:
+                log.exception("Бонус за приглашение не начислен (лот %s)", lot_id)
     return stats
 
 
@@ -940,6 +963,48 @@ def revoke_purchase(order, n, now=None):
     return n
 
 
+def revoke_accrual(uid, lot_id, n, now=None, note="", source_ref=""):
+    """Отозвать начисление (бонус за активность ушёл на проверку или отклонён):
+    сначала из самого лота, недостача — из других доступных, при нехватке баланс
+    уходит в минус (как возврат покупки). Статусные этого начисления снимаются.
+    Возвращает, сколько отозвано."""
+    now = now or timezone.now()
+    n = int(n or 0)
+    if n <= 0 or not lot_id:
+        return 0
+    with transaction.atomic():
+        lock_wallet(uid)
+        lot = LoyaltyLot.objects.filter(pk=lot_id, user_id=uid).first()
+        if lot is None:
+            return 0
+        meta = dict(lot.meta or {})
+        revoked = int(meta.get("revoked", 0))
+        n = min(n, lot.amount - revoked)
+        if n <= 0:
+            return 0
+        st = _ensure_status(uid, now)
+        take = min(n, max(0, lot.remaining))
+        if take:
+            lot.remaining -= take
+            if lot.remaining == 0:
+                lot.state = CANCELLED if lot.state == HELD else SPENT
+        lot.save(update_fields=["remaining", "state"])
+        rest = n - take
+        if rest:
+            _parts, short = _debit_fifo(uid, rest)
+            _add_debt(uid, st, short, now)
+            lot.refresh_from_db()
+        meta["revoked"] = revoked + n
+        lot.meta = meta
+        lot.status_amount = max(0, lot.status_amount - n)
+        lot.save(update_fields=["status_amount", "meta"])
+        _reserve(-n)
+        _event(uid, "cancel", -n, now=now, level_before=st.level, st=st, lot=lot,
+               source_ref=source_ref or lot.source_ref, note=note)
+    _invalidate(uid)
+    return n
+
+
 # ── сгорание ─────────────────────────────────────────────────────────────────
 
 def expire_lots(now=None) -> dict:
@@ -996,12 +1061,17 @@ def daily(now=None) -> dict:
     """Ежедневная задача: удержание, сгорание, предупреждения, понижение уровней."""
     if not config.enabled():
         return {"enabled": False}
+    from . import activity
+
     now = now or timezone.now()
     return {
         "holds": release_holds(now),
         "expired": expire_lots(now),
         "warned": warn_expiring(now),
         "levels": recheck_levels(now),
+        # Этап 2: месячный этап (1-е место в месячном итоге дивизиона) — закрытие
+        # прошлого месяца, идемпотентно (первый запуск месяца выдаёт бонусы).
+        "stage": activity.close_stage_month(now=now),
     }
 
 
@@ -1106,6 +1176,9 @@ def mirror_legacy(txn) -> None:
     """
     uid = txn.user_id
     now = timezone.now()
+    if txn.source in GAME_SOURCES and config.enabled():
+        # Игровой счёт: при включённой v1 бег и захват оплачиваются бонусами этапа 2.
+        return
     with transaction.atomic():
         lock_wallet(uid)
         st = LoyaltyStatus.objects.filter(user_id=uid).first()

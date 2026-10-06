@@ -181,6 +181,39 @@ def _cap_fields(capped, reason=DAY_CAP_REASON):
     return {"dailyCapReached": True, "pointsCapped": capped, "capReason": reason}
 
 
+def _bonus_fields(out, act):
+    """Программа лояльности v1 (этап 2): в ответе — бонус, а не игровые баллы.
+
+    `pointsAwarded` выпущенные сборки показывают как «+N» на экране финиша — при
+    включённой программе это начисленные бонусы (то, что попало в кошелёк), а
+    не игровые км×10. Новые поля: `bonus` (сумма, решение, причина, остаток
+    лимитов месяца) и `monthCapReached`/`capReason` при исчерпанном лимите."""
+    if act is None:
+        return out
+    from loyalty import activity
+
+    bonus = activity.payload(act)
+    out["pointsAwarded"] = act.amount
+    out["bonus"] = bonus
+    out.pop("dailyCapReached", None)
+    out.pop("pointsCapped", None)
+    out.pop("capReason", None)
+    if bonus["monthCapReached"]:
+        out["monthCapReached"] = True
+        out["capReason"] = activity.CAP_MESSAGE
+    return out
+
+
+def _v1_act(run):
+    from loyalty import config as loyalty_config
+
+    if not loyalty_config.enabled():
+        return None
+    from loyalty import activity
+
+    return activity.on_run(run)
+
+
 def _dup_payload(run):
     out = {
         "ok": True, "duplicate": True,
@@ -189,7 +222,7 @@ def _dup_payload(run):
     }
     if run.points_capped:
         out.update(_cap_fields(run.points_capped))
-    return out
+    return _bonus_fields(out, _v1_act(run))
 
 
 @api_view(["GET", "POST"])
@@ -276,6 +309,9 @@ def runs(request):
             ).exists():
                 add_txn(uid, points, "runnerRun",
                         f"Пробежка {distance_m / 1000.0:.1f} км", None, rid)
+            # Программа лояльности v1 (этап 2): бонус за пробежку по правилам ТЗ —
+            # ДО захватов: бонус за захват платится только за валидную пробежку.
+            bonus_act = _v1_act(run)
             # Захваты этой пробежки, пришедшие раньше сводки (офлайн-очередь, гонка
             # запросов на финише), ждали её — довести их баллы или привязать к
             # помеченному забегу до решения модератора (решение 28.09.2026, п.4).
@@ -312,7 +348,7 @@ def runs(request):
     }
     if capped:
         out.update(_cap_fields(capped, cap_reason))
-    return Response(out)
+    return Response(_bonus_fields(out, bonus_act))
 
 
 # Разбор помеченных забегов живёт в runs/review.py. Здесь оставлена ссылка:

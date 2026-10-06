@@ -175,8 +175,12 @@ def import_workouts(request):
         return Response({"detail": "Нет списка тренировок"}, status=400)
     items = items[:MAX_ITEMS_PER_REQUEST]
 
+    from loyalty import config as loyalty_config
+
+    v1_on = loyalty_config.enabled()
     imported = duplicates = skipped = 0
     points_total = 0
+    bonus_total = 0
     capped_total, cap_note = 0, ""
     result = []
 
@@ -197,7 +201,13 @@ def import_workouts(request):
             cap_note = workout.cap_reason
         points_total += getattr(workout, "points_this_time", 0)
         imported += 1
-        result.append(workout.to_json())
+        item = workout.to_json()
+        act = getattr(workout, "bonus_act", None)
+        if act is not None:
+            bonus_total += getattr(workout, "bonus_this_time", 0)
+            # Новое поле (программа v1): решение по бонусу за эту тренировку.
+            item["bonus"] = {"amount": act.amount, "status": act.status, "reason": act.reason}
+        result.append(item)
 
     out = {
         "imported": imported,
@@ -206,6 +216,9 @@ def import_workouts(request):
         "points": points_total,
         "items": result,
     }
+    if v1_on:
+        # Программа v1: «points» — начисленные бонусы (то, что попало в кошелёк).
+        out["points"] = bonus_total
     if capped_total:
         # Новые поля (старые клиенты их не читают): часть баллов срезал потолок.
         out.update({"dailyCapReached": True, "pointsCapped": capped_total,

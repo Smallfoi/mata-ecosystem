@@ -425,7 +425,12 @@ def capture(request):
         # пробежки ещё нет — захват ждёт её сводку, помечена — ждёт модератора.
         # Суточный потолок баллов общий с забегами и импортом (п.1).
         award = {"points": 0, "pending": 0, "reason": "", "capped": 0}
-        if capture_id and territory_points > 0:
+        from loyalty import config as loyalty_config
+
+        # Программа v1: «захват квартала» — бонус и тогда, когда новой площади
+        # следа нет, но кварталы перешли (скорость проверена).
+        v1_block = loyalty_config.enabled() and speed_verified and blocks_gained > 0
+        if capture_id and (territory_points > 0 or v1_block):
             award = claim_capture(
                 uid, capture_id, territory_points, run_hint,
                 client_distance, route_m, elapsed,
@@ -450,6 +455,12 @@ def capture(request):
     if award["capped"]:
         out.update({"dailyCapReached": True, "pointsCapped": award["capped"],
                     "capReason": award["reason"]})
+    if award.get("bonus"):
+        # Новые поля (программа v1): бонус за захват и остаток лимитов месяца.
+        out["bonus"] = award["bonus"]
+        if award["bonus"]["monthCapReached"]:
+            out["monthCapReached"] = True
+            out["capReason"] = award["bonus"]["message"]
     if not speed_verified:
         # Новое поле (старые клиенты его не читают): баллы не начислены, потому что
         # без времени пробежки скорость не проверить.

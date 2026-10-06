@@ -240,7 +240,15 @@ POST /auth/phone/channel       { phone }                 → { type, status, cod
                                                            клиент опрашивает раз в 3 с, пока ждёт код (лимит otp_poll 300/мин);
                                                            codeType=codeless → поля кода нет: ждём status=confirmed и шлём
                                                            verify/register/password-reset с ПУСТЫМ code (D-78)
-POST /auth/phone/verify        { phone, code }           → { token, user }      (создаёт аккаунт при первом входе)
+POST /auth/phone/verify        { phone, code, referralCode? } → { token, user, signupBonus?, referral? }
+                                                           (создаёт аккаунт при первом входе)
+                                                           Программа лояльности v1 (этап 2), новые поля:
+                                                           signupBonus — бонус за регистрацию (75), только
+                                                           новому аккаунту и один раз на телефон (переживает
+                                                           удаление аккаунта); referralCode (опц.) — код
+                                                           пригласившего; referral { ok, detail } — результат
+                                                           (плохой код регистрацию НЕ ломает). То же для
+                                                           POST /auth/register { phone, code, …, referralCode? }.
 POST /auth/password/forgot     { email }                 → 200
 POST /auth/password/reset      { password }              → 200
 PUT  /auth/password            { old, new }              → 200
@@ -426,7 +434,17 @@ GET  /loyalty/account   + programV1: bool   (false — старые правил
            heldNextAt, heldNextAmount, expiringAt, expiringAmount,
            lots: [{ id, amount, remaining, state: held|available, source, accruedAt,
                     availableAt (для held; null — ждёт получения заказа), expiresAt }] }
-     transactions — прежний реестр (история до v1 и начисления за бег/захват до этапа 2).
+     transactions — прежний реестр: история до v1 и ИГРОВОЙ счёт бега/захвата (км×10 —
+           рейтинги, клубы, челленджи). При v1 он в баланс не входит: деньги за активность —
+           лоты run / capture / stage (этап 2, ниже).
+GET  /loyalty/referral  → { programV1, code, bonus, capMonth, invitedBy, canBind, bindUntil,
+                            invited, rewarded }      (code — мой постоянный код приглашения)
+POST /loyalty/referral  { code } → 200 { ok: true, detail, …как GET } | 400 { ok: false, detail, … }
+                        ввести код пригласившего (для сборок без поля в регистрации): только в
+                        первые 7 дней после регистрации, связь одна и навсегда; самоприглашение
+                        (тот же телефон или то же устройство) отклоняется.
+                        Бонус пригласившему (BONUS_REFERRAL = 100, не больше CAP_REFERRALS_MONTH = 3
+                        в месяц) — когда первый заказ приглашённого вышел из удержания без возврата.
 POST /loyalty/redeem-preview  { items: [{ productId, quantity }], deliveryCost? }
                         → программа выключена: { programV1: false, available, redeemMin: 50, maxPercent: 30 }
                         → включена: { programV1: true, level, available, eligibleTotal, ceiling,
@@ -449,12 +467,45 @@ POST /orders  pointsRedeemed — при v1: от redeemMin и ≤ redeemMax, и�
               (при нехватке баланс уходит в минус и гасится следующими начислениями).
 ```
 
+#### Программа v1, этап 2 — бонусы за активность (ТЗ §3) — **при включённой программе v1**
+Пробежка 10, захват квартала 30, победа в этапе 50 — лот `available` сразу, в статусные входит.
+Лимиты — календарный месяц по Якутску (UTC+9): пробежек 12, захватов 3, этапов 1 и общий
+260/325/390/520 по уровню (упёрлись в общий посреди бонуса — начисляется остаток). Суточный
+потолок 1000 и созревание 3 дня (D-107) при v1 НЕ действуют; заморозка бонусов за активность,
+пока аккаунт на проверке, — действует. При лимите событие засчитано в игре, бонуса нет.
+Условия бонуса за пробежку: ≥ 3 км и средний темп 3:00–12:00 мин/км — по серверному пересчёту
+трека, если он есть (`POST /runs/track`), иначе по итогам `POST /runs` (`validatedBy: summary`);
+загружена ≤ 48 ч после финиша; одна пробежка с бонусом в календарный день; одна тренировка
+двумя путями (свой забег + импорт, пересечение по времени > 50 %) — один раз. Признаки обмана —
+темп быстрее 3:00, отрезок > 200 м быстрее 2:30 (по треку), трек противоречит итогам, трек
+совпадает > 80 % с треком другого аккаунта с того же устройства (оба) — без бонуса и в очередь
+ручной проверки (админка «Проверка забегов» → «Бонусы на проверке»). Трек пришёл после итогов —
+пересчёт по нему; признак обмана → бонус отзывается (событие `cancel`), пробежка на проверку.
+Захват — только за валидную пробежку (привязка захват → пробежка, см. Territories); пробежка на
+проверке — бонус захвата ждёт решения. Этап — 1-е место в месячном итоге своего дивизиона
+(уровень дивизиона в этом месяце, км засчитанных забегов), выдаётся ежедневной задачей в
+первый день следующего месяца, один раз.
+Поле `bonus` в ответах `/runs`, `/territories/capture` (новое):
+```
+bonus: { amount, status: granted|capped|day_limit|duplicate|ineligible|suspicious|flagged|waiting|rejected,
+         reason, validatedBy: track|summary|null, monthCapReached, message,
+         month: "2026-10", runsLeft, capturesLeft, stagesLeft, activityLeft, activityCap,
+         resetsAt (1-е число следующего месяца, 00:00 Якутск) }
+message — текст для экрана после пробежки: «+10 бонусов» / «Лимит месяца исчерпан, обновится
+1 числа» / «Бонус за пробежку — один раз в день» / «Пробежка на проверке — бонус придёт после неё».
+```
+
 ### Runs (история пробежек + серверный расчёт очков — анти-чит S-04)
 ```
 GET  /runs                              → Run[]   (сводки забегов пользователя, новые сверху)
 POST /runs  { id, distanceMeters, elapsedSeconds, finishedAtMs, capturedTerritory, capturedZones, mockDetected? }
                                         → { ok, duplicate, flagged, flagReason, pointsAwarded, run,
-                                            dailyCapReached?, pointsCapped?, capReason? }
+                                            dailyCapReached?, pointsCapped?, capReason?,
+                                            bonus?, monthCapReached? }
+            Программа лояльности v1 включена: pointsAwarded = начисленный БОНУС за пробежку
+            (то, что попало в кошелёк; «+N» на экране финиша выпущенных сборок), bonus — см.
+            «Программа v1, этап 2»; при исчерпанном лимите monthCapReached: true и capReason =
+            «Лимит месяца исчерпан, обновится 1 числа». Суточного потолка (dailyCap*) при v1 нет.
             dailyCapReached/pointsCapped/capReason (новые, 28.09.2026) — суточный потолок баллов:
             не больше 1000 в сутки (UTC) на свои забеги + импорт с часов + захваты вместе.
             Сверх — забег засчитан (не 400, не flagged), pointsAwarded урезан, pointsCapped — сколько
@@ -477,7 +528,11 @@ POST /runs  { id, distanceMeters, elapsedSeconds, finishedAtMs, capturedTerritor
 ```
 POST /territories/capture { points: [[lat,lng],...], captureId, distanceMeters?, elapsedSeconds?, runId? }
      → { ok, areaM2, points, blocksGained, blocksTotal, geojson, holdHoursLeft, unverified?,
-         pointsPending?, pendingReason?, dailyCapReached?, pointsCapped?, capReason? }
+         pointsPending?, pendingReason?, dailyCapReached?, pointsCapped?, capReason?,
+         bonus?, monthCapReached? }
+     программа лояльности v1: points = начисленный бонус за захват (30, лимиты месяца), bonus —
+     см. «Программа v1, этап 2»; бонус и тогда, когда новой площади нет, но кварталы перешли
+     (blocksGained > 0, скорость проверена).
      дубль captureId → { ok, duplicate: true, areaM2, geojson }
 ```
 Скорость = max(distanceMeters, длина маршрута по points) / elapsedSeconds; > 40 км/ч → 400.
@@ -564,6 +619,9 @@ GET  /integrations/coros/status     → проверка «сервис жив»
 ```
 POST /workouts/import  { source, items[] }  → { imported, duplicates, skipped, points, items[],
                                                 dailyCapReached?, pointsCapped?, capReason? }
+                       программа лояльности v1: points = начисленные бонусы за эти тренировки;
+                       items[].bonus { amount, status, reason } — решение по бонусу (дубль своего
+                       забега, одна в день, лимиты месяца — см. «Программа v1, этап 2»)
                        (суточный потолок баллов общий со своими забегами и захватами — 1000/сутки;
                         сверх — тренировка сохраняется, items[].pointsAwarded урезан; 28.09.2026)
 GET  /workouts[?source=]                    → { items[] }
