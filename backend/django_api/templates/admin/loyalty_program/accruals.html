@@ -1,0 +1,59 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{% include "admin/loyalty_program/_nav.html" %}
+
+{% if errors %}
+<div class="m-err"><b>Не сохранено — исправьте и сохраните ещё раз:</b>
+  <ul class="m-list">{% for title, text in errors %}<li>{% if title %}{{ title }}: {% endif %}{{ text }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<p class="m-lead">Сколько бонусов за что начисляется, месячные лимиты, удержание, проверка пробежки
+  и стоп-кран. Проценты пишите числом (7 = 7%), темп — как мин:сек (3:00). Изменения действуют сразу
+  после сохранения; каждое попадает в историю.</p>
+
+<form method="post">{% csrf_token %}
+{% for group, items in groups %}
+<div class="m-card">
+  <h3>{{ group }}</h3>
+  <div class="m-wrap">
+    <table class="m top">
+      <tbody>
+      {% for it in items %}
+        <tr>
+          <td>
+            <b>{{ it.spec.title }}</b>
+            {% if it.spec.help %}<div class="m-help">{{ it.spec.help }}</div>{% endif %}
+            <div class="m-key">{{ it.key }} · по ТЗ {{ it.default }}{% if it.spec.who != "владелец" %} · меняет: {{ it.spec.who }}{% endif %}</div>
+            {% if it.error %}<div class="m-minus m-small">{{ it.error }}</div>{% endif %}
+          </td>
+          <td class="n">
+            {% if it.kind == "bool" %}
+              <input type="hidden" name="{{ it.key }}__present" value="1">
+              <input type="checkbox" name="{{ it.key }}" {% if it.checked %}checked{% endif %} {% if not may_edit %}disabled{% endif %}>
+            {% else %}
+              <input class="m-input num {% if it.error %}err{% endif %}" type="text" inputmode="decimal"
+                     name="{{ it.key }}" value="{{ it.value }}" {% if not may_edit %}disabled{% endif %}>{% if it.unit %} <span class="m-muted">{{ it.unit }}</span>{% endif %}
+            {% endif %}
+          </td>
+          <td class="m-small m-muted">сейчас: <b>{{ it.effective }}</b>{% if it.is_default %} (как в ТЗ){% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% if may_edit %}
+<div class="m-card">
+  <div class="m-acts">
+    <input class="m-input" type="text" name="comment" maxlength="300" placeholder="Комментарий к изменению (необязательно)">
+    <button class="m-btn primary" type="submit">Сохранить начисления</button>
+  </div>
+</div>
+{% endif %}
+</form>
+
+{% include "admin/loyalty_program/_history.html" %}
+{% endblock %}

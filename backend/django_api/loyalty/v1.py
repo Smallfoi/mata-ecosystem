@@ -568,18 +568,25 @@ def on_order_paid(order, now=None) -> None:
         before = st.level
         delivery = delivery_kop(order.payload)
         cash_kop = max(0, order.amount_kop - delivery)
+        # Позиции «без начисления» (исключения владельца) своей денежной частью
+        # бонусов не дают.
+        base_kop, no_accrual_kop, unit_accrues = accrual_base_kop(
+            (order.payload or {}).get("items"), cash_kop, order.points_redeemed)
         rate = Decimal(str(config.by_level("RATE_PURCHASE", st.level)))
-        amount = _floor(Decimal(cash_kop) * rate / 100)
+        amount = _floor(Decimal(base_kop) * rate / 100)
         order_total_kop = order.amount_kop + int(order.points_redeemed or 0) * 100
         if amount <= 0:
             return
         lot = _create_lot(uid, st, amount, PURCHASE, oid, state=HELD, now=now, status=True,
                           meta={"cashPartKop": cash_kop, "orderTotalKop": order_total_kop,
-                                "deliveryKop": delivery, "revoked": 0})
+                                "deliveryKop": delivery, "noAccrualKop": no_accrual_kop,
+                                "unitAccrues": unit_accrues, "revoked": 0})
         _reserve(amount)
         _event(uid, "accrue_purchase", amount, now=now, level_before=before, st=st, lot=lot,
                source_ref=oid, order_total_kop=order_total_kop,
-               eligible_kop=red.eligible_kop if red else None, cash_kop=cash_kop)
+               eligible_kop=red.eligible_kop if red else None, cash_kop=cash_kop,
+               note=(f"Без начисления (исключения): {_rub(no_accrual_kop)} ₽"
+                     if no_accrual_kop else ""))
         _check_level(uid, st, now)
     _invalidate(uid)
 
@@ -652,9 +659,9 @@ def release_holds(now=None) -> dict:
 
 # ── списание при оформлении ──────────────────────────────────────────────────
 
-def excluded_categories() -> set:
-    """Коды групп 1С без списания — вместе со всеми подгруппами."""
-    codes = set(config.get("EXCLUDED_CATEGORIES_1C"))
+def category_closure(codes) -> set:
+    """Коды категорий вместе со всеми их подкатегориями (дерево 1С по parent_id)."""
+    codes = {str(c) for c in codes or ()}
     if not codes:
         return set()
     from catalog.models import Category
@@ -672,12 +679,88 @@ def excluded_categories() -> set:
     return out
 
 
-def eligibility(items) -> dict:
-    """Какая часть корзины допускает списание (ТЗ §4).
+def excluded_categories() -> set:
+    """Коды групп 1С без списания — вместе со всеми подгруппами."""
+    return category_closure(config.get("EXCLUDED_CATEGORIES_1C"))
 
-    Цена — витрины (каталог). Не допускаются: группы 1С из EXCLUDED_CATEGORIES_1C
-    (с подгруппами; сертификаты там же), уценка (old_price > price), товары не из
-    каталога. Доставка не входит никогда.
+
+# Причины, по которым позиция не оплачивается бонусами / не даёт бонусов. Коды
+# уходят клиентам (redeem-preview), тексты — для кассы и админки.
+REASON_TEXT = {
+    "not_in_catalog": "товара нет в каталоге",
+    "excluded_product": "товар исключён из оплаты бонусами",
+    "excluded_category": "категория исключена из оплаты бонусами",
+    "excluded_brand": "бренд исключён из оплаты бонусами",
+    "markdown": "уценённый товар — без оплаты бонусами",
+    "no_accrual_product": "за этот товар бонусы не начисляются",
+    "no_accrual_category": "за товары этой категории бонусы не начисляются",
+    "no_accrual_brand": "за товары этого бренда бонусы не начисляются",
+}
+
+
+def _brand_key(name) -> str:
+    return " ".join(str(name or "").split()).casefold()
+
+
+def exclusion_rules() -> dict:
+    """Действующие исключения владельца («Товары в программе»), развёрнутые:
+    категории — с подкатегориями, бренды — без учёта регистра."""
+    return {
+        "redeem": {
+            "products": set(config.get("EXCLUDED_PRODUCTS")),
+            "categories": category_closure(config.get("EXCLUDED_CATEGORIES_1C")),
+            "brands": {_brand_key(b) for b in config.get("EXCLUDED_BRANDS")},
+        },
+        "accrual": {
+            "products": set(config.get("NO_ACCRUAL_PRODUCTS")),
+            "categories": category_closure(config.get("NO_ACCRUAL_CATEGORIES_1C")),
+            "brands": {_brand_key(b) for b in config.get("NO_ACCRUAL_BRANDS")},
+        },
+    }
+
+
+def redeem_reason(product, rules=None) -> str:
+    """Почему товар нельзя оплатить бонусами ("" — можно). Порядок причин: товар,
+    категория, бренд, уценка (уценка — правило ТЗ, не настройка)."""
+    if product is None:
+        return "not_in_catalog"
+    r = (rules or exclusion_rules())["redeem"]
+    if product.pk in r["products"]:
+        return "excluded_product"
+    if product.category_id in r["categories"]:
+        return "excluded_category"
+    if product.brand and _brand_key(product.brand) in r["brands"]:
+        return "excluded_brand"
+    try:
+        if product.old_price and float(product.old_price) > float(product.price):
+            return "markdown"
+    except (TypeError, ValueError):
+        pass
+    return ""
+
+
+def accrual_reason(product, rules=None) -> str:
+    """Почему за товар не начисляются бонусы ("" — начисляются). Товар не из
+    каталога исключением не считается: о нём ничего не известно."""
+    if product is None:
+        return ""
+    r = (rules or exclusion_rules())["accrual"]
+    if product.pk in r["products"]:
+        return "no_accrual_product"
+    if product.category_id in r["categories"]:
+        return "no_accrual_category"
+    if product.brand and _brand_key(product.brand) in r["brands"]:
+        return "no_accrual_brand"
+    return ""
+
+
+def eligibility(items, rules=None) -> dict:
+    """Какая часть корзины допускает списание (ТЗ §4) и какие позиции дают бонусы.
+
+    Цена — витрины (каталог). Не допускаются к списанию: товары, категории 1С (с
+    подкатегориями; сертификаты там же) и бренды из исключений владельца, уценка
+    (old_price > price), товары не из каталога. Доставка не входит никогда.
+    `accrues` — даёт ли позиция бонусы за покупку (исключения «без начисления»).
     `unit_eligible_kop` — по единице товара в порядке позиций чека
     (`orders.receipt._lines`): по нему возврат делит списанные бонусы.
     """
@@ -686,11 +769,11 @@ def eligibility(items) -> dict:
     from orders.pricing import CartError, parse_quantity
 
     items = items if isinstance(items, list) else []
+    rules = rules or exclusion_rules()
     ids = {str(it.get("productId") or "").strip() for it in items if isinstance(it, dict)}
     products = {p.pk: p for p in Product.objects.filter(pk__in=ids - {""}).only(
-        "id", "price", "old_price", "category_id")} if ids else {}
-    excluded = excluded_categories()
-    lines, units, eligible = [], [], 0
+        "id", "price", "old_price", "category_id", "brand")} if ids else {}
+    lines, units, unit_accrues, eligible = [], [], [], 0
     for index, it in enumerate(items):
         if not isinstance(it, dict):
             continue
@@ -700,31 +783,77 @@ def eligibility(items) -> dict:
         except CartError:
             qty = 1
         product = products.get(pid)
-        reason = ""
-        if product is None:
-            reason = "not_in_catalog"
-            price_kop = 0
-        else:
+        reason = redeem_reason(product, rules)
+        no_accrual = accrual_reason(product, rules)
+        price_kop = 0
+        if product is not None:
             try:
                 price_kop = to_kop(product.price)
             except ValueError:
                 price_kop = 0
-            if product.category_id in excluded:
-                reason = "excluded_category"
-            elif product.old_price and float(product.old_price) > float(product.price):
-                reason = "markdown"
         line_kop = 0 if reason else price_kop * qty
         eligible += line_kop
-        lines.append({"index": index, "productId": pid, "eligible": not reason,
-                      "reason": reason, "eligibleKop": line_kop})
         # Позиции чека: единица товара с ценой > 0 (цена строки заказа).
         try:
             receipt_price = to_kop(it.get("price") if it.get("price") is not None else 0)
         except ValueError:
             receipt_price = 0
+        lines.append({"index": index, "productId": pid, "eligible": not reason,
+                      "reason": reason, "reasonText": REASON_TEXT.get(reason, ""),
+                      "accrues": not no_accrual, "accrualReason": no_accrual,
+                      "eligibleKop": line_kop,
+                      "paidKop": (receipt_price if receipt_price > 0 else price_kop) * qty})
         if receipt_price > 0:
             units.extend([0 if reason else price_kop] * qty)
-    return {"eligible_kop": eligible, "lines": lines, "unit_eligible_kop": units}
+            unit_accrues.extend([not no_accrual] * qty)
+    return {"eligible_kop": eligible, "lines": lines, "unit_eligible_kop": units,
+            "unit_accrues": unit_accrues}
+
+
+def accrual_base_kop(items, cash_kop, points) -> tuple:
+    """База начисления за покупку: денежная часть без позиций «без начисления».
+
+    Денежная часть позиции = её сумма минус приходящиеся на неё бонусы (бонусы
+    делятся по допущенным к списанию позициям пропорционально). Позиция,
+    исключённая из начисления, своей денежной частью бонусов не даёт (ТЗ: начисление
+    только на cash_part). Возвращает (база, исключено в копейках, флаги «даёт бонусы»
+    по позициям чека — для возврата; None, если исключений «без начисления» нет).
+    """
+    rules = exclusion_rules()
+    acc = rules["accrual"]
+    if not (acc["products"] or acc["categories"] or acc["brands"]):
+        return cash_kop, 0, None
+    elig = eligibility(items, rules)
+    total_eligible = elig["eligible_kop"]
+    points_kop = max(0, int(points or 0)) * 100
+    excluded = 0
+    for line in elig["lines"]:
+        if line["accrues"]:
+            continue
+        share = points_kop * line["eligibleKop"] // total_eligible if total_eligible else 0
+        excluded += max(0, line["paidKop"] - share)
+    excluded = min(excluded, cash_kop)
+    flags = elig["unit_accrues"] if not all(elig["unit_accrues"]) else None
+    return cash_kop - excluded, excluded, flags
+
+
+def earned_share(order, rows, chosen, earned):
+    """Сколько начисленных за покупку бонусов снять при возврате позиций `chosen`:
+    по доле возвращённых денег среди позиций, которые давали бонусы. Позиция «без
+    начисления» бонусов не давала — её возврат ничего не снимает.
+    None — в заказе таких позиций не было (действует общее правило доли денег)."""
+    lot = purchase_lot(order)
+    flags = (lot.meta or {}).get("unitAccrues") if lot is not None else None
+    if not flags:
+        return None
+
+    def accrues(row):
+        i = row["index"]
+        return row["subject"] == "commodity" and i < len(flags) and flags[i]
+
+    total = sum(row["paid"] for row in rows if accrues(row))
+    part = sum(row["paid"] for row in rows if accrues(row) and row["index"] in chosen)
+    return earned * part // total if total else 0
 
 
 def quote(uid, items, now=None) -> dict:
@@ -1220,3 +1349,45 @@ def mirror_legacy(txn) -> None:
             _event(uid, etype or "cancel", -n, now=now, level_before=before, st=st,
                    source_ref=ref, note=f"Старый реестр: {txn.source}")
     _invalidate(uid)
+
+
+# ── ручные операции из админки ───────────────────────────────────────────────
+
+def manual_accrue(uid, amount, comment, now=None):
+    """Ручное начисление (ТЗ §6): лот available, событие accrue_manual, в статусные
+    НЕ идёт. Комментарий обязателен."""
+    comment = (comment or "").strip()
+    if not comment:
+        raise RedeemError("Нужен комментарий: за что начисляем")
+    amount = int(amount)
+    if amount <= 0:
+        raise RedeemError("Сумма начисления — целое число больше нуля")
+    return accrue(uid, amount, MANUAL, "admin", event_type="accrue_manual", status=False,
+                  now=now, note=comment, meta={"manual": True})
+
+
+def manual_debit(uid, amount, comment, now=None) -> int:
+    """Ручное списание/корректировка: снять бонусы из доступных лотов (FIFO по сроку).
+    Больше доступного не снимает — в минус ручная правка не уводит. Событие —
+    accrue_manual с минусом (ручная корректировка), статусные не трогает."""
+    now = now or timezone.now()
+    comment = (comment or "").strip()
+    if not comment:
+        raise RedeemError("Нужен комментарий: почему списываем")
+    n = int(amount)
+    if n <= 0:
+        raise RedeemError("Сумма списания — целое число больше нуля")
+    with transaction.atomic():
+        lock_wallet(uid)
+        st = _ensure_status(uid, now)
+        available, _ = _balances(uid)
+        if n > max(0, available):
+            raise RedeemError(f"Нельзя списать больше доступного: доступно {max(0, available)}")
+        _parts, short = _debit_fifo(uid, n)
+        if short:
+            raise RedeemError("Недостаточно доступных бонусов")
+        _reserve(-n)
+        _event(uid, "accrue_manual", -n, now=now, level_before=st.level, st=st,
+               source_ref="admin", note=comment)
+    _invalidate(uid)
+    return n

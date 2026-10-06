@@ -133,8 +133,12 @@ def redeem_preview(request):
         "redeemMin": q["redeemMin"],
         "canRedeem": q["canRedeem"],
         "reason": q["reason"],
+        # reasonText / accrues / accrualReason — добавлены к прежним полям позиции
+        # (исключения владельца «Товары в программе»); старые клиенты их не читают.
         "lines": [{"index": ln["index"], "productId": ln["productId"],
-                   "eligible": ln["eligible"], "reason": ln["reason"]} for ln in q["lines"]],
+                   "eligible": ln["eligible"], "reason": ln["reason"],
+                   "reasonText": ln["reasonText"], "accrues": ln["accrues"],
+                   "accrualReason": ln["accrualReason"]} for ln in q["lines"]],
     })
 
 

@@ -52,6 +52,7 @@ from config.onec_log_view import onec_log
 from config.runs_review_view import runs_review
 from config.order_return_view import order_return
 from config.points_view import points_client, points_clients
+from config import loyalty_program_view as loyalty_pages
 from staff import views as staff_views
 
 urlpatterns = [
@@ -88,6 +89,19 @@ urlpatterns = [
     path("admin/order-return/<int:pk>/", order_return, name="order_return"),
     path("admin/points/", points_clients, name="points_clients"),
     path("admin/points/<str:user_id>/", points_client, name="points_client"),
+    # «Программа лояльности»: всё о лояльности настраивает владелец (ТЗ v1).
+    path("admin/loyalty-program/", loyalty_pages.loyalty_program, name="loyalty_program"),
+    path("admin/loyalty-program/levels/", loyalty_pages.loyalty_levels, name="loyalty_levels"),
+    path("admin/loyalty-program/accruals/", loyalty_pages.loyalty_accruals,
+         name="loyalty_accruals"),
+    path("admin/loyalty-program/products/", loyalty_pages.loyalty_products,
+         name="loyalty_products"),
+    path("admin/loyalty-program/members/", loyalty_pages.loyalty_members,
+         name="loyalty_members"),
+    path("admin/loyalty-program/journal/", loyalty_pages.loyalty_journal,
+         name="loyalty_journal"),
+    path("admin/loyalty-program/history/", loyalty_pages.loyalty_history,
+         name="loyalty_history"),
     path("admin/errors/<str:issue_id>/", error_detail, name="error_detail"),
     # Сотрудники и права (S-12). Тоже ДО admin/ — иначе перехватит catch-all.
     # Свой второй фактор. НЕ под /admin/2fa/ — тот префикс пропускает мимо

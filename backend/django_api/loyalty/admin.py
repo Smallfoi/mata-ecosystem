@@ -102,7 +102,7 @@ class LoyaltySettingForm(forms.ModelForm):
         if value is None:
             return None  # «как в ТЗ»
         try:
-            return loyalty_config.validate(self.instance.key, value)
+            return loyalty_config.validate(self.instance.key, value, strict=True)
         except loyalty_config.ConfigError as e:
             raise forms.ValidationError(str(e)) from e
 
