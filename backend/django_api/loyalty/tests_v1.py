@@ -443,6 +443,10 @@ class Migration(TestCase):
     def setUp(self):
         from accounts.models import Account
 
+        # Настройки кэшируются на минуту, откат транзакции теста кэш не сбрасывает:
+        # «программа включена» из соседнего теста не должна сюда протечь (с этапа 2
+        # от выключателя зависит и зеркало бега/захвата).
+        config.invalidate()
         Account.objects.create(id=self.uid, email="m@t.dev", phone="+79990077003")
         add_txn(self.uid, 300, "purchase", "Покупка", "SS-OLD", available_at=None)
         add_txn(self.uid, 250, "runnerRun", "бег", None, "run-1")  # созревает 3 дня
