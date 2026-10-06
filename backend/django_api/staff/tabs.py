@@ -36,7 +36,8 @@ TABS = (
         hint="Заказы покупателей, статусы, состав, возвраты."),
     Tab("loyalty", "Баллы", "Магазин",
         ("loyalty.loyaltytransaction", "loyalty.loyaltylot", "loyalty.loyaltystatus",
-         "loyalty.loyaltyredemption", "loyalty.loyaltyevent", "loyalty.loyaltyrulesnapshot"),
+         "loyalty.loyaltyredemption", "loyalty.loyaltyevent", "loyalty.loyaltyrulesnapshot",
+         "loyalty.loyaltyactivity", "loyalty.loyaltyreferral"),
         hint="Начисления и списания баллов; лоты, уровни и журнал программы v1."),
     Tab("shoes", "Кроссовки", "Магазин", ("shoes.shoeasset",)),
 

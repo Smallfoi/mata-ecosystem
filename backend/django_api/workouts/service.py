@@ -87,12 +87,26 @@ def accept(user_id, source, data, *, validate, find_same_run, running_sports, po
                     id=wid, user_id=user_id, source=source, points=points,
                     txn_id=txn.id if txn else "",
                 )
+            # Программа лояльности v1 (этап 2): бонус за тренировку по правилам ТЗ
+            # (дубль своего забега, одна в день, капы месяца) — для HTTP-импорта и
+            # часов одинаково. Повтор после переподключения источника второй раз не
+            # платит: решение хранится (LoyaltyActivity).
+            from loyalty import config as loyalty_config
+
+            bonus_act = None
+            if loyalty_config.enabled():
+                from loyalty import activity
+
+                bonus_act = activity.on_workout(workout, same_run)
     except IntegrityError:
         # Параллельный приём той же тренировки успел первым — это дубль.
         existing = ExternalWorkout.objects.filter(id=wid).first()
         return existing, "duplicate"
 
     workout.points_this_time = points        # сколько начислили именно сейчас
+    workout.bonus_act = bonus_act            # решение по бонусу v1 (None — программа выкл.)
+    workout.bonus_this_time = (bonus_act.amount if bonus_act is not None and not prior
+                               and bonus_act.status == "granted" else 0)
     workout.points_capped = capped
     workout.cap_reason = cap_note
     return workout, "imported"
