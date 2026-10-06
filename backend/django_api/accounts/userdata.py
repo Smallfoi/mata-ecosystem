@@ -67,6 +67,12 @@ MODELS = (
     ("loyaltyLots", "loyalty.LoyaltyLot", ("user_id",), DELETE),
     ("loyaltyLevel", "loyalty.LoyaltyStatus", ("user_id",), DELETE),
     ("loyaltyRedemptions", "loyalty.LoyaltyRedemption", ("user_id",), DELETE),
+    # Этап 2: решения по бонусам за активность, код и связи приглашений.
+    # `loyalty.LoyaltyPhoneGrant` — без пользователя (HMAC телефона): остаётся,
+    # чтобы удаление аккаунта не давало второй бонус за регистрацию.
+    ("loyaltyActivity", "loyalty.LoyaltyActivity", ("user_id",), DELETE),
+    ("loyaltyReferralCode", "loyalty.LoyaltyReferralCode", ("user_id",), DELETE),
+    ("loyaltyReferrals", "loyalty.LoyaltyReferral", ("user_id", "inviter_id"), DELETE),
     ("orders", "orders.Order", ("user_id",), DELETE),  # возвраты уходят каскадом
     ("analyticsEvents", "analytics.Event", ("user_id",), ANON),
 )

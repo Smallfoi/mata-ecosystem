@@ -1,0 +1,134 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{% include "admin/loyalty_program/_nav.html" %}
+
+<form method="get" class="m-form">
+  <label class="m-field">Участник: телефон, имя, почта или ID
+    <input class="m-input" type="search" name="q" value="{{ q }}" placeholder="+7 914 …">
+  </label>
+  <button class="m-btn primary" type="submit">Найти</button>
+</form>
+
+{% if q and not card %}
+<div class="m-card">
+  {% if found %}
+  <div class="m-wrap">
+    <table class="m">
+      <thead><tr><th>Имя</th><th>Телефон</th><th>Почта</th></tr></thead>
+      <tbody>
+      {% for a in found %}
+        <tr>
+          <td><a href="?uid={{ a.id|urlencode }}"><b>{{ a.name|default:"без имени" }}</b></a> <span class="m-key">{{ a.id }}</span></td>
+          <td class="m-muted">{{ a.phone|default:"—" }}</td>
+          <td class="m-muted">{{ a.email|default:"—" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="m-empty">Никого не нашли по «{{ q }}».</div>{% endif %}
+</div>
+{% endif %}
+
+{% if card %}
+<div class="m-card">
+  <div class="m-head">
+    <div class="m-who">
+      <h3>{% if card.account %}{{ card.account.name|default:"без имени" }}{% else %}Аккаунт удалён{% endif %}</h3>
+      <div class="m-meta">{% if card.account %}{{ card.account.phone|default:"" }}{% if card.account.email %} · {{ card.account.email }}{% endif %} · {% endif %}<span class="m-key">{{ card.uid }}</span></div>
+      <div class="m-tags">
+        <span class="m-tag info">{{ card.level_title }}</span>
+        {% if not card.migrated %}<span class="m-tag warn">ещё не перенесён в программу</span>{% endif %}
+        {% if card.account.needs_review %}<span class="m-tag review">на проверке — бонусы за активность заморожены</span>{% endif %}
+      </div>
+    </div>
+    {% if card.migrated %}
+    <div class="m-nums">
+      <div class="m-num"><b>{{ card.available }}</b><span>доступно</span></div>
+      <div class="m-num"><b>{{ card.held }}</b><span>ожидает</span></div>
+      {% if card.debt %}<div class="m-num"><b class="m-minus">{{ card.debt }}</b><span>долг</span></div>{% endif %}
+      <div class="m-num"><b>{{ card.status_points }}{% if card.next_threshold %} / {{ card.next_threshold }}{% endif %}</b><span>статусных{% if card.next_threshold %} до след. уровня{% endif %}</span></div>
+      <div class="m-num"><b>{{ card.purchases_rub }} ₽</b><span>покупки за 365 дней</span></div>
+    </div>
+    {% endif %}
+  </div>
+  {% if card.migrated %}
+    {% if card.status.level_until %}<div class="m-strip">Уровень действует до {{ card.status.level_until|date:"d.m.Y" }}. В программе с {{ card.status.migrated_at|date:"d.m.Y" }}.</div>{% endif %}
+  {% else %}
+    <div class="m-strip">По плану переноса: баланс {{ card.plan.balance }} (доступно {{ card.plan.available }}, созревает {{ card.plan.held }}),
+      статусные {{ card.plan.status_points }}, уровень «{{ card.level_title }}». Перенос случится при первом обращении к программе или кнопкой на «Обзоре».</div>
+  {% endif %}
+  {% if may_edit %}
+  <div class="m-acts">
+    <form class="m-inline" method="post"
+          onsubmit="return confirm('Начислить бонусы вручную? Запись попадёт в журнал.')">{% csrf_token %}
+      <input type="hidden" name="uid" value="{{ card.uid }}"><input type="hidden" name="action" value="accrue">
+      <input class="m-input num" type="number" min="1" step="1" name="amount" placeholder="сумма" required>
+      <input class="m-input" type="text" name="comment" maxlength="280" placeholder="За что (обязательно)" required>
+      <button class="m-btn ok" type="submit">Ручное начисление</button>
+    </form>
+    <form class="m-inline" method="post"
+          onsubmit="return confirm('Списать бонусы вручную? Запись попадёт в журнал.')">{% csrf_token %}
+      <input type="hidden" name="uid" value="{{ card.uid }}"><input type="hidden" name="action" value="debit">
+      <input class="m-input num" type="number" min="1" step="1" name="amount" placeholder="сумма" required>
+      <input class="m-input" type="text" name="comment" maxlength="280" placeholder="Почему (обязательно)" required>
+      <button class="m-btn bad" type="submit">Ручное списание</button>
+    </form>
+  </div>
+  <div class="m-strip m-small m-muted">Ручное начисление — сразу доступно, в статусные (уровень) не идёт. Списание — из доступных
+    бонусов, начиная с ближайших к сгоранию; больше доступного списать нельзя. Обе операции пишутся в журнал и в журнал действий сотрудников.</div>
+  {% endif %}
+</div>
+
+{% if card.migrated %}
+<div class="m-card">
+  <h3>Бонусы (лоты)</h3>
+  {% if card.lots %}
+  <div class="m-wrap">
+    <table class="m compact">
+      <thead><tr><th>Начислено</th><th>Источник</th><th class="n">Сумма</th><th class="n">Остаток</th><th>Состояние</th><th>Доступно с</th><th>Сгорает</th></tr></thead>
+      <tbody>
+      {% for lot in card.lots %}
+        <tr class="{% if lot.state == 'spent' or lot.state == 'expired' or lot.state == 'cancelled' %}m-off{% endif %}">
+          <td class="m-muted">{{ lot.accrued_at|date:"d.m.Y H:i" }}</td>
+          <td>{{ lot.source }}{% if lot.source_ref %} <span class="m-key">{{ lot.source_ref }}</span>{% endif %}</td>
+          <td class="n">{{ lot.amount }}</td>
+          <td class="n"><b>{{ lot.remaining }}</b></td>
+          <td>{{ lot.state_title }}</td>
+          <td class="m-muted">{{ lot.available_at|date:"d.m.Y"|default:"—" }}</td>
+          <td class="m-muted">{{ lot.expires_at|date:"d.m.Y"|default:"—" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="m-empty">Бонусов нет.</div>{% endif %}
+</div>
+
+<div class="m-card">
+  <h3>Последние события</h3>
+  {% if card.events %}
+  <div class="m-wrap">
+    <table class="m compact">
+      <thead><tr><th>Когда</th><th>Событие</th><th class="n">Сумма</th><th class="n">Доступно после</th><th>Основание</th><th>Комментарий</th></tr></thead>
+      <tbody>
+      {% for ev in card.events %}
+        <tr>
+          <td class="m-muted">{{ ev.created_at|date:"d.m.Y H:i" }}</td>
+          <td>{{ ev.title }}</td>
+          <td class="n">{% if ev.amount > 0 %}<span class="m-plus">+{{ ev.amount }}</span>{% elif ev.amount < 0 %}<span class="m-minus">{{ ev.amount }}</span>{% else %}0{% endif %}</td>
+          <td class="n">{{ ev.balance_after }}</td>
+          <td class="m-key">{{ ev.source_ref }}</td>
+          <td class="m-small">{{ ev.note|default:"" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if card.account.loyalty_pseudonym %}<div class="m-acts"><a class="m-btn quiet" href="{{ journal_url }}?pseudonym={{ card.account.loyalty_pseudonym|urlencode }}">Все события в журнале</a></div>{% endif %}
+  {% else %}<div class="m-empty">Событий пока нет.</div>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

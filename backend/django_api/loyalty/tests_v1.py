@@ -404,7 +404,13 @@ class Switch(ApiTestCase):
 
 class Rules(TestCase):
     def test_hard_ceiling_cannot_be_raised(self):
-        config.set_value("REDEEM_CEILING", [0.5, 0.6, 0.7, 0.9], by="test")
+        # Сохранить выше потолка нельзя (админка и set_value отклоняют) ...
+        with self.assertRaises(config.ConfigError):
+            config.set_value("REDEEM_CEILING", [0.5, 0.6, 0.7, 0.9], by="test")
+        # ... а если такое значение оказалось в таблице в обход — код его срезает.
+        LoyaltySetting.objects.update_or_create(key="REDEEM_CEILING",
+                                                defaults={"value": [0.5, 0.6, 0.7, 0.9]})
+        config.invalidate()
         self.assertEqual(config.redeem_ceiling(3), 0.30)
         self.assertEqual(config.redeem_ceiling(0), 0.30)
         Product.objects.create(id="p", name="p", category_id="c", price=1000)
@@ -458,6 +464,10 @@ class Migration(TestCase):
     def setUp(self):
         from accounts.models import Account
 
+        # Настройки кэшируются на минуту, откат транзакции теста кэш не сбрасывает:
+        # «программа включена» из соседнего теста не должна сюда протечь (с этапа 2
+        # от выключателя зависит и зеркало бега/захвата).
+        config.invalidate()
         Account.objects.create(id=self.uid, email="m@t.dev", phone="+79990077003")
         add_txn(self.uid, 300, "purchase", "Покупка", "SS-OLD", available_at=None)
         add_txn(self.uid, 250, "runnerRun", "бег", None, "run-1")  # созревает 3 дня

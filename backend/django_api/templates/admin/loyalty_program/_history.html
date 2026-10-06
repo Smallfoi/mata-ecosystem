@@ -1,0 +1,23 @@
+{% comment %}Последние изменения настроек этой страницы (полная история — «История настроек»).{% endcomment %}
+<div class="m-card">
+  <h3>Последние изменения</h3>
+  {% if history %}
+  <div class="m-wrap">
+    <table class="m compact">
+      <thead><tr><th>Когда</th><th>Настройка</th><th>Было</th><th>Стало</th><th>Кто</th><th>Комментарий</th></tr></thead>
+      <tbody>
+      {% for h in history %}
+        <tr>
+          <td class="m-muted">{{ h.when }}</td>
+          <td>{{ h.title }}<div class="m-key">{{ h.key }}</div></td>
+          <td class="m-muted">{{ h.old }}</td>
+          <td><b>{{ h.new }}</b></td>
+          <td class="m-muted">{{ h.who }}</td>
+          <td class="m-small">{{ h.comment|default:"—" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="m-empty">Пока не менялось — действуют значения из ТЗ.</div>{% endif %}
+</div>

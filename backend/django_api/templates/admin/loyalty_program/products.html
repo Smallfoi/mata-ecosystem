@@ -1,0 +1,211 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{% include "admin/loyalty_program/_nav.html" %}
+
+<p class="m-lead">Какие товары участвуют в программе. Две разные вещи: <b>«можно оплачивать бонусами»</b>
+  (на эти товары покупатель тратит бонусы, до {{ hard_ceiling }}% суммы) и <b>«начисляются бонусы за покупку»</b>
+  (за эти товары покупатель получает бонусы). Исключить можно категорию (вместе с подкатегориями), бренд
+  или отдельный товар. Изменения действуют сразу и видны в кассе Store с причиной.</p>
+
+<div class="m-sum">
+  <div class="m-tile"><b>{{ totals.total|default:0 }}</b><span>товаров на витрине</span></div>
+  <div class="m-tile"><b class="m-plus">{{ totals.redeem_ok|default:0 }}</b><span>можно оплачивать бонусами</span></div>
+  <div class="m-tile"><b class="m-minus">{{ totals.redeem_off|default:0 }}</b><span>без оплаты бонусами</span></div>
+  <div class="m-tile"><b>{{ totals.accrual_off|default:0 }}</b><span>без начисления бонусов</span></div>
+</div>
+{% if reasons %}
+<p class="m-small m-muted">Почему без оплаты бонусами: {% for text, n in reasons %}{{ text }} — {{ n }}{% if not forloop.last %}; {% endif %}{% endfor %}.</p>
+{% endif %}
+
+<div class="m-card pad">
+  <h3>Проверить товар</h3>
+  <form method="get" class="m-form">
+    <label class="m-field">Название, артикул или ID товара
+      <input class="m-input" type="search" name="check" value="{{ check }}" placeholder="например, Гель SIS">
+    </label>
+    {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+    <button class="m-btn primary" type="submit">Почему так?</button>
+  </form>
+  {% if check_missing %}<div class="m-hint">Товар «{{ check }}» не найден в каталоге.</div>{% endif %}
+  {% if explain %}
+  <div class="{% if explain.redeem_ok %}m-good{% else %}m-hint{% endif %}">
+    <b>{{ explain.product.name }}</b>{% if explain.product.article %} · арт. {{ explain.product.article }}{% endif %}
+    · {{ explain.product.price|floatformat:"-2" }} ₽{% if explain.product.brand %} · бренд {{ explain.product.brand }}{% endif %}<br>
+    Категория: {{ explain.category_path }}<br>
+    Оплата бонусами: {% if explain.redeem_ok %}<b>можно</b>{% else %}<b>нельзя</b> — {{ explain.redeem_text }}{% if explain.redeem_detail %} ({{ explain.redeem_detail }}){% endif %}{% endif %}.<br>
+    Бонусы за покупку: {% if explain.accrual_ok %}<b>начисляются</b>{% else %}<b>не начисляются</b> — {{ explain.accrual_text }}{% if explain.accrual_detail %} ({{ explain.accrual_detail }}){% endif %}{% endif %}.
+  </div>
+  {% endif %}
+</div>
+
+<div class="m-card">
+  <h3>Правила, которые не меняются</h3>
+  <div class="m-body">
+    <ul class="m-list">
+      <li><b>Уценённые товары</b> (старая цена больше цены) — не оплачиваются бонусами. Правило ТЗ, зашито в код; бонусы за их покупку начисляются.</li>
+      <li><b>Доставка</b> — не оплачивается бонусами и бонусов не даёт. Правило ТЗ, зашито в код.</li>
+      <li><b>Оплатить бонусами можно не больше {{ hard_ceiling }}%</b> суммы допущенных товаров на любом уровне.</li>
+      <li>Бонусы начисляются только на часть заказа, оплаченную деньгами.</li>
+    </ul>
+  </div>
+</div>
+
+<form method="post">{% csrf_token %}
+<input type="hidden" name="action" value="categories">
+<input type="hidden" name="back" value="{{ back }}">
+<div class="m-card">
+  <h3>Категории каталога (из 1С)</h3>
+  <div class="m-strip">Снимите флажок — категория и все её подкатегории выйдут из программы. Флажок у
+    подкатегории значит только её собственное правило: если исключён родитель, она исключена вместе с ним.</div>
+  {% if categories %}
+  <div class="m-wrap">
+    <table class="m">
+      <thead><tr><th>Категория</th><th class="n">Товаров</th><th class="c">Можно оплачивать бонусами</th><th class="c">Начисляются бонусы</th><th>Итог</th></tr></thead>
+      <tbody>
+      {% for c in categories %}
+        <tr class="{% if not c.redeem_on or c.redeem_by %}m-off{% endif %}">
+          <td><input type="hidden" name="cats" value="{{ c.id }}">{{ c.indent }}{{ c.name }} <span class="m-key">{{ c.id }}</span></td>
+          <td class="n">{{ c.total }}{% if c.total != c.own %} <span class="m-dim">({{ c.own }} своих)</span>{% endif %}</td>
+          <td class="c"><input type="checkbox" name="redeem_{{ c.id }}" {% if c.redeem_on %}checked{% endif %} {% if not may_edit %}disabled{% endif %}></td>
+          <td class="c"><input type="checkbox" name="accrual_{{ c.id }}" {% if c.accrual_on %}checked{% endif %} {% if not may_edit %}disabled{% endif %}></td>
+          <td class="m-small">
+            {% if c.redeem_by %}<span class="m-warn">без оплаты — с «{{ c.redeem_by }}»</span>{% elif not c.redeem_on %}<span class="m-warn">без оплаты бонусами</span>{% endif %}
+            {% if c.accrual_by %}<span class="m-warn">без начисления — с «{{ c.accrual_by }}»</span>{% elif not c.accrual_on %}<span class="m-warn">без начисления</span>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="m-empty">Категорий пока нет — их присылает 1С.</div>{% endif %}
+  {% if may_edit and categories %}
+  <div class="m-acts">
+    <input class="m-input" type="text" name="comment" maxlength="300" placeholder="Комментарий (необязательно)">
+    <button class="m-btn primary" type="submit">Сохранить категории</button>
+  </div>
+  {% endif %}
+</div>
+</form>
+
+<form method="post">{% csrf_token %}
+<input type="hidden" name="action" value="brands">
+<input type="hidden" name="back" value="{{ back }}">
+<div class="m-card">
+  <h3>Бренды</h3>
+  {% if brands %}
+  <div class="m-wrap">
+    <table class="m">
+      <thead><tr><th>Бренд</th><th class="n">Товаров</th><th class="c">Можно оплачивать бонусами</th><th class="c">Начисляются бонусы</th></tr></thead>
+      <tbody>
+      {% for b in brands %}
+        <tr class="{% if not b.redeem_on %}m-off{% endif %}">
+          <td><input type="hidden" name="brand_{{ forloop.counter0 }}" value="{{ b.name }}">{{ b.name }}</td>
+          <td class="n">{{ b.count }}</td>
+          <td class="c"><input type="checkbox" name="redeem_{{ forloop.counter0 }}" {% if b.redeem_on %}checked{% endif %} {% if not may_edit %}disabled{% endif %}></td>
+          <td class="c"><input type="checkbox" name="accrual_{{ forloop.counter0 }}" {% if b.accrual_on %}checked{% endif %} {% if not may_edit %}disabled{% endif %}></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="m-empty">У товаров не заполнен бренд.</div>{% endif %}
+  {% if may_edit and brands %}
+  <div class="m-acts">
+    <input class="m-input" type="text" name="comment" maxlength="300" placeholder="Комментарий (необязательно)">
+    <button class="m-btn primary" type="submit">Сохранить бренды</button>
+  </div>
+  {% endif %}
+</div>
+</form>
+
+<div class="m-card">
+  <h3>Отдельные товары и модели</h3>
+  <div class="m-body">
+    <form method="get" class="m-form">
+      <label class="m-field">Найти товар: название, артикул, бренд или ID
+        <input class="m-input" type="search" name="q" value="{{ q }}">
+      </label>
+      <button class="m-btn" type="submit">Найти</button>
+    </form>
+  </div>
+  {% if q %}
+    {% if results %}
+    <div class="m-wrap">
+      <table class="m compact">
+        <thead><tr><th>Товар</th><th>Артикул</th><th>Бренд</th><th class="n">Цена</th><th>Сейчас</th>{% if may_edit %}<th>Исключить</th>{% endif %}</tr></thead>
+        <tbody>
+        {% for r in results %}
+          <tr>
+            <td>{{ r.p.name }} <span class="m-key">{{ r.p.id }}</span></td>
+            <td class="m-muted">{{ r.p.article|default:"—" }}</td>
+            <td class="m-muted">{{ r.p.brand|default:"—" }}</td>
+            <td class="n">{{ r.p.price|floatformat:"-2" }}</td>
+            <td class="m-small">{% if r.redeem %}<span class="m-warn">{{ r.redeem }}</span>{% else %}оплата бонусами — можно{% endif %}{% if r.accrual %}<br><span class="m-warn">{{ r.accrual }}</span>{% endif %}</td>
+            {% if may_edit %}
+            <td>
+              {% if not r.in_redeem %}
+              <form class="m-inline" method="post">{% csrf_token %}
+                <input type="hidden" name="action" value="product_add"><input type="hidden" name="list" value="redeem">
+                <input type="hidden" name="pid" value="{{ r.p.id }}"><input type="hidden" name="back" value="{{ back }}">
+                <button class="m-btn" type="submit">из оплаты</button>
+              </form>
+              {% endif %}
+              {% if not r.in_accrual %}
+              <form class="m-inline" method="post">{% csrf_token %}
+                <input type="hidden" name="action" value="product_add"><input type="hidden" name="list" value="accrual">
+                <input type="hidden" name="pid" value="{{ r.p.id }}"><input type="hidden" name="back" value="{{ back }}">
+                <button class="m-btn" type="submit">из начисления</button>
+              </form>
+              {% endif %}
+            </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<div class="m-empty">Ничего не найдено по «{{ q }}».</div>{% endif %}
+  {% endif %}
+
+  <div class="m-body">
+    <div class="m-group-title">Исключены из оплаты бонусами ({{ excluded_products|length }})</div>
+    {% for r in excluded_products %}
+      <div class="m-row">
+        <span>{% if r.p %}{{ r.p.name }}{% if r.p.article %} · арт. {{ r.p.article }}{% endif %}{% else %}товар удалён из каталога{% endif %} <span class="m-key">{{ r.id }}</span></span>
+        {% if may_edit %}
+        <form class="m-inline" method="post">{% csrf_token %}
+          <input type="hidden" name="action" value="product_remove"><input type="hidden" name="list" value="redeem">
+          <input type="hidden" name="pid" value="{{ r.id }}"><input type="hidden" name="back" value="{{ back }}">
+          <button class="m-btn quiet" type="submit">вернуть</button>
+        </form>
+        {% endif %}
+      </div>
+    {% empty %}<div class="m-muted m-small">нет</div>{% endfor %}
+    <div class="m-group-title">Исключены из начисления бонусов ({{ no_accrual_products|length }})</div>
+    {% for r in no_accrual_products %}
+      <div class="m-row">
+        <span>{% if r.p %}{{ r.p.name }}{% if r.p.article %} · арт. {{ r.p.article }}{% endif %}{% else %}товар удалён из каталога{% endif %} <span class="m-key">{{ r.id }}</span></span>
+        {% if may_edit %}
+        <form class="m-inline" method="post">{% csrf_token %}
+          <input type="hidden" name="action" value="product_remove"><input type="hidden" name="list" value="accrual">
+          <input type="hidden" name="pid" value="{{ r.id }}"><input type="hidden" name="back" value="{{ back }}">
+          <button class="m-btn quiet" type="submit">вернуть</button>
+        </form>
+        {% endif %}
+      </div>
+    {% empty %}<div class="m-muted m-small">нет</div>{% endfor %}
+  </div>
+</div>
+
+{% if other_lists %}
+<div class="m-card">
+  <h3>Другие списки</h3>
+  <div class="m-body">
+    {% for key, spec, value in other_lists %}
+      <div><b>{{ spec.title }}</b>: {{ value }} <span class="m-key">{{ key }}</span></div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

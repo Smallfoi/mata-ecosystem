@@ -19,6 +19,29 @@ from loyalty.models import seed_runner_points
 
 from .models import Account
 from . import login_guard, otp_guard
+
+
+def _welcome(acc, data, out):
+    """Новый аккаунт с подтверждённым телефоном (программа лояльности v1, этап 2):
+    бонус за регистрацию (один раз на телефон) и необязательный код приглашения
+    `referralCode`. Новые поля ответа: `signupBonus`, `referral` {ok, detail}.
+    Ошибка кода не мешает регистрации — её текст уходит в `referral.detail`."""
+    from loyalty import activity
+
+    try:
+        bonus = activity.grant_signup(acc.id, acc.phone)
+    except Exception:  # бонус не часть регистрации
+        import logging
+
+        logging.getLogger(__name__).exception("Бонус за регистрацию не начислен")
+        bonus = 0
+    if bonus:
+        out["signupBonus"] = bonus
+    code = str((data or {}).get("referralCode") or "").strip() if isinstance(data, dict) else ""
+    if code:
+        ok, detail = activity.bind_referral(acc.id, code)
+        out["referral"] = {"ok": ok, "detail": detail}
+    return out
 from .sms import channel_info, check_code, code_error, request_code, sms_enabled
 
 
@@ -56,7 +79,8 @@ def register(request):
         )
         seed_runner_points(acc.id)
         track(E_REGISTER, user_id=acc.id, source="phone")
-        return Response({"token": make_token(acc.id, acc.token_version), "user": acc.to_json()})
+        return Response(_welcome(acc, d, {"token": make_token(acc.id, acc.token_version),
+                                          "user": acc.to_json()}))
 
     # Легаси: регистрация по email+паролю (обратная совместимость).
     if Account.objects.filter(email=email).exists():
@@ -218,7 +242,17 @@ def phone_verify(request):
     from analytics.models import E_LOGIN, E_REGISTER, track
 
     track(E_REGISTER if created else E_LOGIN, user_id=acc.id, source="phone")
-    return Response({"token": make_token(acc.id, acc.token_version), "user": acc.to_json()})
+    out = {"token": make_token(acc.id, acc.token_version), "user": acc.to_json()}
+    if created:
+        _welcome(acc, d, out)
+    elif isinstance(d, dict) and str(d.get("referralCode") or "").strip():
+        # Вход по коду в первые 7 дней после регистрации тоже принимает код
+        # приглашения (проверки — те же, что у POST /v1/loyalty/referral).
+        from loyalty import activity
+
+        ok, detail = activity.bind_referral(acc.id, d.get("referralCode"))
+        out["referral"] = {"ok": ok, "detail": detail}
+    return Response(out)
 
 
 @api_view(["GET"])

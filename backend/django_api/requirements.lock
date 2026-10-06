@@ -22,6 +22,7 @@ django-otp==1.7.0
 django-storages==1.14.6
 django-unfold==0.104.1
 djangorestframework==3.18.0
+fitparse==1.2.0
 gunicorn==26.1.0
 imageio-ffmpeg==0.6.0
 jmespath==1.1.0

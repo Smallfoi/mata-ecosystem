@@ -155,8 +155,12 @@ def redeem_preview(request):
         "redeemMin": q["redeemMin"],
         "canRedeem": q["canRedeem"],
         "reason": q["reason"],
+        # reasonText / accrues / accrualReason — добавлены к прежним полям позиции
+        # (исключения владельца «Товары в программе»); старые клиенты их не читают.
         "lines": [{"index": ln["index"], "productId": ln["productId"],
-                   "eligible": ln["eligible"], "reason": ln["reason"]} for ln in q["lines"]],
+                   "eligible": ln["eligible"], "reason": ln["reason"],
+                   "reasonText": ln["reasonText"], "accrues": ln["accrues"],
+                   "accrualReason": ln["accrualReason"]} for ln in q["lines"]],
     })
 
 
@@ -294,6 +298,30 @@ def transactions(request):
         run_id,
     )
     return Response({"ok": True})
+
+
+@api_view(["GET", "POST"])
+def referral(request):
+    """Приглашения (программа v1, этап 2).
+
+    GET — мой постоянный код и состояние: {programV1, code, bonus, capMonth,
+    invitedBy, canBind, bindUntil, invited, rewarded}.
+    POST {code} — ввести код пригласившего (для сборок, где его нет в регистрации):
+    только в первые 7 дней после регистрации и один раз; самоприглашение (тот же
+    телефон или устройство) отклоняется. Ответ {ok, detail, ...состояние}; 400 при
+    отказе.
+    """
+    from . import activity
+
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    if request.method == "GET":
+        return Response(activity.referral_info(uid))
+    d = request.data if isinstance(request.data, dict) else {}
+    ok, detail = activity.bind_referral(uid, d.get("code") or d.get("referralCode"))
+    body = {"ok": ok, "detail": detail, **activity.referral_info(uid)}
+    return Response(body, status=200 if ok else 400)
 
 
 @api_view(["GET"])

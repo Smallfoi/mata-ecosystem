@@ -36,13 +36,18 @@ TABS = (
         hint="Заказы покупателей, статусы, состав, возвраты."),
     Tab("loyalty", "Баллы", "Магазин",
         ("loyalty.loyaltytransaction", "loyalty.loyaltylot", "loyalty.loyaltystatus",
-         "loyalty.loyaltyredemption", "loyalty.loyaltyevent", "loyalty.loyaltyrulesnapshot"),
+         "loyalty.loyaltyredemption", "loyalty.loyaltyevent", "loyalty.loyaltyrulesnapshot",
+         "loyalty.loyaltyactivity", "loyalty.loyaltyreferral"),
         hint="Начисления и списания баллов; лоты, уровни и журнал программы v1."),
-    Tab("loyalty_settings", "Настройки лояльности", "Магазин",
-        ("loyalty.loyaltysetting", "loyalty.loyaltysettingchange"),
-        hint="Числа программы лояльности v1 (ставки, пороги, сроки, исключённые группы 1С) "
-             "и выключатель программы. Каждое изменение — в истории."),
     Tab("shoes", "Кроссовки", "Магазин", ("shoes.shoeasset",)),
+
+    # Ключ остался прежним (права уже выданы), раздел — свой блок меню.
+    Tab("loyalty_settings", "Программа лояльности", "Программа лояльности",
+        ("loyalty.loyaltysetting", "loyalty.loyaltysettingchange"),
+        hint="Раздел «Программа лояльности»: выключатель и перенос балансов, уровни, "
+             "начисления, товары в программе, участники (ручные начисления), журнал и "
+             "история настроек. «Смотреть» — видно всё; «редактировать» — менять "
+             "настройки и делать ручные начисления/списания."),
 
     Tab("clubs", "Клубы", "Сообщество",
         ("clubs.club", "clubs.clubmember", "clubs.clubjoinrequest", "clubs.clubchallenge"),

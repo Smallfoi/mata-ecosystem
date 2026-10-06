@@ -22,7 +22,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from common.security import user_id_from_request
-from integrations import suunto
+from integrations import suunto, tasks
 from integrations.models import WatchAccount
 
 
@@ -146,6 +146,28 @@ def suunto_callback(request):
     return Response({"ok": True, "detail": "Часы Suunto подключены. Вернитесь в приложение."})
 
 
+@api_view(["GET"])
+def suunto_account(request):
+    """Подключены ли часы у этого человека — для экрана «Часы и приложения».
+
+    `configured` отдаём отдельно: пока ключей на сервере нет, кнопку показывать
+    незачем — она приведёт в тупик.
+    """
+    me = user_id_from_request(request)
+    if not me:
+        return Response({"detail": "Нет токена"}, status=401)
+    account = WatchAccount.objects.filter(user_id=me, source="suunto").first()
+    return Response({
+        "configured": suunto.configured(),
+        "connected": account is not None,
+        "connectedAtMs": int(account.connected_at.timestamp() * 1000) if account else None,
+        "lastSyncAtMs": (
+            int(account.last_sync_at.timestamp() * 1000)
+            if account and account.last_sync_at else None
+        ),
+    })
+
+
 @api_view(["DELETE"])
 def suunto_disconnect(request):
     """Отключить часы: токен удаляем целиком, а не помечаем неактивным."""
@@ -159,19 +181,38 @@ def suunto_disconnect(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def suunto_push(request):
-    """Сюда Suunto присылает события о завершённых тренировках (вебхук).
+    """Уведомление Suunto: у человека появилась новая тренировка.
 
-    Отвечаем 200 на любой корректный запрос — для отправителя это подтверждение
-    доставки. Содержимое пока не разбираем: Suunto подписывает тело запроса
-    (HMAC-SHA256), а ключа для проверки подписи у нас ещё нет.
+    В теле всего два поля — `username` и `workoutid` (их FAQ). Самих данных нет,
+    поэтому верить уведомлению и не нужно: мы идём за тренировкой сами, своим
+    токеном. Подделать уведомление можно, но смысла нет — максимум мы лишний раз
+    спросим про тренировку, которая и так есть у этого человека.
+
+    Отвечаем сразу и всегда 200: отправитель ждёт подтверждение доставки, а не
+    результат разбора. Работа уходит в фон (`integrations.tasks`).
     """
     try:
         body = request.data if isinstance(request.data, (dict, list)) else json.loads(request.body or b"{}")
     except (ValueError, TypeError):
         return Response({"detail": "Некорректный JSON"}, status=400)
-    count = len(body) if isinstance(body, list) else 1
-    print(f"Suunto push: получено записей {count} в {timezone.now().isoformat()}.")
-    return Response({"ok": True, "received": count})
+
+    events = body if isinstance(body, list) else [body]
+    queued = 0
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        username = str(event.get("username") or event.get("user") or "").strip()[:120]
+        workout_id = str(event.get("workoutid") or event.get("workoutId") or "").strip()[:120]
+        if not username or not workout_id:
+            continue
+        account = WatchAccount.objects.filter(source="suunto", external_id=username).first()
+        if account is None:
+            # Часы отключили или это чужой username — молча пропускаем: отвечать
+            # «такого нет» значит подтверждать чужому, кто у нас есть.
+            continue
+        tasks.fetch_suunto_workout.delay(account.pk, workout_id)
+        queued += 1
+    return Response({"ok": True, "received": len(events), "queued": queued})
 
 
 @api_view(["GET"])
