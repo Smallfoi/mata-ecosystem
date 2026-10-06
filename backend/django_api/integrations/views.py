@@ -9,6 +9,7 @@
 подпись запроса нечем, а принимать чужие данные без проверки нельзя.
 """
 import json
+import os
 import secrets
 import time
 
@@ -22,25 +23,128 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from common.security import user_id_from_request
-from integrations import suunto, tasks
-from integrations.models import WatchAccount
+from integrations import coros, suunto, tasks
+from integrations.models import McpClient, WatchAccount
+
+
+COROS_STATE_SALT = "mata.coros.connect"
+COROS_STATE_MAX_AGE = 30 * 60
+# Секрет-проверка PKCE живёт между началом входа и возвратом — в кэше, не в
+# ссылке: иначе он уехал бы к COROS вместе со `state` и смысл защиты пропал.
+COROS_VERIFIER_TTL = COROS_STATE_MAX_AGE
+
+
+def _coros_redirect_uri() -> str:
+    base = (os.environ.get("PUBLIC_API_BASE") or "https://api.mata-club.ru").rstrip("/")
+    return f"{base}/v1/integrations/coros/callback"
+
+
+def _coros_client() -> McpClient:
+    """Наше приложение у COROS. Нет — регистрируем сами (ключи никто не выдаёт)."""
+    redirect = _coros_redirect_uri()
+    client = McpClient.objects.filter(source="coros").first()
+    if client and client.redirect_uri == redirect:
+        return client
+    data = coros.register_client(redirect)
+    client, _ = McpClient.objects.update_or_create(
+        source="coros",
+        defaults={
+            "client_id": data.get("client_id") or "",
+            "client_secret": data.get("client_secret") or "",
+            "redirect_uri": redirect,
+        },
+    )
+    return client
+
+
+@api_view(["GET"])
+def coros_connect(request):
+    """Начало подключения COROS: ссылка на их страницу разрешения доступа."""
+    me = user_id_from_request(request)
+    if not me:
+        return Response({"detail": "Нет токена"}, status=401)
+    try:
+        client = _coros_client()
+    except coros.CorosError as e:
+        return Response({"detail": f"COROS сейчас недоступен: {e}"}, status=503)
+
+    verifier, challenge = coros.make_pkce()
+    state = signing.dumps({"uid": me, "n": secrets.token_hex(8)}, salt=COROS_STATE_SALT)
+    cache.set(f"coros:pkce:{state}", verifier, COROS_VERIFIER_TTL)
+    return Response({
+        "url": coros.authorize_url(client.client_id, client.redirect_uri, state, challenge)
+    })
 
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def coros_callback(request):
-    """Куда COROS возвращает человека после того, как он разрешил доступ.
+    """Куда COROS возвращает человека после разрешения доступа."""
+    code = (request.query_params.get("code") or "").strip()
+    state = (request.query_params.get("state") or "").strip()
+    if not code or not state:
+        return Response({"ok": False, "detail": "Подключение отменено."})
+    try:
+        uid = signing.loads(state, salt=COROS_STATE_SALT, max_age=COROS_STATE_MAX_AGE)["uid"]
+    except (signing.BadSignature, KeyError, TypeError):
+        return Response({"ok": False, "detail": "Ссылка устарела. Начните подключение заново."},
+                        status=400)
+    verifier = cache.get(f"coros:pkce:{state}")
+    if not verifier:
+        return Response({"ok": False, "detail": "Срок подключения истёк. Попробуйте снова."},
+                        status=400)
 
-    Придут `code` и `state`; на код меняется токен доступа — этот обмен добавим
-    вместе с ключами. Сейчас отвечаем понятной страницей, а не ошибкой: человек
-    не должен упереться в пустоту, если попал сюда раньше времени.
-    """
-    code = request.query_params.get("code", "")
+    try:
+        client = _coros_client()
+        tokens = coros.exchange_code(
+            client.client_id, client.client_secret, code, client.redirect_uri, verifier)
+    except coros.CorosError as e:
+        return Response({"ok": False, "detail": f"COROS не подтвердил доступ: {e}"}, status=502)
+
+    access = (tokens.get("access_token") or "").strip()
+    if not access:
+        return Response({"ok": False, "detail": "COROS не вернул токен."}, status=502)
+    cache.delete(f"coros:pkce:{state}")
+
+    WatchAccount.objects.update_or_create(
+        user_id=uid, source="coros",
+        defaults={
+            "external_id": str(tokens.get("sub") or tokens.get("user") or "")[:120],
+            "access_token": access,
+            "refresh_token": (tokens.get("refresh_token") or "").strip(),
+            "expires_at": coros.expires_at(tokens),
+            "connected_at": timezone.now(),
+        },
+    )
+    return Response({"ok": True, "detail": "Часы COROS подключены. Вернитесь в приложение."})
+
+
+@api_view(["GET"])
+def coros_account(request):
+    """Подключены ли часы COROS у этого человека."""
+    me = user_id_from_request(request)
+    if not me:
+        return Response({"detail": "Нет токена"}, status=401)
+    account = WatchAccount.objects.filter(user_id=me, source="coros").first()
     return Response({
-        "ok": True,
-        "received": bool(code),
-        "detail": "Подключение COROS готовится. Вернитесь в приложение.",
+        # COROS регистрируется сам — подключение доступно всегда, ключей ждать не надо.
+        "configured": True,
+        "connected": account is not None,
+        "lastSyncAtMs": (
+            int(account.last_sync_at.timestamp() * 1000)
+            if account and account.last_sync_at else None
+        ),
     })
+
+
+@api_view(["DELETE"])
+def coros_disconnect(request):
+    """Отключить часы COROS: токен удаляем целиком."""
+    me = user_id_from_request(request)
+    if not me:
+        return Response({"detail": "Нет токена"}, status=401)
+    removed, _ = WatchAccount.objects.filter(user_id=me, source="coros").delete()
+    return Response({"ok": True, "removed": bool(removed)})
 
 
 @api_view(["POST"])
