@@ -40,6 +40,11 @@ def resolve(code):
 
     code = str(code or "").strip() or DEFAULT_CODE
     option = ShippingOption.objects.filter(code=code).first()
+    if option is None and code == DEFAULT_CODE and not ShippingOption.objects.exists():
+        # Таблица пуста (база без начальных данных): прежнее поведение — самовывоз
+        # бесплатно (D-92), а не отказ в любом заказе.
+        return ShippingOption(code=DEFAULT_CODE, name="Самовывоз",
+                              kind=ShippingOption.PICKUP, price=0)
     if option is None:
         raise ShippingError("Неизвестный способ получения заказа")
     if not option.is_active:
