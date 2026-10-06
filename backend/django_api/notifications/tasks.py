@@ -10,3 +10,11 @@ def send_push_task(user_id, title, body=""):
     from .push import send_push
 
     return send_push(user_id, title, body)
+
+
+@shared_task(name="notifications.send_email", ignore_result=True)
+def send_email_task(to, subject, text):
+    """Отправить письмо (no-op без EMAIL_PROVIDER, D-111)."""
+    from .email import send_email
+
+    return send_email(to, subject, text)

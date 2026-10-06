@@ -688,6 +688,23 @@ RACES_IMPORT_FEED_URL = os.environ.get("RACES_IMPORT_FEED_URL", "")
 # Пусто — приём выключен: лучше отказать, чем принимать номенклатуру без проверки.
 INTEGRATION_1C_TOKEN = os.environ.get("INTEGRATION_1C_TOKEN", "")
 
+# ── Письма покупателям (D-111) ──────────────────────────────────────────────
+# Служебные письма о заказе (оплачен/отправлен/возврат). Провайдер — окружением:
+# EMAIL_PROVIDER пуст — выключено; smtp — любой SMTP (Unisender Go, Yandex 360…);
+# console — в лог (разработка). Логин/пароль SMTP — в секретах (Lockbox), не в коде.
+EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "").strip()
+EMAIL_BACKEND = ("django.core.mail.backends.console.EmailBackend"
+                 if EMAIL_PROVIDER == "console"
+                 else "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "465"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "1") == "1"
+EMAIL_USE_TLS = not EMAIL_USE_SSL and os.environ.get("EMAIL_USE_TLS", "") == "1"
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "МАТА Store <noreply@mata-club.ru>")
+
 # ── Sentry / GlitchTip (видимость ошибок, D-25/D-32: self-host РФ) ───────────
 # Каркас: подключается ТОЛЬКО при заданном SENTRY_DSN. Без ключа — no-op, без
 # накладных расходов. DSN даёт наш self-host GlitchTip (Sentry-совместимый) —
