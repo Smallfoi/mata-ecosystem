@@ -424,6 +424,9 @@ GET  /loyalty/account   + programV1: bool   (false — старые правил
            statusPoints, purchases365, level, levelIndex 0..3, levelUntil,
            nextLevelThreshold (null у Платины), platinumMinSpend, redeemMin, redeemCeiling,
            heldNextAt, heldNextAmount, expiringAt, expiringAmount,
+           levels: [{ key, title, threshold (статусные для входа), minSpend (₽ за 365 дней,
+                      только Платина), purchaseRate, redeemCeiling, expiryMonths }]
+                   (действующие настройки; клиенты показывают привилегии уровней отсюда),
            lots: [{ id, amount, remaining, state: held|available, source, accruedAt,
                     availableAt (для held; null — ждёт получения заказа), expiresAt }] }
      transactions — прежний реестр (история до v1 и начисления за бег/захват до этапа 2).

@@ -1,3 +1,7 @@
+import 'loyalty_v1.dart';
+
+export 'loyalty_v1.dart';
+
 /// Уровни лояльности (Часть 5 RECOMMENDATION.md / adiClub).
 enum LoyaltyLevel { basic, silver, gold, platinum }
 
@@ -15,34 +19,24 @@ extension LoyaltyLevelX on LoyaltyLevel {
     }
   }
 
-  /// Кэшбэк баллами, %.
-  int get cashbackPercent {
-    switch (this) {
-      case LoyaltyLevel.basic:
-        return 1;
-      case LoyaltyLevel.silver:
-        return 2;
-      case LoyaltyLevel.gold:
-        return 3;
-      case LoyaltyLevel.platinum:
-        return 5;
+  /// Ключ уровня в API (`basic` | `silver` | `gold` | `platinum`).
+  String get key => name;
+
+  /// Уровень из строки сервера; неизвестное значение — null.
+  static LoyaltyLevel? fromKey(String? key) {
+    for (final l in LoyaltyLevel.values) {
+      if (l.name == key) return l;
     }
+    return null;
   }
 
-  String get perk {
-    switch (this) {
-      case LoyaltyLevel.basic:
-        return 'Кэшбэк 1% баллами';
-      case LoyaltyLevel.silver:
-        return 'Кэшбэк 2% + ранний доступ к акциям';
-      case LoyaltyLevel.gold:
-        return 'Кэшбэк 3% + бесплатная доставка';
-      case LoyaltyLevel.platinum:
-        return 'Кэшбэк 5% + эксклюзив + VIP-поддержка';
-    }
-  }
+  // Привилегии уровней в сборку НЕ зашиваются (ТЗ v1 §6): ставка начисления и
+  // потолок оплаты бонусами приходят с сервера (LoyaltyV1.levels), описание —
+  // настраиваемый текст. Прежние «кэшбэк 1/2/3/5%», «бесплатная доставка»,
+  // «VIP» — убраны: ни одна программа их не даёт.
 
-  /// Нижний порог уровня по баллам.
+  /// Порог уровня по баллам ПРЕЖНЕЙ программы (сервер без v1 / офлайн-прототип).
+  /// В программе v1 пороги приходят с сервера.
   int get threshold {
     switch (this) {
       case LoyaltyLevel.basic:
@@ -183,6 +177,13 @@ class LoyaltyAccount {
   /// Аккаунт на проверке — баллы за активность заморожены.
   final bool frozen;
 
+  /// Уровень, присланный сервером (`level`); null — не прислал (офлайн).
+  final LoyaltyLevel? serverLevel;
+
+  /// Программа v1 (ТЗ 30.09.2026): кошелёк с лотами, уровни по статусным.
+  /// null — сервер на прежней программе, всё как раньше.
+  final LoyaltyV1? v1;
+
   const LoyaltyAccount({
     this.balance = 0,
     this.transactions = const [],
@@ -192,16 +193,22 @@ class LoyaltyAccount {
     this.pendingNextAmount = 0,
     this.pendingNextAt,
     this.frozen = false,
+    this.serverLevel,
+    this.v1,
   });
 
-  /// Уровень — по всему накопленному: созревание не понижает статус.
-  LoyaltyLevel get level => LoyaltyLevelX.forPoints(total ?? balance);
+  bool get programV1 => v1 != null;
+
+  /// Уровень v1 — с сервера (по статусным). Прежняя программа — по всему
+  /// накопленному: созревание не понижает статус.
+  LoyaltyLevel get level => v1?.level ?? LoyaltyLevelX.forPoints(total ?? balance);
 
   /// Правила списания (Часть 11.5): 1 балл = 1 ₽, макс 30% заказа, мин 50.
   static const int minRedeem = 50;
   static const double maxRedeemFraction = 0.30;
 
-  /// Сколько баллов можно списать на заказ суммой [orderTotal].
+  /// Сколько баллов можно списать на заказ суммой [orderTotal] — ПРЕЖНЯЯ
+  /// программа. В v1 максимум считает сервер по корзине (redeem-preview).
   int maxRedeemable(double orderTotal) {
     if (balance < minRedeem) return 0;
     final cap = (orderTotal * maxRedeemFraction).floor();

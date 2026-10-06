@@ -12,6 +12,7 @@ import '../../auth/data/auth_provider.dart';
 import '../../trails/data/trails_provider.dart';
 import '../../loyalty/data/loyalty_provider.dart';
 import '../../notifications/data/notifications_provider.dart';
+import 'run_bonus.dart';
 
 /// Старое общее хранилище (до аудита C03): один список на телефон, без владельца.
 /// Читается только разовой миграцией [CompletedRunsNotifier.migrateLegacyStorage].
@@ -436,6 +437,10 @@ class CompletedRunsNotifier extends StateNotifier<List<CompletedRun>> {
           points: (body['pointsAwarded'] as num).toInt(),
         );
       }
+      // Программа v1: бонусы за пробежку и остаток месячного лимита (если
+      // сервер их прислал; иначе null — экран показывает прежние баллы).
+      ref.read(lastRunBonusProvider.notifier).state =
+          RunBonusInfo.fromRunResponse(run.id, body);
       unawaited(ref.read(loyaltyProvider.notifier).refresh());
       // Сервер мог сказать что-то про этот забег (придержал баллы, веха, итоги
       // дивизиона) — тянем ленту сразу, а не после перезапуска.
@@ -616,6 +621,10 @@ final completedRunsProvider =
       });
       return notifier;
     });
+
+/// Бонусы программы v1 за последнюю отправленную пробежку: «+10 бонусов»,
+/// остаток лимита месяца, лимит исчерпан. null — сервер полей не прислал.
+final lastRunBonusProvider = StateProvider<RunBonusInfo?>((_) => null);
 
 /// Баллы, начисленные сервером за последнюю отправленную пробежку —
 /// церемония итогов (Ф1) дорисовывает «+N баллов», когда ответ долетел.

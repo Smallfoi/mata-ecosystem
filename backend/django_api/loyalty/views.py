@@ -70,6 +70,25 @@ def _iso(dt):
     return dt.isoformat() if dt else None
 
 
+def _levels_table() -> list:
+    """Пороги и привилегии уровней из настроек: статусные для входа, покупки за
+    365 дней (только Платина), ставка начисления за покупку, потолок оплаты
+    бонусами, срок жизни бонусов. Процентных скидок у уровней нет (ТЗ §6)."""
+    th = config.get("LEVEL_THRESHOLD")
+    out = []
+    for i, key in enumerate(config.LEVELS):
+        out.append({
+            "key": key,
+            "title": config.LEVEL_TITLES[i],
+            "threshold": 0 if i == 0 else int(th[i - 1]),
+            "minSpend": int(config.get("PLATINUM_MIN_SPEND")) if i == len(config.LEVELS) - 1 else 0,
+            "purchaseRate": float(config.by_level("RATE_PURCHASE", i)),
+            "redeemCeiling": config.redeem_ceiling(i),
+            "expiryMonths": int(config.by_level("EXPIRY_MONTHS", i)),
+        })
+    return out
+
+
 def _v1_block(uid, v) -> dict:
     """Кошелёк программы v1 для клиентов (этап 3 — экраны)."""
     from .models_v1 import LoyaltyLot
@@ -93,6 +112,9 @@ def _v1_block(uid, v) -> dict:
         "heldNextAmount": v["next_amount"],
         "expiringAt": _iso(v["expiring_at"]),
         "expiringAmount": v["expiring_amount"],
+        # Все уровни с действующими настройками (этап 3): клиенты показывают
+        # привилегии отсюда, а не зашитыми в сборку цифрами.
+        "levels": _levels_table(),
         "lots": [{
             "id": lot.pk, "amount": lot.amount, "remaining": lot.remaining,
             "state": lot.state, "source": lot.source, "accruedAt": _iso(lot.accrued_at),

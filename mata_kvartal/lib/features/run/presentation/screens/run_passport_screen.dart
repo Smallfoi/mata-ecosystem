@@ -39,6 +39,9 @@ class RunPassportScreen extends ConsumerWidget {
     final splits = computeKmSplits(run);
     final points = ref.watch(lastRunPointsProvider);
     final runPoints = points != null && points.runId == run.id ? points.points : null;
+    // Программа v1: бонусы за пробежку и лимит месяца (если сервер прислал).
+    final b = ref.watch(lastRunBonusProvider);
+    final bonus = b != null && b.runId == run.id ? b : null;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -144,7 +147,18 @@ class RunPassportScreen extends ConsumerWidget {
               const SizedBox(height: 14),
               _AwardsBlock(awards: awards),
             ],
-            if (runPoints != null && runPoints > 0) ...[
+            if (bonus != null &&
+                (bonus.headline != null || bonus.limitLine != null)) ...[
+              const SizedBox(height: 14),
+              _PointsBlock(
+                points: bonus.awarded ?? 0,
+                captured: captured,
+                note: [
+                  'бонусы МАТА · тратятся в МАТА Store',
+                  if (bonus.limitLine case final l?) l,
+                ].join('\n'),
+              ),
+            ] else if (runPoints != null && runPoints > 0) ...[
               const SizedBox(height: 14),
               _PointsBlock(points: runPoints, captured: captured),
             ],
@@ -632,7 +646,10 @@ class _AwardsBlock extends StatelessWidget {
 class _PointsBlock extends StatelessWidget {
   final int points;
   final bool captured;
-  const _PointsBlock({required this.points, required this.captured});
+
+  /// Подпись программы v1 (бонусы и лимит месяца); null — прежняя.
+  final String? note;
+  const _PointsBlock({required this.points, required this.captured, this.note});
 
   @override
   Widget build(BuildContext context) {
@@ -657,9 +674,10 @@ class _PointsBlock extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              captured
-                  ? 'баллы экосистемы за бег и захват · тратятся в МАТА Store'
-                  : 'баллы экосистемы за бег · тратятся в МАТА Store',
+              note ??
+                  (captured
+                      ? 'баллы экосистемы за бег и захват · тратятся в МАТА Store'
+                      : 'баллы экосистемы за бег · тратятся в МАТА Store'),
               style: TextStyle(
                 fontSize: 11,
                 height: 1.4,
