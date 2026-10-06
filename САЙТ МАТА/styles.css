@@ -848,10 +848,27 @@ html.js.motion-off .hero .brand-wordmark span {
   color: #fff;
 }
 
+/* Витрина: ширина ограничена, как у Nike и Puma (1540–1560px), — на широком
+   мониторе карточки не растут вместе с экраном. Замер 06.10.2026: при 1761px и
+   фото 4:5 карточка была 966px высотой, на экран влезало 2,7 товара; у Puma — 6,5. */
+.catalog .section-heading,
+.catalog .catalog-bar,
+.catalog .product-grid {
+  max-width: 1540px;
+  margin-inline: auto;
+}
+
 .product-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(18px, 2vw, 28px);
+  gap: clamp(14px, 1.4vw, 24px);
+}
+
+/* Четыре колонки с 1440px — стандарт обувных витрин (Puma, adidas, Lamoda). */
+@media (min-width: 1440px) {
+  .product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .product-card {
@@ -880,16 +897,25 @@ html.js.motion-off .hero .brand-wordmark span {
 }
 
 /* — Медиа карточки + «быстрый просмотр» — */
+/* Квадрат 1:1, как у Nike и Puma: кроссовок — широкий предмет, в портрете 4:5
+   он терял 140px высоты на пустые поля. Карточка без фото держит тот же квадрат —
+   сетка не рвётся. Фото вписывается cover: у товарных фото на светлом фоне сверху
+   и снизу всегда есть воздух, его и режем. */
 .product-media {
   position: relative;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   cursor: pointer;
   background: #f3f1ec;
 }
 
 .product-media img {
-  aspect-ratio: 4 / 5;
-  height: auto;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
   transition: transform 900ms var(--ease-staw);
 }
 
@@ -902,47 +928,51 @@ html.js.motion-off .hero .brand-wordmark span {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
+/* Блок под фото ужат с 267px до ~145px: бренд, название в две строки, цвета,
+   цена. Размеры и ссылка «Размеры и цвета» живут в быстром просмотре — у Nike
+   и Puma в карточке их тоже нет. */
 .product-info {
   display: flex;
   flex-direction: column;
   flex: 1;
-  padding: clamp(16px, 1.4vw, 22px);
+  padding: 14px 16px 16px;
 }
 
 .product-cat {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 850;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .product-info h3 {
-  margin-bottom: 12px;
-  font-size: clamp(18px, 1.4vw, 21px);
-  line-height: 1.15;
+  margin-bottom: 8px;
+  font-size: 16px;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .product-colors {
   display: flex;
-  gap: 7px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .product-colors i {
-  width: 14px;
-  height: 14px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: var(--c);
   box-shadow: inset 0 0 0 1px rgba(17, 19, 23, 0.18);
 }
 
 .product-sizes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 16px;
+  display: none;
 }
 
 .product-sizes span {
@@ -969,11 +999,11 @@ html.js.motion-off .hero .brand-wordmark span {
   justify-content: space-between;
   gap: 12px;
   margin-top: auto;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .product-price {
-  font-size: clamp(20px, 1.6vw, 24px);
+  font-size: 18px;
   font-weight: 900;
 }
 
@@ -989,7 +1019,9 @@ html.js.motion-off .hero .brand-wordmark span {
 
 .product-add {
   width: 100%;
-  min-height: 48px;
+  margin-top: 10px;
+  min-height: 40px;
+  font-size: 14px;
   border: 0;
   border-radius: var(--r-pill);
   background: var(--graphite);
@@ -2930,7 +2962,7 @@ html.lenis body {
      четыре товара вместо одного. Мельче отступы, короче подписи, ниже кнопка. */
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    gap: 8px;
   }
 
   .product-card {
@@ -3024,9 +3056,11 @@ html.lenis body {
   .statement,
   .cinema,
   .product-story,
+  /* Поля каталога на телефоне 12px, как у Nike (от края до края): при 18px карточка
+     теряла ~9px ширины, а фото — около 5% площади. */
   .catalog {
-    padding-left: 18px;
-    padding-right: 18px;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .statement {
@@ -3256,11 +3290,12 @@ html:has(.eco-modal.is-open) {
 /* Подсказка вместо кнопки: карточка сама ведёт внутрь (как у Nike), но пока у
    товаров нет фотографий, по одному тексту это неочевидно — особенно на телефоне,
    где нет наведения. Появятся фото — подсказку можно будет убрать. */
+/* Ссылка «Размеры и цвета →» в карточке убрана (06.10.2026): фото уже открывает
+   быстрый просмотр, а строка добавляла карточке 20px. Правило оставлено здесь,
+   а не выше по файлу: более ранний display:none проигрывал этому по порядку. */
 .product-more {
-  display: inline-block; margin-top: 4px; cursor: pointer;
-  font-size: 13px; font-weight: 600; color: var(--muted, #6f7278);
+  display: none;
 }
-.product-card:hover .product-more { color: var(--ink, #20252b); }
 
 /* ── Выбор цвета в быстром просмотре ─────────────────────────────────────────
    Раньше цвета были просто точками: видно, что их несколько, а выбрать нельзя.
