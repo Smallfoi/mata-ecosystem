@@ -1,0 +1,87 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{% include "admin/loyalty_program/_nav.html" %}
+
+<div class="m-sum">
+  <div class="m-tile"><b>{{ stats.participants }}</b><span>участников программы</span></div>
+  {% for l in stats.levels %}
+  <div class="m-tile"><b>{{ l.count }}</b><span>{{ l.title }}</span></div>
+  {% endfor %}
+</div>
+<div class="m-sum">
+  <div class="m-tile"><b>{{ stats.available }}</b><span>бонусов доступно всего</span></div>
+  <div class="m-tile"><b>{{ stats.held }}</b><span>ожидают (удержание)</span></div>
+  {% if stats.debt %}<div class="m-tile"><b class="m-minus">{{ stats.debt }}</b><span>долг после возвратов</span></div>{% endif %}
+  <div class="m-tile"><b>{{ stats.reserve_rub }} ₽</b><span>резерв (reserve_rub)</span></div>
+  <div class="m-tile"><b class="m-plus">+{{ stats.month_accrued }}</b><span>начислено за {{ stats.month_label }}</span></div>
+  <div class="m-tile"><b class="m-minus">−{{ stats.month_redeemed }}</b><span>оплачено бонусами за {{ stats.month_label }}</span></div>
+  <div class="m-tile"><b>{{ stats.month_expired }}</b><span>сгорело за {{ stats.month_label }}</span></div>
+</div>
+
+<div class="m-card pad">
+  <h3>Программа {% if program_on %}включена{% else %}выключена{% endif %}</h3>
+  <p>
+    {% if program_on %}Действуют правила v1: одна валюта — бонус, четыре уровня, бонусы за покупку
+    с удержанием, частичная оплата бонусами, сгорание.{% else %}Сейчас работают прежние правила
+    баллов. Новая программа считает всё «в тени» и начнёт действовать после включения.{% endif %}
+  </p>
+  <p class="m-small">Порядок включения: 1) задать товары-исключения («Товары в программе»);
+    2) «Сухой прогон переноса» — проверить цифры; 3) «Выполнить перенос»; 4) включить программу.</p>
+  {% for w in warnings %}<div class="m-hint">{{ w }}</div>{% endfor %}
+  {% if may_edit %}
+  <form method="post"
+        onsubmit="return confirm('{% if program_on %}Выключить программу лояльности? Вернутся прежние правила баллов.{% else %}Включить программу лояльности? Новые правила начнут действовать сразу для всех.{% endif %}')">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="toggle">
+    <input type="hidden" name="value" value="{% if program_on %}off{% else %}on{% endif %}">
+    <div class="m-form">
+      <label class="m-field">Комментарий (необязательно)
+        <input class="m-input" type="text" name="comment" maxlength="300">
+      </label>
+      {% if not program_on and warnings %}
+      <label class="m-field"><span><input type="checkbox" name="confirm" value="yes"> Понимаю, включить всё равно</span></label>
+      {% endif %}
+      <button class="m-btn {% if program_on %}bad{% else %}ok{% endif %}" type="submit">
+        {% if program_on %}Выключить программу{% else %}Включить программу{% endif %}
+      </button>
+    </div>
+  </form>
+  {% endif %}
+  <div class="m-key">{{ enabled_spec.title }} · LOYALTY_V1_ENABLED</div>
+</div>
+
+<div class="m-card pad">
+  <h3>Перенос балансов в программу</h3>
+  <p>Перенесено аккаунтов: <b>{{ migration.migrated }}</b>; ещё не перенесено: <b>{{ migration.pending }}</b>.
+    Баланс по прежним правилам становится бонусами с датой сгорания по новым правилам, уровень — по статусным
+    за 365 дней. Перенос повторно ничего не трогает: перенесённых пропускает. Кого не перенесли, программа
+    перенесёт сама при первом обращении — баланс не потеряется.</p>
+  {% if migration_result %}
+  <div class="{% if migration_result.apply %}m-good{% else %}m-note{% endif %}">
+    <b>{% if migration_result.apply %}Перенос выполнен.{% else %}Сухой прогон — ничего не записано.{% endif %}</b>
+    Людей к переносу: {{ migration_result.moved }}; уже перенесены: {{ migration_result.skipped }}.
+    Баллов переносится: {{ migration_result.total }} (из них созревают: {{ migration_result.held }});
+    с отрицательным балансом: {{ migration_result.negative }}.
+    Уровни после переноса:
+    {% for name, title, n in migration_result.levels %}{{ title }} — {{ n }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+  </div>
+  {% endif %}
+  <div class="m-row">
+    <form class="m-inline" method="post">{% csrf_token %}
+      <input type="hidden" name="action" value="migrate_dry">
+      <button class="m-btn" type="submit">Сухой прогон переноса</button>
+    </form>
+    {% if may_edit %}
+    <form class="m-inline" method="post"
+          onsubmit="return confirm('Выполнить перенос балансов в программу? Повтор безопасен: перенесённых не трогает.')">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="migrate_apply">
+      <input type="hidden" name="confirm" value="yes">
+      <button class="m-btn primary" type="submit">Выполнить перенос</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="m-key">то же, что manage.py loyalty_migrate_v1 [--apply]</div>
+</div>
+{% endblock %}

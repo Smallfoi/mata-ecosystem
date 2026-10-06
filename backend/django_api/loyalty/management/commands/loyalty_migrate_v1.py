@@ -15,18 +15,14 @@
 1) выкатить код (программа выключена — всё работает по-старому);
 2) manage.py loyalty_find_excluded_categories, проверить, затем --apply;
 3) manage.py loyalty_migrate_v1 (сухой прогон), проверить цифры, затем --apply;
-4) в админке «Настройки лояльности» → LOYALTY_V1_ENABLED = true.
+4) в админке «Программа лояльности → Обзор» включить программу.
+(Шаги 2–4 есть и кнопками в админке: «Товары в программе», «Обзор».)
 Кого не перенесли командой (новый человек, пропуск) — перенесёт первое же
 обращение к программе v1: баланс не потеряется.
 """
-from collections import Counter
-
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
-from accounts.models import Account
-from loyalty import config, v1
-from loyalty.models import LoyaltyStatus, LoyaltyTransaction
+from loyalty import config, program
 
 
 class Command(BaseCommand):
@@ -40,44 +36,21 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         apply = opts["apply"]
-        now = timezone.now()
-        if opts.get("user"):
-            uids = [opts["user"]]
-        else:
-            uids = sorted(set(Account.objects.values_list("id", flat=True))
-                          | set(LoyaltyTransaction.objects.values_list("user_id", flat=True)
-                                .distinct()))
-        done = set(LoyaltyStatus.objects.values_list("user_id", flat=True))
-        levels, moved, skipped, total, held, negative = Counter(), 0, 0, 0, 0, 0
-        for uid in uids:
-            if not uid:
-                continue
-            if uid in done:
-                skipped += 1
-                continue
-            plan = v1.migrate_user(uid, now=now, apply=apply)
-            if plan.get("skipped"):
-                skipped += 1
-                continue
-            moved += 1
-            levels[plan["level_name"]] += 1
-            total += plan["balance"]
-            held += plan["held"]
-            negative += plan["balance"] < 0
-            if opts["verbose_users"]:
-                self.stdout.write(
-                    f"{uid}: баланс {plan['balance']} (доступно {plan['available']}, "
-                    f"созревает {plan['held']}), статусные {plan['status_points']}, "
-                    f"уровень {plan['level_name']}")
-        if apply:
-            # Псевдонимы — всем аккаунтам, даже без баллов (журнал и аналитика).
-            for uid in Account.objects.filter(loyalty_pseudonym="").values_list("id", flat=True):
-                v1.pseudonym(uid)
+
+        def line(uid, plan):
+            self.stdout.write(
+                f"{uid}: баланс {plan['balance']} (доступно {plan['available']}, "
+                f"созревает {plan['held']}), статусные {plan['status_points']}, "
+                f"уровень {plan['level_name']}")
+
+        # Та же функция — у кнопок «Сухой прогон» / «Выполнить перенос» в админке.
+        res = program.migrate_all(apply=apply, user=opts.get("user"),
+                                  on_user=line if opts["verbose_users"] else None)
         mode = "ПЕРЕНЕСЕНО" if apply else "СУХОЙ ПРОГОН (ничего не записано; --apply — перенести)"
         self.stdout.write(self.style.SUCCESS(mode))
-        self.stdout.write(f"Людей к переносу: {moved}; уже перенесены: {skipped}")
-        self.stdout.write(f"Баллов переносится: {total} (из них созревают: {held}); "
-                          f"с отрицательным балансом: {negative}")
+        self.stdout.write(f"Людей к переносу: {res['moved']}; уже перенесены: {res['skipped']}")
+        self.stdout.write(f"Баллов переносится: {res['total']} (из них созревают: {res['held']}); "
+                          f"с отрицательным балансом: {res['negative']}")
         self.stdout.write("Уровни после переноса: " + ", ".join(
-            f"{name} — {levels.get(name, 0)}" for name in config.LEVELS))
+            f"{name} — {n}" for name, _title, n in res["levels"]))
         self.stdout.write(f"Программа v1 сейчас: {'ВКЛЮЧЕНА' if config.enabled() else 'выключена'}")
