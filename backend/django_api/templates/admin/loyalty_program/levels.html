@@ -1,0 +1,60 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{% include "admin/loyalty_program/_nav.html" %}
+
+{% if errors %}
+<div class="m-err"><b>Не сохранено — исправьте и сохраните ещё раз:</b>
+  <ul class="m-list">{% for title, text in errors %}<li>{% if title %}{{ title }}: {% endif %}{{ text }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<p class="m-lead">Четыре уровня программы. Уровень даёт процент бонусов за покупку и долю заказа,
+  которую можно оплатить бонусами. Оплата бонусами — не больше {{ hard_ceiling }}% на любом уровне:
+  это потолок, зашитый в код, поле больше не примет. Проценты пишите числом (5 = 5%).
+  Изменения действуют сразу после сохранения.</p>
+
+<form method="post">{% csrf_token %}
+<div class="m-card">
+  <div class="m-wrap">
+    <table class="m top">
+      <thead>
+        <tr>
+          <th>Уровень</th>
+          {% for c in cols %}
+          <th class="n">{{ c.spec.title }}
+            <div class="m-help">{{ c.spec.help }}</div>
+            <div class="m-key">{{ c.key }} · сейчас {{ c.effective }} · по ТЗ {{ c.default }}</div>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><b>{{ r.title }}</b></td>
+          {% for cell in r.cells %}
+          <td class="n">
+            {% if cell %}
+              <input class="m-input num" type="text" inputmode="decimal" name="{{ cell.name }}"
+                     value="{{ cell.value }}" {% if not may_edit %}disabled{% endif %}>{% if cell.unit %} {{ cell.unit }}{% endif %}
+            {% elif r.index == 0 %}<span class="m-muted">0 — с регистрации</span>
+            {% else %}<span class="m-dim">—</span>{% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if may_edit %}
+  <div class="m-acts">
+    <input class="m-input" type="text" name="comment" maxlength="300" placeholder="Комментарий к изменению (необязательно)">
+    <button class="m-btn primary" type="submit">Сохранить уровни</button>
+  </div>
+  {% endif %}
+</div>
+</form>
+
+{% include "admin/loyalty_program/_history.html" %}
+{% endblock %}

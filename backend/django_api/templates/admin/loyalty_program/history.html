@@ -1,0 +1,50 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{% include "admin/loyalty_program/_nav.html" %}
+
+<p class="m-lead">Кто, когда и что поменял в настройках программы: было → стало, с комментарием.
+  История только дописывается.</p>
+
+<form method="get" class="m-form">
+  <label class="m-field">Настройка
+    <select name="key">
+      <option value="">все</option>
+      {% for k, title in keys %}<option value="{{ k }}" {% if key == k %}selected{% endif %}>{{ title }}</option>{% endfor %}
+    </select>
+  </label>
+  <button class="m-btn primary" type="submit">Показать</button>
+</form>
+
+<div class="m-card">
+  {% if rows %}
+  <div class="m-wrap">
+    <table class="m">
+      <thead><tr><th>Когда</th><th>Настройка</th><th>Было</th><th>Стало</th><th>Кто</th><th>Комментарий</th></tr></thead>
+      <tbody>
+      {% for h in rows %}
+        <tr>
+          <td class="m-muted">{{ h.when }}</td>
+          <td>{{ h.title }}<div class="m-key">{{ h.key }}</div></td>
+          <td class="m-muted">{{ h.old }}</td>
+          <td><b>{{ h.new }}</b></td>
+          <td class="m-muted">{{ h.who }}</td>
+          <td class="m-small">{{ h.comment|default:"—" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page.paginator.num_pages > 1 %}
+  <div class="m-pages">
+    <span class="m-muted">Всего: {{ page.paginator.count }}</span>
+    <span>
+      {% if page.has_previous %}<a href="?key={{ key|urlencode }}&amp;page={{ page.previous_page_number }}">← назад</a>{% endif %}
+      стр. {{ page.number }} из {{ page.paginator.num_pages }}
+      {% if page.has_next %}<a href="?key={{ key|urlencode }}&amp;page={{ page.next_page_number }}">дальше →</a>{% endif %}
+    </span>
+  </div>
+  {% endif %}
+  {% else %}<div class="m-empty">Изменений пока не было — действуют значения из ТЗ.</div>{% endif %}
+</div>
+{% endblock %}
