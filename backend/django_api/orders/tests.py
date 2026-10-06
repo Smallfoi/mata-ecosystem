@@ -715,9 +715,14 @@ class PointsAtCheckoutTests(ApiTestCase):
                 available_at=None)  # созревшие (правило 3 дней)
 
     def _order(self, oid, goods, points, delivery=0):
+        # Цену доставки задаёт способ в админке (D-110), а не клиент.
+        from orders.models import ShippingOption
+
+        ShippingOption.objects.filter(code="courier").update(price=delivery)
         return self.api_post("/v1/orders", {
             "id": oid, "total": goods + delivery - points, "pointsRedeemed": points,
             "deliveryCost": delivery, "items": _catalog_items(goods),
+            "checkoutData": {"deliveryType": "courier"},
         })
 
     def test_points_are_spent_by_the_order_itself(self):

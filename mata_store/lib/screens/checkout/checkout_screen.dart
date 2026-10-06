@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../data/api/api_client.dart';
+import '../../data/shipping_rates.dart';
 import '../../models/loyalty.dart';
 import '../../models/order.dart';
 import '../../providers/auth_provider.dart';
@@ -71,6 +73,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
+    // Свежие цены доставки (D-110): владелец мог поменять их, пока приложение открыто.
+    final api = context.read<ApiClient?>();
+    if (api != null) {
+      ShippingRates.load(api).then((_) {
+        if (mounted) setState(() {});
+      });
+    }
     final auth = context.read<AuthProvider>();
     if (auth.isLoggedIn) {
       final user = auth.user!;
@@ -204,7 +213,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // Лояльность: ограничиваем списание актуальным максимумом на момент заказа
     final loyalty = context.read<LoyaltyProvider>();
-    final orderTotal = cart.total + _deliveryCost;
+    final orderTotal = cart.total + _deliveryCostFor(cart);
     // v1 — максимум и минимум из превью сервера по этой корзине.
     final redeem = _preview != null
         ? _preview!.snap(_pointsToRedeem)
@@ -286,7 +295,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     context.go('/order-payment/${order.id}');
   }
 
-  double get _deliveryCost => OrderProvider.costFor(_delivery);
+  double _deliveryCostFor(CartProvider cart) =>
+      OrderProvider.costFor(_delivery, cart.total);
 
   @override
   Widget build(BuildContext context) {
@@ -343,7 +353,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   houseCtrl: _houseCtrl,
                   aptCtrl: _aptCtrl,
                   payment: _payment,
-                  deliveryCost: _deliveryCost,
+                  deliveryCost: _deliveryCostFor(cart),
                   pointsToRedeem: _pointsToRedeem,
                   onRedeemChanged: (v) => setState(() => _pointsToRedeem = v),
                   preview: _preview,

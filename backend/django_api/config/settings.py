@@ -408,6 +408,9 @@ UNFOLD = {
                     {"title": "Заказы", "icon": "shopping_cart",
                      "link": reverse_lazy("admin:orders_order_changelist"),
                      "permission": _tab("orders")},
+                    {"title": "Доставка", "icon": "local_shipping",
+                     "link": reverse_lazy("admin:orders_shippingoption_changelist"),
+                     "permission": _tab("orders")},
                     {"title": "Баллы", "icon": "loyalty",
                      # Клиенты с операциями за выбранные дни; журнал — ссылкой со страницы.
                      "link": reverse_lazy("points_clients"),

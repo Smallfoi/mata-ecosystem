@@ -203,6 +203,7 @@ urlpatterns = [
     path("v1/site/content", catalog_views.site_content),
     # Заказы Store (D-13)
     path("v1/orders", orders_views.orders),
+    path("v1/shipping-options", orders_views.shipping_options),  # способы доставки (D-110)
     path("v1/orders/<str:order_id>/pay", orders_views.pay_order),  # инициировать оплату
     # Статус оплаты с перепроверкой у провайдера: страховка от потерянного вебхука.
     path("v1/orders/<str:order_id>/payment", orders_views.payment_state),

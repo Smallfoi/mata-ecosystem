@@ -8,7 +8,7 @@ from unfold.admin import ModelAdmin, TabularInline
 from common.adminutils import ExportCsvMixin, UserRefMixin
 from staff.models import StaffAudit
 
-from .models import Order, OrderReturn
+from .models import Order, OrderReturn, ShippingOption
 from .returns import RETURNABLE, ReturnError, make_return, return_plan
 
 
@@ -188,3 +188,17 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
             "selected": request.POST.getlist(ACTION_CHECKBOX_NAME),
             "select_across": request.POST.get("select_across", "0"),
         })
+
+
+@admin.register(ShippingOption)
+class ShippingOptionAdmin(ModelAdmin):
+    """Способы получения заказа (D-110): цену доставки считает сервер по этой таблице."""
+
+    list_display = ("name", "code", "kind", "zone", "price", "free_from", "is_active",
+                    "sort_order")
+    list_editable = ("price", "free_from", "is_active", "sort_order")
+    list_filter = ("kind", "is_active")
+
+    def has_delete_permission(self, request, obj=None):
+        # Удалённый код ломает старые сборки и разбор прошлых заказов — выключайте.
+        return False

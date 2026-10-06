@@ -181,3 +181,48 @@ class OrderReturn(models.Model):
 
     def __str__(self) -> str:
         return f"{self.order.order_id}: {self.amount_kop / 100:.2f} ₽"
+
+
+class ShippingOption(models.Model):
+    """Способ получения заказа — по образцу ShippingOption из Medusa (D-110).
+
+    Раньше способы и их цена жили в коде приложения и сайта (D-92), а в чек шла
+    `deliveryCost`, присланная клиентом. Теперь способы ведёт владелец в админке,
+    а цену доставки и итог заказа считает сервер (`orders/shipping.py`).
+    `code` — то, что шлют клиенты в `checkoutData.deliveryType`; не менять у
+    существующих способов, иначе старые сборки получат «способ недоступен».
+    """
+
+    PICKUP = "pickup"
+    DELIVERY = "delivery"
+    KIND_CHOICES = [(PICKUP, "Самовывоз"), (DELIVERY, "Доставка")]
+
+    code = models.SlugField(max_length=40, unique=True, verbose_name="Код",
+                            help_text="Как способ называют приложение и сайт (pickup, courier…). "
+                                      "У существующих способов не менять.")
+    name = models.CharField(max_length=80, verbose_name="Название")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=DELIVERY,
+                            verbose_name="Тип")
+    zone = models.CharField(max_length=120, blank=True, default="",
+                            verbose_name="Зона", help_text="Где работает: «Якутск», «вся Россия»…")
+    description = models.CharField(max_length=300, blank=True, default="",
+                                   verbose_name="Пояснение покупателю",
+                                   help_text="Адрес самовывоза, сроки, как связывается курьер.")
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0,
+                                verbose_name="Цена, ₽")
+    free_from = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                    verbose_name="Бесплатно от, ₽",
+                                    help_text="Сумма товаров, с которой способ бесплатный. "
+                                              "Пусто — порога нет.")
+    requires_address = models.BooleanField(default=False, verbose_name="Нужен адрес")
+    is_active = models.BooleanField(default=True, verbose_name="Доступен")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        db_table = "store_shipping_options"
+        ordering = ["sort_order", "id"]
+        verbose_name = "Способ доставки"
+        verbose_name_plural = "Способы доставки"
+
+    def __str__(self) -> str:
+        return self.name
