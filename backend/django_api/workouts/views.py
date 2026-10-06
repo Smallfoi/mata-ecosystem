@@ -181,6 +181,7 @@ def import_workouts(request):
     imported = duplicates = skipped = 0
     points_total = 0
     bonus_total = 0
+    bonus_capped, bonus_text = False, ""
     capped_total, cap_note = 0, ""
     result = []
 
@@ -207,6 +208,11 @@ def import_workouts(request):
             bonus_total += getattr(workout, "bonus_this_time", 0)
             # Новое поле (программа v1): решение по бонусу за эту тренировку.
             item["bonus"] = {"amount": act.amount, "status": act.status, "reason": act.reason}
+            from loyalty import activity
+
+            blk = activity.loyalty_block(act)
+            bonus_capped = bonus_capped or blk["capped"]
+            bonus_text = blk["text"]
         result.append(item)
 
     out = {
@@ -219,6 +225,12 @@ def import_workouts(request):
     if v1_on:
         # Программа v1: «points» — начисленные бонусы (то, что попало в кошелёк).
         out["points"] = bonus_total
+        from loyalty import activity
+
+        # Объект `loyalty` (контракт клиентов этапа 3): итог по всем тренировкам запроса.
+        out["loyalty"] = activity.client_block(
+            bonus_total, me, activity.month_of(timezone.now()), bonus_capped,
+            f"+{bonus_total} бонусов" if bonus_total else bonus_text)
     if capped_total:
         # Новые поля (старые клиенты их не читают): часть баллов срезал потолок.
         out.update({"dailyCapReached": True, "pointsCapped": capped_total,

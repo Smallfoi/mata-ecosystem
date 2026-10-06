@@ -458,6 +458,9 @@ def capture(request):
     if award.get("bonus"):
         # Новые поля (программа v1): бонус за захват и остаток лимитов месяца.
         out["bonus"] = award["bonus"]
+        b = award["bonus"]
+        out["loyalty"] = {"awarded": b["amount"], "monthLeft": b["activityLeft"],
+                          "capped": b["monthCapReached"], "text": b["message"]}
         if award["bonus"]["monthCapReached"]:
             out["monthCapReached"] = True
             out["capReason"] = award["bonus"]["message"]

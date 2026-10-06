@@ -195,6 +195,7 @@ def _bonus_fields(out, act):
     bonus = activity.payload(act)
     out["pointsAwarded"] = act.amount
     out["bonus"] = bonus
+    out["loyalty"] = activity.loyalty_block(act)  # контракт клиентов этапа 3
     out.pop("dailyCapReached", None)
     out.pop("pointsCapped", None)
     out.pop("capReason", None)

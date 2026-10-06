@@ -184,6 +184,20 @@ def payload(act) -> dict:
     }
 
 
+def client_block(awarded, uid, month, capped, text) -> dict:
+    """Объект `loyalty` для клиентов (контракт этапа 3, mata_kvartal run_bonus.dart):
+    {awarded, monthLeft — сколько бонусов за активность ещё можно получить в этом
+    месяце, capped — лимит исчерпан, text — текст для человека}."""
+    return {"awarded": int(awarded), "monthLeft": limits(uid, month)["activityLeft"],
+            "capped": bool(capped), "text": text}
+
+
+def loyalty_block(act) -> dict:
+    p = payload(act)
+    return client_block(act.amount, act.user_id, act.month, p["monthCapReached"],
+                        p["message"])
+
+
 # ── трек ─────────────────────────────────────────────────────────────────────
 
 def _haversine(a, b) -> float:

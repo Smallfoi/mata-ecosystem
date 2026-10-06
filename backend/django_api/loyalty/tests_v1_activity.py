@@ -360,6 +360,15 @@ class RunsApi(ResetConfig, ApiTestCase):
         self.assertEqual(out["bonus"]["runsLeft"], 11)
         self.assertEqual(out["bonus"]["activityLeft"], 250)
         self.assertNotIn("dailyCapReached", out)
+        # Контракт клиентов этапа 3 (mata_kvartal run_bonus.dart).
+        self.assertEqual(out["loyalty"], {"awarded": 10, "monthLeft": 250, "capped": False,
+                                          "text": "+10 бонусов"})
+        # Уведомление на каждое начисление (ТЗ §6) — тип, который показывают ленты.
+        from notifications.models import Notification
+
+        n = Notification.objects.filter(user_id=self.uid, title="+10 бонусов").get()
+        self.assertEqual(n.type, "system")
+        self.assertIn("пробежку", n.body)
         # Игровой счёт (км рейтингов) пишется, но деньгами не становится.
         self.assertEqual(self.balance(), 50)
         self.assertFalse(LoyaltyLot.objects.filter(user_id=self.uid,
@@ -381,6 +390,9 @@ class RunsApi(ResetConfig, ApiTestCase):
         self.assertTrue(out["monthCapReached"])
         self.assertEqual(out["capReason"], "Лимит месяца исчерпан, обновится 1 числа")
         self.assertEqual(out["bonus"]["runsLeft"], 0)
+        self.assertTrue(out["loyalty"]["capped"])
+        self.assertEqual(out["loyalty"]["awarded"], 0)
+        self.assertEqual(out["loyalty"]["text"], "Лимит месяца исчерпан, обновится 1 числа")
         self.assertEqual(self.balance(), 50)  # в игре засчитано
 
     def test_daily_cap_d107_replaced(self):
@@ -427,6 +439,8 @@ class RunsApi(ResetConfig, ApiTestCase):
                                                     "items": [item]}).json()
         self.assertEqual(out["points"], 10)
         self.assertEqual(out["items"][0]["bonus"]["status"], "granted")
+        self.assertEqual(out["loyalty"]["awarded"], 10)
+        self.assertEqual(out["loyalty"]["monthLeft"], 250)
         # Тот же выход, записанный ещё и приложением, — бонус один раз.
         self.assertEqual(self.post_run("same-as-watch")["bonus"]["status"], "duplicate")
         self.assertEqual(v1.wallet(self.uid)["available"], 10)
@@ -495,6 +509,12 @@ class SignupAndReferral(ResetConfig, ApiTestCase):
         self.assertEqual(ref.status, LoyaltyReferral.REWARDED)
         self.assertEqual(v1.wallet(self.uid)["available"], 100)
         self.assertEqual(LoyaltyEvent.objects.filter(type="accrue_referral").count(), 1)
+        from notifications.models import Notification
+
+        self.assertTrue(Notification.objects.filter(user_id=self.uid,
+                                                    title="+100 бонусов").exists())
+        self.assertTrue(Notification.objects.filter(user_id=invitee,
+                                                    title="+75 бонусов").exists())
         lot.refresh_from_db()
         self.assertEqual(lot.state, "available")
         # Связь одна: второй код не принимается.
