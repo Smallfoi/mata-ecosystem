@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from .awards import accrue_purchase_points, refund_redeemed_points
 from .models import Order
+from .payment_receipt import WAITING, expects_receipt
 
 log = logging.getLogger(__name__)
 
@@ -56,10 +57,16 @@ def mark_paid(order) -> None:
         state = locked.payment_status
         if state in AWAITING:
             locked.payment_status = "paid"
-            fields = ["payment_status"]
+            locked.paid_at = timezone.now()
+            fields = ["payment_status", "paid_at"]
             if locked.status == "pending":
                 locked.status = "paid"
                 fields.append("status")
+            if expects_receipt(locked):
+                # Касса пробивает чек не мгновенно: ждём его номер для 1С
+                # (`orders/payment_receipt.py`, опрос раз в минуту).
+                locked.receipt = {"status": WAITING}
+                fields.append("receipt")
             locked.save(update_fields=fields)
         elif state != "paid":
             if state == "canceled":

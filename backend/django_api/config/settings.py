@@ -640,6 +640,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "orders.expire_unpaid_orders",
         "schedule": crontab(minute="*/5"),
     },
+    # Чек оплаты (D-101): касса пробивает его за секунды-минуты после оплаты, а 1С
+    # нужен его номер. Пока чека нет, заказ ждёт выгрузки (не дольше 30 минут).
+    "sync-payment-receipts": {
+        "task": "orders.sync_payment_receipts",
+        "schedule": crontab(minute="*"),
+    },
     # Возвраты «в обработке» (аудит B04): подтверждение ЮKassa могло не дойти.
     "reconcile-order-returns": {
         "task": "orders.reconcile_returns",
