@@ -532,6 +532,9 @@
               <label class="co-radio"><input type="radio" name="co-delivery" value="courier" checked /> Курьер</label>
               <label class="co-radio"><input type="radio" name="co-delivery" value="pickup" /> Самовывоз — бесплатно</label>
               <input type="text" placeholder="Город, улица, дом, квартира" autocomplete="street-address" data-co-address />
+              <!-- Пояснение к способу (админка → «Способы доставки»). При самовывозе стоит
+                   вместо поля адреса: где и как забрать заказ. -->
+              <p class="co-delivery-note" data-co-delivery-note aria-live="polite" hidden></p>
             </fieldset>
 
             <fieldset class="co-group">

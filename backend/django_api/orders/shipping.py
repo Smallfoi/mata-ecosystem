@@ -73,3 +73,34 @@ def to_json(option, goods=None) -> dict:
     if goods is not None:
         out["cost"] = float(cost(option, goods))
     return out
+
+
+# Адрес приходит в двух видах: приложение шлёт части (`city`, `street`…), сайт —
+# одной строкой (`address`). Считаем оба, иначе адрес с сайта терялся по дороге в 1С.
+_ADDRESS_PARTS = ("city", "street", "house", "apartment")
+_ADDRESS_KEYS = _ADDRESS_PARTS + ("address", "postalCode")
+
+
+def address_text(checkout) -> str:
+    """Адрес доставки одной строкой: части от приложения или строка от сайта."""
+    checkout = checkout if isinstance(checkout, dict) else {}
+    parts = [str(checkout.get(k) or "").strip() for k in _ADDRESS_PARTS]
+    joined = ", ".join(p for p in parts if p)
+    return joined or str(checkout.get("address") or "").strip()
+
+
+def checkout_for(option, checkout) -> dict:
+    """Данные получения под выбранный способ.
+
+    Курьеру нужен адрес — без него заказ не принимаем: склад не знает, куда везти.
+    При самовывозе адрес, наоборот, убираем, даже если клиент его прислал, — иначе
+    в 1С и в заказе висит адрес, по которому никто ничего не повезёт.
+    """
+    checkout = dict(checkout) if isinstance(checkout, dict) else {}
+    if option.requires_address:
+        if not address_text(checkout):
+            raise ShippingError(f"Укажите адрес доставки — для способа «{option.name}» он нужен")
+        return checkout
+    for key in _ADDRESS_KEYS:
+        checkout.pop(key, None)
+    return checkout

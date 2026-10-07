@@ -363,6 +363,8 @@ def orders(request):
             checkout = d.get("checkoutData") if isinstance(d.get("checkoutData"), dict) else {}
             try:
                 option = shipping.resolve(checkout.get("deliveryType"))
+                # Курьеру нужен адрес, самовывозу — нет: лишний адрес убираем.
+                checkout = shipping.checkout_for(option, checkout)
             except shipping.ShippingError as e:
                 return Response({"detail": e.detail}, status=e.status)
             delivery = shipping.cost(option, cart.goods)
@@ -410,7 +412,8 @@ def orders(request):
                 return Response(
                     {"detail": "Сумма заказа не совпадает с ценами каталога"}, status=400
                 )
-            payload = {**d, "items": cart.items, "deliveryCost": float(delivery),
+            payload = {**d, "checkoutData": checkout, "items": cart.items,
+                       "deliveryCost": float(delivery),
                        "deliveryOption": {"code": option.code, "name": option.name}}
             if cart.verified:
                 # Сумма товаров по ценам каталога — та же, что в строках.

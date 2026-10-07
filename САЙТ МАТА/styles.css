@@ -1867,6 +1867,14 @@ html.js.motion-off .hero .brand-wordmark span {
   cursor: pointer;
 }
 
+/* Пояснение к способу получения: при самовывозе встаёт на место поля адреса. */
+.co-delivery-note {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .co-points-note {
   margin: 4px 0 0;
   color: var(--muted);

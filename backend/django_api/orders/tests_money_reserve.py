@@ -135,7 +135,7 @@ class ReceiptMatchesPaymentTests(ApiTestCase):
         body = {"id": "SS-R1", "total": 3149.98, "items": items, "deliveryCost": 299.995,
                 "pointsRedeemed": 150,
                 "checkoutData": {"email": "b@example.test", "phone": "+79990000000",
-                                 "deliveryType": "courier"}}
+                                 "deliveryType": "courier", "address": "Якутск, Ленина 1"}}
         r = self.api_post("/v1/orders", body)
         self.assertEqual(r.status_code, 200, r.content)
         order = Order.objects.get(user_id=self.uid, order_id="SS-R1")

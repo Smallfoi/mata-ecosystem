@@ -83,6 +83,15 @@ class OneCOrderFlowTests(TestCase):
         self.assertEqual(item["size"], "42")
         self.assertEqual(item["qty"], 1)
 
+    def test_site_address_reaches_warehouse(self):
+        """Сайт шлёт адрес одной строкой — раньше в 1С уходила пустая строка."""
+        self.order.payload["checkoutData"] = {"name": "Михаил", "phone": "+79148278470",
+                                              "address": "Якутск, Ленина 1, кв. 5",
+                                              "deliveryType": "courier"}
+        self.order.save()
+        o = self._get(PULL).json()["orders"][0]
+        self.assertEqual(o["address"], "Якутск, Ленина 1, кв. 5")
+
     def test_unpaid_order_is_not_handed_over(self):
         """Ждёт оплату — на склад не уходит, иначе соберут неоплаченное."""
         self._order("MATA-2", payment="pending")
