@@ -10,6 +10,14 @@ def expire_unpaid_orders():
     return expire_unpaid()
 
 
+@shared_task(name="orders.sync_payment_receipts", ignore_result=True)
+def sync_payment_receipts():
+    """Забрать у ЮKassa чеки оплаты, которые касса уже пробила (номер чека — для 1С)."""
+    from .payment_receipt import sync_waiting
+
+    return sync_waiting()
+
+
 @shared_task(name="orders.reconcile_returns", ignore_result=True)
 def reconcile_returns():
     """Досверить с ЮKassa возвраты «в обработке» (аудит B04)."""

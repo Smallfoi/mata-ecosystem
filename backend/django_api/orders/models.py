@@ -46,6 +46,11 @@ class Order(models.Model):
     )
     payload = models.JSONField(default=dict, verbose_name="Данные заказа (JSON)")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Создан")
+    paid_at = models.DateTimeField(null=True, blank=True, verbose_name="Оплачен")
+    # Чек оплаты из ЮKassa (предоплата, D-101): его фискальные реквизиты уходят в 1С —
+    # по ним склад пробивает второй чек «полный расчёт» с зачётом этого аванса.
+    # Ведёт `orders/payment_receipt.py`; пусто — чека не ждём.
+    receipt = models.JSONField(default=dict, blank=True, verbose_name="Чек оплаты (ЮKassa)")
 
     # ── Обратный поток «заказ → 1С» (D-62). 1С забирает заказы сама и подтверждает
     # приём: свой сервер 1С обычно за NAT, достучаться до него мы не можем, а без

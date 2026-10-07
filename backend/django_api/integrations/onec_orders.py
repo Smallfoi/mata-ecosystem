@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from catalog.models import Product
 from orders.models import Order
+from orders import payment_receipt
 from orders.money import kop_to_float, to_kop
 from orders.shipping import address_text
 
@@ -115,6 +116,9 @@ def order_to_json(order: Order) -> dict:
         "pointsRedeemed": order.points_redeemed,
         "payment": checkout.get("paymentType") or "",
         "paymentStatus": order.payment_status,
+        # Чек оплаты (предоплата) из ЮKassa: по нему склад пробивает второй чек
+        # «полный расчёт» с зачётом аванса (D-101). None — чека нет.
+        "receipt": payment_receipt.for_1c(order),
         # Тестовый заказ: оплачен симуляцией, денег не было. В 1С его можно
         # принять и провести весь путь, но продажей считать нельзя (D-97).
         "test": order.is_test,
@@ -131,6 +135,12 @@ def pending_orders(limit: int = MAX_ORDERS_PER_PULL):
         Order.objects.filter(onec_taken_at__isnull=True, payment_status="paid")
         # Номер платежа ЮKassa — доказательство, что деньги прошли через неё.
         .exclude(payment_id="")
+        # Касса ещё не пробила чек оплаты — ждём его реквизиты, но не дольше
+        # получаса: сломанная касса не должна останавливать сборку.
+        # `contains`, а не `receipt__status`: у пустого {} ключа нет, и сравнение
+        # дало бы NULL — exclude выкинул бы из очереди обычные заказы.
+        .exclude(receipt__contains={"status": payment_receipt.WAITING},
+                 paid_at__gt=payment_receipt.held_until())
         .order_by("created_at")[:limit]
     )
 
