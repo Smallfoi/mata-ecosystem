@@ -722,7 +722,7 @@ class PointsAtCheckoutTests(ApiTestCase):
         return self.api_post("/v1/orders", {
             "id": oid, "total": goods + delivery - points, "pointsRedeemed": points,
             "deliveryCost": delivery, "items": _catalog_items(goods),
-            "checkoutData": {"deliveryType": "courier"},
+            "checkoutData": {"deliveryType": "courier", "address": "Якутск, Ленина 1"},
         })
 
     def test_points_are_spent_by_the_order_itself(self):

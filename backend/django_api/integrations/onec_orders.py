@@ -19,6 +19,7 @@ from django.utils import timezone
 from catalog.models import Product
 from orders.models import Order
 from orders.money import kop_to_float, to_kop
+from orders.shipping import address_text
 
 # Статус 1С → наш статус заказа. Часть этапов 1С у нас не имеет пары: «принят» и
 # «собран» — это внутренняя кухня склада, покупателю мы показываем их отдельной
@@ -94,11 +95,8 @@ def order_to_json(order: Order) -> dict:
             "price": _price(raw.get("price")),
         })
 
-    address = ", ".join(
-        str(checkout.get(k) or "").strip()
-        for k in ("city", "street", "house", "apartment")
-        if str(checkout.get(k) or "").strip()
-    )
+    # Части адреса от приложения или одна строка от сайта.
+    address = address_text(checkout)
     return {
         "orderId": order.order_id,
         # Глобальный номер заказа на сервере (аудит B06): `orderId` уникален только

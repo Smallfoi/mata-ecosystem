@@ -17,13 +17,40 @@ class ShippingOptionsTests(ApiTestCase):
         _product("ship-a", 1000)
         self.courier = ShippingOption.objects.get(code="courier")
 
-    def _order(self, oid, total, delivery_type="courier", client_delivery=0):
+    def _order(self, oid, total, delivery_type="courier", client_delivery=0, checkout=None):
+        if checkout is None:
+            checkout = {"address": "Якутск, Ленина 1"}
         return self.api_post("/v1/orders", {
             "id": oid, "total": total, "deliveryCost": client_delivery,
             "items": [{"productId": "ship-a", "productName": "x", "price": 1000,
                        "quantity": 1}],
-            "checkoutData": {"deliveryType": delivery_type},
+            "checkoutData": {"deliveryType": delivery_type, **checkout},
         })
+
+    def test_courier_without_address_refused(self):
+        """Курьеру некуда везти — заказ не принимаем, и баллы не списываются."""
+        r = self._order("SS-AD1", 1000, checkout={})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("адрес", r.json()["detail"])
+        self.assertFalse(Order.objects.filter(order_id="SS-AD1").exists())
+
+    def test_courier_address_from_site_or_app(self):
+        """Сайт шлёт адрес одной строкой, приложение — частями: годится и то, и другое."""
+        self.assertEqual(self._order("SS-AD2", 1000).status_code, 200)
+        r = self._order("SS-AD3", 1000, checkout={"city": "Якутск", "street": "Ленина"})
+        self.assertEqual(r.status_code, 200, r.content)
+
+    def test_pickup_drops_address(self):
+        """Самовывоз: присланный адрес не сохраняем — в 1С не должно быть адреса,
+        по которому никто ничего не повезёт."""
+        r = self._order("SS-AD4", 1000, delivery_type="pickup",
+                        checkout={"address": "Якутск, Ленина 1", "city": "Якутск",
+                                  "name": "Иван"})
+        self.assertEqual(r.status_code, 200, r.content)
+        checkout = Order.objects.get(order_id="SS-AD4").payload["checkoutData"]
+        self.assertNotIn("address", checkout)
+        self.assertNotIn("city", checkout)
+        self.assertEqual(checkout["name"], "Иван")
 
     def test_seeded_options_are_free_like_before(self):
         r = self.client.get("/v1/shipping-options")

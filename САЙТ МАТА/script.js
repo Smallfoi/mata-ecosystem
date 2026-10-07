@@ -552,6 +552,7 @@ function coLoadShipping() {
         map[o.code] = o;
       });
       coShipping = map;
+      coSyncDelivery();
       coRecompute();
     })
     .catch(() => {});
@@ -560,6 +561,34 @@ function coLoadShipping() {
 function coDeliveryCode() {
   if (!coModal) return "courier";
   return (coModal.querySelector('input[name="co-delivery"]:checked') || {}).value || "courier";
+}
+
+// Нужен ли адрес выбранному способу. Пока способы не загрузились — как раньше:
+// курьеру нужен, самовывозу нет.
+function coNeedsAddress() {
+  const o = coShipping[coDeliveryCode()];
+  return o ? !!o.requiresAddress : coDeliveryCode() !== "pickup";
+}
+
+// Поле адреса — только когда оно нужно. При самовывозе вместо него инструкция,
+// где забрать заказ: иначе покупатель вписывает адрес, по которому никто не повезёт.
+function coSyncDelivery() {
+  if (!coModal) return;
+  const needs = coNeedsAddress();
+  const addr = coModal.querySelector("[data-co-address]");
+  if (addr) {
+    addr.hidden = !needs;
+    addr.disabled = !needs;
+    addr.required = needs;
+  }
+  const note = coModal.querySelector("[data-co-delivery-note]");
+  if (!note) return;
+  const o = coShipping[coDeliveryCode()];
+  const text =
+    (o && o.description) ||
+    (needs ? "" : "Заберёте заказ в магазине МАТА — сообщим, когда он будет готов.");
+  note.textContent = text;
+  note.hidden = !text;
 }
 
 function coDeliveryCost(goods) {
@@ -652,6 +681,7 @@ function openCheckout() {
   coModal.querySelector('[data-co-view="form"]').hidden = false;
   coModal.querySelector('[data-co-view="success"]').hidden = true;
   coModal.querySelector("[data-co-err]").textContent = "";
+  coSyncDelivery();
   coRecompute();
   coLoadPreview();
   coLoadShipping();
@@ -672,7 +702,12 @@ if (coModal) {
   const ptoggle = coModal.querySelector("[data-co-points-toggle]");
   if (ptoggle) ptoggle.addEventListener("change", coRecompute);
   coModal.querySelectorAll('input[name="co-delivery"]').forEach((r) =>
-    r.addEventListener("change", coRecompute),
+    r.addEventListener("change", () => {
+      // Ошибка «укажите адрес» относилась к прежнему способу.
+      coModal.querySelector("[data-co-err]").textContent = "";
+      coSyncDelivery();
+      coRecompute();
+    }),
   );
 
   coModal.querySelector("[data-co-submit]").addEventListener("click", () => {
@@ -692,6 +727,15 @@ if (coModal) {
       err.textContent = "Укажите корректный email";
       return;
     }
+    // Адрес — только если способ его требует; при самовывозе не отправляем вовсе.
+    const needsAddress = coNeedsAddress();
+    const address = needsAddress
+      ? (coModal.querySelector("[data-co-address]").value || "").trim()
+      : "";
+    if (needsAddress && !address) {
+      err.textContent = "Укажите адрес доставки";
+      return;
+    }
     err.textContent = "";
 
     const submitBtn = coModal.querySelector("[data-co-submit]");
@@ -700,7 +744,6 @@ if (coModal) {
     const delivery = coDeliveryCode();
     const deliveryCost = coDeliveryCost(goods);
     const pay = "sbp"; // единственный способ оплаты (D-72)
-    const address = (coModal.querySelector("[data-co-address]").value || "").trim();
     const payload = {
       id: orderId,
       total: goods + deliveryCost - coPointsApplied,
