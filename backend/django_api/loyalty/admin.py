@@ -3,7 +3,7 @@ from unfold.admin import ModelAdmin
 
 from common.adminutils import ExportCsvMixin, UserRefMixin
 
-from .models import LoyaltyPartner, LoyaltyTransaction
+from .models import LoyaltyPartner, LoyaltyTransaction, add_txn
 
 
 @admin.register(LoyaltyTransaction)
@@ -21,7 +21,7 @@ class LoyaltyTransactionAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
     search_fields = ("id", "user_id", "description", "order_id", "run_id")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
-    readonly_fields = ("id",)
+    readonly_fields = ("id", "created_at")
     actions = ("export_as_csv",)
     csv_filename = "loyalty_transactions"
     export_fields = ("id", "user_id", "amount", "source", "description",
@@ -36,6 +36,18 @@ class LoyaltyTransactionAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def save_model(self, request, obj, form, change):
+        # Новая запись — через add_txn: свой id, замок кошелька, срок доступности.
+        # Прямой save() оставлял readonly `id` пустым: страница падала с 500
+        # (NoReverseMatch по пустому ключу), а повторная запись перезаписывала первую
+        # (UPDATE по пустому ключу) — баланс молча терялся (проба 07.10.2026).
+        if change:
+            return super().save_model(request, obj, form, change)
+        kwargs = {"available_at": obj.available_at} if obj.available_at else {}
+        txn = add_txn(obj.user_id, obj.amount, obj.source, obj.description,
+                      obj.order_id, obj.run_id, **kwargs)
+        obj.id, obj.created_at, obj.available_at = txn.id, txn.created_at, txn.available_at
 
 
 @admin.register(LoyaltyPartner)
