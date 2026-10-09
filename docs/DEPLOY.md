@@ -153,3 +153,11 @@ flutter build apk --release --target-platform android-arm64 \
 зоне. **Когда зона вернётся**, прежняя ВМ `mata-prod` поднимется со своими кронами (beat, опрос
 часов, бэкап в тот же бакет) — **сразу остановить её** (`yc compute instance stop --name
 mata-prod`), а данные с её диска переносить вручную, сверив с новой базой.
+
+**Если Яндекс не выделяет ресурсы** (`ResourceExhausted — Resource allocation is restricted`,
+так было 9.10.2026) — поднимаем на VPS (D-115): заказать у Beget VPS Ubuntu 24.04, 2 vCPU/4 ГБ,
+диск ≥40 ГБ, доступ root; затем в Cloud Shell:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Smallfoi/mata-ecosystem/main/backend/deploy/beget-up.sh | HOST=<IP VPS> bash
+```
+Дальше — те же шаги 2–4 (ждать «ГОТОВО», перевести DNS, TLS сам).

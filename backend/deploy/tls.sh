@@ -17,7 +17,9 @@ EMAIL="${TLS_EMAIL:-}"
 COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env"
 # Состояние certbot — на ПОСТОЯННОМ диске (если смонтирован), чтобы сертификат пережил
 # пересоздание ВМ и НЕ перевыпускался каждый раз (иначе упираемся в лимиты ACME/LE).
-if mountpoint -q /mnt/data 2>/dev/null; then
+# Каталог данных (на VPS без отдельного диска — /mnt/data на системном, D-115): серт живёт
+# рядом с БД и переживает повторный деплой, который пересоздаёт /opt/mata.
+if mountpoint -q /mnt/data 2>/dev/null || [ -d /mnt/data/pgdata ]; then
   LE_DIR="/mnt/data/letsencrypt"
 else
   LE_DIR="$PWD/nginx/letsencrypt"
