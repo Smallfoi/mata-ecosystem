@@ -19,6 +19,10 @@ systemctl enable --now docker
 usermod -aG docker ubuntu || true
 
 rm -rf /opt/mata && git clone --depth 1 https://github.com/Smallfoi/mata-ecosystem.git /opt/mata
+# Ограниченный канал обслуживания (D-103): ключ claude-ops, прибитый к обёртке с белым списком
+# команд. Ставим сразу — на новой ВМ (авария зоны, D-114) его иначе нет, и проверить сервер
+# можно только руками владельца. Ключ владельца (cloud-init) остаётся полным доступом.
+bash /opt/mata/backend/deploy/install-ops-key.sh || echo "ВНИМАНИЕ: канал claude-ops не установлен"
 # Статика САЙТ МАТА → /opt/mata-site (bind-mount в nginx). Синхронизируем ПО МЕСТУ (rsync,
 # тот же inode) — НЕ rm -rf: на живом проде rm -rf сорвал бы mount у работающего nginx (403).
 mkdir -p /opt/mata-site
