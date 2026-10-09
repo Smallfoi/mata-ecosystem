@@ -9,9 +9,11 @@
 #
 # Запуск в Yandex Cloud Shell (зона по умолчанию — ru-central1-a, Владимир):
 #   curl -fsSL https://raw.githubusercontent.com/Smallfoi/mata-ecosystem/main/backend/deploy/yc-failover.sh | bash
-#   ZONE=ru-central1-d ... | bash        # другая зона (Калуга)
+#   ... | ZONE=ru-central1-d bash        # другая зона (Калуга)
+#   ... | DISK_TYPE=network-hdd bash     # если SSD-диски не выделяют
 # Повторный запуск безопасен: готовые IP/диск/ВМ переиспользуются, а не создаются заново.
 set -euo pipefail
+trap 'echo; echo "ОСТАНОВЛЕНО: шаг выше не прошёл. ResourceExhausted «Resource allocation is restricted» —"; echo "Яндекс не выделяет ресурсы в зоне $ZONE: повторите с другой зоной (ZONE=ru-central1-d или -a)"; echo "или с HDD (DISK_TYPE=network-hdd). Уже созданное переиспользуется."' ERR
 
 ZONE="${ZONE:-ru-central1-a}"
 SUFFIX="${ZONE##*-}"                          # a | b | d
@@ -19,6 +21,9 @@ NAME="mata-prod-${SUFFIX}"
 ADDR_NAME="mata-prod-ip-${SUFFIX}"
 DISK_NAME="mata-db-data-${SUFFIX}"
 DISK_GB="${DISK_GB:-30}"
+# Тип дисков. В аварию 8.10.2026 Яндекс ограничивал выделение ресурсов в живых зонах
+# (ResourceExhausted «Resource allocation is restricted») — HDD может пройти там, где SSD нет.
+DISK_TYPE="${DISK_TYPE:-network-ssd}"
 OLD_SUBNET="e2lrgpcelk00ugbo1f0n"             # подсеть прежней ВМ (ru-central1-b) — берём из неё сеть
 SG="enptivfkcai2uguhb837"                     # группа безопасности прода (принадлежит сети)
 SA="ajeqekgcl5qjghk2rlju"                     # mata-vm: читает Lockbox и бакеты
@@ -62,7 +67,7 @@ echo "== 3/5 Диск под БД ($DISK_GB ГБ, пустой — база пр
 DISK=$(yc compute disk get --name "$DISK_NAME" --format json 2>/dev/null | js 'print(d["id"])' 2>/dev/null || true)
 if [ -z "$DISK" ]; then
   DISK=$(yc compute disk create --name "$DISK_NAME" --zone "$ZONE" --size "$DISK_GB" \
-    --type network-ssd --format json | js 'print(d["id"])')
+    --type "$DISK_TYPE" --format json | js 'print(d["id"])')
   echo "   создан $DISK"
 else
   echo "   уже есть $DISK"
@@ -84,7 +89,7 @@ else
     --cores 2 \
     --memory 4G \
     --core-fraction 100 \
-    --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-2404-lts,size=30G,type=network-ssd \
+    --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-2404-lts,size=30G,type="$DISK_TYPE" \
     --attach-disk disk-id="$DISK",auto-delete=false,mode=rw \
     --network-interface subnet-id="$SUBNET",security-group-ids="$SG",nat-address="$IP" \
     --metadata-from-file user-data=/tmp/mata-ci.yaml \
