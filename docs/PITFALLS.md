@@ -25,6 +25,13 @@ NULL, а `NOT (NULL AND …)` — тоже NULL: строка выпадает �
 бы ВСЕ обычные заказы без чека. Для «исключить, если в JSON такое значение» —
 `receipt__contains={"status": "waiting"}`: у пустого объекта это честное `false`.
 
+## `crontab -l | grep -v …` под `set -euo pipefail` на сервере без расписания — пусто и обрыв
+
+На свежем сервере (VPS Beget, 9.10.2026) `crontab -l` даёт ошибку «no crontab», `grep -v` без
+строк — тоже; под pipefail падал весь конвейер `( … ) | crontab -`: в расписание не попадало
+ничего, а `prod-deploy.sh` обрывался на этом шаге. Прод работал без авто-деплоя, бэкапа и TLS.
+Теперь `deploy/install-cron.sh`: `$(crontab -l 2>/dev/null || true)` и `grep -v … || true`.
+
 ## Python на Windows: правка файла превращает LF в CRLF, а stdin читается в cp1251
 
 **Случай (06.10.2026).** Правил файлы скриптом `open(p, "w", encoding="utf-8").write(s)` —
