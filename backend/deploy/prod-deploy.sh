@@ -34,6 +34,16 @@ fi
 cd /opt/mata/backend
 umask 077
 
+# Метаданные ВМ (Yandex Cloud отдаёт их в формате GCE): внешний IP и режим развёртывания.
+md() { curl -sf -H "Metadata-Flavor: Google" "http://169.254.169.254/computeMetadata/v1/instance/$1" 2>/dev/null || true; }
+PUBLIC_IP=$(md network-interfaces/0/access-configs/0/external-ip)
+[ -n "$PUBLIC_IP" ] || PUBLIC_IP=$(curl -sf --max-time 10 https://api.ipify.org 2>/dev/null || true)
+echo "Внешний IP сервера: ${PUBLIC_IP:-не определён}"
+# mata-restore-latest=1 — сервер поднимается БЕЗ прежнего диска БД (другая зона, авария):
+# база восстанавливается из последнего бэкапа в бакете ДО выпуска TLS и перевода DNS
+# (yc-failover.sh). Иначе покупатели успели бы оформить заказы в пустой базе.
+RESTORE_LATEST=$(md attributes/mata-restore-latest)
+
 cat > .env <<ENVEOF
 DJANGO_DEBUG=0
 DJANGO_ALLOWED_HOSTS=api.mata-club.ru
@@ -50,7 +60,8 @@ APP_PREVIEW_URL=https://mata-media.storage.yandexcloud.net/mata-app-preview/inde
 LEGAL_DOCS_DIR=/legal_docs
 TLS_DOMAIN=api.mata-club.ru
 TLS_EMAIL=admin@mata-club.ru
-TLS_EXTRA_SAN=mata-club.ru,www.mata-club.ru,158-160-12-117.nip.io
+TLS_EXTRA_SAN=mata-club.ru,www.mata-club.ru${PUBLIC_IP:+,${PUBLIC_IP//./-}.nip.io}
+PUBLIC_IP=${PUBLIC_IP}
 ENVEOF
 
 # Секреты из Yandex Lockbox через сервисный аккаунт ВМ. Ретрай на случай «прогрева» SA.
@@ -97,6 +108,18 @@ sed -i 's/api\.mata-store\.ru/api.mata-club.ru/g' nginx/mata.conf
 docker compose -f docker-compose.prod.yml --env-file .env up -d --build db redis web worker beat
 sleep 15
 ./deploy/smoke.sh || true
+if [ "$RESTORE_LATEST" = "1" ] && [ ! -f /opt/mata-restore.done ]; then
+  # Не новее «сейчас»: свой бэкап этот сервер ещё не делал, но отсечка страхует повторный запуск.
+  echo "=== Восстановление БД из последнего бэкапа в бакете ==="
+  DUMP=$(BACKUP_NOT_AFTER="$(date -u +%Y%m%d%H%M%S)" ./deploy/fetch-latest-backup.sh) \
+    || { echo "FATAL: последний бэкап не скачан — сервер с пустой базой в работу не пускаю"; exit 1; }
+  # restore.sh спрашивает подтверждение дважды. Контрольный бэкап пропускаем осознанно:
+  # живая база здесь — только что созданная пустая, а её «бэкап» лёг бы в бакет последним.
+  printf 'yes\nyes\n' | RESTORE_SKIP_CONTROL_BACKUP=1 ./deploy/restore.sh "$DUMP" \
+    || { echo "FATAL: восстановление БД не удалось — см. вывод выше"; exit 1; }
+  rm -f "$DUMP"
+  echo "$(date -u) restored from $DUMP" > /opt/mata-restore.done
+fi
 docker compose -f docker-compose.prod.yml --env-file .env exec -T web python manage.py seed_catalog || true
 # Учётка владельца — ТОЛЬКО на пустой системе. Раньше здесь стоял createsuperuser:
 # после смены логина владельцем имя «admin» освобождается, и очередное полное
@@ -107,11 +130,13 @@ echo "MATA deploy done" > /opt/mata-deploy.done
 # Авто-деплой + краны. Скрипт берём из склонированного репо (переменные целостны, в отличие
 # от запечённого cloud-init). grep -v чистит старые/битые кроны (mata-autodeploy/mata-tls) и дубли.
 cp /opt/mata/backend/deploy/prod-autodeploy.sh /opt/prod-autodeploy.sh && chmod +x /opt/prod-autodeploy.sh
-( crontab -l 2>/dev/null | grep -v 'prod-autodeploy\|mata-autodeploy\|mata-tls\|tls.sh renew\|backup.sh' ; \
+( crontab -l 2>/dev/null | grep -v 'prod-autodeploy\|mata-autodeploy\|mata-tls\|tls.sh renew\|tls-when-dns\|backup.sh' ; \
   echo "*/2 * * * * /opt/prod-autodeploy.sh >> /var/log/mata-autodeploy.log 2>&1" ; \
+  echo "*/5 * * * * cd /opt/mata/backend && ./deploy/tls-when-dns.sh >> /var/log/mata-tls.log 2>&1" ; \
   echo "0 3 * * 1 cd /opt/mata/backend && ./deploy/tls.sh renew >> /var/log/mata-tls.log 2>&1" ; \
   echo "0 4 * * * cd /opt/mata/backend && ./deploy/backup.sh >> /var/log/mata-backup.log 2>&1" ) | crontab -
-echo "=== TLS issue (inline) ==="
-./deploy/tls.sh issue 2>&1 || echo "=== TLS issue FAILED (см. вывод выше) ==="
+# TLS — только когда DNS уже указывает на этот сервер (иначе крон выше повторит раз в 5 мин).
+echo "=== TLS (если DNS уже здесь) ==="
+./deploy/tls-when-dns.sh 2>&1 || echo "=== TLS issue FAILED (см. вывод выше) ==="
 ./deploy/backup.sh >> /var/log/mata-backup.log 2>&1 || true
 echo "=== ГОТОВО: прод развёрнут (проверь https://api.mata-club.ru/v1/health) ==="
