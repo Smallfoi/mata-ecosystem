@@ -60,6 +60,23 @@ printf '%s\n' "$LINE" >> "$AUTH"
 chown ubuntu:ubuntu "$AUTH"
 chmod 0600 "$AUTH"
 
+# sudo для обёртки — ровно то, что она вызывает (docker compose, запись в журнал,
+# refresh-env.sh). На ВМ Yandex Cloud у ubuntu и так sudo без пароля; на обычном VPS
+# (D-115) пользователь заведён без прав, и каждая команда канала падала на пароле sudo.
+SUDOERS=/etc/sudoers.d/mata-ops
+cat > "$SUDOERS.tmp" <<'EOF'
+# Канал claude-ops (D-103): только команды обёртки /opt/mata-ops/ops-shell.sh.
+ubuntu ALL=(root) NOPASSWD: /usr/bin/docker, /usr/bin/tee -a /var/log/mata-ops.log, /usr/bin/bash /opt/mata/backend/deploy/refresh-env.sh
+EOF
+chmod 0440 "$SUDOERS.tmp"
+if visudo -cf "$SUDOERS.tmp" >/dev/null; then
+  mv -f "$SUDOERS.tmp" "$SUDOERS"
+  echo "sudo для канала: $SUDOERS"
+else
+  rm -f "$SUDOERS.tmp"
+  echo "ВНИМАНИЕ: правило sudo не прошло проверку visudo — не установлено"
+fi
+
 echo
 echo "Готово. Проверка с машины владельца:"
 echo "  ssh -i ~/.ssh/mata_prod_ops -p 2222 ubuntu@158.160.12.117 status"
