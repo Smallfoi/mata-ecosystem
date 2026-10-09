@@ -16,6 +16,14 @@ for i in 1 2 3 4 5 6; do
 done
 command -v docker >/dev/null || { echo "FATAL: docker не установился после ретраев"; exit 1; }
 systemctl enable --now docker
+# Где разворачиваемся: yc (по умолчанию — ВМ Yandex Cloud из cloud-init) или vps (обычный
+# сервер, напр. Beget: нет метаданных ВМ, Lockbox и отдельного диска БД — см. beget-up.sh, D-115).
+MATA_HOST="${MATA_HOST:-yc}"
+if [ "$MATA_HOST" = vps ]; then
+  # На Yandex Cloud пользователя ubuntu заводит образ; на VPS входят под root — заводим сами
+  # (под ним работает канал claude-ops и группа docker).
+  id ubuntu >/dev/null 2>&1 || useradd -m -s /bin/bash ubuntu
+fi
 usermod -aG docker ubuntu || true
 
 rm -rf /opt/mata && git clone --depth 1 https://github.com/Smallfoi/mata-ecosystem.git /opt/mata
@@ -39,14 +47,17 @@ cd /opt/mata/backend
 umask 077
 
 # Метаданные ВМ (Yandex Cloud отдаёт их в формате GCE): внешний IP и режим развёртывания.
-md() { curl -sf -H "Metadata-Flavor: Google" "http://169.254.169.254/computeMetadata/v1/instance/$1" 2>/dev/null || true; }
+md() {
+  [ "$MATA_HOST" = yc ] || return 0
+  curl -sf --max-time 5 -H "Metadata-Flavor: Google" "http://169.254.169.254/computeMetadata/v1/instance/$1" 2>/dev/null || true
+}
 PUBLIC_IP=$(md network-interfaces/0/access-configs/0/external-ip)
 [ -n "$PUBLIC_IP" ] || PUBLIC_IP=$(curl -sf --max-time 10 https://api.ipify.org 2>/dev/null || true)
 echo "Внешний IP сервера: ${PUBLIC_IP:-не определён}"
 # mata-restore-latest=1 — сервер поднимается БЕЗ прежнего диска БД (другая зона, авария):
 # база восстанавливается из последнего бэкапа в бакете ДО выпуска TLS и перевода DNS
 # (yc-failover.sh). Иначе покупатели успели бы оформить заказы в пустой базе.
-RESTORE_LATEST=$(md attributes/mata-restore-latest)
+RESTORE_LATEST="${MATA_RESTORE_LATEST:-$(md attributes/mata-restore-latest)}"
 
 cat > .env <<ENVEOF
 DJANGO_DEBUG=0
@@ -68,6 +79,14 @@ TLS_EXTRA_SAN=mata-club.ru,www.mata-club.ru${PUBLIC_IP:+,${PUBLIC_IP//./-}.nip.i
 PUBLIC_IP=${PUBLIC_IP}
 ENVEOF
 
+if [ "$MATA_HOST" = vps ]; then
+  # Вне Yandex Cloud сервисного аккаунта ВМ нет: секреты Lockbox заранее кладёт на сервер
+  # beget-up.sh (из Cloud Shell, по SSH — не через чат и не через репозиторий).
+  SECRETS_FILE="${MATA_SECRETS_FILE:-/root/mata-secrets.env}"
+  [ -s "$SECRETS_FILE" ] || { echo "FATAL: нет файла секретов $SECRETS_FILE (его кладёт beget-up.sh)"; exit 1; }
+  cat "$SECRETS_FILE" >> .env
+  echo "Секреты: из $SECRETS_FILE"
+else
 # Секреты из Yandex Lockbox через сервисный аккаунт ВМ. Ретрай на случай «прогрева» SA.
 LB_SECRET_ID="e6q1ias432ne7vtogghv"
 for lb_try in $(seq 1 30); do
@@ -80,31 +99,40 @@ for lb_try in $(seq 1 30); do
   echo "Lockbox: токен/секреты ещё не готовы (попытка $lb_try/30) — жду 10с..."
   sleep 10
 done
+fi
 for k in POSTGRES_PASSWORD DJANGO_SECRET_KEY JWT_SECRET; do
-  grep -q "^$k=" .env || { echo "FATAL: $k отсутствует (Lockbox не отдал) — abort"; exit 1; }
+  grep -q "^$k=" .env || { echo "FATAL: $k отсутствует (секреты не пришли) — abort"; exit 1; }
 done
 
 # Доп. секрет фотопайплайна (mata-eco-image): OPENAI_API_KEY (+ опц. OPENAI_BASE_URL).
 # Тот же сервисный аккаунт ВМ читает его (lockbox.payloadViewer на уровне папки).
 # ОПЦИОНАЛЬНО: нет секрета/ключа → фотопайплайн просто не гоняет GPT (no-op), деплой не падает.
 ECO_IMAGE_SECRET_ID="e6qu8vruift7elbpm6o8"
-ECO_IAM=$(curl -s -H "Metadata-Flavor: Google" "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || true)
+ECO_IAM=""
+[ "$MATA_HOST" = yc ] && ECO_IAM=$(curl -s --max-time 5 -H "Metadata-Flavor: Google" "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || true)
 if [ -n "$ECO_IAM" ]; then
   curl -s -H "Authorization: Bearer $ECO_IAM" "https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/$ECO_IMAGE_SECRET_ID/payload" 2>/dev/null \
     | python3 -c "import sys,json,shlex;[print(e['key']+'='+shlex.quote(e.get('textValue',''))) for e in json.load(sys.stdin).get('entries',[])]" >> .env 2>/dev/null || true
   grep -q "^OPENAI_API_KEY=" .env && echo "Lockbox: mata-eco-image подключён (OPENAI_API_KEY)" || echo "Lockbox: mata-eco-image без OPENAI_API_KEY — фотопайплайн в no-op"
 fi
 
-# Постоянный диск под БД (/dev/vdb) — форматируем ТОЛЬКО пустой; монтируем в /mnt/data.
-DBDEV=/dev/vdb
 mkdir -p /mnt/data
-if [ -b "$DBDEV" ]; then
-  blkid "$DBDEV" >/dev/null 2>&1 || mkfs.ext4 -F "$DBDEV"
-  DBUUID=$(blkid -s UUID -o value "$DBDEV")
-  grep -q "$DBUUID" /etc/fstab || echo "UUID=$DBUUID /mnt/data ext4 defaults,nofail 0 2" >> /etc/fstab
-  mount -a
+if [ "$MATA_HOST" = vps ]; then
+  # На VPS второго диска нет, а «чужие» устройства (/dev/vdb бывает диском конфигурации)
+  # трогать нельзя: данные БД — каталогом на системном диске. Его не удаляет повторный
+  # деплой (тот пересоздаёт только /opt/mata).
+  echo "Данные БД: /mnt/data на системном диске"
+else
+  # Постоянный диск под БД (/dev/vdb) — форматируем ТОЛЬКО пустой; монтируем в /mnt/data.
+  DBDEV=/dev/vdb
+  if [ -b "$DBDEV" ]; then
+    blkid "$DBDEV" >/dev/null 2>&1 || mkfs.ext4 -F "$DBDEV"
+    DBUUID=$(blkid -s UUID -o value "$DBDEV")
+    grep -q "$DBUUID" /etc/fstab || echo "UUID=$DBUUID /mnt/data ext4 defaults,nofail 0 2" >> /etc/fstab
+    mount -a
+  fi
+  mountpoint -q /mnt/data || { echo "FATAL: /mnt/data not mounted — abort"; exit 1; }
 fi
-mountpoint -q /mnt/data || { echo "FATAL: /mnt/data not mounted — abort"; exit 1; }
 mkdir -p /mnt/data/pgdata
 
 cp nginx/mata.conf.example nginx/mata.conf
