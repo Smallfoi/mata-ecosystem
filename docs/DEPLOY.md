@@ -18,7 +18,8 @@
 | Сервер (Docker-стек: БД, Django, Celery, nginx) | **VPS Beget**, СПб, `62.113.108.108`, 2 vCPU / 4 ГБ / 40 ГБ NVMe, проект «МАТА» в облаке Beget | владелец: `ssh root@62.113.108.108` (порт 22, пароль); Claude: канал `ssh -i ~/.ssh/mata_prod_ops ubuntu@62.113.108.108 status` |
 | DNS `mata-club.ru`, `www`, `api` | Beget | A → 62.113.108.108 |
 | Фото, баннеры, превью приложения | Yandex Object Storage `mata-media` | не менять — ссылки зашиты в базе |
-| Бэкапы БД (каждую ночь, 07:00 МСК) | Yandex `mata-club-backups` + второе хранилище у Beget, когда в Lockbox заданы `BACKUP2_S3_*` (D-116) | `deploy/backup.sh`, восстановление — `fetch-latest-backup.sh` (+ `BACKUP_FROM=2`) |
+| Непрерывная копия БД (каждое изменение ≤1 мин) | pgBackRest → Yandex + Beget, путь `/pgbackrest` в бакетах бэкапов (D-117) | `deploy/pgbr.sh check / info / restore 1|2` |
+| Ночные дампы БД (07:00 МСК) | Yandex `mata-club-backups` + второе хранилище у Beget, когда в Lockbox заданы `BACKUP2_S3_*` (D-116) | `deploy/backup.sh`, восстановление — `fetch-latest-backup.sh` (+ `BACKUP_FROM=2`) |
 | Секреты | Yandex Lockbox `mata-prod-secrets` | поменяли → в Cloud Shell `beget-up.sh` с `SECRETS_ONLY=1` |
 
 Почему так — D-114/D-115: 8.10.2026 пожар в ЦОД Яндекса (зона ru-central1-b) положил прежнюю ВМ,
@@ -181,3 +182,8 @@ mata-prod`), а данные с её диска переносить вручн�
 curl -fsSL https://raw.githubusercontent.com/Smallfoi/mata-ecosystem/main/backend/deploy/beget-up.sh | HOST=<IP VPS> bash
 ```
 Дальше — те же шаги 2–4 (ждать «ГОТОВО», перевести DNS, TLS сам).
+
+**Откуда берётся база на новом сервере** (D-117): сначала непрерывная копия pgBackRest —
+хранилище 1 (Яндекс), не вышло — 2 (Beget); отстаёт от погибшего сервера на ~минуту. Нет её —
+ночной дамп (до суток потерь). Вручную на чистом сервере: `./deploy/pgbr.sh restore 2`.
+**Старый сервер, если ожил, остановить сразу** — иначе он продолжит писать в тот же архив.

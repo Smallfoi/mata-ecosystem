@@ -4,10 +4,23 @@
 # Подробности и чеклист — docs/DEPLOY.md.
 services:
   db:
-    # 16-3.4 — самый точный тег PostGIS (патч-тегов нет); не менялся с 14.10.2024 (digest
-    # sha256:44126d87…). Строку образа НЕ трогаем: её смена = пересоздание БД при автодеплое (F05).
-    image: postgis/postgis:16-3.4
+    # Основа — postgis/postgis:16-3.4 (самый точный тег, патч-тегов нет) + pgBackRest: см. db/Dockerfile.
+    # Смена образа пересоздаёт контейнер БД (F05) — данные на bind-mount /mnt/data не трогаются,
+    # БД недоступна ~10–30 с. Версию PostgreSQL (16) не менять: каталог данных несовместим.
+    build: ./db
+    image: mata-db:16-3.4-pgbackrest
     restart: always
+    # Непрерывная копия БД (D-117): каждый сегмент WAL — в pgBackRest, оттуда в ОБА хранилища
+    # (Яндекс + Beget). archive_timeout=60 — даже без нагрузки сегмент закрывается раз в минуту:
+    # при потере сервера пропадает не больше минуты изменений, а не сутки (как 8.10.2026).
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=/usr/local/bin/mata-pgbackrest-archive %p
+      - -c
+      - archive_timeout=60
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -16,7 +29,11 @@ services:
       # Данные БД — на ОТДЕЛЬНОМ постоянном диске (bind-mount /mnt/data), а не в
       # named-volume на boot-диске: переживает пересоздание ВМ (диск autoDelete=false).
       # cloud-init монтирует диск в /mnt/data ДО старта стека (иначе деплой падает).
-      - /mnt/data/pgdata:/var/lib/postgresql/data
+      - ${MATA_DATA_DIR:-/mnt/data}/pgdata:/var/lib/postgresql/data
+      # Конфиг pgBackRest (ключи хранилищ, пароль шифрования) — пишет deploy/pgbr.sh из .env.
+      - ${MATA_DATA_DIR:-/mnt/data}/pgbackrest:/etc/pgbackrest:ro
+      # Очередь асинхронной отправки WAL — переживает перезапуск контейнера.
+      - ${MATA_DATA_DIR:-/mnt/data}/pgbackrest-spool:/var/spool/pgbackrest
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
