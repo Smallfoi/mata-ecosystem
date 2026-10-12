@@ -41,7 +41,7 @@ echo "C1: сервер без расписания — строки ставят
 SB="$(make_sandbox)"
 run_cron "$SB"; rc=$?
 [ "$rc" = 0 ] && ok "код 0" || { bad "код $rc"; sed 's/^/       /' "$SB/out.log"; }
-for pat in prod-autodeploy tls-when-dns "tls.sh renew" backup.sh; do
+for pat in prod-autodeploy tls-when-dns "tls.sh renew" backup.sh "pgbr.sh backup full" "pgbr.sh backup diff"; do
   grep -q "$pat" "$SB/crontab.txt" 2>/dev/null && ok "есть $pat" || bad "нет $pat"
 done
 [ -x "$SB/prod-autodeploy.sh" ] && ok "авто-деплой скопирован" || bad "авто-деплой не скопирован"

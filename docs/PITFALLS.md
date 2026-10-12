@@ -32,6 +32,19 @@ NULL, а `NOT (NULL AND …)` — тоже NULL: строка выпадает �
 ничего, а `prod-deploy.sh` обрывался на этом шаге. Прод работал без авто-деплоя, бэкапа и TLS.
 Теперь `deploy/install-cron.sh`: `$(crontab -l 2>/dev/null || true)` и `grep -v … || true`.
 
+## `pgbackrest check`: archive_command обязан содержать слово «pgbackrest»
+
+Обёртку `/usr/local/bin/mata-archive` check отверг: `[068] archive_command ... must contain
+pgbackrest`. Обёртка называется `mata-pgbackrest-archive`. Её смысл: без конфига (dev, сервер без
+ключей) сегмент считается обработанным — иначе pg_wal рос бы до переполнения диска.
+
+## Debian 11 и MinIO: пакеты и образы уехали
+
+Образ postgis/postgis:16-3.4 — Debian 11, снят с поддержки: `deb.debian.org/debian-security`
+отдаёт 404, PGDG для bullseye — только `apt-archive.postgresql.org`. В `db/Dockerfile` источники
+переписаны на `archive.debian.org` + `Check-Valid-Until=false`. MinIO закрыл образы на Docker Hub
+(pull denied) и quay.io (401) — для теста S3 взят `versity/versitygw` (корзина = папка, есть TLS).
+
 ## Python на Windows: правка файла превращает LF в CRLF, а stdin читается в cp1251
 
 **Случай (06.10.2026).** Правил файлы скриптом `open(p, "w", encoding="utf-8").write(s)` —

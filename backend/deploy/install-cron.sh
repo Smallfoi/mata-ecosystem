@@ -15,7 +15,7 @@ install -m 755 "$MATA_DIR/backend/deploy/prod-autodeploy.sh" "$AUTODEPLOY"
 CURRENT=$(crontab -l 2>/dev/null || true)
 # Убираем наши прежние строки (и битые старые — mata-autodeploy/mata-tls), чужие оставляем.
 KEEP=$(printf '%s\n' "$CURRENT" \
-  | grep -v 'prod-autodeploy\|mata-autodeploy\|mata-tls\|tls.sh renew\|tls-when-dns\|backup.sh' || true)
+  | grep -v 'prod-autodeploy\|mata-autodeploy\|mata-tls\|tls.sh renew\|tls-when-dns\|backup.sh\|pgbr.sh' || true)
 
 {
   [ -n "$KEEP" ] && printf '%s\n' "$KEEP"
@@ -23,7 +23,11 @@ KEEP=$(printf '%s\n' "$CURRENT" \
   echo "*/5 * * * * cd /opt/mata/backend && ./deploy/tls-when-dns.sh >> /var/log/mata-tls.log 2>&1"
   echo "0 3 * * 1 cd /opt/mata/backend && ./deploy/tls.sh renew >> /var/log/mata-tls.log 2>&1"
   echo "0 4 * * * cd /opt/mata/backend && ./deploy/backup.sh >> /var/log/mata-backup.log 2>&1"
+  # Непрерывная копия БД (D-117): WAL идёт сам; полная копия — по воскресеньям, разностная — в
+  # остальные дни (восстановление = копия + WAL после неё; чем свежее копия, тем быстрее).
+  echo "30 3 * * 0 cd /opt/mata/backend && ./deploy/pgbr.sh backup full >> /var/log/mata-pgbr.log 2>&1"
+  echo "30 3 * * 1-6 cd /opt/mata/backend && ./deploy/pgbr.sh backup diff >> /var/log/mata-pgbr.log 2>&1"
 } | crontab -
 
 echo "Расписание установлено:"
-crontab -l | grep -E 'prod-autodeploy|tls|backup'
+crontab -l | grep -E 'prod-autodeploy|tls|backup|pgbr'

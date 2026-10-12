@@ -135,6 +135,21 @@ else
 fi
 mkdir -p /mnt/data/pgdata
 
+# Новый сервер после аварии (каталог БД пуст): сначала — непрерывная копия pgBackRest (D-117),
+# она отстаёт от погибшего сервера на ~минуту. Нет её или хранилища недоступны — ниже
+# сработает прежний путь: ночной дамп через restore.sh.
+if [ "$RESTORE_LATEST" = "1" ] && [ ! -f /opt/mata-restore.done ] \
+   && [ -z "$(find /mnt/data/pgdata -mindepth 1 -maxdepth 1 2>/dev/null | head -n 1)" ] \
+   && grep -qE '^BACKUP2?_S3_BUCKET=.+' .env; then
+  echo "=== Восстановление БД из непрерывной копии (pgBackRest) ==="
+  docker compose -f docker-compose.prod.yml --env-file .env build db
+  if ./deploy/pgbr.sh restore 1 || ./deploy/pgbr.sh restore 2; then
+    echo "$(date -u) restored from pgbackrest" > /opt/mata-restore.done
+  else
+    echo "Непрерывной копии нет или хранилища недоступны — восстановлю из ночного дампа"
+  fi
+fi
+
 cp nginx/mata.conf.example nginx/mata.conf
 sed -i 's/api\.mata-store\.ru/api.mata-club.ru/g' nginx/mata.conf
 docker compose -f docker-compose.prod.yml --env-file .env up -d --build db redis web worker beat
@@ -161,6 +176,9 @@ docker compose -f docker-compose.prod.yml --env-file .env exec -T web python man
 echo "MATA deploy done" > /opt/mata-deploy.done
 # Авто-деплой, бэкап, TLS — расписание (отдельный скрипт: его же запускают на живом сервере).
 bash /opt/mata/backend/deploy/install-cron.sh
+# Непрерывная копия БД в оба хранилища (D-117): конфиг, stanza, первая полная копия.
+# Сбой не валит деплой — прод работает, а отсутствие копии видно в `pgbr.sh check`.
+./deploy/pgbr.sh setup 2>&1 || echo "ВНИМАНИЕ: непрерывная копия БД не настроена (./deploy/pgbr.sh setup)"
 # TLS — только когда DNS уже указывает на этот сервер (иначе крон выше повторит раз в 5 мин).
 echo "=== TLS (если DNS уже здесь) ==="
 ./deploy/tls-when-dns.sh 2>&1 || echo "=== TLS issue FAILED (см. вывод выше) ==="

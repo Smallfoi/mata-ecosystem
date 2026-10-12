@@ -113,6 +113,10 @@ docker compose -f docker-compose.prod.yml --env-file .env exec -T web python man
 docker compose -f docker-compose.prod.yml --env-file .env exec -T nginx nginx -s reload 2>/dev/null \
   || docker compose -f docker-compose.prod.yml --env-file .env up -d nginx || true
 
+# Ключи хранилищ могли поменяться — пересобрать конфиг непрерывной копии БД (D-117).
+# Контейнер БД при неизменном образе не перезапускается.
+./deploy/pgbr.sh setup 2>&1 | grep -E "Конфиг|ОШИБКА|ERROR|полная копия|status" || echo "WARN: pgbr.sh setup не отработал"
+
 echo "=== health ==="
 curl -s https://api.mata-club.ru/v1/health || true
 echo
