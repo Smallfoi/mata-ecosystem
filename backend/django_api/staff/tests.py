@@ -244,6 +244,18 @@ class InviteTests(Base):
         # Повторно та же ссылка не работает.
         self.assertEqual(self.client.get(f"/admin/invite/{token}/").status_code, 404)
 
+    def test_login_after_invite_lands_in_admin_not_404(self):
+        """12.10.2026: после входа из приглашения сотрудник попадал на /accounts/profile/ (404)."""
+        token = self.profile.issue_invite()
+        r = self.client.post(f"/admin/invite/{token}/",
+                             {"password1": "Sprint-2026-run", "password2": "Sprint-2026-run"})
+        self.assertContains(r, 'href="/admin/login/?next=/admin/"')
+        # Даже без ?next= вход ведёт в админку, а не на несуществующую страницу.
+        r = self.client.post("/admin/login/", {"username": self.staff.get_username(),
+                                               "password": "Sprint-2026-run"})
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(r["Location"].startswith("/admin/"), r["Location"])
+
     def test_expired_invite_is_refused(self):
         token = self.profile.issue_invite()
         self.profile.invite_expires = timezone.now() - timedelta(minutes=1)

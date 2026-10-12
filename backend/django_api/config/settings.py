@@ -738,3 +738,7 @@ if SENTRY_DSN:
         before_send=sentry_scrub.before_send,
         before_breadcrumb=sentry_scrub.before_breadcrumb,
     )
+
+# После входа без ?next= Django уводит на /accounts/profile/ — у нас такой страницы нет
+# (сотрудник из приглашения видел 404, 12.10.2026). Вход здесь только в админку.
+LOGIN_REDIRECT_URL = "/admin/"
