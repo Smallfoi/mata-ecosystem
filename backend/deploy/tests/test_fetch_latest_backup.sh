@@ -78,4 +78,11 @@ printf 'MEDIA_S3_ACCESS_KEY=k\nMEDIA_S3_SECRET_KEY=s\n' > "$SB/backend/.env"
 STUB_PAGE1="db/mata_20261007_040002.sql.gz.enc" STUB_PAGE2="" run_fetch "$SB"; rc=$?
 [ "$rc" != 0 ] && ok "код $rc" || bad "прошло без бакета"
 
+echo "F6: BACKUP_FROM=2 — берём из второго хранилища (Beget)"
+SB="$(make_sandbox)"
+printf 'BACKUP2_S3_BUCKET=beget-backups\nBACKUP2_S3_ACCESS_KEY=k2\nBACKUP2_S3_SECRET_KEY=s2\n' >> "$SB/backend/.env"
+STUB_PAGE1="db/mata_20261012_040001.sql.gz.enc" STUB_PAGE2="" BACKUP_FROM=2 run_fetch "$SB"; rc=$?
+[ "$rc" = 0 ] && grep -q 's3.ru1.storage.beget.cloud/beget-backups' "$SB/urls.log" \
+  && ok "список и файл — из Beget" || bad "код $rc, адреса: $(tr '\n' ' ' < "$SB/urls.log" 2>/dev/null)"
+
 [ "$fails" = 0 ]

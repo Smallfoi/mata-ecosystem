@@ -10,6 +10,9 @@
 #      в /root/mata-secrets.env (права 600) — по SSH, мимо чата и репозитория;
 #   2. запускает на VPS prod-deploy.sh в режиме vps с восстановлением последнего бэкапа БД.
 # Хранилище фото и бэкапов остаётся в Yandex Object Storage — ключи доступа среди секретов.
+#
+# Только обновить секреты на работающем сервере (поменяли Lockbox) — без переустановки:
+#   curl -fsSL …/beget-up.sh | HOST=<IP VPS> SECRETS_ONLY=1 bash
 set -euo pipefail
 
 HOST="${HOST:?Укажите IP VPS: ... | HOST=1.2.3.4 bash}"
@@ -45,6 +48,13 @@ echo "   ключей: $(grep -c '=' "$TMP")"
 
 echo "== 2/3 Секреты → ${SSH_USER}@${HOST}:/root/mata-secrets.env =="
 "${SSH[@]}" 'umask 077; cat > /root/mata-secrets.env' < "$TMP"
+
+if [ "${SECRETS_ONLY:-0}" = 1 ]; then
+  echo "== 3/3 Пересборка .env и перезапуск web/worker/beat =="
+  "${SSH[@]}" -n "bash /opt/mata/backend/deploy/refresh-env.sh 2>&1 | grep -E 'OK:|WARN|FATAL|Секреты|ГОТОВО|status'"
+  "${SSH[@]}" -O exit 2>/dev/null || true
+  exit 0
+fi
 
 echo "== 3/3 Запуск развёртывания на VPS (в фоне, 10–20 мин) =="
 "${SSH[@]}" -n "set -e; command -v curl >/dev/null || (apt-get update -y && apt-get install -y curl);

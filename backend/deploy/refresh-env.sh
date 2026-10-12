@@ -19,6 +19,12 @@
 set -euo pipefail
 cd /opt/mata/backend
 
+# На VPS (Beget, D-115) Lockbox с сервера недоступен: секреты кладёт beget-up.sh в этот файл.
+# Он есть только на VPS — по нему и различаем площадки.
+SECRETS_FILE="${MATA_SECRETS_FILE:-/root/mata-secrets.env}"
+# Внешний IP — из текущего .env (его записал prod-deploy.sh): нужен для nip.io-имени в серте.
+PUBLIC_IP=$(sed -n 's/^PUBLIC_IP=//p' .env 2>/dev/null | head -n 1)
+
 # --- статический (НЕ секретный) блок .env — 1:1 как в prod-deploy.sh ---
 STATIC_ENV() {
 cat <<'ENVEOF'
@@ -37,8 +43,10 @@ APP_PREVIEW_URL=https://mata-media.storage.yandexcloud.net/mata-app-preview/inde
 LEGAL_DOCS_DIR=/legal_docs
 TLS_DOMAIN=api.mata-club.ru
 TLS_EMAIL=admin@mata-club.ru
-TLS_EXTRA_SAN=mata-club.ru,www.mata-club.ru,158-160-12-117.nip.io
 ENVEOF
+# Не в heredoc: зависят от IP этого сервера (раньше было зашито 158-160-12-117 — старый прод).
+echo "TLS_EXTRA_SAN=mata-club.ru,www.mata-club.ru${PUBLIC_IP:+,${PUBLIC_IP//./-}.nip.io}"
+echo "PUBLIC_IP=${PUBLIC_IP}"
 }
 
 IAM_TOKEN() {
@@ -64,6 +72,11 @@ umask 077
 TMP=".env.new"
 STATIC_ENV > "$TMP"
 
+if [ -s "$SECRETS_FILE" ]; then
+  # VPS: оба секрета Lockbox уже собраны в файл (beget-up.sh SECRETS_ONLY=1).
+  cat "$SECRETS_FILE" >> "$TMP"
+  echo "Секреты: из $SECRETS_FILE"
+else
 # основной секрет — с ретраем на «прогрев» сервисного аккаунта
 for t in $(seq 1 12); do
   PULL_SECRET "$LB_SECRET_ID" >> "$TMP"
@@ -73,6 +86,7 @@ done
 
 # доп. секрет фотопайплайна (опционально — без него пайплайн просто в no-op)
 PULL_SECRET "$ECO_IMAGE_SECRET_ID" >> "$TMP"
+fi
 
 # ВАЛИДАЦИЯ: без критичных ключей .env НЕ заменяем
 for k in POSTGRES_PASSWORD DJANGO_SECRET_KEY JWT_SECRET; do
@@ -80,6 +94,7 @@ for k in POSTGRES_PASSWORD DJANGO_SECRET_KEY JWT_SECRET; do
 done
 grep -q "^OPENAI_API_KEY=" "$TMP" && echo "OK: OPENAI_API_KEY получен" || echo "WARN: OPENAI_API_KEY нет (фотопайплайн в no-op)"
 grep -q "^LEGAL_OGRNIP=" "$TMP"  && echo "OK: LEGAL_* получены"        || echo "WARN: LEGAL_* нет — publish_legal подставит плейсхолдеры"
+grep -q "^BACKUP2_S3_BUCKET=" "$TMP" && echo "OK: второе хранилище бэкапов задано" || echo "WARN: BACKUP2_S3_* нет — бэкап только в Яндекс"
 
 mv "$TMP" .env
 echo "=== .env пересобран из Lockbox ==="

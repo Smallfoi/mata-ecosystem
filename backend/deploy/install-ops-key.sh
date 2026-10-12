@@ -79,5 +79,5 @@ fi
 
 echo
 echo "Готово. Проверка с машины владельца:"
-echo "  ssh -i ~/.ssh/mata_prod_ops -p 2222 ubuntu@158.160.12.117 status"
-echo "  ssh -i ~/.ssh/mata_prod_ops -p 2222 ubuntu@158.160.12.117 'rm -rf /'   # должно быть «Отказано»"
+echo "  ssh -i ~/.ssh/mata_prod_ops ubuntu@<IP сервера> status          # порт: Beget 22, ВМ Яндекса 2222"
+echo "  ssh -i ~/.ssh/mata_prod_ops ubuntu@<IP сервера> 'rm -rf /'     # должно быть «Отказано»"

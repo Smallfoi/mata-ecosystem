@@ -60,29 +60,60 @@ fi
 
 # ── Выгрузка в объектное хранилище ────────────────────────────────────────────
 # Дамп рядом с БД на том же диске — это НЕ бэкап: диск умрёт вместе с обоими.
-# Заливаем в Yandex Object Storage подписью SigV4 средствами curl (без доп. пакетов).
-S3_BUCKET="${BACKUP_S3_BUCKET:-}"
-if [ -z "$S3_BUCKET" ]; then
-  echo "ВНИМАНИЕ: BACKUP_S3_BUCKET не задан — дамп остался ТОЛЬКО на диске сервера."
-else
-  # Ключи по умолчанию — те же, что у медиа (обычно один сервисный аккаунт).
-  S3_KEY="${BACKUP_S3_ACCESS_KEY:-${MEDIA_S3_ACCESS_KEY:-}}"
-  S3_SECRET="${BACKUP_S3_SECRET_KEY:-${MEDIA_S3_SECRET_KEY:-}}"
-  S3_ENDPOINT="${BACKUP_S3_ENDPOINT:-${MEDIA_S3_ENDPOINT:-https://storage.yandexcloud.net}}"
-  S3_REGION="${BACKUP_S3_REGION:-${MEDIA_S3_REGION:-ru-central1}}"
-  [ -n "$S3_KEY" ] && [ -n "$S3_SECRET" ] || {
-    echo "ОШИБКА: BACKUP_S3_BUCKET задан, но ключи доступа пусты"; exit 1; }
+# Заливаем подписью SigV4 средствами curl (без доп. пакетов) в ДВА независимых места:
+#   1) Yandex Object Storage (BACKUP_S3_*);
+#   2) второе хранилище у другого провайдера (BACKUP2_S3_*, по умолчанию S3 Beget) — D-116.
+# 8.10.2026 пожар в ЦОД Яндекса показал: всё у одного провайдера — одна точка отказа.
+# Одно место недоступно — во второе всё равно грузим; итоговый код 1 скажет о сбое.
+FAILED=0
 
-  DEST="${S3_ENDPOINT%/}/${S3_BUCKET}/db/$(basename "$OUT")"
-  echo "Выгрузка → $DEST"
-  CODE=$(curl -sS -o /dev/null -w '%{http_code}' \
-           --aws-sigv4 "aws:amz:${S3_REGION}:s3" \
-           --user "${S3_KEY}:${S3_SECRET}" \
-           --upload-file "$OUT" "$DEST") || CODE="000"
-  [ "$CODE" = "200" ] || { echo "ОШИБКА выгрузки в S3: HTTP $CODE"; exit 1; }
-  echo "Выгружено в бакет ${S3_BUCKET}."
+s3_put() {  # s3_put <имя> <endpoint> <регион> <бакет> <ключ> <секрет>
+  local name="$1" endpoint="$2" region="$3" bucket="$4" key="$5" secret="$6" dest code
+  [ -n "$key" ] && [ -n "$secret" ] || {
+    echo "ОШИБКА ($name): бакет $bucket задан, но ключи доступа пусты"; FAILED=1; return; }
+  dest="${endpoint%/}/${bucket}/db/$(basename "$OUT")"
+  echo "Выгрузка ($name) → $dest"
+  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 600 \
+           --aws-sigv4 "aws:amz:${region}:s3" \
+           --user "${key}:${secret}" \
+           --upload-file "$OUT" "$dest") || code="000"
+  if [ "$code" = "200" ]; then
+    echo "Выгружено в бакет ${bucket}."
+  else
+    echo "ОШИБКА выгрузки ($name): HTTP $code"; FAILED=1
+  fi
+}
+
+if [ -n "${BACKUP_S3_BUCKET:-}" ]; then
+  # Ключи по умолчанию — те же, что у медиа (обычно один сервисный аккаунт).
+  s3_put "Яндекс" \
+    "${BACKUP_S3_ENDPOINT:-${MEDIA_S3_ENDPOINT:-https://storage.yandexcloud.net}}" \
+    "${BACKUP_S3_REGION:-${MEDIA_S3_REGION:-ru-central1}}" \
+    "$BACKUP_S3_BUCKET" \
+    "${BACKUP_S3_ACCESS_KEY:-${MEDIA_S3_ACCESS_KEY:-}}" \
+    "${BACKUP_S3_SECRET_KEY:-${MEDIA_S3_SECRET_KEY:-}}"
+else
+  echo "ВНИМАНИЕ: BACKUP_S3_BUCKET не задан — в Яндекс дамп не выгружен."
+fi
+
+if [ -n "${BACKUP2_S3_BUCKET:-}" ]; then
+  s3_put "второе хранилище" \
+    "${BACKUP2_S3_ENDPOINT:-https://s3.ru1.storage.beget.cloud}" \
+    "${BACKUP2_S3_REGION:-ru1}" \
+    "$BACKUP2_S3_BUCKET" \
+    "${BACKUP2_S3_ACCESS_KEY:-}" \
+    "${BACKUP2_S3_SECRET_KEY:-}"
+else
+  echo "ВНИМАНИЕ: BACKUP2_S3_BUCKET не задан — копии бэкапа у второго провайдера нет."
+fi
+
+if [ -z "${BACKUP_S3_BUCKET:-}" ] && [ -z "${BACKUP2_S3_BUCKET:-}" ]; then
+  echo "ВНИМАНИЕ: ни одно хранилище не задано — дамп остался ТОЛЬКО на диске сервера."
 fi
 
 # Ротация ЛОКАЛЬНЫХ дампов старше KEEP_DAYS дней (в бакете — политика жизненного цикла).
 find "$DIR" -name 'mata_*.sql.gz' -mtime +"$KEEP_DAYS" -delete 2>/dev/null || true
 find "$DIR" -name 'mata_*.sql.gz.enc' -mtime +"$KEEP_DAYS" -delete 2>/dev/null || true
+
+# Сбой выгрузки хоть в одно место — код 1: в кроне и при restore.sh (контрольный бэкап) это видно.
+[ "$FAILED" = 0 ] || { echo "ОШИБКА: бэкап выгружен не во все хранилища (см. выше)"; exit 1; }
