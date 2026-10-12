@@ -72,6 +72,35 @@ SB="$(make_sandbox)"
 STUB_DUMP_BYTES=10 STUB_DUMP_MODE=ok run_backup "$SB"; rc=$?
 [ "$rc" != 0 ] && ok "код $rc" || bad "пустой дамп принят за бэкап"
 
+# ── D-116: копия в два хранилища (Яндекс + второй провайдер) ─────────────────
+# Заглушка curl: пишет адрес выгрузки в журнал; адрес с подстрокой STUB_CURL_FAIL → HTTP 500.
+add_s3() {  # add_s3 <sandbox> — заглушка curl + оба бакета в .env
+  local sb="$1"
+  cat > "$sb/bin/curl" <<'STUB'
+#!/usr/bin/env bash
+url="${*: -1}"
+echo "$url" >> "$STUB_CURL_LOG"
+case "$url" in *"${STUB_CURL_FAIL:-@@нет@@}"*) printf '500' ;; *) printf '200' ;; esac
+STUB
+  chmod +x "$sb/bin/curl"
+  printf '%s\n' BACKUP_S3_BUCKET=yc-backups MEDIA_S3_ACCESS_KEY=k MEDIA_S3_SECRET_KEY=s \
+    BACKUP2_S3_BUCKET=beget-backups BACKUP2_S3_ACCESS_KEY=k2 BACKUP2_S3_SECRET_KEY=s2 >> "$sb/backend/.env"
+}
+
+echo "D116-1: дамп уходит в оба хранилища"
+SB="$(make_sandbox)"; add_s3 "$SB"
+STUB_CURL_LOG="$SB/urls.log" STUB_DUMP_BYTES=5000 run_backup "$SB"; rc=$?
+[ "$rc" = 0 ] && ok "код 0" || { bad "код $rc"; sed 's/^/       /' "$SB/out.log"; }
+grep -q 'storage.yandexcloud.net/yc-backups/db/mata_' "$SB/urls.log" 2>/dev/null && ok "Яндекс" || bad "в Яндекс не выгружено"
+grep -q 's3.ru1.storage.beget.cloud/beget-backups/db/mata_' "$SB/urls.log" 2>/dev/null && ok "Beget" || bad "в Beget не выгружено"
+
+echo "D116-2: Яндекс недоступен — копия в Beget всё равно есть, код 1"
+SB="$(make_sandbox)"; add_s3 "$SB"
+STUB_CURL_LOG="$SB/urls.log" STUB_CURL_FAIL=yandexcloud STUB_DUMP_BYTES=5000 run_backup "$SB"; rc=$?
+[ "$rc" != 0 ] && ok "код $rc" || bad "сбой выгрузки не замечен"
+grep -q 'beget-backups' "$SB/urls.log" 2>/dev/null && ok "Beget получил копию" || bad "до Beget не дошло"
+grep -q 'ОШИБКА выгрузки (Яндекс)' "$SB/out.log" && ok "ошибка названа" || bad "ошибка не названа"
+
 if command -v shellcheck >/dev/null 2>&1; then
   (cd "$HERE/.." && shellcheck -S warning backup.sh) && ok "shellcheck backup.sh" || bad "shellcheck backup.sh"
 fi
