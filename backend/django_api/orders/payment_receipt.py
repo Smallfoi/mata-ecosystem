@@ -19,9 +19,11 @@
 """
 import logging
 from datetime import timedelta
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.utils import timezone
 
+from .money import kop_to_float
 from .payment import PaymentError, PaymentUncertain, fetch_receipts
 from .receipt import receipts_enabled
 
@@ -52,6 +54,36 @@ def held_until():
     return timezone.now() - timedelta(minutes=WAIT_MINUTES)
 
 
+def _money(value):
+    try:
+        return Decimal(str((value or {}).get("value")))
+    except (InvalidOperation, TypeError, AttributeError):
+        return None
+
+
+def _receipt_amount(item: dict):
+    """Сумма чека (строка «1234.00») — по расчётам (settlements), а без них по позициям.
+
+    У чека ЮKassa нет поля «итого»: в расчётах — сколько и чем заплачено, в позициях —
+    цена за единицу и количество. Ничего не разобрать — None (1С возьмёт `total` заказа).
+    """
+    parts = [_money(s.get("amount")) for s in item.get("settlements") or [] if isinstance(s, dict)]
+    if not parts or None in parts:
+        parts = []
+        for pos in item.get("items") or []:
+            price = _money(pos.get("amount")) if isinstance(pos, dict) else None
+            try:
+                qty = Decimal(str(pos.get("quantity")))
+            except (InvalidOperation, TypeError, AttributeError):
+                return None
+            if price is None:
+                return None
+            parts.append(price * qty)
+    if not parts:
+        return None
+    return str(sum(parts).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
 def _from_yookassa(item: dict) -> dict:
     status = item.get("status")
     out = {"status": SUCCEEDED if status == "succeeded" else CANCELED,
@@ -62,6 +94,7 @@ def _from_yookassa(item: dict) -> dict:
             "fiscalStorageNumber": str(item.get("fiscal_storage_number") or ""),
             "fiscalAttribute": str(item.get("fiscal_attribute") or ""),
             "registeredAt": item.get("registered_at") or "",
+            "amount": _receipt_amount(item),
         })
     return out
 
@@ -113,10 +146,14 @@ def for_1c(order):
     receipt = order.receipt or {}
     if receipt.get("status") != SUCCEEDED:
         return None
+    # Сумма — из самого чека; чеки, сохранённые до этого поля, и чек без разбираемой суммы
+    # дают итог заказа: в оплату и в чек ушло одно и то же число копеек.
+    amount = receipt.get("amount")
     return {
         "id": receipt.get("id") or "",
         "fiscalDocumentNumber": receipt.get("fiscalDocumentNumber") or "",
         "fiscalStorageNumber": receipt.get("fiscalStorageNumber") or "",
         "fiscalAttribute": receipt.get("fiscalAttribute") or "",
         "registeredAt": receipt.get("registeredAt") or "",
+        "amount": float(amount) if amount else kop_to_float(order.amount_kop),
     }

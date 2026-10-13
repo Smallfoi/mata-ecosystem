@@ -92,7 +92,33 @@ class ReceiptSyncTests(TestCase):
             "id": "rt-1", "fiscalDocumentNumber": "3986",
             "fiscalStorageNumber": "9288000100115785", "fiscalAttribute": "2617603921",
             "registeredAt": "2026-10-07T10:06:42.985Z",
+            # В ответе ЮKassa нет ни расчётов, ни позиций — сумма заказа.
+            "amount": 1000.0,
         })
+
+    def _stored_amount(self, receipt):
+        with _fetch(dict(YK_RECEIPT, **receipt)):
+            payment_receipt.sync_waiting()
+        self.order.refresh_from_db()
+        return payment_receipt.for_1c(self.order)["amount"]
+
+    def test_amount_from_settlements(self):
+        """Сумма чека — из расчётов: столько и прошло через кассу."""
+        amount = self._stored_amount({"settlements": [
+            {"type": "prepayment", "amount": {"value": "1234.50", "currency": "RUB"}}]})
+        self.assertEqual(amount, 1234.5)
+
+    def test_amount_from_items_when_no_settlements(self):
+        """Без расчётов — по позициям: цена за единицу × количество."""
+        amount = self._stored_amount({"items": [
+            {"amount": {"value": "999.99"}, "quantity": "2"},
+            {"amount": {"value": "300.00"}, "quantity": "1.000"},
+        ]})
+        self.assertEqual(amount, 2299.98)
+
+    def test_unreadable_amount_falls_back_to_order_total(self):
+        amount = self._stored_amount({"items": [{"amount": {"value": "abc"}, "quantity": "1"}]})
+        self.assertEqual(amount, 1000.0)
 
     def test_receipt_still_in_cashbox_keeps_waiting(self):
         with _fetch(dict(YK_RECEIPT, status="pending")):
@@ -150,7 +176,10 @@ class ReceiptGoesToOneCTests(TestCase):
             payment_receipt.sync_waiting()
         self.assertEqual(self._queue(), ["MATA-R1"])
         self.order.refresh_from_db()
-        self.assertEqual(order_to_json(self.order)["receipt"]["fiscalDocumentNumber"], "3986")
+        body = order_to_json(self.order)
+        self.assertEqual(body["receipt"]["fiscalDocumentNumber"], "3986")
+        # Номер платежа ЮKassa — в каждом заказе, с чеком и без.
+        self.assertEqual(body["paymentId"], "yk-MATA-R1")
 
     def test_broken_cashbox_does_not_stop_warehouse(self):
         """Чека нет полчаса — заказ уходит в 1С без него, сборка не встаёт."""

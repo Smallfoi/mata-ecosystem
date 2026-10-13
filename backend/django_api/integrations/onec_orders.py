@@ -116,6 +116,9 @@ def order_to_json(order: Order) -> dict:
         "pointsRedeemed": order.points_redeemed,
         "payment": checkout.get("paymentType") or "",
         "paymentStatus": order.payment_status,
+        # Номер платежа ЮKassa — по нему ищут оплату в личном кабинете и в поддержке ЮKassa.
+        # У тестовых заказов (D-97) вида TEST-<номер>: денег не было.
+        "paymentId": order.payment_id,
         # Чек оплаты (предоплата) из ЮKassa: по нему склад пробивает второй чек
         # «полный расчёт» с зачётом аванса (D-101). None — чека нет.
         "receipt": payment_receipt.for_1c(order),
