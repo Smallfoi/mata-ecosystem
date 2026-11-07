@@ -11,21 +11,23 @@
 
 ---
 
-## 0. Где прод сейчас (с 9.10.2026)
+## 0. Где прод сейчас (с 8.11.2026)
 
 | Что | Где | Как трогать |
 |---|---|---|
-| Сервер (Docker-стек: БД, Django, Celery, nginx) | **VPS Beget**, СПб, `62.113.108.108`, 2 vCPU / 4 ГБ / 40 ГБ NVMe, проект «МАТА» в облаке Beget | владелец: `ssh root@62.113.108.108` (порт 22, пароль); Claude: канал `ssh -i ~/.ssh/mata_prod_ops ubuntu@62.113.108.108 status` |
-| DNS `mata-club.ru`, `www`, `api` | Beget | A → 62.113.108.108 |
+| Сервер (Docker-стек: БД, Django, Celery, nginx) | **Cloud.ru Evolution**, ВМ `web-vm-01`, ru.AZ-1, `87.242.100.147`, 2 vCPU / 4 ГБ / SSD 40 ГБ | владелец: `ssh user1@87.242.100.147` из Cloud Shell Яндекса (sudo без пароля) или «Виртуальная консоль» в Cloud.ru; Claude: канал `ssh -i ~/.ssh/mata_prod_ops ubuntu@87.242.100.147 status` (с ПК — только без VPN, см. PITFALLS) |
+| Сеть ВМ | группа безопасности `web-vm-sg`: вход TCP 22/80/443, **выход — всё** | без исходящих правил ВМ теряет сеть (PITFALLS) |
+| DNS `mata-club.ru`, `www`, `api` | Beget (регистратор тоже Beget), правка на domains.beget.ru, код — на почту администратора домена | A → 87.242.100.147, TTL 300 |
 | Фото, баннеры, превью приложения | Yandex Object Storage `mata-media` | не менять — ссылки зашиты в базе |
-| Непрерывная копия БД (каждое изменение ≤1 мин) | pgBackRest → Yandex + Beget, путь `/pgbackrest` в бакетах бэкапов (D-117) | `deploy/pgbr.sh check / info / restore 1|2` |
-| Ночные дампы БД (07:00 МСК) | Yandex `mata-club-backups` + второе хранилище у Beget, когда в Lockbox заданы `BACKUP2_S3_*` (D-116) | `deploy/backup.sh`, восстановление — `fetch-latest-backup.sh` (+ `BACKUP_FROM=2`) |
-| Секреты | Yandex Lockbox `mata-prod-secrets` | поменяли → в Cloud Shell `beget-up.sh` с `SECRETS_ONLY=1` |
+| Непрерывная копия БД (каждое изменение ≤1 мин) | pgBackRest → Yandex, путь `/pgbackrest` в `mata-club-backups` (D-117) | `deploy/pgbr.sh check / info / restore 1` |
+| Ночные дампы БД (07:00 МСК) | Yandex `mata-club-backups/db/` | `deploy/backup.sh`, восстановление — `fetch-latest-backup.sh` |
+| Секреты | Yandex Lockbox `mata-prod-secrets` | поменяли → в Cloud Shell `beget-up.sh` с `HOST=87.242.100.147 SSH_USER=user1 SECRETS_ONLY=1` |
 
-Почему так — D-114/D-115: 8.10.2026 пожар в ЦОД Яндекса (зона ru-central1-b) положил прежнюю ВМ,
-а в живых зонах Яндекс не выделял ресурсы. Скрипты `yc-recreate.sh` / `yc-restore-prod.sh` /
-`cloud-init-prod.yaml` относятся к ВМ Яндекса и к текущему проду не применимы. Старая ВМ
-`mata-prod` — остановить, когда зона вернётся (на её диске данные 7.10, которых нет в базе).
+Почему так — D-118: 2.11.2026 атака на Beget уничтожила их облако вместе с прежним VPS
+(62.113.108.108) и S3 второй копии; до того (D-114/D-115) — пожар в зоне ru-central1-b Яндекса.
+Скрипты `yc-recreate.sh` / `yc-restore-prod.sh` / `cloud-init-prod.yaml` — для ВМ Яндекса.
+Новый сервер у любого провайдера поднимается `beget-up.sh` (Ubuntu 24.04, root или `SSH_USER`
+с sudo); при пустой БД он сам восстановит последнюю копию из Яндекса.
 
 **IP сервера прописан у внешних сервисов** — сменили сервер, сменить и там:
 SIGMA ProPush (вход по звонку, настройки виджета), у 1С-ника — если он ограничивал обмен по IP.
