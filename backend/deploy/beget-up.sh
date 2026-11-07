@@ -3,7 +3,10 @@
 #
 # Запускать в Yandex Cloud Shell (там есть доступ к Lockbox), указав IP нового VPS:
 #   curl -fsSL https://raw.githubusercontent.com/Smallfoi/mata-ecosystem/main/backend/deploy/beget-up.sh | HOST=<IP VPS> bash
-# SSH на VPS — под root (SSH_USER/SSH_PORT меняют это). Пароль root спросят один раз.
+# SSH на VPS — под root (SSH_USER/SSH_PORT меняют это). Пароль спросят один раз.
+# Облако не пускает под root (Cloud.ru и др.: вход обычным пользователем с sudo) —
+#   … | HOST=<IP> SSH_USER=<пользователь> bash
+# Команды на сервере тогда идут через sudo; если sudo просит пароль, скрипт спросит его сам.
 #
 # Что делает:
 #   1. берёт секреты прода из Lockbox (mata-prod-secrets + mata-eco-image) и кладёт их на VPS
@@ -28,6 +31,29 @@ CTL="/tmp/mata-ssh-${HOST}"
 SSH=(ssh -p "$SSH_PORT" -o StrictHostKeyChecking=accept-new
      -o ControlMaster=auto -o ControlPath="$CTL" -o ControlPersist=120 "${SSH_USER}@${HOST}")
 
+# Команда от root на сервере. Под root — как есть; иначе через sudo: без пароля, если так
+# настроено, а нет — пароль первой строкой stdin (sudo -S), остаток stdin — данные команды.
+SUDO_MODE=root
+as_root() {
+  case "$SUDO_MODE" in
+    root)   "${SSH[@]}" "$1" ;;
+    nopass) "${SSH[@]}" "sudo -n bash -c $(printf '%q' "$1")" ;;
+    *)      { printf '%s\n' "$SUDO_PW"; cat; } | "${SSH[@]}" "sudo -S -k -p '' bash -c $(printf '%q' "$1")" ;;
+  esac
+}
+
+if [ "$SSH_USER" != root ]; then
+  if "${SSH[@]}" -n 'sudo -n true' 2>/dev/null; then
+    SUDO_MODE=nopass
+  else
+    SUDO_MODE=password
+    read -rs -p "Пароль sudo пользователя ${SSH_USER} на ${HOST}: " SUDO_PW < /dev/tty; echo
+    printf '%s\n' "$SUDO_PW" | "${SSH[@]}" "sudo -S -k -p '' true" \
+      || { echo "ОШИБКА: sudo не принял пароль или у ${SSH_USER} нет прав sudo"; exit 1; }
+  fi
+  echo "   вход: ${SSH_USER}, команды от root через sudo (${SUDO_MODE})"
+fi
+
 TMP=$(mktemp)
 chmod 600 "$TMP"
 trap 'rm -f "$TMP"' EXIT
@@ -47,20 +73,20 @@ done
 echo "   ключей: $(grep -c '=' "$TMP")"
 
 echo "== 2/3 Секреты → ${SSH_USER}@${HOST}:/root/mata-secrets.env =="
-"${SSH[@]}" 'umask 077; cat > /root/mata-secrets.env' < "$TMP"
+as_root 'umask 077; cat > /root/mata-secrets.env' < "$TMP"
 
 if [ "${SECRETS_ONLY:-0}" = 1 ]; then
   echo "== 3/3 Пересборка .env и перезапуск web/worker/beat =="
-  "${SSH[@]}" -n "bash /opt/mata/backend/deploy/refresh-env.sh 2>&1 | grep -E 'OK:|WARN|FATAL|Секреты|ГОТОВО|status'"
+  as_root "bash /opt/mata/backend/deploy/refresh-env.sh 2>&1 | grep -E 'OK:|WARN|FATAL|Секреты|ГОТОВО|status'" < /dev/null
   "${SSH[@]}" -O exit 2>/dev/null || true
   exit 0
 fi
 
 echo "== 3/3 Запуск развёртывания на VPS (в фоне, 10–20 мин) =="
-"${SSH[@]}" -n "set -e; command -v curl >/dev/null || (apt-get update -y && apt-get install -y curl);
+as_root "set -e; command -v curl >/dev/null || (apt-get update -y && apt-get install -y curl);
   curl -fsSL '$DEPLOY_URL' -o /opt/prod-deploy.sh;
   MATA_HOST=vps MATA_RESTORE_LATEST=1 nohup bash /opt/prod-deploy.sh > /var/log/mata-deploy.log 2>&1 < /dev/null &
-  echo запущено"
+  echo запущено" < /dev/null
 "${SSH[@]}" -O exit 2>/dev/null || true
 
 cat <<EOF
@@ -70,7 +96,8 @@ cat <<EOF
     ssh -p ${SSH_PORT} ${SSH_USER}@${HOST} 'grep -E "===|FATAL|restore|Восстан" /var/log/mata-deploy.log | tail -20'
 
   Ждите «=== ГОТОВО». Строка FATAL — пришлите её Claude, домен НЕ переводите.
-  После «ГОТОВО» — в Beget A-записи mata-club.ru, www, api → ${HOST}.
+  После «ГОТОВО» — A-записи mata-club.ru, www, api → ${HOST}
+  (DNS домена сейчас у Beget: domains.beget.ru).
   Сертификат HTTPS выпустится сам через ~5 минут после обновления DNS.
 ==================================================================
 EOF
