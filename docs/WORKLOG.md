@@ -15,6 +15,17 @@
 
 ---
 
+## 2026-11-08 — Claude — DNS-зоны в Яндексе (ждут Beget), внешний мониторинг, Pareta на Selectel
+**Сделано:**
+- Память Claude общая для ПК и MacBook: приватный `Smallfoi/mata-claude-memory`, хуки SessionStart(pull)/Stop(push) в `~/.claude/settings.json`, скрипт `~/.claude/memory-sync.sh`. Память Pareta и МАТА — в одном репо.
+- Pareta поднята на **Selectel 178.130.60.206** (не у того провайдера, что МАТА): HTTPS, автодеплой CI, зашифрованные копии бэкапа в Yandex S3 `pareta-backups-bmai`. БД пустая — ждём файловый бэкап Beget. Детали — в CLAUDE.md репо Pareta.
+- **Yandex Cloud DNS:** публичные зоны `mata-club.ru` и `pareta.ru` созданы (все записи скопированы с Beget: A @/www/api, MX/SPF/autoconfig почты Beget). Ответы `ns1/ns2.yandexcloud.net` проверены.
+- Внешний мониторинг `.github/workflows/uptime.yml`: раз в 5 мин из GitHub проверяет API МАТА, сайт, Pareta; пишет один раз при падении и при восстановлении (Telegram/ntfy/WhatsApp — какие секреты заданы; письмо GitHub о красном запуске — всегда).
+**Пробовали — не вышло:** сменить NS у Beget — раздел «Редактирование DNS-серверов» в cp.beget.com серый (панель восстанавливается).
+**Состояние:** DNS обоих доменов ещё у Beget (работает). Зоны в Яндексе готовы и ждут переключения NS.
+**Дальше:** когда Beget включит раздел — NS обоих доменов → `ns1.yandexcloud.net`, `ns2.yandexcloud.net` (записи Beget не удалять до схождения); секреты `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`; регистратор — уйти с Beget (D-118).
+
+
 ## 2026-11-08 — Claude — два компьютера владельца: синхронизация через GitHub
 
 **Сделано:** Pareta склонирована на ПК в `D:\MyProjects\pareta` (свежая, `89bb777`). В
