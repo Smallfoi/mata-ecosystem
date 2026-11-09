@@ -15,6 +15,25 @@
 
 ---
 
+## 2026-11-09 — Claude — второе хранилище бэкапов МАТА — Timeweb Cloud S3 (D-119)
+**Сделано:**
+- Владелец создал в Timeweb Cloud приватный бакет `mata-backups-2` (Стандартный, 10 ГБ с
+  автомасштабом, СПб), ключи внёс в Lockbox `mata-prod-secrets` через `read -rsp` (новая версия
+  поверх старой — 40 ключей, все прежние на месте), доставил на прод `beget-up.sh SECRETS_ONLY=1`.
+- Проверено на проде: `.env` содержит 5 `BACKUP2_S3_*`, `pgbr.sh info` — stanza ok, первая полная
+  копия в repo2 (Timeweb) 09.11 08:38 UTC, 9,9 МБ; repo1 (Яндекс) работает как раньше; API ok.
+- Код: умолчания `BACKUP2_S3_ENDPOINT/REGION` с погибшего Beget S3 → `https://s3.twcstorage.ru` /
+  `ru-1` (backup.sh, fetch-latest-backup.sh, pgbr.sh), тексты «2 (Beget)» → «2 (Timeweb)», тесты.
+- `refresh-env.sh`: health с тайм-аутом через локальный nginx — из-за него скрипт висел (PITFALLS).
+**Пробовали — не вышло:** —
+**Решения:** D-119 (вторая копия — Timeweb: независим от Cloud.ru/Яндекса/Selectel, данные в РФ).
+**Состояние:** бэкапы МАТА снова в двух хранилищах у разных провайдеров: ночной дамп и
+непрерывная копия — Яндекс + Timeweb.
+**Дальше:** ночной `backup.sh` 10.11 07:00 МСК — убедиться, что дамп лёг и в `mata-backups-2`
+(`BACKUP_FROM=2 fetch-latest-backup.sh`). Баланс Timeweb 336 ₽ (~5 дней из-за VPS-релея OpenAI
+`147.45.240.21`, который к тому же пускает только старый IP прода 158.160.12.117) — владельцу
+пополнить или выключить релей. Подтвердить почту в Timeweb.
+
 ## 2026-11-08 — Claude — DNS-зоны в Яндексе (ждут Beget), внешний мониторинг, Pareta на Selectel
 **Сделано:**
 - Память Claude общая для ПК и MacBook: приватный `Smallfoi/mata-claude-memory`, хуки SessionStart(pull)/Stop(push) в `~/.claude/settings.json`, скрипт `~/.claude/memory-sync.sh`. Память Pareta и МАТА — в одном репо.

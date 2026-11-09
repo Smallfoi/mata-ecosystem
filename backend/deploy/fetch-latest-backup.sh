@@ -15,15 +15,15 @@ cd "$(dirname "$0")/.."  # → backend/
 [ -f .env ] || { echo "Нет .env" >&2; exit 1; }
 set -a; . ./.env; set +a
 
-# Откуда брать: 1 — Яндекс (по умолчанию), 2 — второе хранилище (BACKUP2_*, S3 Beget; D-116),
+# Откуда брать: 1 — Яндекс (по умолчанию), 2 — второе хранилище (BACKUP2_*, S3 Timeweb Cloud; D-116, D-119),
 # если Яндекс недоступен целиком.
 if [ "${BACKUP_FROM:-1}" = 2 ]; then
   S3_BUCKET="${BACKUP2_S3_BUCKET:-}"
   [ -n "$S3_BUCKET" ] || { echo "ОШИБКА: BACKUP2_S3_BUCKET не задан — второго хранилища нет" >&2; exit 1; }
   S3_KEY="${BACKUP2_S3_ACCESS_KEY:-}"
   S3_SECRET="${BACKUP2_S3_SECRET_KEY:-}"
-  S3_ENDPOINT="${BACKUP2_S3_ENDPOINT:-https://s3.ru1.storage.beget.cloud}"
-  S3_REGION="${BACKUP2_S3_REGION:-ru1}"
+  S3_ENDPOINT="${BACKUP2_S3_ENDPOINT:-https://s3.twcstorage.ru}"
+  S3_REGION="${BACKUP2_S3_REGION:-ru-1}"
 else
   S3_BUCKET="${BACKUP_S3_BUCKET:-}"
   [ -n "$S3_BUCKET" ] || { echo "ОШИБКА: BACKUP_S3_BUCKET не задан — откуда брать бэкап?" >&2; exit 1; }
