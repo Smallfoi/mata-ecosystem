@@ -62,7 +62,7 @@ fi
 # Дамп рядом с БД на том же диске — это НЕ бэкап: диск умрёт вместе с обоими.
 # Заливаем подписью SigV4 средствами curl (без доп. пакетов) в ДВА независимых места:
 #   1) Yandex Object Storage (BACKUP_S3_*);
-#   2) второе хранилище у другого провайдера (BACKUP2_S3_*, по умолчанию S3 Beget) — D-116.
+#   2) второе хранилище у другого провайдера (BACKUP2_S3_*, S3 Timeweb Cloud) — D-116, D-119.
 # 8.10.2026 пожар в ЦОД Яндекса показал: всё у одного провайдера — одна точка отказа.
 # Одно место недоступно — во второе всё равно грузим; итоговый код 1 скажет о сбое.
 FAILED=0
@@ -98,8 +98,8 @@ fi
 
 if [ -n "${BACKUP2_S3_BUCKET:-}" ]; then
   s3_put "второе хранилище" \
-    "${BACKUP2_S3_ENDPOINT:-https://s3.ru1.storage.beget.cloud}" \
-    "${BACKUP2_S3_REGION:-ru1}" \
+    "${BACKUP2_S3_ENDPOINT:-https://s3.twcstorage.ru}" \
+    "${BACKUP2_S3_REGION:-ru-1}" \
     "$BACKUP2_S3_BUCKET" \
     "${BACKUP2_S3_ACCESS_KEY:-}" \
     "${BACKUP2_S3_SECRET_KEY:-}"

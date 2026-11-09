@@ -19,8 +19,8 @@
 | Сеть ВМ | группа безопасности `web-vm-sg`: вход TCP 22/80/443, **выход — всё** | без исходящих правил ВМ теряет сеть (PITFALLS) |
 | DNS `mata-club.ru`, `www`, `api` | Beget (регистратор тоже Beget), правка на domains.beget.ru, код — на почту администратора домена | A → 87.242.100.147, TTL 300 |
 | Фото, баннеры, превью приложения | Yandex Object Storage `mata-media` | не менять — ссылки зашиты в базе |
-| Непрерывная копия БД (каждое изменение ≤1 мин) | pgBackRest → Yandex, путь `/pgbackrest` в `mata-club-backups` (D-117) | `deploy/pgbr.sh check / info / restore 1` |
-| Ночные дампы БД (07:00 МСК) | Yandex `mata-club-backups/db/` | `deploy/backup.sh`, восстановление — `fetch-latest-backup.sh` |
+| Непрерывная копия БД (каждое изменение ≤1 мин) | pgBackRest → Yandex, путь `/pgbackrest` в `mata-club-backups`, и Timeweb Cloud S3 `mata-backups-2` (D-117, D-119) | `deploy/pgbr.sh check / info / restore 1` |
+| Ночные дампы БД (07:00 МСК) | Yandex `mata-club-backups/db/` + Timeweb Cloud S3 `mata-backups-2` (D-119) | `deploy/backup.sh`, восстановление — `fetch-latest-backup.sh` (+ `BACKUP_FROM=2`) |
 | Секреты | Yandex Lockbox `mata-prod-secrets` | поменяли → в Cloud Shell `beget-up.sh` с `HOST=87.242.100.147 SSH_USER=user1 SECRETS_ONLY=1` |
 
 Почему так — D-118: 2.11.2026 атака на Beget уничтожила их облако вместе с прежним VPS
@@ -186,6 +186,6 @@ curl -fsSL https://raw.githubusercontent.com/Smallfoi/mata-ecosystem/main/backen
 Дальше — те же шаги 2–4 (ждать «ГОТОВО», перевести DNS, TLS сам).
 
 **Откуда берётся база на новом сервере** (D-117): сначала непрерывная копия pgBackRest —
-хранилище 1 (Яндекс), не вышло — 2 (Beget); отстаёт от погибшего сервера на ~минуту. Нет её —
+хранилище 1 (Яндекс), не вышло — 2 (Timeweb); отстаёт от погибшего сервера на ~минуту. Нет её —
 ночной дамп (до суток потерь). Вручную на чистом сервере: `./deploy/pgbr.sh restore 2`.
 **Старый сервер, если ожил, остановить сразу** — иначе он продолжит писать в тот же архив.

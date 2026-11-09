@@ -7,7 +7,7 @@
 #   check          архив WAL доходит до хранилищ? (код ≠0 — нет)
 #   info           что лежит в хранилищах
 #   restore [1|2]  НОВЫЙ сервер, ПУСТОЙ каталог БД: восстановить последнее состояние из
-#                  хранилища 1 (Яндекс) или 2 (Beget); БД догонит архив WAL до последней секунды
+#                  хранилища 1 (Яндекс) или 2 (Timeweb); БД догонит архив WAL до последней секунды
 #
 # Как это работает: PostgreSQL отдаёт каждый сегмент журнала (WAL) в pgBackRest не реже раза в
 # минуту (archive_timeout=60 в docker-compose.prod.yml), тот шифрует и кладёт его в оба
@@ -57,11 +57,11 @@ write_conf() {
     fi
     if [ -n "${BACKUP2_S3_BUCKET:-}" ]; then
       repos=$((repos + 1))
-      echo "# Хранилище 2 — у другого провайдера (по умолчанию S3 Beget)"
+      echo "# Хранилище 2 — у другого провайдера (S3 Timeweb Cloud, D-119)"
       echo "repo2-type=s3"
-      echo "repo2-s3-endpoint=$(host_of "${BACKUP2_S3_ENDPOINT:-https://s3.ru1.storage.beget.cloud}")"
-      echo "repo2-storage-port=$(port_of "${BACKUP2_S3_ENDPOINT:-https://s3.ru1.storage.beget.cloud}")"
-      echo "repo2-s3-region=${BACKUP2_S3_REGION:-ru1}"
+      echo "repo2-s3-endpoint=$(host_of "${BACKUP2_S3_ENDPOINT:-https://s3.twcstorage.ru}")"
+      echo "repo2-storage-port=$(port_of "${BACKUP2_S3_ENDPOINT:-https://s3.twcstorage.ru}")"
+      echo "repo2-s3-region=${BACKUP2_S3_REGION:-ru-1}"
       echo "repo2-s3-bucket=${BACKUP2_S3_BUCKET}"
       echo "repo2-s3-key=${BACKUP2_S3_ACCESS_KEY:-}"
       echo "repo2-s3-key-secret=${BACKUP2_S3_SECRET_KEY:-}"
@@ -149,7 +149,7 @@ print(" ".join(sorted({str(b["database"]["repo-key"]) for b in (d[0].get("backup
     ;;
   restore)
     repo="${2:-1}"
-    case "$repo" in 1|2) ;; *) echo "Хранилище: 1 (Яндекс) или 2 (Beget)"; exit 1 ;; esac
+    case "$repo" in 1|2) ;; *) echo "Хранилище: 1 (Яндекс) или 2 (Timeweb)"; exit 1 ;; esac
     PGDATA_HOST="$DATA/pgdata"
     if [ -n "$(ls -A "$PGDATA_HOST" 2>/dev/null)" ]; then
       echo "ОШИБКА: $PGDATA_HOST не пуст — восстанавливаю только в пустой каталог (новый сервер)"; exit 1

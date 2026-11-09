@@ -118,6 +118,9 @@ docker compose -f docker-compose.prod.yml --env-file .env exec -T nginx nginx -s
 ./deploy/pgbr.sh setup 2>&1 | grep -E "Конфиг|ОШИБКА|ERROR|полная копия|status" || echo "WARN: pgbr.sh setup не отработал"
 
 echo "=== health ==="
-curl -s https://api.mata-club.ru/v1/health || true
+# Сервер не достучится до себя по внешнему IP (Cloud.ru без hairpin NAT) — curl без тайм-аута
+# висел вечно, и beget-up.sh SECRETS_ONLY=1 «зависал» после всей работы (09.11.2026). Идём на
+# свой nginx через 127.0.0.1 с настоящим именем (проверяется и сертификат), с тайм-аутом.
+curl -s -m 15 --resolve api.mata-club.ru:443:127.0.0.1 https://api.mata-club.ru/v1/health   || echo "WARN: health через локальный nginx не ответил за 15 с — проверьте снаружи"
 echo
 echo "=== ГОТОВО: .env обновлён, web перезапущен, юр.документы опубликованы ==="
