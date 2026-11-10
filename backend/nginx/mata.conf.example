@@ -2,6 +2,10 @@
 # TLS-сертификаты положить в backend/nginx/certs/ (fullchain.pem + privkey.pem).
 # Проксирует API на web:8000, раздаёт /media и /static, форсит HTTPS.
 
+# Доп. адреса (errors.mata-club.ru — GlitchTip, D-122). Файлы кладёт deploy/glitchtip.sh
+# только после выпуска их сертификата; пустой каталог nginx не смущает.
+include /etc/nginx/extra/*.conf;
+
 # HTTP → HTTPS
 server {
     listen 80;

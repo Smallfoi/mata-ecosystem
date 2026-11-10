@@ -1,0 +1,40 @@
+# errors.mata-club.ru → GlitchTip (D-122). Кладёт deploy/glitchtip.sh tls в nginx/extra/
+# ТОЛЬКО после выпуска сертификата: без серта этот блок сломал бы проверку nginx -t.
+#
+# Адрес GlitchTip — через переменную и resolver докера: если контейнера нет (остановлен,
+# перенесён на другую площадку), nginx всё равно стартует, а этот адрес отвечает 502.
+# С прямым `proxy_pass http://glitchtip-web:8000` nginx не поднялся бы вовсе — и лёг бы
+# магазин.
+
+server {
+    listen 80;
+    server_name errors.mata-club.ru;
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://errors.mata-club.ru$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name errors.mata-club.ru;
+
+    ssl_certificate     /etc/nginx/certs/errors/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/errors/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Отчёты об ошибках с картами исходников бывают крупными.
+    client_max_body_size 20m;
+
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    set $glitchtip http://glitchtip-web:8000;
+
+    location / {
+        proxy_pass $glitchtip;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+}
