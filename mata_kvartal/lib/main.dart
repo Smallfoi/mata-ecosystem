@@ -11,6 +11,7 @@ import 'core/config/app_config_provider.dart';
 import 'core/storage/account_scope.dart';
 import 'features/races/data/race_reminders.dart';
 import 'features/run/data/completed_runs_provider.dart';
+import 'core/theme/text_scale.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -138,6 +139,7 @@ class _KvartalAppState extends ConsumerState<KvartalApp>
       title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.current(),
+      builder: clampTextScale,
       routerConfig: ref.watch(routerProvider),
     );
   }

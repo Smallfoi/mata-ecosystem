@@ -6,6 +6,7 @@ import 'router/app_router.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'theme/app_theme.dart';
+import 'theme/text_scale.dart';
 
 class SportStoreApp extends StatefulWidget {
   final SharedPreferences prefs;
@@ -40,6 +41,7 @@ class _SportStoreAppState extends State<SportStoreApp> {
     if (!_splashDone) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
+        builder: clampTextScale,
         home: SplashScreen(
           onComplete: () => setState(() => _splashDone = true),
         ),
@@ -49,6 +51,7 @@ class _SportStoreAppState extends State<SportStoreApp> {
     if (!_onboardingDone) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
+        builder: clampTextScale,
         theme: AppTheme.light,
         home: OnboardingScreen(onComplete: _finishOnboarding),
       );
@@ -78,6 +81,7 @@ class _SportStoreAppState extends State<SportStoreApp> {
       scaffoldMessengerKey: _messengerKey,
       routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
+        builder: clampTextScale,
     );
   }
 }
