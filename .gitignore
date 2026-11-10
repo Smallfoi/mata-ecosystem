@@ -33,6 +33,8 @@ backups/
 # === Прод-nginx: реальный конфиг с доменом + состояние TLS (создаётся на сервере) ===
 backend/nginx/mata.conf
 backend/nginx/certs/
+backend/nginx/extra/
+backend/glitchtip.env
 backend/nginx/letsencrypt/
 backend/nginx/certbot-www/
 
