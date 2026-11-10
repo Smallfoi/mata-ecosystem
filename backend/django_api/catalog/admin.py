@@ -210,15 +210,18 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
     )
     list_filter = (ShopTitleFilter, MissingFilter, "category_id", "brand", "in_stock",
                    "is_published", "is_featured", "is_new", "is_active_1c")
+    # Штрихкод ищется точным совпадением — можно вставить со сканера (D-121).
     search_fields = ("id", "name", "display_name", "display_name_override", "model_key",
-                     "model_key_override", "brand", "article", "description")
+                     "model_key_override", "brand", "article", "description",
+                     "=barcodes__barcode")
     ordering = ("sort",)
     actions = [make_published, make_draft, "rebuild_names", delete_products]
     fieldsets = (
         ("Основное", {
             "fields": ("id", "name", "display_name", "display_name_override",
                        "model_key", "model_key_override",
-                       "brand", "article", "category_id", "category_ref", "description"),
+                       "brand", "article", "barcode_list", "category_id", "category_ref",
+                       "description"),
             "description": "«Название» 1С шлёт по позиции — с артикулом, цветом и размером "
             "(«ЖИЛЕТ Жен. BMAI арт. FRWK006-1 цвет ЧЕРНЫЙ р. XL»): так удобно на "
             "этикетке и в офлайн-магазине. «Витринное название» считается из него "
@@ -252,7 +255,16 @@ class ProductAdmin(ColumnPickerMixin, ModelAdmin):
             "странице «Конструктор витрины».",
         }),
     )
-    readonly_fields = ("preview_large", "display_name", "model_key", "category_ref")
+    readonly_fields = ("preview_large", "display_name", "model_key", "category_ref",
+                       "barcode_list")
+
+    @admin.display(description="Штрихкоды")
+    def barcode_list(self, obj):
+        """Штрихкоды позиции из 1С (D-121). Ведёт 1С — здесь только посмотреть."""
+        if not obj or not obj.pk:
+            return "—"
+        codes = [b.barcode for b in obj.barcodes.all()]
+        return ", ".join(codes) if codes else "— (1С не прислала)"
 
     @admin.action(description="🔤 Пересчитать витринные названия и модели")
     def rebuild_names(self, request, queryset):

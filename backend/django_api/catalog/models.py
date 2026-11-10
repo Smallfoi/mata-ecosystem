@@ -338,6 +338,30 @@ class CheckDismissal(models.Model):
 
 
 
+class ProductBarcode(models.Model):
+    """Штрихкод складской позиции из 1С (D-121).
+
+    В 1С каждый размер и цвет — отдельная позиция, и штрихкоды висят на ней: у
+    позиции их может быть несколько (свой и производителя). Один штрихкод — ровно
+    одна позиция: это держит уникальный индекс. Ведёт только 1С, в админке —
+    для чтения и поиска.
+    """
+
+    barcode = models.CharField(max_length=64, unique=True, verbose_name="Штрихкод")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="barcodes",
+                                verbose_name="Товар")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Получен")
+
+    class Meta:
+        db_table = "catalog_product_barcodes"
+        ordering = ["id"]
+        verbose_name = "Штрихкод"
+        verbose_name_plural = "Штрихкоды"
+
+    def __str__(self):
+        return self.barcode
+
+
 class ProductPhoto(models.Model):
     """Фотографии витрины: привязаны к МОДЕЛИ и ЦВЕТУ, а не к складской позиции.
 

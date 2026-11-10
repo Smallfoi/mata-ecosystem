@@ -15,7 +15,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from catalog.models import Category, Product
+from catalog.models import Category, Product, ProductBarcode
 
 # Поле в JSON от 1С → поле модели. Ключи совпадают с Product.OVERRIDABLE.
 FIELD_MAP = {
@@ -63,7 +63,7 @@ def _parcel_errors(product: Product, raw: dict, who: str) -> list:
 CATALOG_KEYS = {"id", "article", "name", "categoryId",
                 "brand", "active", "updatedAt",
                 "price", "oldPrice", "description", "sizes", "colors", "images",
-                "weightG", "lengthCm", "widthCm", "heightCm"}
+                "weightG", "lengthCm", "widthCm", "heightCm", "barcodes"}
 PRICE_KEYS = {"id", "article", "price", "oldPrice", "stock", "variants"}
 CATEGORY_KEYS = {"id", "name", "parentId", "sort"}
 
@@ -203,6 +203,80 @@ def _clean_list(value) -> list:
     return out
 
 
+BARCODE_MAX = 64
+
+
+def _clean_barcodes(value, who: str, errors: list) -> list:
+    """Штрихкоды позиции (D-121): массив строк. Объект `{"barcode": "…"}` тоже
+    поймём. Пустоты и повторы отбрасываем; длиннее 64 знаков или с пробелом внутри —
+    в отчёт, остальные примем."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        value = [value]
+    out: list = []
+    for item in value:
+        if isinstance(item, dict):
+            item = item.get("barcode")
+        if item is None:
+            continue
+        text = str(item).strip()
+        if not text or text.lower() in _EMPTY:
+            continue
+        if len(text) > BARCODE_MAX or any(ch.isspace() for ch in text):
+            errors.append(f"{who}: штрихкод «{text[:40]}» не принят — длиннее "
+                          f"{BARCODE_MAX} знаков или с пробелом внутри")
+            continue
+        if text not in out:
+            out.append(text)
+    return out
+
+
+def _sync_barcodes(wanted: dict, errors: list) -> dict:
+    """Записать штрихкоды позиций, у которых в выгрузке было поле `barcodes`.
+
+    `wanted` — id товара → его штрихкоды. Поле пришло — список у позиции становится
+    ровно таким (пустой массив снимает все). Не пришло — штрихкоды не трогаем.
+    Штрихкод, уже висящий на другой позиции, переезжает: 1С — источник правды.
+    Один штрихкод у двух позиций одной пачки — ошибка данных в 1С: такой не
+    принимаем, у прежней позиции он остаётся.
+    """
+    stats = {"added": 0, "moved": 0, "removed": 0}
+    if not wanted:
+        return stats
+    owner: dict = {}
+    clash: set = set()
+    for pid, codes in wanted.items():
+        for code in codes:
+            if code in owner and owner[code] != pid:
+                clash.add(code)
+            else:
+                owner[code] = pid
+    for code in sorted(clash):
+        errors.append(f"штрихкод {code} пришёл у нескольких позиций — не принят, "
+                      f"проверьте карточки в 1С")
+        owner.pop(code, None)
+
+    existing = {b.barcode: b for b in ProductBarcode.objects.filter(
+        Q(product_id__in=list(wanted)) | Q(barcode__in=list(owner)))}
+    gone = {b.pk for b in existing.values()
+            if b.product_id in wanted and b.barcode not in clash
+            and owner.get(b.barcode) != b.product_id}
+    to_create, to_move = [], []
+    for code, pid in owner.items():
+        b = existing.get(code)
+        if b is None or b.pk in gone:
+            to_create.append(ProductBarcode(barcode=code, product_id=pid))
+        elif b.product_id != pid:
+            b.product_id = pid
+            to_move.append(b)
+    ProductBarcode.objects.filter(pk__in=gone).delete()
+    ProductBarcode.objects.bulk_create(to_create, batch_size=CHUNK)
+    ProductBarcode.objects.bulk_update(to_move, ["product"], batch_size=CHUNK)
+    stats.update(added=len(to_create), moved=len(to_move), removed=len(gone))
+    return stats
+
+
 def _apply(product: Product, payload: dict, fields: dict) -> list:
     """Записать пришедшие поля: эффективное значение — только если не переопределено.
     Возвращает список полей, которые владелец удержал за собой (для отчёта)."""
@@ -312,6 +386,7 @@ def import_catalog(items) -> dict:
     # тысячах позиций получится квадрат — ровно то, что мы здесь и чиним.
     to_create: dict = {}
     to_update: dict = {}
+    barcodes: dict = {}  # id товара → штрихкоды (только у тех, где поле пришло)
 
     for raw in items:
         if not isinstance(raw, dict):
@@ -349,6 +424,9 @@ def import_catalog(items) -> dict:
 
         kept_fields.update(_apply(product, raw, FIELD_MAP))
         errors.extend(_parcel_errors(product, raw, external_id or article))
+        if "barcodes" in raw:
+            barcodes[product.id] = _clean_barcodes(raw["barcodes"], external_id or article,
+                                                   errors)
         # Витринное имя пересчитываем всегда: оно зависит от названия, цвета и
         # размера, а они могли приехать этой же выгрузкой (catalog/naming.py).
         product.rebuild_display_name()
@@ -363,6 +441,7 @@ def import_catalog(items) -> dict:
         if to_update:
             Product.objects.bulk_update(list(to_update.values()), CATALOG_FIELDS,
                                         batch_size=CHUNK)
+        barcode_stats = _sync_barcodes(barcodes, errors)
     created, updated = len(to_create), len(to_update)
 
     for cid in sorted(unknown):
@@ -372,7 +451,8 @@ def import_catalog(items) -> dict:
     return {
         "received": len(items), "created": created, "updated": updated,
         "skipped": skipped, "keptByOwner": sorted(kept_fields),
-        "unknownCategories": sorted(unknown), "errors": errors[:20],
+        "unknownCategories": sorted(unknown), "barcodes": barcode_stats,
+        "errors": errors[:20],
         "sample": sample, "unknownKeys": unknown_keys, "fields": report,
     }
 
