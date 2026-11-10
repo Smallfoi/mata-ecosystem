@@ -85,6 +85,13 @@ case "${1:-}" in
     docker run --rm -v "$LE_DIR:/etc/letsencrypt" -v "$WEBROOT:/var/www/certbot" \
       certbot/certbot renew --webroot -w /var/www/certbot --non-interactive
     install_certs
+    # Сертификат errors.mata-club.ru (GlitchTip, D-122) — certbot продлил его тем же
+    # вызовом, раскладываем рядом.
+    if [ -f "$LE_DIR/live/errors.mata-club.ru/fullchain.pem" ] && [ -d "$CERTS/errors" ]; then
+      cp -L "$LE_DIR/live/errors.mata-club.ru/fullchain.pem" "$CERTS/errors/fullchain.pem"
+      cp -L "$LE_DIR/live/errors.mata-club.ru/privkey.pem" "$CERTS/errors/privkey.pem"
+      chmod 600 "$CERTS/errors/privkey.pem"
+    fi
     $COMPOSE exec -T nginx nginx -s reload
     echo "Обновление завершено, nginx перечитал конфигурацию."
     ;;

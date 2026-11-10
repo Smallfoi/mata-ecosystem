@@ -1,0 +1,66 @@
+# GlitchTip — мониторинг ошибок МАТА (D-32, D-122): Sentry-совместимый, свой сервер в РФ.
+#
+# ВРЕМЕННО живёт на прод-ВМ (решение владельца 10.11.2026, 0 ₽). Цель — перенести на
+# отдельную площадку: мониторинг не должен падать вместе с продом. Набор отдельный от
+# docker-compose.prod.yml как раз для этого — переносится одним файлом и скриптом.
+#
+# Автодеплой этот файл НЕ запускает. Управление — только deploy/glitchtip.sh:
+#   sudo bash deploy/glitchtip.sh setup   — первый запуск (секреты, база, миграции)
+#   sudo bash deploy/glitchtip.sh tls     — сертификат + адрес errors.mata-club.ru
+#   sudo bash deploy/glitchtip.sh admin   — создать первого пользователя
+#
+# Своя маленькая база, а не общая с магазином: нагрузка от ошибок не ложится на прод-БД
+# и не попадает в её бэкапы. Без Valkey (VALKEY_URL пуст): очередь и кэш GlitchTip держит
+# в своей PostgreSQL — минус контейнер и сотня мегабайт памяти.
+name: mata-glitchtip
+
+services:
+  glitchtip-db:
+    # Точная версия (F05). 16-я, как у прода; GlitchTip требует PostgreSQL 14+.
+    image: postgres:16.14-alpine3.23
+    restart: always
+    environment:
+      POSTGRES_DB: glitchtip
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${GLITCHTIP_DB_PASSWORD:?нет GLITCHTIP_DB_PASSWORD — запусти deploy/glitchtip.sh setup}
+    # Партиционированным таблицам GlitchTip нужно больше блокировок (их же образец настройки).
+    command: postgres -c max_locks_per_transaction=512 -c shared_buffers=64MB
+    volumes:
+      - glitchtip-pg:/var/lib/postgresql/data
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glitchtip -d glitchtip"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  glitchtip:
+    # Точная версия (F05): 6.2.6 от 08.08.2026. Ветку 7.x не берём, пока ей нет и месяца.
+    image: glitchtip/glitchtip:6.2.6
+    restart: always
+    env_file: glitchtip.env
+    environment:
+      SERVER_ROLE: all_in_one
+      VALKEY_URL: ""
+      PORT: "8000"
+    volumes:
+      - glitchtip-uploads:/code/uploads
+    # Потолок памяти: GlitchTip не должен отнять память у магазина.
+    mem_limit: 700m
+    depends_on:
+      glitchtip-db:
+        condition: service_healthy
+    networks:
+      default: {}
+      # Сеть прод-стека: через неё nginx магазина отдаёт errors.mata-club.ru.
+      prod:
+        aliases: [glitchtip-web]
+
+volumes:
+  glitchtip-pg:
+  glitchtip-uploads:
+
+networks:
+  prod:
+    external: true
+    name: ${MATA_PROD_NETWORK:-backend_default}
