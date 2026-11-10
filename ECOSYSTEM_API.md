@@ -395,19 +395,33 @@ POST /orders     { items, checkoutData, pointsRedeemed, total } → Order   (з�
 GET  /shipping-options[?goods=<сумма товаров>]           → { options: [{ code, name, kind: pickup|delivery, zone, description, price, freeFrom, requiresAddress, cost? }] }
                  публично; способы ведёт владелец в админке «Магазин → Доставка» (D-110); code = checkoutData.deliveryType (pickup, courier).
 
-Заявки покупателя на возврат (D-112) — Bearer, только свои заказы:
+Заявки покупателя на возврат (D-112, D-123) — Bearer, только свои заказы. Сервер — первая инстанция: сроки и что можно вернуть решает он.
 GET  /orders/:id/return-options   → { canReturn, reason, lines:[{index, name, paid, available, status: available|requested|returned}],
-                                      reasons:{size, style, defect, not_as_described, wrong_item, other}, returnDays, bringDays,
-                                      standardUntil, standardOpen, defectUntil, store:{name, description} }
+                                      reasons:{size, style, defect, not_as_described, wrong_item, other}, returnDays, bringDays, maxPhotos,
+                                      standardUntil, standardOpen, standardNote, defectUntil, store:{name, description},
+                                      canCancel, cancelRequested, cancelNote }
+                 Заказ не получен (1С не прислала shipped/delivered) → canReturn=false, вместо возврата — отмена (canCancel).
+                 standardNote — пояснение для кнопки, когда срок 7 дней истёк (со ссылкой на ст. 26.1); брак ещё можно.
+POST /return-photos  multipart image  → 201 { id, url }   (фото к будущей заявке; без EXIF, приватно; не прикреплённые — удаляются через сутки)
 GET  /orders/:id/return-requests  → ReturnRequest[]
-POST /orders/:id/return-requests  { method: store|parcel, lines:[{index, reason, comment?}] } → 201 ReturnRequest
-                 400 — нет причины / defect|other без описания / срок истёк; 409 — вещь уже вернули или заявлена.
-                 Без брака — RETURN_DAYS (7) со дня получения; брак/не тот товар/не по описанию — до 2 лет.
+POST /orders/:id/return-requests  { method: store|parcel, lines:[{index, reason, comment?}], photos?:[id] } → 201 ReturnRequest
+                 400 — нет причины / defect|other без описания / defect без фото (если клиент прислал photos; без поля —
+                 старая сборка, брак принимаем без снимка) / срок истёк (текст с законом и датой);
+                 409 — вещь уже вернули или заявлена. Без брака — 7 дней со дня получения; брак/не тот товар/не по описанию — до 2 лет.
 GET  /return-requests             → ReturnRequest[] (все свои)
 POST /return-requests/:pk/cancel  → ReturnRequest   (только пока status=awaiting; иначе 409)
-ReturnRequest = { id, number «В-N», orderId, status: awaiting|received|approved|rejected|canceled|expired, statusLabel,
-                  method, lines, bringUntil, decisionNote, refundRub, createdAt }
-                 Решение — в админке «Заявки на возврат»: товар получен → одобрить (деньги по строкам чека, D-73) / отказать с причиной.
+POST /return-requests/:pk/sent    { trackNumber } → ReturnRequest (посылка: status=sent, заявка больше не истекает)
+POST /return-requests/:pk/goods-back { way: pickup|ship } → ReturnRequest (как забрать вещи, по которым отказано; ship — за счёт покупателя)
+ReturnRequest = { id, number «<номер заказа>-В<n>» (старые «В-N»), orderId,
+                  status: awaiting|sent|received|approved|partial|rejected|canceled|expired, statusLabel,
+                  method, lines:[{index, name, reason, reasonLabel, comment, decision?: accept|reject, rejectReasons?, rejectReasonLabels?}],
+                  bringUntil, trackNumber, canCancel, needsTrack, decisionNote, goodsBack, goodsBackDone, needsGoodsBack,
+                  refundRub, photos:[{id,url}], inspectionPhotos:[{id,url}] (после решения), createdAt }
+                 Решение — в админке «Заявки на возврат» → «Открыть заявку»: товар получен → по каждой вещи принять/отказать
+                 (причины, пояснение, фото осмотра) → деньги за принятые — по строкам чека (D-73), ЮKassa без своего чека.
+POST /orders/:id/cancel           → { status: canceled|requested, canCancel, cancelRequested, cancelNote }
+                 До передачи курьеру (D-123). 1С заказ ещё не забрала → отмена сразу, деньги целиком; забрала → запрос складу
+                 (подтверждает/отклоняет в админке). 409 — уже у курьера / уже возврат / запрос уже есть.
 GET  /orders                                             → Order[] (текущего пользователя)
 GET  /orders/:id                                         → Order
 POST /orders/:id/pay  { returnUrl? }  → { status, paymentId, confirmationUrl, method: "sbp" }  (только СБП, D-72; 409 — время на оплату истекло; 502 — оплата недоступна; dev без провайдера — status=paid без paymentId, на сборку не уходит)

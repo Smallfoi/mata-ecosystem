@@ -410,6 +410,8 @@ UNFOLD = {
                      "permission": _tab("orders")},
                     {"title": "Заявки на возврат", "icon": "assignment_return",
                      "link": reverse_lazy("admin:orders_returnrequest_changelist"),
+                     # Сколько заявок ждут склад — видно, не открывая раздел (D-123).
+                     "badge": "orders.return_requests.sidebar_badge",
                      "permission": _tab("orders")},
                     {"title": "Доставка", "icon": "local_shipping",
                      "link": reverse_lazy("admin:orders_shippingoption_changelist"),

@@ -141,7 +141,10 @@ def pending_orders(limit: int = MAX_ORDERS_PER_PULL):
     """Очередь на выдачу: не забранные и готовые к сборке, самые старые первыми."""
     limit = max(1, min(int(limit or MAX_ORDERS_PER_PULL), MAX_ORDERS_PER_PULL))
     return list(
-        Order.objects.filter(onec_taken_at__isnull=True, payment_status="paid")
+        Order.objects.filter(onec_taken_at__isnull=True, payment_status="paid",
+                             # Покупатель отменяет заказ (orders/cancel.py): пока идёт
+                             # возврат денег, на склад его не отдаём.
+                             cancel_requested_at__isnull=True)
         # Номер платежа ЮKassa — доказательство, что деньги прошли через неё.
         .exclude(payment_id="")
         # Касса ещё не пробила чек оплаты — ждём его реквизиты, но не дольше

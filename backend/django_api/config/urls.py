@@ -51,6 +51,7 @@ from productmedia.views import photo_guide, photo_pipeline, photo_prompts, photo
 from config.onec_log_view import onec_log
 from config.runs_review_view import runs_review
 from config.order_return_view import order_return
+from config.return_request_view import return_request_page
 from config.points_view import points_client, points_clients
 from config import loyalty_program_view as loyalty_pages
 from staff import views as staff_views
@@ -87,6 +88,8 @@ urlpatterns = [
     # «Проверка забегов» — разбор помеченных анти-читом (S-04 ф.2). ДО admin/.
     path("admin/runs-review/", runs_review, name="runs_review"),
     path("admin/order-return/<int:pk>/", order_return, name="order_return"),
+    path("admin/return-request/<int:pk>/", return_request_page,
+         name="return_request_page"),
     path("admin/points/", points_clients, name="points_clients"),
     path("admin/points/<str:user_id>/", points_client, name="points_client"),
     # «Программа лояльности»: всё о лояльности настраивает владелец (ТЗ v1).
@@ -209,6 +212,10 @@ urlpatterns = [
     path("v1/orders/<str:order_id>/return-requests", orders_views.order_return_requests),
     path("v1/return-requests", orders_views.my_return_requests),
     path("v1/return-requests/<int:pk>/cancel", orders_views.cancel_return_request),
+    path("v1/return-requests/<int:pk>/sent", orders_views.return_request_sent),
+    path("v1/return-requests/<int:pk>/goods-back", orders_views.return_request_goods_back),
+    path("v1/return-photos", orders_views.return_photo_upload),
+    path("v1/orders/<str:order_id>/cancel", orders_views.cancel_order),
     path("v1/orders/<str:order_id>/pay", orders_views.pay_order),  # инициировать оплату
     # Статус оплаты с перепроверкой у провайдера: страховка от потерянного вебхука.
     path("v1/orders/<str:order_id>/payment", orders_views.payment_state),
