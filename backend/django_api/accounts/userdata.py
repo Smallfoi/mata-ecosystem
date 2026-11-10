@@ -76,7 +76,7 @@ MODELS = (
     ("orders", "orders.Order", ("user_id",), DELETE),  # возвраты уходят каскадом
     # Заявки на возврат (D-112): причины и комментарии покупателя; с заказом — каскадом.
     ("returnRequests", "orders.ReturnRequest", ("user_id",), DELETE),
-    # Фото к возврату (D-122): снимки вещей покупателя. Файл в хранилище удаляется
+    # Фото к возврату (D-123): снимки вещей покупателя. Файл в хранилище удаляется
     # вместе со строкой (сигнал post_delete в orders/models.py).
     ("returnPhotos", "orders.ReturnPhoto", ("user_id",), DELETE),
     ("analyticsEvents", "analytics.Event", ("user_id",), ANON),

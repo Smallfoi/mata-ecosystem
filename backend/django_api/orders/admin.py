@@ -259,7 +259,7 @@ class ShippingOptionAdmin(ModelAdmin):
 
 @admin.register(ReturnRequest)
 class ReturnRequestAdmin(UserRefMixin, ModelAdmin):
-    """Заявки покупателей на возврат (D-112, D-122).
+    """Заявки покупателей на возврат (D-112, D-123).
 
     Каждый день: «Открыть заявку» → когда вещи пришли — «Товар получен» → осмотр →
     решение по каждой вещи на странице заявки. Заявлен брак — отказать можно только

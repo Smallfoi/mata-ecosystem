@@ -1,4 +1,4 @@
-"""Заявки покупателей на возврат (D-112, D-122): покупатель оформляет, магазин осматривает
+"""Заявки покупателей на возврат (D-112, D-123): покупатель оформляет, магазин осматривает
 и решает по каждой вещи; отмена заказа до передачи курьеру.
 
 Покупка как в tests_returns: куртка (позиция 0), две футболки (1, 2), доставка (3).
@@ -53,7 +53,7 @@ class ReturnRequestApiTests(ApiTestCase):
                              {"lines": lines, "method": method, "photos": photos or []})
 
     def test_old_app_without_photo_support_can_still_claim_defect(self):
-        """Сборки до D-122 поле photos не шлют — брак без снимка не блокируем."""
+        """Сборки до D-123 поле photos не шлют — брак без снимка не блокируем."""
         r = self.api_post("/v1/orders/SS-RR/return-requests",
                           {"lines": [{"index": 0, "reason": "defect",
                                       "comment": "отклеилась подошва"}],

@@ -395,7 +395,7 @@ POST /orders     { items, checkoutData, pointsRedeemed, total } → Order   (з�
 GET  /shipping-options[?goods=<сумма товаров>]           → { options: [{ code, name, kind: pickup|delivery, zone, description, price, freeFrom, requiresAddress, cost? }] }
                  публично; способы ведёт владелец в админке «Магазин → Доставка» (D-110); code = checkoutData.deliveryType (pickup, courier).
 
-Заявки покупателя на возврат (D-112, D-122) — Bearer, только свои заказы. Сервер — первая инстанция: сроки и что можно вернуть решает он.
+Заявки покупателя на возврат (D-112, D-123) — Bearer, только свои заказы. Сервер — первая инстанция: сроки и что можно вернуть решает он.
 GET  /orders/:id/return-options   → { canReturn, reason, lines:[{index, name, paid, available, status: available|requested|returned}],
                                       reasons:{size, style, defect, not_as_described, wrong_item, other}, returnDays, bringDays, maxPhotos,
                                       standardUntil, standardOpen, standardNote, defectUntil, store:{name, description},
@@ -420,7 +420,7 @@ ReturnRequest = { id, number «<номер заказа>-В<n>» (старые �
                  Решение — в админке «Заявки на возврат» → «Открыть заявку»: товар получен → по каждой вещи принять/отказать
                  (причины, пояснение, фото осмотра) → деньги за принятые — по строкам чека (D-73), ЮKassa без своего чека.
 POST /orders/:id/cancel           → { status: canceled|requested, canCancel, cancelRequested, cancelNote }
-                 До передачи курьеру (D-122). 1С заказ ещё не забрала → отмена сразу, деньги целиком; забрала → запрос складу
+                 До передачи курьеру (D-123). 1С заказ ещё не забрала → отмена сразу, деньги целиком; забрала → запрос складу
                  (подтверждает/отклоняет в админке). 409 — уже у курьера / уже возврат / запрос уже есть.
 GET  /orders                                             → Order[] (текущего пользователя)
 GET  /orders/:id                                         → Order

@@ -562,7 +562,7 @@ def _my_request(request, pk):
 
 @api_view(["POST"])
 def return_request_sent(request, pk):
-    """Покупатель отправил посылку: трек-номер → заявка «в пути» (D-122)."""
+    """Покупатель отправил посылку: трек-номер → заявка «в пути» (D-123)."""
     from . import return_requests as rr
 
     uid, req = _my_request(request, pk)
@@ -579,7 +579,7 @@ def return_request_sent(request, pk):
 
 @api_view(["POST"])
 def return_request_goods_back(request, pk):
-    """Как покупатель забирает вещи, по которым отказано: pickup | ship (D-122)."""
+    """Как покупатель забирает вещи, по которым отказано: pickup | ship (D-123)."""
     from . import return_requests as rr
 
     uid, req = _my_request(request, pk)
@@ -597,7 +597,7 @@ def return_request_goods_back(request, pk):
 @api_view(["POST"])
 def return_photo_upload(request):
     """Фото к будущей заявке (multipart, поле image) → {id, url}; id передаются в
-    POST /orders/:id/return-requests как photos:[...]. Без EXIF, приватно (D-122)."""
+    POST /orders/:id/return-requests как photos:[...]. Без EXIF, приватно (D-123)."""
     from . import return_requests as rr
 
     uid = user_id_from_request(request)
@@ -612,7 +612,7 @@ def return_photo_upload(request):
 
 @api_view(["POST"])
 def cancel_order(request, order_id):
-    """Покупатель отменяет заказ, пока он не передан курьеру (D-122)."""
+    """Покупатель отменяет заказ, пока он не передан курьеру (D-123)."""
     from .cancel import CancelError, cancel_order as do_cancel, cancel_state
 
     uid, order = _my_order(request, order_id)
