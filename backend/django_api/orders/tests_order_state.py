@@ -13,6 +13,7 @@ from django.test import override_settings
 
 from common.testutils import ApiTestCase
 from orders.models import Order
+from orders.testutil import by_ref
 
 
 class OrderStateInApiTests(ApiTestCase):
@@ -24,10 +25,10 @@ class OrderStateInApiTests(ApiTestCase):
                                          "deliveryCost": 0,
                                          "checkoutData": {"name": "Тест"}})
         self.assertEqual(r.status_code, 200)
-        return Order.objects.get(user_id=self.uid, order_id=oid)
+        return Order.objects.get(by_ref(oid), user_id=self.uid)
 
     def _listed(self, oid):
-        return next(o for o in self.api_get("/v1/orders").json() if o["id"] == oid)
+        return next(o for o in self.api_get("/v1/orders").json() if oid in (o["id"], o.get("clientRef")))
 
     def test_payload_fields_are_kept(self):
         self._create()

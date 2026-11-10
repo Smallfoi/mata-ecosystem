@@ -48,10 +48,12 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
     list_display_links = ("order_id",)
     list_editable = ("status",)
     list_filter = ("status", "payment_status", "onec_status", "is_test")
-    search_fields = ("order_id", "user_id")
+    search_fields = ("order_id", "client_ref", "user_id")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
-    readonly_fields = ("return_link", "payload", "created_at", "onec_taken_at",
+    # Номер выдаёт сервер (D-120) — руками его не меняют: на него ссылаются
+    # платёж, баллы и 1С.
+    readonly_fields = ("order_id", "client_ref", "return_link", "payload", "created_at", "onec_taken_at",
                        "onec_number", "onec_status", "onec_status_at")
     inlines = (OrderReturnInline,)
 

@@ -5,6 +5,7 @@ from unittest import mock
 
 from common.testutils import ApiTestCase
 from orders.models import Order
+from orders.testutil import by_ref, number
 from orders.payment import PaymentError, payment_enabled
 
 # Боевой режим оплаты: провайдер + ключи магазина. Сеть в тестах не трогаем —
@@ -27,7 +28,7 @@ def _yk_paid(order_id, pid="pay_1"):
 
     Сервер засчитывает оплату, только если платёж совпал с заказом (аудит B01).
     """
-    order = Order.objects.get(order_id=order_id)
+    order = Order.objects.get(by_ref(order_id))
     data = _yk(status="succeeded", pid=pid)
     data["amount"] = {"value": f"{order.total:.2f}", "currency": "RUB"}
     data["metadata"] = {"order_id": order.order_id,
@@ -69,7 +70,7 @@ class PaymentScaffoldTests(ApiTestCase):
         self.api_post("/v1/orders", {"id": "SS-P3", "total": 500, "items": []})
         r = self.api_post("/v1/orders/SS-P3/pay", {})
         self.assertEqual(r.status_code, 502)
-        order = Order.objects.get(user_id=self.uid, order_id="SS-P3")
+        order = Order.objects.get(by_ref("SS-P3"), user_id=self.uid)
         self.assertEqual(order.payment_status, "pending")
         self.assertEqual(self.balance(), 0)
 
@@ -142,7 +143,7 @@ class YooKassaPaymentTests(ApiTestCase):
         self._order("SS-Y3")
         r = self.api_post("/v1/orders/SS-Y3/pay", {})
         self.assertEqual(r.status_code, 502)
-        self.assertEqual(Order.objects.get(order_id="SS-Y3").payment_status, "pending")
+        self.assertEqual(Order.objects.get(by_ref("SS-Y3")).payment_status, "pending")
 
     @mock.patch.dict(os.environ, _YK_ENV)
     @mock.patch("orders.payment._http")
@@ -169,7 +170,7 @@ class YooKassaPaymentTests(ApiTestCase):
         self._webhook("pay_1")
         self._webhook("pay_1")  # ЮKassa повторяет доставку при сбоях
         self.assertEqual(self.balance(), 150)
-        self.assertEqual(Order.objects.get(order_id="SS-Y5").payment_status, "paid")
+        self.assertEqual(Order.objects.get(by_ref("SS-Y5")).payment_status, "paid")
 
     @mock.patch.dict(os.environ, _YK_ENV)
     @mock.patch("orders.payment._http")
@@ -182,7 +183,7 @@ class YooKassaPaymentTests(ApiTestCase):
 
         http.return_value = _yk(status="pending")  # правда от API: не оплачен
         self._webhook("pay_1", event="payment.succeeded")  # ложь в теле
-        self.assertEqual(Order.objects.get(order_id="SS-Y6").payment_status, "pending")
+        self.assertEqual(Order.objects.get(by_ref("SS-Y6")).payment_status, "pending")
         self.assertEqual(self.balance(), 0)
 
     @mock.patch.dict(os.environ, _YK_ENV)
@@ -193,7 +194,7 @@ class YooKassaPaymentTests(ApiTestCase):
         http.return_value = _yk()
         self._order("SS-Y7", total=1000)
         add_txn(self.uid, 300, "run", "Баллы за бег")
-        add_txn(self.uid, -100, "redeem", "Оплата баллами", "SS-Y7")
+        add_txn(self.uid, -100, "redeem", "Оплата баллами", number("SS-Y7"))
         self.assertEqual(self.balance(), 200)
 
         self.api_post("/v1/orders/SS-Y7/pay", {})
@@ -274,13 +275,13 @@ class OrderCheckoutTests(ApiTestCase):
         self.api_post("/v1/orders", {"id": "old", "total": 100, "items": []})
         self.api_post("/v1/orders", {"id": "new", "total": 100, "items": []})
         # Детерминированно разводим по времени (иначе одинаковый created_at → неустойчивый порядок).
-        Order.objects.filter(user_id=self.uid, order_id="old").update(
+        Order.objects.filter(by_ref("old"), user_id=self.uid).update(
             created_at=timezone.now() - timedelta(hours=1)
         )
         Order.objects.create(
             user_id="u_stranger", order_id="x", total=100, payload={"id": "x"}
         )  # чужой — не должен попасть в ленту
-        ids = [o["id"] for o in self.api_get("/v1/orders").json()]
+        ids = [o.get("clientRef") for o in self.api_get("/v1/orders").json()]
         self.assertEqual(ids, ["new", "old"])
 
     def test_tiny_order_registration_but_no_purchase_points(self):
@@ -304,7 +305,7 @@ class OrderCheckoutTests(ApiTestCase):
         # Статус заказа ведёт сервер (оплата, 1С, админка), не клиент: повтор
         # оплаченного заказа его не меняет (аудит B01).
         self.assertEqual(
-            Order.objects.get(user_id=self.uid, order_id="SS-U").status, "paid"
+            Order.objects.get(by_ref("SS-U"), user_id=self.uid).status, "paid"
         )
 
     def test_orders_require_auth(self):
@@ -330,7 +331,7 @@ class OrderTotalIntegrityTests(ApiTestCase):
         """Корзина на 5000 ₽ с заявленной суммой 1 ₽ — отказ, а не рубль за куртку."""
         r = self._order("SS-T1", 1, [{"productId": "p-jacket", "quantity": 1}])
         self.assertEqual(r.status_code, 400)
-        self.assertFalse(Order.objects.filter(order_id="SS-T1").exists())
+        self.assertFalse(Order.objects.filter(by_ref("SS-T1")).exists())
 
     def test_correct_total_accepted(self):
         r = self._order("SS-T2", 5500, [
@@ -355,9 +356,13 @@ class OrderTotalIntegrityTests(ApiTestCase):
         from loyalty.models import add_txn
 
         add_txn(self.uid, 2000, "run", "Баллы за бег")
-        add_txn(self.uid, -1000, "redeem", "Оплата баллами", "SS-T5")
+        # Заказ уже есть, и списание по нему проведено под его настоящим номером.
+        Order.objects.create(user_id=self.uid, order_id="МАТА-10000005",
+                             client_ref="SS-T5", total=4000, payload={})
+        add_txn(self.uid, -1000, "redeem", "Оплата баллами", "МАТА-10000005")
         r = self._order("SS-T5", 4000, [{"productId": "p-jacket", "quantity": 1}])
         self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["id"], "МАТА-10000005")
 
     def test_claimed_points_do_not_lower_the_minimum(self):
         """Заявить «списал 5000 баллов» без реального списания нельзя."""
@@ -438,8 +443,9 @@ class PaymentReferenceTests(ApiTestCase):
             self.api_post("/v1/orders/SS-META/pay", {})
 
         meta = bodies[0]["metadata"]
-        self.assertEqual(meta["order_id"], "SS-META")
-        self.assertTrue(meta["reference"].startswith("SS-META-"), meta["reference"])
+        real = number("SS-META")  # провайдеру — настоящий номер (D-120)
+        self.assertEqual(meta["order_id"], real)
+        self.assertTrue(meta["reference"].startswith(f"{real}-"), meta["reference"])
 
 
 class PaymentMethodTests(ApiTestCase):
@@ -592,7 +598,7 @@ class PaymentStateTests(ApiTestCase):
             self.api_post("/v1/orders/SS-S1/pay", {})
 
         # Вебхук не дошёл: заказ висит в «ждёт оплаты», хотя деньги списаны.
-        self.assertEqual(Order.objects.get(order_id="SS-S1").payment_status, "pending")
+        self.assertEqual(Order.objects.get(by_ref("SS-S1")).payment_status, "pending")
 
         with mock.patch("orders.payment._http", return_value=_yk_paid("SS-S1")):
             r = self.api_get("/v1/orders/SS-S1/payment")
@@ -627,7 +633,7 @@ class RefundPointsTests(ApiTestCase):
         from orders.awards import accrue_purchase_points, revoke_purchase_points
 
         self.api_post("/v1/orders", {"id": "SS-RF", "total": 1000, "items": []})
-        order = Order.objects.get(user_id=self.uid, order_id="SS-RF")
+        order = Order.objects.get(by_ref("SS-RF"), user_id=self.uid)
         accrue_purchase_points(order)  # как при подтверждённой оплате
         earned = self.balance()
         self.assertGreater(earned, 0)
@@ -655,7 +661,7 @@ class SinglePaymentPathTests(ApiTestCase):
         return self.api_post("/v1/orders", body)
 
     def _get(self, oid):
-        return Order.objects.get(user_id=self.uid, order_id=oid)
+        return Order.objects.get(by_ref(oid), user_id=self.uid)
 
     def test_every_order_is_born_waiting_for_payment(self):
         self._order("SS-B1")
@@ -676,7 +682,7 @@ class SinglePaymentPathTests(ApiTestCase):
     @mock.patch.dict(os.environ, _YK_ENV)
     def test_resubmit_does_not_unpay_paid_order(self):
         self._order("SS-B4")
-        Order.objects.filter(user_id=self.uid, order_id="SS-B4").update(payment_status="paid")
+        Order.objects.filter(by_ref("SS-B4"), user_id=self.uid).update(payment_status="paid")
         self._order("SS-B4")
         self.assertEqual(self._get("SS-B4").payment_status, "paid")
 
@@ -687,13 +693,13 @@ class SinglePaymentPathTests(ApiTestCase):
         r = self.api_post("/v1/orders", {"id": "SS-B5", "total": 1, "items": [
             {"productName": "Куртка", "price": 1, "quantity": 1}]})
         self.assertEqual(r.status_code, 400)
-        self.assertFalse(Order.objects.filter(order_id="SS-B5").exists())
+        self.assertFalse(Order.objects.filter(by_ref("SS-B5")).exists())
 
     @mock.patch.dict(os.environ, _YK_ENV)
     @mock.patch("orders.payment._http")
     def test_expired_order_cannot_be_paid(self, http):
         self._order("SS-B6")
-        Order.objects.filter(user_id=self.uid, order_id="SS-B6").update(payment_status="canceled")
+        Order.objects.filter(by_ref("SS-B6"), user_id=self.uid).update(payment_status="canceled")
         r = self.api_post("/v1/orders/SS-B6/pay", {})
         self.assertEqual(r.status_code, 409)
         http.assert_not_called()
@@ -744,7 +750,7 @@ class PointsAtCheckoutTests(ApiTestCase):
         add_txn(self.uid, -900, "redeem", "Потрачено раньше", "OLD")  # на счёте 100
         r = self._order("SS-PT3", 1000, 300)
         self.assertEqual(r.status_code, 400)
-        self.assertFalse(Order.objects.filter(order_id="SS-PT3").exists())
+        self.assertFalse(Order.objects.filter(by_ref("SS-PT3")).exists())
         self.assertEqual(self.balance(), 100)
 
     def test_more_than_30_percent_refused(self):
@@ -764,7 +770,7 @@ class PointsAtCheckoutTests(ApiTestCase):
             "id": "SS-PT7", "total": 300, "pointsRedeemed": 100,
             "items": _catalog_items(1000)})
         self.assertEqual(r.status_code, 400)
-        self.assertFalse(Order.objects.filter(order_id="SS-PT7").exists())
+        self.assertFalse(Order.objects.filter(by_ref("SS-PT7")).exists())
         self.assertEqual(self.balance(), 1000)
 
 
@@ -787,7 +793,7 @@ class UnpaidOrderExpiryTests(ApiTestCase):
         r = self.api_post("/v1/orders", {"id": oid, "total": 700, "pointsRedeemed": 300,
                                          "items": _catalog_items(1000)})
         self.assertEqual(r.status_code, 200, r.content)
-        Order.objects.filter(user_id=self.uid, order_id=oid).update(
+        Order.objects.filter(by_ref(oid), user_id=self.uid).update(
             created_at=timezone.now() - timedelta(minutes=minutes_ago),
             payment_id=payment_id,
         )
@@ -798,7 +804,7 @@ class UnpaidOrderExpiryTests(ApiTestCase):
         return expire_unpaid()
 
     def _get(self, oid):
-        return Order.objects.get(user_id=self.uid, order_id=oid)
+        return Order.objects.get(by_ref(oid), user_id=self.uid)
 
     def test_abandoned_order_is_canceled_and_points_return(self):
         self._order("SS-X1", minutes_ago=16)

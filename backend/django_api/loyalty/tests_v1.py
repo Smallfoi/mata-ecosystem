@@ -31,6 +31,7 @@ from loyalty.models import (
 )
 from orders.lifecycle import mark_canceled, mark_paid
 from orders.models import Order
+from orders.testutil import by_ref, number
 from orders.returns import make_return
 
 YKT = ZoneInfo("Asia/Yakutsk")
@@ -77,7 +78,7 @@ class V1Case(ApiTestCase):
         return self.api_post("/v1/orders", body)
 
     def pay(self, oid):
-        o = Order.objects.get(user_id=self.uid, order_id=oid)
+        o = Order.objects.get(by_ref(oid), user_id=self.uid)
         o.payment_id = f"pay_{oid}"
         o.save(update_fields=["payment_id"])
         mark_paid(o)
@@ -85,7 +86,7 @@ class V1Case(ApiTestCase):
         return o
 
     def deliver(self, oid, at):
-        Order.objects.filter(user_id=self.uid, order_id=oid).update(
+        Order.objects.filter(by_ref(oid), user_id=self.uid).update(
             status="delivered", onec_status="delivered", onec_status_at=at)
 
     def ret(self, order, lines):
@@ -155,12 +156,12 @@ class Acceptance(V1Case):
         r = self.order("SS-2", items, 5400, points=2100)
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(self.wallet()["available"], 2900)
-        red = LoyaltyRedemption.objects.get(order_id="SS-2")
+        red = LoyaltyRedemption.objects.get(order_id=number("SS-2"))
         self.assertEqual((red.state, red.eligible_kop), ("blocked", 700000))
         self.pay("SS-2")
         red.refresh_from_db()
         self.assertEqual(red.state, "spent")
-        lot = LoyaltyLot.objects.get(source="purchase", source_ref="SS-2")
+        lot = LoyaltyLot.objects.get(source="purchase", source_ref=number("SS-2"))
         self.assertEqual(lot.amount, 486)
         ev = LoyaltyEvent.objects.get(type="accrue_purchase")
         self.assertEqual((float(ev.cash_part), float(ev.eligible_total), float(ev.order_total)),
@@ -316,10 +317,10 @@ class Acceptance(V1Case):
         source = self.give(1000)
         self.order("SS-U", [{"productId": "shoe"}], 2700, points=300)
         self.assertEqual(self.wallet()["available"], 700)
-        mark_canceled(Order.objects.get(order_id="SS-U"))
+        mark_canceled(Order.objects.get(by_ref("SS-U")))
         source.refresh_from_db()
         self.assertEqual(source.remaining, 1000)
-        self.assertEqual(LoyaltyRedemption.objects.get(order_id="SS-U").state, "released")
+        self.assertEqual(LoyaltyRedemption.objects.get(order_id=number("SS-U")).state, "released")
         # Прежний /loyalty/redeem второй раз не спишет и не сломается.
         r = self.api_post("/v1/loyalty/redeem", {"amount": 300, "orderId": "SS-U"})
         self.assertEqual(r.status_code, 400)
@@ -379,7 +380,7 @@ class Switch(ApiTestCase):
                 "checkoutData": {"email": "b@example.test"}}
         r = self.api_post("/v1/orders", body)
         self.assertEqual(r.status_code, 200, r.content)  # 50 < 300, но правила старые
-        o = Order.objects.get(order_id="SS-OFF")
+        o = Order.objects.get(by_ref("SS-OFF"))
         o.payment_id = "p"
         o.save()
         mark_paid(o)
@@ -397,7 +398,7 @@ class Switch(ApiTestCase):
         self.api_post("/v1/orders", {"id": "SS-ON", "total": 1000,
                                      "items": [{"productId": "shoe"}],
                                      "checkoutData": {"email": "b@example.test"}})
-        o = Order.objects.get(order_id="SS-ON")
+        o = Order.objects.get(by_ref("SS-ON"))
         mark_paid(o)
         self.assertFalse(LoyaltyTransaction.objects.filter(user_id=self.uid).exists())
         self.assertEqual(LoyaltyLot.objects.get(source="purchase").amount, 50)

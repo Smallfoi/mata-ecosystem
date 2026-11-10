@@ -109,6 +109,9 @@ class OrderProvider extends ChangeNotifier {
       if (scope != _scope) return;
       final byId = <String, Order>{for (final o in _orders) o.id: o};
       for (final o in server) {
+        // Черновик этого заказа (номер придумало приложение) заменяется
+        // серверным заказом с настоящим номером (D-120).
+        if (o.clientRef != null) byId.remove(o.clientRef);
         byId[o.id] = o;
       }
       final merged = byId.values.toList()
@@ -212,8 +215,9 @@ class OrderProvider extends ChangeNotifier {
   /// не было ситуации «заказ оформлен в приложении, но на сервере его нет».
   Future<bool> _submit(Order order) async {
     try {
-      await _repo.submitOrder(order);
-      _onSubmitted(order.id);
+      final saved = await _repo.submitOrder(order);
+      _adopt(order.id, saved);
+      _onSubmitted(saved.id);
       return true;
     } catch (e, st) {
       _onSubmitFailed(order.id);
@@ -234,6 +238,25 @@ class OrderProvider extends ChangeNotifier {
       );
       return false;
     }
+  }
+
+  /// Черновой номер → настоящий, выданный сервером (D-120).
+  final Map<String, String> _serverIds = {};
+
+  /// Номер заказа для показа и дальнейших запросов: после ответа сервера —
+  /// настоящий, до него (или в mock-режиме) — черновой.
+  String idOf(String draftId) => _serverIds[draftId] ?? draftId;
+
+  /// Сервер принял заказ и выдал ему номер: локальный черновик заменяем
+  /// серверной версией, чтобы покупатель везде видел тот же номер, что магазин
+  /// и 1С.
+  void _adopt(String draftId, Order saved) {
+    _serverIds[draftId] = saved.id;
+    final i = _orders.indexWhere((o) => o.id == draftId);
+    if (i < 0) return;
+    _orders[i] = saved;
+    _save();
+    notifyListeners();
   }
 
   /// Заказ принят сервером: первое уведомление. Дальше статус приходит с

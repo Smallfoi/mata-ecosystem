@@ -30,6 +30,7 @@ from loyalty.models import add_txn
 from orders import pricing
 from orders.lifecycle import mark_canceled, mark_paid
 from orders.models import Order
+from orders.testutil import by_ref
 from orders.money import to_kop
 from orders.payment import payment_mismatch
 from orders.receipt import build_receipt
@@ -74,7 +75,7 @@ class KopecksTests(ApiTestCase):
         _product("m-tee", price=2490.5)
         r = self.api_post("/v1/orders", _body("SS-M1", "m-tee", 2490.5))
         self.assertEqual(r.status_code, 200, r.content)
-        order = Order.objects.get(user_id=self.uid, order_id="SS-M1")
+        order = Order.objects.get(by_ref("SS-M1"), user_id=self.uid)
         self.assertEqual(order.total_kop, 249050)
         self.assertEqual(order.total, 2490.5)
         # Контракт клиентов прежний: total — число в рублях.
@@ -138,7 +139,7 @@ class ReceiptMatchesPaymentTests(ApiTestCase):
                                  "deliveryType": "courier", "address": "Якутск, Ленина 1"}}
         r = self.api_post("/v1/orders", body)
         self.assertEqual(r.status_code, 200, r.content)
-        order = Order.objects.get(user_id=self.uid, order_id="SS-R1")
+        order = Order.objects.get(by_ref("SS-R1"), user_id=self.uid)
         self.assertEqual(order.total_kop, 314998)
 
         sent = {}
@@ -175,7 +176,7 @@ class ReserveTests(ApiTestCase):
     def _first(self, oid="SS-A1"):
         r = self.api_post("/v1/orders", _body(oid, "m-last", 5000))
         self.assertEqual(r.status_code, 200, r.content)
-        return Order.objects.get(user_id=self.uid, order_id=oid)
+        return Order.objects.get(by_ref(oid), user_id=self.uid)
 
     def _second(self, oid="SS-B1"):
         return self.api_post("/v1/orders", _body(oid, "m-last", 5000), token=self.other)
@@ -186,7 +187,7 @@ class ReserveTests(ApiTestCase):
         self.assertEqual(r.status_code, 409, r.content)
         self.assertEqual(r.json()["productId"], "m-last")
         self.assertIn("другой покупатель", r.json()["detail"])
-        self.assertFalse(Order.objects.filter(order_id="SS-B1").exists())
+        self.assertFalse(Order.objects.filter(by_ref("SS-B1")).exists())
 
     def test_stock_itself_not_written(self):
         before = Product.objects.values("stock_count", "stock_by_size", "in_stock").get(pk="m-last")
@@ -316,11 +317,11 @@ class ConcurrentLastUnitTests(TransactionTestCase):
             for t in threads:
                 t.join(timeout=30)
         self.assertEqual(sorted(codes), [200, 409], codes)
-        self.assertEqual(Order.objects.filter(order_id__startswith="SS-T").count(), 1)
+        self.assertEqual(Order.objects.filter(client_ref__startswith="SS-T").count(), 1)
         self.assertEqual(Product.objects.get(pk="m-race").stock_count, 1)
 
         # Первый не оплатил и заказ отменили — единица снова продаётся.
-        mark_canceled(Order.objects.get(order_id__startswith="SS-T"))
+        mark_canceled(Order.objects.get(client_ref__startswith="SS-T"))
         r = Client().post("/v1/orders", data=json.dumps(_body("SS-T9", "m-race", 5000)),
                           content_type="application/json",
                           HTTP_AUTHORIZATION=f"Bearer {self._token('+79990009307')}")

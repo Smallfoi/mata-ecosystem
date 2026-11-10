@@ -15,6 +15,7 @@ from common.testutils import ApiTestCase
 from integrations.models import OneCExchange
 from notifications.models import Notification
 from orders.models import Order
+from orders.testutil import by_ref
 
 TOKEN = "test-1c-token"
 PULL = "/v1/integrations/1c/orders"
@@ -160,7 +161,7 @@ class OneCOrderFlowTests(TestCase):
         r = self._post(STATUS, {"orders": [
             {"orderId": "MATA-1", "status": "shipped", "number": "УТ-000123"}]})
         self.assertEqual(r.json()["updated"], 1)
-        o = Order.objects.get(order_id="MATA-1")
+        o = Order.objects.get(by_ref("MATA-1"))
         self.assertEqual(o.status, "shipped")
         self.assertEqual(o.onec_status, "shipped")
         self.assertEqual(o.onec_number, "УТ-000123")
@@ -171,7 +172,7 @@ class OneCOrderFlowTests(TestCase):
     def test_warehouse_stages_do_not_change_order_status(self):
         """«Принят» и «собран» — кухня склада: покупателю сообщаем, статус не двигаем."""
         self._post(STATUS, {"orders": [{"orderId": "MATA-1", "status": "assembled"}]})
-        o = Order.objects.get(order_id="MATA-1")
+        o = Order.objects.get(by_ref("MATA-1"))
         self.assertEqual(o.status, "pending")       # общий статус на месте
         self.assertEqual(o.onec_status, "assembled")
         self.assertEqual(Notification.objects.filter(user_id="u1").count(), 1)
@@ -184,7 +185,7 @@ class OneCOrderFlowTests(TestCase):
 
     def test_cancel_maps_to_our_status(self):
         self._post(STATUS, {"orders": [{"orderId": "MATA-1", "status": "canceled"}]})
-        self.assertEqual(Order.objects.get(order_id="MATA-1").status, "cancelled")
+        self.assertEqual(Order.objects.get(by_ref("MATA-1")).status, "cancelled")
 
     def test_status_takes_order_off_the_queue(self):
         """Статус пришёл — значит документ у 1С есть, даже если ack потерялся."""
@@ -195,7 +196,7 @@ class OneCOrderFlowTests(TestCase):
         r = self._post(STATUS, {"orders": [{"orderId": "MATA-1", "status": "чтототам"}]})
         self.assertEqual(r.json()["updated"], 0)
         self.assertTrue(r.json()["errors"])
-        self.assertEqual(Order.objects.get(order_id="MATA-1").status, "pending")
+        self.assertEqual(Order.objects.get(by_ref("MATA-1")).status, "pending")
 
     def test_unknown_order_reported(self):
         r = self._post(STATUS, {"orders": [{"orderId": "нет-такого", "status": "shipped"}]})
@@ -236,14 +237,15 @@ class UnpaidOrderStaysOffWarehouseTests(ApiTestCase):
             "checkoutData": {"paymentType": pay_type},
         })
         self.assertEqual(r.status_code, 200, r.content)
+        return r
 
     @mock.patch.dict(os.environ, {"PAYMENT_PROVIDER": "yookassa"})
     def test_order_reaches_warehouse_only_after_confirmed_payment(self):
-        self._order("MATA-E1")
-        self.assertNotIn("MATA-E1", self._pull())
-        Order.objects.filter(order_id="MATA-E1").update(payment_status="paid",
-                                                       payment_id="yk-e1")
-        self.assertIn("MATA-E1", self._pull())
+        number = self._order("MATA-E1").json()["id"]
+        self.assertNotIn(number, self._pull())
+        Order.objects.filter(order_id=number).update(payment_status="paid",
+                                                     payment_id="yk-e1")
+        self.assertIn(number, self._pull())
 
     @mock.patch.dict(os.environ, {"PAYMENT_PROVIDER": "yookassa"})
     def test_pay_on_delivery_choice_does_not_bypass_payment(self):
@@ -256,5 +258,5 @@ class UnpaidOrderStaysOffWarehouseTests(ApiTestCase):
         """Режим разработки «оплачивает» без ЮKassa — такой заказ на склад не идёт."""
         self._order("MATA-E3")
         self.api_post("/v1/orders/MATA-E3/pay", {})
-        self.assertEqual(Order.objects.get(order_id="MATA-E3").payment_status, "paid")
+        self.assertEqual(Order.objects.get(by_ref("MATA-E3")).payment_status, "paid")
         self.assertNotIn("MATA-E3", self._pull())

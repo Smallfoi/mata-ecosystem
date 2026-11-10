@@ -15,6 +15,7 @@ from common.testutils import ApiTestCase
 from integrations.onec_orders import pending_orders
 from loyalty.models import add_txn
 from orders.models import Order
+from orders.testutil import by_ref
 
 _YK_ENV = {
     "PAYMENT_PROVIDER": "yookassa",
@@ -79,7 +80,7 @@ class FrozenOrderTests(_YooKassaCase):
         return r
 
     def _get(self, oid):
-        return Order.objects.get(user_id=self.uid, order_id=oid)
+        return Order.objects.get(by_ref(oid), user_id=self.uid)
 
     def test_repeat_of_same_order_in_payment_is_idempotent(self):
         """Ретрай/офлайн-очередь шлют тот же заказ ещё раз — это не ошибка."""
@@ -89,7 +90,8 @@ class FrozenOrderTests(_YooKassaCase):
 
         r = self._post("SS-F1")
         self.assertEqual(r.status_code, 200, r.content)
-        self.assertEqual(r.json()["id"], "SS-F1")
+        self.assertEqual(r.json()["id"], before.order_id)
+        self.assertEqual(r.json()["clientRef"], "SS-F1")
         after = self._get("SS-F1")
         self.assertEqual(after.total, before.total)
         self.assertEqual(after.payment_id, "pay_1")
@@ -167,7 +169,7 @@ class PaymentMatchTests(_YooKassaCase):
         self.api_post("/v1/orders", {"id": "SS-M", "total": 1000, "items": _items(1000)})
         with mock.patch("orders.payment._http", return_value=_yk()):
             self.api_post("/v1/orders/SS-M/pay", {})
-        self.order = Order.objects.get(user_id=self.uid, order_id="SS-M")
+        self.order = Order.objects.get(by_ref("SS-M"), user_id=self.uid)
         self.assertEqual(self.order.payment_id, "pay_1")
 
     def _webhook(self, info):
@@ -241,7 +243,7 @@ class PaymentTransitionTests(_YooKassaCase):
                                      "items": _items(1000)})
         with mock.patch("orders.payment._http", return_value=_yk()):
             self.api_post("/v1/orders/SS-T/pay", {})
-        self.order = Order.objects.get(user_id=self.uid, order_id="SS-T")
+        self.order = Order.objects.get(by_ref("SS-T"), user_id=self.uid)
         self.assertEqual(self.order.payment_id, "pay_1")
 
     def _webhook(self, info, event="payment.succeeded"):

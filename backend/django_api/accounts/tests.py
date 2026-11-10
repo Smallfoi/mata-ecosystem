@@ -340,7 +340,7 @@ class AccountExportTests(ApiTestCase):
         self.assertEqual(d["userId"], self.uid)
         self.assertEqual(d["profile"]["id"], self.uid)
         self.assertTrue(d["loyalty"]["transactions"])  # начисления за заказ попали
-        self.assertTrue(any(o.get("id") == "o1" for o in d["orders"]))
+        self.assertTrue(any(o.get("clientRef") == "o1" for o in d["orders"]))
         self.assertIn("exportedAt", d)
         # структура покрывает удаляемые данные (зеркало delete_account)
         for key in ("runs", "shoes", "notifications", "consents", "analyticsEvents"):

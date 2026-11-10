@@ -16,7 +16,16 @@ class Order(models.Model):
     ]
 
     user_id = models.CharField(max_length=40, db_index=True, verbose_name="Пользователь (ID)")
-    order_id = models.CharField(max_length=40, verbose_name="Номер заказа")  # клиентский id (SS-xxxxx)
+    # Номер заказа выдаёт СЕРВЕР (D-120): `МАТА-` + 8 случайных цифр, уникален во всей
+    # базе. Случайный, а не порядковый — по номеру нельзя понять, сколько у магазина
+    # заказов. Его видят покупатель, магазин и 1С. Заказы до D-120 сохранили номер,
+    # который придумало приложение (SS-xxxxx / МАТА-xxxxxx): он тоже уникален.
+    order_id = models.CharField(max_length=40, unique=True, verbose_name="Номер заказа")
+    # Черновой номер, с которым приложение/сайт прислали заказ. Служебный: по нему
+    # повторная отправка (ретрай, офлайн-очередь) находит уже созданный заказ, а
+    # старые сборки — свой заказ в оплате и баллах. Наружу (покупателю, 1С) не идёт.
+    client_ref = models.CharField(max_length=40, blank=True, default="",
+                                  verbose_name="Черновой номер из приложения")
     # Устаревшее хранение суммы (float, рубли) — пишется и отдаётся в API как раньше.
     # Считаем по `total_kop`. Убрать float-поле — отдельный шаг (см. orders/money.py).
     total = models.FloatField(default=0, verbose_name="Сумма, ₽")
@@ -78,13 +87,32 @@ class Order(models.Model):
     class Meta:
         db_table = "store_orders"
         ordering = ["-created_at"]
-        # Идемпотентность: один и тот же заказ пользователя не дублируется.
-        unique_together = (("user_id", "order_id"),)
+        # Идемпотентность: один и тот же черновой заказ пользователя не дублируется.
+        constraints = [
+            models.UniqueConstraint(fields=["user_id", "client_ref"],
+                                    condition=~models.Q(client_ref=""),
+                                    name="uniq_order_client_ref"),
+        ]
         verbose_name = "Заказ"
         verbose_name_plural = "Заказы"
 
     def __str__(self) -> str:
         return self.order_id
+
+    @classmethod
+    def find_for_user(cls, user_id, ref, *, lock=False):
+        """Заказ пользователя по номеру — серверному или черновому (D-120).
+
+        Новые сборки знают серверный номер, старые — только черновой, с которым
+        оформляли. Оба пути должны вести к одному заказу (оплата, баллы, возвраты).
+        """
+        ref = str(ref or "").strip()
+        if not ref:
+            return None
+        qs = cls.objects.filter(user_id=user_id)
+        if lock:
+            qs = qs.select_for_update()
+        return qs.filter(order_id=ref).first() or qs.filter(client_ref=ref).first()
 
     # Серверный статус → словарь приложения Store (`pending | processing | shipped |
     # delivered | cancelled`). Старые сборки неизвестный статус читают как «ожидает»,
@@ -131,7 +159,10 @@ class Order(models.Model):
         заменяем серверным — иначе покупатель вечно видит «ожидает».
         """
         data = dict(self.payload or {})
-        data.setdefault("id", self.order_id)
+        data["id"] = self.order_id
+        if self.client_ref and self.client_ref != self.order_id:
+            # Новая сборка по нему заменяет у себя черновик серверным заказом.
+            data["clientRef"] = self.client_ref
         client_status = self.CLIENT_STATUS.get(self.status)
         if client_status:
             data["status"] = client_status

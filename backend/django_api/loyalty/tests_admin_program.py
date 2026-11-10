@@ -21,6 +21,7 @@ from loyalty.models import (
 )
 from orders.lifecycle import mark_paid
 from orders.models import Order
+from orders.testutil import by_ref, number
 from orders.receipt import allocate
 from staff.models import LEVEL_EDIT, LEVEL_VIEW, StaffAudit, StaffProfile, TabPermission
 
@@ -404,7 +405,7 @@ class ExclusionServiceTests(ApiTestCase):
         return self.api_post("/v1/orders", body)
 
     def pay(self, oid):
-        o = Order.objects.get(user_id=self.uid, order_id=oid)
+        o = Order.objects.get(by_ref(oid), user_id=self.uid)
         o.payment_id = f"pay_{oid}"
         o.save(update_fields=["payment_id"])
         mark_paid(o)
@@ -441,10 +442,10 @@ class ExclusionServiceTests(ApiTestCase):
                          (False, "no_accrual_product"))
         self.assertEqual(self.order("SS-NA1", items, 5000).status_code, 200)
         self.pay("SS-NA1")
-        lot = LoyaltyLot.objects.get(source="purchase", source_ref="SS-NA1")
+        lot = LoyaltyLot.objects.get(source="purchase", source_ref=number("SS-NA1"))
         self.assertEqual(lot.amount, 200)  # 4 000 × 0,05; носки (1 000) бонусов не дают
         self.assertEqual(lot.meta["noAccrualKop"], 100000)
-        ev = LoyaltyEvent.objects.get(type="accrue_purchase", source_ref="SS-NA1")
+        ev = LoyaltyEvent.objects.get(type="accrue_purchase", source_ref=number("SS-NA1"))
         self.assertEqual(float(ev.cash_part), 5000.0)
         self.assertIn("Без начисления", ev.note)
 
@@ -458,7 +459,7 @@ class ExclusionServiceTests(ApiTestCase):
         r = self.order("SS-NA2", items, 7500, points=500)
         self.assertEqual(r.status_code, 200, r.content)
         self.pay("SS-NA2")
-        lot = LoyaltyLot.objects.get(source="purchase", source_ref="SS-NA2")
+        lot = LoyaltyLot.objects.get(source="purchase", source_ref=number("SS-NA2"))
         # cash_part 7 500, из них сертификат 1 000 → база 6 500 × 0,05 = 325.
         self.assertEqual(lot.amount, 325)
 
@@ -467,7 +468,7 @@ class ExclusionServiceTests(ApiTestCase):
         items = [{"productId": "hoka", "quantity": 1}, {"productId": "sock", "quantity": 1}]
         self.order("SS-NA3", items, 5000)
         order = self.pay("SS-NA3")
-        lot = LoyaltyLot.objects.get(source="purchase", source_ref="SS-NA3")
+        lot = LoyaltyLot.objects.get(source="purchase", source_ref=number("SS-NA3"))
         self.assertEqual(lot.amount, 200)
         rows = allocate(order.payload, 5000)
         # Возврат носков (без начисления) ничего не снимает, возврат HOKA — всё.
@@ -478,6 +479,6 @@ class ExclusionServiceTests(ApiTestCase):
         items = [{"productId": "hoka", "quantity": 1}, {"productId": "sock", "quantity": 1}]
         self.order("SS-NA4", items, 5000)
         order = self.pay("SS-NA4")
-        lot = LoyaltyLot.objects.get(source="purchase", source_ref="SS-NA4")
+        lot = LoyaltyLot.objects.get(source="purchase", source_ref=number("SS-NA4"))
         self.assertEqual(lot.amount, 250)
         self.assertIsNone(v1.earned_share(order, allocate(order.payload, 5000), {1}, 250))

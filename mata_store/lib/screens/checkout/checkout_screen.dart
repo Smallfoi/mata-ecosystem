@@ -242,12 +242,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    // Заказ принят сервером — завершаем покупку.
+    // Заказ принят сервером — завершаем покупку. Дальше — только номер, который
+    // выдал сервер (D-120): его видят магазин и 1С.
+    final orderId = orders.idOf(order.id);
     cart.clear();
 
     if (redeem > 0) {
       // Трата баллов авторитетно идёт через общий backend (если он включён).
-      final err = await loyalty.redeem(redeem, order.id);
+      final err = await loyalty.redeem(redeem, orderId);
       if (err != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(err), behavior: SnackBarBehavior.floating),
@@ -264,7 +266,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       loyalty.earnForPurchase(
         order.total,
         isFirstOrder: orders.orders.length == 1,
-        orderId: order.id,
+        orderId: orderId,
       );
     }
 
@@ -292,7 +294,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (!mounted) return;
     // Заказ принят — дальше деньги. Экран оплаты сам решит, что показать:
     // без провайдера (dev) он сразу уводит на «заказ оформлен».
-    context.go('/order-payment/${order.id}');
+    context.go('/order-payment/$orderId');
   }
 
   double _deliveryCostFor(CartProvider cart) =>

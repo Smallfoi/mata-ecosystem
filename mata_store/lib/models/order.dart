@@ -125,6 +125,11 @@ class Order {
   /// Кто везёт и когда ждать — заполняет магазин на сервере (D-92). Необязательное.
   final String? courierNote;
 
+  /// Черновой номер, с которым приложение оформляло заказ (D-120). Настоящий
+  /// номер ([id]) выдаёт сервер; по черновику приложение узнаёт свой заказ в
+  /// ответе сервера и заменяет им локальную копию.
+  final String? clientRef;
+
   const Order({
     required this.id,
     required this.items,
@@ -137,6 +142,7 @@ class Order {
     required this.createdAt,
     this.paymentStatus,
     this.courierNote,
+    this.clientRef,
   });
 
   String get shortId => id.split('-').last;
@@ -153,6 +159,7 @@ class Order {
         createdAt: createdAt,
         paymentStatus: paymentStatus,
         courierNote: courierNote,
+        clientRef: clientRef,
       );
 
   Map<String, dynamic> toJson() => {
@@ -169,6 +176,7 @@ class Order {
         // их нет: заказ ещё не существует на сервере).
         if (paymentStatus != null) 'paymentStatus': paymentStatus,
         if (courierNote != null) 'courierNote': courierNote,
+        if (clientRef != null) 'clientRef': clientRef,
       };
 
   /// Статус заказа из ответа сервера. Помимо словаря приложения понимает
@@ -214,5 +222,6 @@ class Order {
         createdAt: DateTime.parse(j['createdAt'] as String),
         paymentStatus: _optString(j['paymentStatus'] ?? j['payment_status']),
         courierNote: _optString(j['courierNote'] ?? j['courier_note']),
+        clientRef: _optString(j['clientRef']),
       );
 }

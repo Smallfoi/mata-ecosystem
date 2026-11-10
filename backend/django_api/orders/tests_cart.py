@@ -20,6 +20,7 @@ from common.testutils import ApiTestCase
 from integrations.onec_orders import order_to_json
 from loyalty.models import add_txn
 from orders.models import Order
+from orders.testutil import by_ref
 from orders.receipt import build_receipt
 
 _YK_ENV = {
@@ -45,7 +46,7 @@ class _CartCase(ApiTestCase):
         return self.api_post("/v1/orders", body)
 
     def _order(self, oid):
-        return Order.objects.get(user_id=self.uid, order_id=oid)
+        return Order.objects.get(by_ref(oid), user_id=self.uid)
 
 
 class InvalidPositionTests(_CartCase):
@@ -67,7 +68,7 @@ class InvalidPositionTests(_CartCase):
     def _refused(self, r, status, oid):
         self.assertEqual(r.status_code, status, r.content)
         self.assertTrue(r.json().get("detail"))
-        self.assertFalse(Order.objects.filter(order_id=oid).exists())
+        self.assertFalse(Order.objects.filter(by_ref(oid)).exists())
 
     def test_unpublished_product_refused(self):
         Product.objects.filter(pk="c-shoe").update(is_published=False)
@@ -245,7 +246,7 @@ class ClientCompatibilityTests(_CartCase):
         это тот же заказ, не 409."""
         items = [{"productId": "legacy", "price": 1400, "quantity": 1}]
         self.assertEqual(self._post("SS-S7", items, 1500).status_code, 200)
-        Order.objects.filter(user_id=self.uid, order_id="SS-S7").update(payment_id="pay_x")
+        Order.objects.filter(by_ref("SS-S7"), user_id=self.uid).update(payment_id="pay_x")
         r = self._post("SS-S7", items, 1500)
         self.assertEqual(r.status_code, 200, r.content)
 
