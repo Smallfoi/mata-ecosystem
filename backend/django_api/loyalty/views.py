@@ -206,15 +206,18 @@ def redeem(request):
 
     with transaction.atomic():
         lock_wallet(uid)
+        # Старая сборка присылает черновой номер, новая — серверный (D-120):
+        # сначала находим заказ, дальше работаем только с его настоящим номером.
+        order = Order.find_for_user(uid, order_id)
+        if not order:
+            return fail("Заказ не найден", status=404)
+        order_id = order.order_id
         # Идемпотентность: заказ уже оплачен баллами — второй раз не списываем.
         spent = redeemed_on_order(uid, order_id)
         if spent:
             return Response(
                 {"ok": True, "deduped": True, "balance": spendable_of(uid), "spent": spent}
             )
-        order = Order.objects.filter(user_id=uid, order_id=order_id).first()
-        if not order:
-            return fail("Заказ не найден", status=404)
         if order.payment_status == "canceled" or order.status == "cancelled":
             return fail("Заказ отменён — баллы не списываются")
         if amount != int(order.points_redeemed or 0):

@@ -11,6 +11,7 @@ from common.security import user_id_from_request
 from .awards import redeem_for_order
 from .lifecycle import AWAITING, apply_payment_info, mark_paid, payment_started
 from .models import Order
+from .numbers import new_order_number
 from .money import kop_to_float, kop_to_rub, to_kop
 from .money import money
 from .pricing import (
@@ -118,7 +119,7 @@ def pay_order(request, order_id):
     uid = user_id_from_request(request)
     if not uid:
         return Response({"detail": "Нет токена"}, status=401)
-    order = Order.objects.filter(user_id=uid, order_id=order_id).first()
+    order = Order.find_for_user(uid, order_id)
     if not order:
         return Response({"detail": "Заказ не найден"}, status=404)
     if order.payment_status == "paid":
@@ -161,12 +162,14 @@ def pay_order(request, order_id):
         return Response({"detail": f"Не удалось собрать чек: {e}"}, status=400)
     try:
         result = create_payment(
-            order_id,
+            # В описании платежа — настоящий номер, даже если старая сборка
+            # прислала черновой (D-120).
+            order.order_id,
             amount,
             request.data.get("returnUrl") or "",
-            # Номер заказа уникален только в паре с пользователем, провайдеру нужен
-            # глобально уникальный — иначе два покупателя с одинаковым SS-… и равной
-            # суммой получат один платёж на двоих (см. orders/payment.py).
+            # reference = номер + id записи. С D-120 номер уникален и сам по себе,
+            # но формат reference не меняем: по нему сверяются уже созданные
+            # платежи (см. orders/payment.py).
             reference=payment_reference(order),
             receipt=receipt,
         )
@@ -220,7 +223,7 @@ def payment_state(request, order_id):
     uid = user_id_from_request(request)
     if not uid:
         return Response({"detail": "Нет токена"}, status=401)
-    order = Order.objects.filter(user_id=uid, order_id=order_id).first()
+    order = Order.find_for_user(uid, order_id)
     if not order:
         return Response({"detail": "Заказ не найден"}, status=404)
 
@@ -313,8 +316,10 @@ def orders(request):
 
     if request.method == "POST":
         d = request.data
-        oid = str(d.get("id") or "").strip()
-        if not oid:
+        # Черновой номер от приложения/сайта (D-120): по нему узнаём повторную
+        # отправку того же заказа. Настоящий номер выдаёт сервер.
+        ref = str(d.get("id") or "").strip()[:40]
+        if not ref:
             return Response({"detail": "Нет id заказа"}, status=400)
         try:
             total_kop = to_kop(d.get("total"))
@@ -329,9 +334,8 @@ def orders(request):
         with transaction.atomic():
             # Блокируем заказ: иначе переоформление могло бы проскочить между
             # созданием платежа и сохранением его номера (аудит B01).
-            already = (
-                Order.objects.select_for_update().filter(user_id=uid, order_id=oid).first()
-            )
+            already = Order.find_for_user(uid, ref, lock=True)
+            oid = already.order_id if already else new_order_number()
             if already and payment_started(already):
                 # Оплата начата — заказ заморожен. Повтор того же заказа (ретрай,
                 # офлайн-очередь) идемпотентен: отдаём, что есть, ничего не меняя —
@@ -412,7 +416,7 @@ def orders(request):
                 return Response(
                     {"detail": "Сумма заказа не совпадает с ценами каталога"}, status=400
                 )
-            payload = {**d, "checkoutData": checkout, "items": cart.items,
+            payload = {**d, "id": oid, "checkoutData": checkout, "items": cart.items,
                        "deliveryCost": float(delivery),
                        "deliveryOption": {"code": option.code, "name": option.name}}
             if cart.verified:
@@ -436,7 +440,7 @@ def orders(request):
                 # вернула бы оплаченному или отгруженному заказу «принят».
                 # Баллы за покупку — только после подтверждённой оплаты (lifecycle).
                 create_defaults={**fields, "status": "pending",
-                                 "payment_status": "pending"},
+                                 "payment_status": "pending", "client_ref": ref},
             )
         # Связка экосистемы: для каждой пары обуви в заказе заводим ресурс
         # «износа кроссовок» (Квартал затем убавляет километраж). Идемпотентно.
@@ -476,7 +480,7 @@ def _my_order(request, order_id):
     uid = user_id_from_request(request)
     if not uid:
         return None, None
-    return uid, Order.objects.filter(user_id=uid, order_id=order_id).first()
+    return uid, Order.find_for_user(uid, order_id)
 
 
 @api_view(["GET"])

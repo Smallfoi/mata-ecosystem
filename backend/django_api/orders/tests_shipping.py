@@ -2,6 +2,7 @@
 from catalog.models import Product
 from common.testutils import ApiTestCase
 from orders.models import Order, ShippingOption
+from orders.testutil import by_ref
 
 
 def _product(pid, price):
@@ -32,7 +33,7 @@ class ShippingOptionsTests(ApiTestCase):
         r = self._order("SS-AD1", 1000, checkout={})
         self.assertEqual(r.status_code, 400)
         self.assertIn("адрес", r.json()["detail"])
-        self.assertFalse(Order.objects.filter(order_id="SS-AD1").exists())
+        self.assertFalse(Order.objects.filter(by_ref("SS-AD1")).exists())
 
     def test_courier_address_from_site_or_app(self):
         """Сайт шлёт адрес одной строкой, приложение — частями: годится и то, и другое."""
@@ -47,7 +48,7 @@ class ShippingOptionsTests(ApiTestCase):
                         checkout={"address": "Якутск, Ленина 1", "city": "Якутск",
                                   "name": "Иван"})
         self.assertEqual(r.status_code, 200, r.content)
-        checkout = Order.objects.get(order_id="SS-AD4").payload["checkoutData"]
+        checkout = Order.objects.get(by_ref("SS-AD4")).payload["checkoutData"]
         self.assertNotIn("address", checkout)
         self.assertNotIn("city", checkout)
         self.assertEqual(checkout["name"], "Иван")
@@ -83,7 +84,7 @@ class ShippingOptionsTests(ApiTestCase):
         """Клиент прислал доставку 500 ₽ — в заказ и чек идёт цена способа (0 ₽)."""
         r = self._order("SS-SH3", 1500, client_delivery=500)
         self.assertEqual(r.status_code, 200, r.content)
-        order = Order.objects.get(user_id=self.uid, order_id="SS-SH3")
+        order = Order.objects.get(by_ref("SS-SH3"), user_id=self.uid)
         self.assertEqual(order.payload["deliveryCost"], 0.0)
         self.assertEqual(order.total_kop, 100000)  # списываем серверный итог
         self.assertEqual(order.payload["deliveryOption"]["code"], "courier")
@@ -95,13 +96,13 @@ class ShippingOptionsTests(ApiTestCase):
         r = self._order("SS-SH4", 1000)
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json()["expectedTotal"], 1300.0)
-        self.assertFalse(Order.objects.filter(order_id="SS-SH4").exists())
+        self.assertFalse(Order.objects.filter(by_ref("SS-SH4")).exists())
 
     def test_paid_delivery_goes_into_order(self):
         self.courier.price = 300
         self.courier.save()
         r = self._order("SS-SH5", 1300)
         self.assertEqual(r.status_code, 200, r.content)
-        order = Order.objects.get(user_id=self.uid, order_id="SS-SH5")
+        order = Order.objects.get(by_ref("SS-SH5"), user_id=self.uid)
         self.assertEqual(order.total_kop, 130000)
         self.assertEqual(order.payload["deliveryCost"], 300.0)

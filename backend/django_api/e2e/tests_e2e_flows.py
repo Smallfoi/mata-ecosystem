@@ -31,6 +31,7 @@ from accounts.models import Account
 from catalog.models import Product
 from loyalty.models import LoyaltyTransaction
 from orders.models import Order
+from orders.testutil import by_ref
 
 ONEC_TOKEN = "e2e-1c-token"
 ONEC_PULL = "/v1/integrations/1c/orders"
@@ -190,7 +191,12 @@ class StoreOrderJourneyE2E(_Journey):
         }])
         r = self._post("/v1/orders", body, token)
         self.assertEqual(r.status_code, 200, r.content)
-        self.assertTrue(Order.objects.filter(user_id=uid, order_id=self.oid).exists())
+        # Номер выдал сервер (D-120): дальше приложение, оплата и 1С живут с ним.
+        number = r.json()["id"]
+        self.assertRegex(number, r"^МАТА-\d{8}$")
+        self.assertEqual(r.json()["clientRef"], self.oid)
+        self.oid = number
+        self.assertTrue(Order.objects.filter(order_id=self.oid, user_id=uid).exists())
         # Не оплачен → на склад не уходит, баллов за покупку нет.
         self.assertNotIn(self.oid, self.onec_pull())
         self.assertEqual(self.balance(token), start)
@@ -223,7 +229,7 @@ class StoreOrderJourneyE2E(_Journey):
             ]}, ONEC_TOKEN)
             self.assertEqual(r.status_code, 200, r.content)
             self.assertEqual(r.json().get("errors") or [], [], r.content)
-        order = Order.objects.get(user_id=uid, order_id=self.oid)
+        order = Order.objects.get(by_ref(self.oid), user_id=uid)
         self.assertEqual(order.status, "delivered")
         self.assertEqual(order.payment_status, "paid")
         return token, uid
@@ -318,7 +324,8 @@ class RunPointsSpentInStoreE2E(_Journey):
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(self.balance(token), after_run - 100)
         redeem = LoyaltyTransaction.objects.filter(
-            user_id=uid, order_id=oid, source="redeem")
+            user_id=uid, order_id=r.json()["id"], source="redeem")
+        oid = r.json()["id"]  # дальше живём с номером от сервера (D-120)
         self.assertEqual(sum(t.amount for t in redeem), -100)
 
         # Оплата: баллы за покупку — с суммы, которую заплатили деньгами (900 ₽).
@@ -345,4 +352,4 @@ class RunPointsSpentInStoreE2E(_Journey):
         r = self._post("/v1/orders", order, token)
         self.assertEqual(r.status_code, 400, r.content)
         self.assertEqual(self.balance(token), have)
-        self.assertFalse(Order.objects.filter(order_id="SS-E2E-OVER").exists())
+        self.assertFalse(Order.objects.filter(by_ref("SS-E2E-OVER")).exists())
