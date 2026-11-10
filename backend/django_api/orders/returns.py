@@ -32,6 +32,8 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
+from loyalty.v1 import earned_share
+
 from .awards import (
     earned_for,
     redeemed_for,
@@ -129,6 +131,11 @@ def _compute(order, indexes):
         if share is not None:
             points_back = share
         points_off = earned * amount_kop // total_kop if total_kop else 0
+        # Программа v1: позиции «без начисления» бонусов не давали — их возврат
+        # начисленное не снимает (доля — среди позиций, дававших бонусы).
+        off = earned_share(order, rows, chosen, earned)
+        if off is not None:
+            points_off = off
 
     return {
         "lines": lines,
@@ -342,12 +349,14 @@ def reconcile_returns(now=None) -> dict:
 
 def _notify_partial(order, ret):
     try:
+        from notifications.email import recipient_for
         from notifications.models import create_notification
 
         text = f"По заказу №{order.order_id} вернём {ret.amount_kop / 100:.2f} ₽"
         if ret.points_returned:
             text += f", на счёт вернутся {ret.points_returned} баллов"
-        create_notification(order.user_id, "Возврат оформлен", text + ".", "order", order.order_id)
+        create_notification(order.user_id, "Возврат оформлен", text + ".", "order", order.order_id,
+                            email_to=recipient_for(order.user_id, order))
     except Exception:
         # Уведомление — не часть возврата: деньги и баллы уже проведены.
         pass

@@ -57,9 +57,34 @@ def _run_row(run):
     }
 
 
+def _bonus_rows():
+    """Очередь «Бонусы на проверке» (программа лояльности v1, этап 2)."""
+    from accounts.models import Account
+    from loyalty.activity import suspicious_queue
+
+    acts = list(suspicious_queue()[:MAX_RUNNERS * MAX_RUNS_EACH])
+    names = {a.id: (a.name or a.phone or a.email or a.id) for a in Account.objects.filter(
+        id__in={x.user_id for x in acts}).only("id", "name", "phone", "email")}
+    rows = []
+    for a in acts:
+        km = a.distance_m / 1000.0
+        pace = a.duration_s / km if km > 0 else 0
+        rows.append({
+            "id": a.pk, "uid": a.user_id, "name": names.get(a.user_id, f"{a.user_id} (удалён)"),
+            "kind": a.get_kind_display(), "when": _local(a.finished_at or a.created_at),
+            "km": round(km, 2), "pace": f"{int(pace // 60)}:{int(pace % 60):02d}" if pace else "—",
+            "source": a.source or "—", "checked": {"track": "трек", "summary": "итоги"}.get(
+                a.validated_by, "—"),
+            "reason": a.reason, "twins": len((a.meta or {}).get("twins") or []),
+        })
+    return rows
+
+
 def _scope(request):
     """Что показываем: очередь (по умолчанию), всё помеченное или аккаунты на ревью."""
     mode = (request.GET.get("mode") or "pending").strip()
+    if mode == "bonus":  # очередь бонусов программы v1 — строится отдельно
+        return mode, Run.objects.none()
     if mode == "all":
         return mode, Run.objects.filter(flagged=True)
     if mode == "review":
@@ -76,6 +101,27 @@ def _act(request):
     def need(level):
         if not can(request.user, "runs", level):
             raise PermissionDenied("Недостаточно прав для этого действия")
+
+    if action in ("bonus_approve", "bonus_reject"):
+        # Программа лояльности v1 (этап 2): очередь «Бонусы на проверке».
+        need(LEVEL_EDIT)
+        from loyalty import activity
+        from loyalty.models import LoyaltyActivity
+
+        raw = (request.POST.get("act") or "").strip()[:20]
+        act = LoyaltyActivity.objects.filter(pk=int(raw)).first() if raw.isdigit() else None
+        if act is None or act.status != LoyaltyActivity.SUSPICIOUS:
+            return "Запись не найдена — возможно, её уже разобрали."
+        if action == "bonus_approve":
+            act = activity.approve(act, by=who)
+            StaffAudit.write(request, f"бонус подтверждён: {act.kind} {act.ref} "
+                                      f"(бегун {act.user_id})")
+            if act.status == LoyaltyActivity.GRANTED:
+                return f"Подтверждено, начислено бонусов: {act.amount}."
+            return f"Подтверждено, но бонус не начислен: {act.reason or act.get_status_display()}."
+        act = activity.reject(act, by=who)
+        StaffAudit.write(request, f"бонус отклонён: {act.kind} {act.ref} (бегун {act.user_id})")
+        return "Отклонено: бонус не начислен."
 
     if action in ("approve", "reject"):
         need(LEVEL_EDIT)
@@ -143,6 +189,10 @@ def runs_review(request):
         return redirect(f"{request.path}?mode={request.POST.get('mode') or 'pending'}")
 
     mode, qs = _scope(request)
+    from loyalty import config as loyalty_config
+    from loyalty.activity import suspicious_queue
+
+    bonus_rows = _bonus_rows() if mode == "bonus" else []
 
     # Группируем по бегуну: модератор решает про человека, а не про строку.
     order = []
@@ -176,7 +226,10 @@ def runs_review(request):
         # Блокировка — действие над аккаунтом: нужны обе вкладки.
         "may_block": (can(request.user, "runs", LEVEL_FULL)
                       and can(request.user, "accounts", LEVEL_EDIT)),
+        "bonus_rows": bonus_rows,
+        "program_v1": loyalty_config.enabled(),
         "summary": {
+            "bonus_pending": suspicious_queue().count(),
             "pending": pending_queryset().count(),
             "accounts": Account.objects.filter(needs_review=True).count(),
             "week_flags": Run.objects.filter(flagged=True, created_at__gte=week).count(),

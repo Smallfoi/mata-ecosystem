@@ -3,7 +3,7 @@ from unfold.admin import ModelAdmin
 
 from common.adminutils import ExportCsvMixin, UserRefMixin
 
-from .models import LoyaltyPartner, LoyaltyTransaction
+from .models import LoyaltyPartner, LoyaltyTransaction, add_txn
 
 
 @admin.register(LoyaltyTransaction)
@@ -21,7 +21,7 @@ class LoyaltyTransactionAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
     search_fields = ("id", "user_id", "description", "order_id", "run_id")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
-    readonly_fields = ("id",)
+    readonly_fields = ("id", "created_at")
     actions = ("export_as_csv",)
     csv_filename = "loyalty_transactions"
     export_fields = ("id", "user_id", "amount", "source", "description",
@@ -36,6 +36,18 @@ class LoyaltyTransactionAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def save_model(self, request, obj, form, change):
+        # Новая запись — через add_txn: свой id, замок кошелька, срок доступности.
+        # Прямой save() оставлял readonly `id` пустым: страница падала с 500
+        # (NoReverseMatch по пустому ключу), а повторная запись перезаписывала первую
+        # (UPDATE по пустому ключу) — баланс молча терялся (проба 07.10.2026).
+        if change:
+            return super().save_model(request, obj, form, change)
+        kwargs = {"available_at": obj.available_at} if obj.available_at else {}
+        txn = add_txn(obj.user_id, obj.amount, obj.source, obj.description,
+                      obj.order_id, obj.run_id, **kwargs)
+        obj.id, obj.created_at, obj.available_at = txn.id, txn.created_at, txn.available_at
 
 
 @admin.register(LoyaltyPartner)
@@ -102,7 +114,7 @@ class LoyaltySettingForm(forms.ModelForm):
         if value is None:
             return None  # «как в ТЗ»
         try:
-            return loyalty_config.validate(self.instance.key, value)
+            return loyalty_config.validate(self.instance.key, value, strict=True)
         except loyalty_config.ConfigError as e:
             raise forms.ValidationError(str(e)) from e
 
@@ -233,3 +245,27 @@ class LoyaltyRedemptionAdmin(UserRefMixin, _ReadOnlyAdmin):
                     "ceiling", "created_at")
     list_filter = ("state",)
     search_fields = ("user_id", "order_id")
+
+
+# ── Этап 2: бонусы за активность, приглашения ────────────────────────────────
+from .models import LoyaltyActivity, LoyaltyReferral  # noqa: E402
+
+
+@admin.register(LoyaltyActivity)
+class LoyaltyActivityAdmin(UserRefMixin, _ReadOnlyAdmin):
+    """Решения по бонусам за активность. Подтвердить/отклонить «на проверке» —
+    на странице «Проверка забегов», вкладка «Бонусы на проверке»."""
+
+    list_display = ("user_ref", "kind", "ref", "status", "amount", "month", "validated_by",
+                    "reason", "created_at")
+    list_filter = ("kind", "status", "validated_by", "month")
+    search_fields = ("user_id", "ref", "run_ref")
+    date_hierarchy = "created_at"
+
+
+@admin.register(LoyaltyReferral)
+class LoyaltyReferralAdmin(UserRefMixin, _ReadOnlyAdmin):
+    list_display = ("user_ref", "inviter_id", "code", "status", "note", "created_at",
+                    "rewarded_at")
+    list_filter = ("status",)
+    search_fields = ("user_id", "inviter_id", "code")

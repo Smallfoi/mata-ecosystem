@@ -1,0 +1,126 @@
+# Внешний мониторинг: МАТА и Pareta проверяются из GitHub — третьей стороны, не
+# Cloud.ru, не Selectel и не Beget. Ляжет сервер или целый провайдер — тревога
+# всё равно придёт (после 2.11.2026 о падении узнавали из жалоб, а не от системы).
+#
+# Пишет ОДИН раз при падении и ОДИН раз при восстановлении — по смене исхода
+# относительно прошлого запуска, без спама каждые 5 минут.
+#
+# Каналы — какие подключены (секреты репозитория; пустой = канал выключен):
+#   email     — GitHub сам шлёт письмо о красном запуске (настройки уведомлений
+#               аккаунта → Actions → «Send notifications for failed workflows»)
+#   ntfy      — NTFY_TOPIC (секретное имя канала в приложении ntfy)
+#   WhatsApp  — CALLMEBOT_PHONE + CALLMEBOT_APIKEY (callmebot.com)
+#   Telegram  — TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID
+# Проверить каналы вручную: Actions → Uptime → Run workflow → test=true.
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Отправить тестовое сообщение во все каналы"
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check services
+        id: check
+        run: |
+          set -u
+          declare -A TARGETS=(
+            ["МАТА API"]="https://api.mata-club.ru/v1/health"
+            ["МАТА сайт"]="https://mata-club.ru/"
+            ["Pareta"]="https://pareta.ru/api/health"
+          )
+          down=()
+          for name in "${!TARGETS[@]}"; do
+            url="${TARGETS[$name]}"
+            ok=0
+            # Три попытки с паузой: один сетевой сбой между GitHub и сервером
+            # — ещё не падение.
+            for attempt in 1 2 3; do
+              code=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$url" || echo 000)
+              if [ "$code" = 200 ]; then ok=1; break; fi
+              sleep 15
+            done
+            if [ $ok = 1 ]; then echo "OK    $name"; else echo "DOWN  $name ($url → $code)"; down+=("$name ($code)"); fi
+          done
+          if [ ${#down[@]} -gt 0 ]; then
+            echo "down=$(IFS=', '; echo "${down[*]}")" >> "$GITHUB_OUTPUT"
+            echo "state=down" >> "$GITHUB_OUTPUT"
+          else
+            echo "state=up" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Previous result
+        id: prev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Исход последнего ЗАВЕРШЁННОГО планового запуска (не текущего).
+          prev=$(gh api "repos/${{ github.repository }}/actions/workflows/uptime.yml/runs?status=completed&per_page=1&event=schedule" \
+                   --jq '.workflow_runs[0].conclusion // "success"' 2>/dev/null || echo success)
+          echo "Предыдущий исход: $prev"
+          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+
+      - name: Notify
+        env:
+          STATE: ${{ steps.check.outputs.state }}
+          DOWN: ${{ steps.check.outputs.down }}
+          PREV: ${{ steps.prev.outputs.prev }}
+          TEST: ${{ inputs.test }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -u
+          msg=""
+          if [ "$TEST" = "true" ]; then
+            msg="Проверка тревог МАТА: канал работает. Сейчас: ${STATE}${DOWN:+ — $DOWN}"
+          elif [ "$STATE" = down ] && [ "$PREV" = success ]; then
+            msg="🔴 УПАЛО: $DOWN. Проверка из GitHub, 3 попытки. $RUN_URL"
+          elif [ "$STATE" = up ] && [ "$PREV" = failure ]; then
+            msg="🟢 Восстановилось: МАТА и Pareta отвечают."
+          fi
+          if [ -z "$msg" ]; then echo "Состояние не изменилось ($PREV → $STATE) — молчу."; exit 0; fi
+          echo "$msg"
+          sent=0
+          if [ -n "$NTFY_TOPIC" ]; then
+            curl -fsS -m 20 -H "Title: МАТА мониторинг" -H "Priority: high" \
+                 -d "$msg" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null && { echo "ntfy: ok"; sent=1; } || echo "ntfy: FAIL"
+          fi
+          if [ -n "$CALLMEBOT_PHONE" ] && [ -n "$CALLMEBOT_APIKEY" ]; then
+            curl -fsS -m 30 -G "https://api.callmebot.com/whatsapp.php" \
+                 --data-urlencode "phone=$CALLMEBOT_PHONE" --data-urlencode "text=$msg" \
+                 --data-urlencode "apikey=$CALLMEBOT_APIKEY" >/dev/null && { echo "whatsapp: ok"; sent=1; } || echo "whatsapp: FAIL"
+          fi
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+            curl -fsS -m 20 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                 --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" --data-urlencode "text=$msg" >/dev/null \
+                 && { echo "telegram: ok"; sent=1; } || echo "telegram: FAIL"
+          fi
+          [ $sent = 1 ] || echo "Ни один канал не подключён — осталось только письмо GitHub о красном запуске."
+
+      - name: Fail when down
+        if: steps.check.outputs.state == 'down'
+        run: |
+          # Красный запуск = письмо от GitHub и опора для «восстановилось» в следующий раз.
+          echo "Недоступно: ${{ steps.check.outputs.down }}"
+          exit 1

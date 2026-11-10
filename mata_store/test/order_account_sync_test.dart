@@ -45,6 +45,9 @@ class _LoyaltyRepo implements LoyaltyRepository {
     String description = '',
   }) async =>
       0;
+  @override
+  Future<RedeemPreview?> redeemPreview(List<Map<String, dynamic>> items) async =>
+      null;
 }
 
 CheckoutData _data() => const CheckoutData(

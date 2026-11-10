@@ -1,0 +1,56 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{% include "admin/loyalty_program/_nav.html" %}
+
+<p class="m-lead">Журнал программы — запись на каждое изменение баланса или уровня. Журнал только
+  дописывается: исправить или удалить запись нельзя. Человек указан псевдонимом (без телефона и имени);
+  найти события человека — со страницы «Участники».</p>
+
+<form method="get" class="m-form">
+  <label class="m-field">Тип
+    <select name="type">
+      <option value="">все</option>
+      {% for code, title in types %}<option value="{{ code }}" {% if f.type == code %}selected{% endif %}>{{ title }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="m-field">С даты <input type="date" name="date_from" value="{{ f.date_from }}"></label>
+  <label class="m-field">По дату <input type="date" name="date_to" value="{{ f.date_to }}"></label>
+  <label class="m-field">Псевдоним <input type="text" name="pseudonym" value="{{ f.pseudonym }}" placeholder="lp_…"></label>
+  <button class="m-btn primary" type="submit">Показать</button>
+  <a class="m-btn" href="?{{ keep }}{% if keep %}&amp;{% endif %}export=csv">Выгрузить CSV</a>
+</form>
+
+<div class="m-card">
+  {% if page.object_list %}
+  <div class="m-wrap">
+    <table class="m compact">
+      <thead><tr><th>Когда (якут.)</th><th>Событие</th><th class="n">Сумма</th><th class="n">Доступно после</th><th class="n">Статусные после</th><th>Уровень</th><th>Основание</th><th>Псевдоним</th><th>Комментарий</th></tr></thead>
+      <tbody>
+      {% for ev in page.object_list %}
+        <tr>
+          <td class="m-muted">{{ ev.when }}</td>
+          <td>{{ ev.title }} <span class="m-key">{{ ev.type }}</span></td>
+          <td class="n">{% if ev.amount > 0 %}<span class="m-plus">+{{ ev.amount }}</span>{% elif ev.amount < 0 %}<span class="m-minus">{{ ev.amount }}</span>{% else %}0{% endif %}</td>
+          <td class="n">{{ ev.balance_after }}</td>
+          <td class="n">{{ ev.status_points_after }}</td>
+          <td>{{ ev.level_title }}</td>
+          <td class="m-key">{{ ev.source_ref }}</td>
+          <td><a class="m-key" href="?pseudonym={{ ev.user_pseudonym|urlencode }}">{{ ev.user_pseudonym }}</a></td>
+          <td class="m-small">{{ ev.note|default:"" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="m-pages">
+    <span class="m-muted">Всего: {{ total }}</span>
+    <span>
+      {% if page.has_previous %}<a href="?{{ keep }}{% if keep %}&amp;{% endif %}page={{ page.previous_page_number }}">← назад</a>{% endif %}
+      стр. {{ page.number }} из {{ page.paginator.num_pages }}
+      {% if page.has_next %}<a href="?{{ keep }}{% if keep %}&amp;{% endif %}page={{ page.next_page_number }}">дальше →</a>{% endif %}
+    </span>
+  </div>
+  {% else %}<div class="m-empty">Событий не найдено.</div>{% endif %}
+</div>
+{% endblock %}

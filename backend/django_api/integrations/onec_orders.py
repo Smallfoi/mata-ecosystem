@@ -18,7 +18,9 @@ from django.utils import timezone
 
 from catalog.models import Product
 from orders.models import Order
+from orders import payment_receipt
 from orders.money import kop_to_float, to_kop
+from orders.shipping import address_text
 
 # Статус 1С → наш статус заказа. Часть этапов 1С у нас не имеет пары: «принят» и
 # «собран» — это внутренняя кухня склада, покупателю мы показываем их отдельной
@@ -94,11 +96,8 @@ def order_to_json(order: Order) -> dict:
             "price": _price(raw.get("price")),
         })
 
-    address = ", ".join(
-        str(checkout.get(k) or "").strip()
-        for k in ("city", "street", "house", "apartment")
-        if str(checkout.get(k) or "").strip()
-    )
+    # Части адреса от приложения или одна строка от сайта.
+    address = address_text(checkout)
     return {
         "orderId": order.order_id,
         # Глобальный номер заказа на сервере (аудит B06): `orderId` уникален только
@@ -117,6 +116,12 @@ def order_to_json(order: Order) -> dict:
         "pointsRedeemed": order.points_redeemed,
         "payment": checkout.get("paymentType") or "",
         "paymentStatus": order.payment_status,
+        # Номер платежа ЮKassa — по нему ищут оплату в личном кабинете и в поддержке ЮKassa.
+        # У тестовых заказов (D-97) вида TEST-<номер>: денег не было.
+        "paymentId": order.payment_id,
+        # Чек оплаты (предоплата) из ЮKassa: по нему склад пробивает второй чек
+        # «полный расчёт» с зачётом аванса (D-101). None — чека нет.
+        "receipt": payment_receipt.for_1c(order),
         # Тестовый заказ: оплачен симуляцией, денег не было. В 1С его можно
         # принять и провести весь путь, но продажей считать нельзя (D-97).
         "test": order.is_test,
@@ -133,6 +138,12 @@ def pending_orders(limit: int = MAX_ORDERS_PER_PULL):
         Order.objects.filter(onec_taken_at__isnull=True, payment_status="paid")
         # Номер платежа ЮKassa — доказательство, что деньги прошли через неё.
         .exclude(payment_id="")
+        # Касса ещё не пробила чек оплаты — ждём его реквизиты, но не дольше
+        # получаса: сломанная касса не должна останавливать сборку.
+        # `contains`, а не `receipt__status`: у пустого {} ключа нет, и сравнение
+        # дало бы NULL — exclude выкинул бы из очереди обычные заказы.
+        .exclude(receipt__contains={"status": payment_receipt.WAITING},
+                 paid_at__gt=payment_receipt.held_until())
         .order_by("created_at")[:limit]
     )
 
@@ -313,6 +324,7 @@ def apply_statuses(items) -> dict:
 
     # Уведомляем сами: `bulk_update` не поднимает сигналы модели, а через них
     # обычно и уходит уведомление о смене статуса заказа (orders/signals.py).
+    from notifications.email import recipient_for
     from notifications.models import create_notification
 
     for order, status in notify:
@@ -322,6 +334,9 @@ def apply_statuses(items) -> dict:
             f"Заказ №{order.order_id}",
             type="order",
             order_id=order.order_id,
+            # Письмом — то, что покупатель ждёт (D-111); «принят/собран» — только в ленту.
+            email_to=(recipient_for(order.user_id, order)
+                      if status in ("shipped", "delivered", "canceled", "cancelled") else ""),
         )
 
     return {"received": len(items), "updated": updated, "errors": errors[:20],

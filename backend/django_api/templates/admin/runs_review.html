@@ -11,13 +11,80 @@
   <div class="m-tile"><b>{{ summary.accounts }}</b><span>аккаунтов на проверке</span></div>
   <div class="m-tile"><b>{{ summary.week_flags }}</b><span>помечено за {{ window_days }} дней</span></div>
   <div class="m-tile"><b>{{ summary.week_done }}</b><span>разобрано за {{ window_days }} дней</span></div>
+  {% if program_v1 or summary.bonus_pending %}<div class="m-tile"><b>{{ summary.bonus_pending }}</b><span>бонусов на проверке</span></div>{% endif %}
 </div>
 
 <div class="m-tabs">
   <a class="m-tab {% if mode == 'pending' %}on{% endif %}" href="?mode=pending">Ждут решения</a>
   <a class="m-tab {% if mode == 'all' %}on{% endif %}" href="?mode=all">Все помеченные</a>
   <a class="m-tab {% if mode == 'review' %}on{% endif %}" href="?mode=review">Аккаунты на проверке</a>
+  {% if program_v1 or summary.bonus_pending %}<a class="m-tab {% if mode == 'bonus' %}on{% endif %}" href="?mode=bonus">Бонусы на проверке</a>{% endif %}
 </div>
+
+{% if mode == 'bonus' %}
+<div class="m-hint">
+  Программа лояльности v1: пробежка засчитана в игре, но <b>бонус придержан</b> — темп быстрее
+  3:00 мин/км, отрезок быстрее 2:30 мин/км, трек противоречит итогам или совпадает с треком
+  другого аккаунта с того же устройства. «Подтвердить» начисляет бонус, если лимиты месяца
+  не исчерпаны и это первая пробежка дня с бонусом; «Отклонить» — бонуса не будет
+  (и за захваты этой пробежки тоже).
+</div>
+{% if not bonus_rows %}
+  <div class="m-card"><div class="m-empty">Очередь пуста — бонусов на проверке нет.</div></div>
+{% else %}
+<div class="m-card">
+  <div class="m-wrap">
+  <table class="m">
+    <thead>
+      <tr>
+        <th>Бегун</th>
+        <th>Событие</th>
+        <th>Когда (якут.)</th>
+        <th class="n">Км</th>
+        <th class="n">Темп</th>
+        <th>Источник</th>
+        <th>Проверено по</th>
+        <th>Почему на проверке</th>
+        <th>Решение</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for b in bonus_rows %}
+      <tr>
+        <td>{{ b.name }}<div class="m-meta">id {{ b.uid }}</div></td>
+        <td>{{ b.kind }}</td>
+        <td>{{ b.when }}</td>
+        <td class="n">{{ b.km }}</td>
+        <td class="n">{{ b.pace }}</td>
+        <td>{{ b.source }}</td>
+        <td>{{ b.checked }}</td>
+        <td class="m-warn m-small">{{ b.reason|default:"—" }}{% if b.twins %} · связанных аккаунтов: {{ b.twins }}{% endif %}</td>
+        <td>
+          {% if may_edit %}
+            <form class="m-inline" method="post">{% csrf_token %}
+              <input type="hidden" name="action" value="bonus_approve">
+              <input type="hidden" name="act" value="{{ b.id }}">
+              <input type="hidden" name="mode" value="bonus">
+              <button class="m-btn ok" type="submit">Подтвердить</button>
+            </form>
+            <form class="m-inline" method="post">{% csrf_token %}
+              <input type="hidden" name="action" value="bonus_reject">
+              <input type="hidden" name="act" value="{{ b.id }}">
+              <input type="hidden" name="mode" value="bonus">
+              <button class="m-btn bad" type="submit">Отклонить</button>
+            </form>
+          {% else %}
+            <span class="m-warn m-small">ждёт решения</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+{% else %}
 
 <div class="m-hint">
   Помеченный забег <b>не приносит баллы, пока его не разобрали</b> — это не бан, а пауза.
@@ -161,7 +228,9 @@
 </div>
 {% endfor %}
 
-{% if runners|length >= limit %}
+{% endif %}
+
+{% if mode != 'bonus' and runners|length >= limit %}
   <p style="color:#6f7278;font-size:.85rem">Показаны первые {{ limit }} бегунов. Разберите очередь — покажутся следующие.</p>
 {% endif %}
 {% endblock %}

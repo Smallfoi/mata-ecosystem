@@ -87,6 +87,16 @@ def add_txn(user_id, amount, source, description="", order_id=None, run_id=None,
         now = timezone.now()
         if available_at is _AUTO:
             available_at = _auto_available_at(user_id, amount, source, run_id, now)
+        if amount:
+            from .v1 import GAME_SOURCES
+
+            if source in GAME_SOURCES and _v1_enabled():
+                # Программа v1: запись бега/захвата — только игровой счёт (в лоты не
+                # зеркалится). Перенос в v1 — ДО неё: иначе ленивый перенос учёл бы
+                # её в переносимом балансе, и бег стал бы деньгами дважды.
+                from .v1 import _ensure_status
+
+                _ensure_status(user_id, now)
         # Баланс ДО этой транзакции — чтобы поймать пересечение порога уровня.
         before = balance_of(user_id)
         txn = LoyaltyTransaction.objects.create(
@@ -331,13 +341,18 @@ class LoyaltyPartner(models.Model):
 
 # Программа лояльности v1 (ТЗ 30.09.2026): лоты, уровень, списания, журнал, настройки.
 from .models_v1 import (  # noqa: E402,F401
+    LoyaltyActivity,
     LoyaltyEvent,
     LoyaltyLot,
+    LoyaltyPhoneGrant,
     LoyaltyRedemption,
     LoyaltyRedemptionPart,
+    LoyaltyReferral,
+    LoyaltyReferralCode,
     LoyaltyReserve,
     LoyaltyRuleSnapshot,
     LoyaltySetting,
     LoyaltySettingChange,
+    LoyaltyStageClose,
     LoyaltyStatus,
 )

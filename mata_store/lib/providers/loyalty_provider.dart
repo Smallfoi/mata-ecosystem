@@ -68,7 +68,7 @@ class LoyaltyProvider extends ChangeNotifier {
         ..clear()
         ..addAll(acc.transactions);
       _code = acc.code;
-      _server = acc.total != null ? acc : null;
+      _server = (acc.total != null || acc.v1 != null) ? acc : null;
       notifyListeners();
     } catch (_) {
       // backend недоступен — оставляем текущее состояние
@@ -92,7 +92,13 @@ class LoyaltyProvider extends ChangeNotifier {
   bool get frozen => _server?.frozen ?? false;
 
   String get code => _code;
-  LoyaltyLevel get level => LoyaltyLevelX.forPoints(total);
+
+  /// Кошелёк программы v1 (ТЗ 30.09.2026). null — прежняя программа/офлайн.
+  LoyaltyV1? get v1 => _server?.v1;
+  bool get programV1 => v1 != null;
+
+  /// Уровень: в v1 — с сервера (по статусным), иначе по всему накопленному.
+  LoyaltyLevel get level => v1?.level ?? LoyaltyLevelX.forPoints(total);
   LoyaltyAccount get account => LoyaltyAccount(
         balance: balance,
         transactions: _txns,
@@ -102,11 +108,15 @@ class LoyaltyProvider extends ChangeNotifier {
         pendingNextAmount: pendingNextAmount,
         pendingNextAt: pendingNextAt,
         frozen: frozen,
+        serverLevel: _server?.serverLevel,
+        v1: v1,
       );
 
   /// Строка о ещё недоступных баллах: «ещё N баллов станут доступны <дата>»
   /// или о заморозке на время проверки. null — показывать нечего.
   String? get pendingLine {
+    // v1: ожидают покупочные бонусы (удержание до срока возврата).
+    if (v1 case final w?) return w.heldLine;
     if (pending <= 0) return null;
     if (frozen) return '$pending баллов за бег заморожены до проверки аккаунта';
     final at = pendingNextAt;
@@ -276,4 +286,11 @@ class LoyaltyProvider extends ChangeNotifier {
   }
 
   int maxRedeemable(double orderTotal) => account.maxRedeemable(orderTotal);
+
+  /// Превью кассы по корзине (v1: максимум считает сервер). null — сервер
+  /// превью не дал или офлайн: касса по прежним правилам [maxRedeemable].
+  Future<RedeemPreview?> redeemPreview(List<Map<String, dynamic>> items) async {
+    if (!serverBacked) return null;
+    return _repo.redeemPreview(items);
+  }
 }

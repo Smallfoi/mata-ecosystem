@@ -280,3 +280,164 @@ class LoyaltyReserve(models.Model):
         db_table = "loyalty_reserve"
         verbose_name = "Резерв бонусов"
         verbose_name_plural = "Резерв бонусов"
+
+
+# ── Этап 2: активность, приглашения, регистрация ─────────────────────────────
+
+class LoyaltyActivity(models.Model):
+    """Решение по бонусу за активность (ТЗ §3): пробежка, захват, этап.
+
+    Одна строка на событие (пробежка — наш забег или импорт; захват — CaptureAward;
+    этап — 1-е место в месячном итоге дивизиона). Хранит, ЧТО решили и почему:
+    начислено / лимит месяца / не прошла условия / дубль / на проверке. По строкам
+    `granted` считаются месячные капы. Игра (забег, территория, лиги) от этого
+    решения не зависит — здесь только бонусы.
+    """
+
+    RUN, CAPTURE, STAGE = "run", "capture", "stage"
+    KIND_CHOICES = [(RUN, "Пробежка"), (CAPTURE, "Захват"), (STAGE, "Этап")]
+
+    GRANTED = "granted"        # бонус начислен
+    CAPPED = "capped"          # засчитано, лимит месяца исчерпан
+    DAY_LIMIT = "day_limit"    # в этот день уже есть зачтённая пробежка
+    DUPLICATE = "duplicate"    # та же тренировка другим путём
+    INELIGIBLE = "ineligible"  # не прошла условия ТЗ (коротко, медленно, поздно)
+    SUSPICIOUS = "suspicious"  # на ручной проверке (очередь в админке)
+    FLAGGED = "flagged"        # забег помечен античитом игры — ждёт решения по нему
+    WAITING = "waiting"        # захват ждёт решения по своей пробежке
+    REJECTED = "rejected"      # отклонено модератором
+    STATUS_CHOICES = [
+        (GRANTED, "Начислено"), (CAPPED, "Лимит месяца"), (DAY_LIMIT, "Не первая за день"),
+        (DUPLICATE, "Дубль"), (INELIGIBLE, "Не прошла условия"),
+        (SUSPICIOUS, "На проверке"), (FLAGGED, "Забег помечен"),
+        (WAITING, "Ждёт пробежку"), (REJECTED, "Отклонено"),
+    ]
+
+    user_id = models.CharField(max_length=40, db_index=True, verbose_name="Пользователь (ID)")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, verbose_name="Событие")
+    ref = models.CharField(max_length=80, verbose_name="Основание (забег/захват/этап)")
+    source = models.CharField(max_length=20, blank=True, default="",
+                              verbose_name="Источник (app / импорт)")
+    run_ref = models.CharField(max_length=80, blank=True, default="", db_index=True,
+                               verbose_name="Пробежка захвата")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, db_index=True,
+                              verbose_name="Решение")
+    amount = models.IntegerField(default=0, verbose_name="Начислено бонусов")
+    lot_id = models.BigIntegerField(null=True, blank=True, verbose_name="Лот")
+    # Календарный месяц по Якутску (UTC+9), в счёт которого идёт событие: «2026-10».
+    month = models.CharField(max_length=7, db_index=True, verbose_name="Месяц")
+    day = models.DateField(null=True, blank=True, verbose_name="День (якут.)")
+    started_at = models.DateTimeField(null=True, blank=True, verbose_name="Начало")
+    finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Конец")
+    distance_m = models.FloatField(default=0, verbose_name="Дистанция для проверки, м")
+    duration_s = models.IntegerField(default=0, verbose_name="Время для проверки, с")
+    # Чем проверена пробежка: «track» — серверный пересчёт трека, «summary» —
+    # итоги от клиента (трека нет: старая сборка, тропы выключены, импорт).
+    validated_by = models.CharField(max_length=10, blank=True, default="",
+                                    verbose_name="Проверено по")
+    reason = models.CharField(max_length=200, blank=True, default="", verbose_name="Причина")
+    meta = models.JSONField(default=dict, blank=True, verbose_name="Подробности")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Создано")
+    reviewed_at = models.DateTimeField(null=True, blank=True, verbose_name="Разобрано")
+    reviewed_by = models.CharField(max_length=150, blank=True, default="",
+                                   verbose_name="Кто разобрал")
+
+    class Meta:
+        db_table = "loyalty_activity"
+        ordering = ["-created_at"]
+        verbose_name = "Бонус за активность"
+        verbose_name_plural = "Бонусы за активность"
+        indexes = [
+            models.Index(fields=["user_id", "month", "status"], name="loyalty_act_month"),
+            models.Index(fields=["user_id", "kind", "day"], name="loyalty_act_day"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["user_id", "kind", "ref"],
+                                    name="loyalty_act_one_per_event"),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}: {self.kind} {self.ref} → {self.status}"
+
+
+class LoyaltyReferralCode(models.Model):
+    """Постоянный код приглашения у аккаунта (ТЗ §3 «Реферал»)."""
+
+    user_id = models.CharField(max_length=40, unique=True, verbose_name="Пользователь (ID)")
+    code = models.CharField(max_length=12, unique=True, verbose_name="Код приглашения")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Выдан")
+
+    class Meta:
+        db_table = "loyalty_referral_codes"
+        verbose_name = "Код приглашения"
+        verbose_name_plural = "Коды приглашения"
+
+    def __str__(self):
+        return self.code
+
+
+class LoyaltyReferral(models.Model):
+    """Связь «кто пригласил» — одна на приглашённого, навсегда (ТЗ §3).
+
+    `user_id` — приглашённый, `inviter_id` — пригласивший. Бонус пригласившему —
+    когда первый заказ приглашённого вышел из удержания без возврата.
+    """
+
+    BOUND, REWARDED, CAPPED, REJECTED = "bound", "rewarded", "capped", "rejected"
+    STATUS_CHOICES = [(BOUND, "Привязан"), (REWARDED, "Бонус начислен"),
+                      (CAPPED, "Лимит месяца"), (REJECTED, "Отклонено")]
+
+    user_id = models.CharField(max_length=40, unique=True, verbose_name="Приглашённый (ID)")
+    inviter_id = models.CharField(max_length=40, db_index=True, verbose_name="Пригласил (ID)")
+    code = models.CharField(max_length=12, verbose_name="Код")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=BOUND,
+                              db_index=True, verbose_name="Статус")
+    lot_id = models.BigIntegerField(null=True, blank=True, verbose_name="Лот бонуса")
+    note = models.CharField(max_length=200, blank=True, default="", verbose_name="Пометка")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Привязан")
+    rewarded_at = models.DateTimeField(null=True, blank=True, verbose_name="Решён")
+
+    class Meta:
+        db_table = "loyalty_referrals"
+        ordering = ["-created_at"]
+        verbose_name = "Приглашение"
+        verbose_name_plural = "Приглашения"
+
+
+class LoyaltyPhoneGrant(models.Model):
+    """«Этот телефон уже получил разовый бонус» — переживает удаление аккаунта.
+
+    Хранится не номер, а HMAC от нормализованного номера (ключ — SECRET_KEY): по
+    строке нельзя узнать телефон, но тот же номер даёт тот же ключ. Пользователя
+    здесь нет — строка не персональная и при удалении аккаунта остаётся, иначе
+    удалил-зарегистрировался = второй бонус за регистрацию.
+    """
+
+    SIGNUP, REFERRAL = "signup", "referral"
+    KIND_CHOICES = [(SIGNUP, "Бонус за регистрацию"),
+                    (REFERRAL, "Бонус за приглашение этого телефона")]
+
+    key = models.CharField(max_length=64, verbose_name="Ключ телефона (HMAC)")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, verbose_name="Бонус")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Когда")
+
+    class Meta:
+        db_table = "loyalty_phone_grants"
+        verbose_name = "Разовый бонус телефона"
+        verbose_name_plural = "Разовые бонусы телефонов"
+        constraints = [
+            models.UniqueConstraint(fields=["key", "kind"], name="loyalty_phone_grant_once"),
+        ]
+
+
+class LoyaltyStageClose(models.Model):
+    """Отметка «месячный этап закрыт» — бонусы за этап выдаются один раз."""
+
+    month = models.CharField(primary_key=True, max_length=7, verbose_name="Месяц")
+    closed_at = models.DateTimeField(default=timezone.now, verbose_name="Закрыт")
+    winners = models.JSONField(default=list, blank=True, verbose_name="Победители")
+
+    class Meta:
+        db_table = "loyalty_stage_closes"
+        verbose_name = "Закрытие этапа"
+        verbose_name_plural = "Закрытия этапов"

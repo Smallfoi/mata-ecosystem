@@ -14,6 +14,11 @@ abstract class LoyaltyRepository {
     required String orderId,
     String description,
   });
+
+  /// Превью кассы: максимум списания по корзине. [items] — `{productId, quantity}`.
+  /// null — сервер превью не умеет (старый бэкенд) или офлайн-прототип:
+  /// касса считает по прежним правилам.
+  Future<RedeemPreview?> redeemPreview(List<Map<String, dynamic>> items);
 }
 
 /// Mock: баланс/история живут локально в LoyaltyProvider (prefs).
@@ -38,6 +43,10 @@ class MockLoyaltyRepository implements LoyaltyRepository {
     await Future.delayed(const Duration(milliseconds: 120));
     return 0;
   }
+
+  @override
+  Future<RedeemPreview?> redeemPreview(List<Map<String, dynamic>> items) async =>
+      null;
 }
 
 class ApiLoyaltyRepository implements LoyaltyRepository {
@@ -58,6 +67,9 @@ class ApiLoyaltyRepository implements LoyaltyRepository {
         data['pendingNextAt']?.toString() ?? '',
       )?.toLocal(),
       frozen: data['frozen'] == true,
+      serverLevel: LoyaltyLevelX.fromKey(data['level']?.toString()),
+      // Программа v1 (ТЗ 30.09.2026): старый сервер блока не шлёт → null.
+      v1: LoyaltyV1.fromAccount(data),
       transactions: (data['transactions'] as List? ?? [])
           .map((j) => LoyaltyTransaction.fromJson(j as Map<String, dynamic>))
           .toList(),
@@ -80,5 +92,18 @@ class ApiLoyaltyRepository implements LoyaltyRepository {
       body: {'amount': points, 'orderId': orderId, 'description': description},
     ) as Map<String, dynamic>;
     return data['balance'] as int? ?? 0;
+  }
+
+  @override
+  Future<RedeemPreview?> redeemPreview(List<Map<String, dynamic>> items) async {
+    try {
+      final data = await _client.post(
+        '/loyalty/redeem-preview',
+        body: {'items': items},
+      );
+      return data is Map ? RedeemPreview.fromJson(data) : null;
+    } catch (_) {
+      return null; // 404 у старого сервера / сеть — касса по прежним правилам
+    }
   }
 }

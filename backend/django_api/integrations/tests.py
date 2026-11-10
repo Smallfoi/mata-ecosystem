@@ -15,13 +15,15 @@ class CorosEndpointsTests(ApiTestCase):
         self.assertEqual(r.json()["status"], "ok")
 
     def test_callback_is_public_and_survives_empty_call(self):
+        """Человек передумал на странице COROS — вернулся без кода, это не ошибка."""
         r = self.client.get("/v1/integrations/coros/callback")
         self.assertEqual(r.status_code, 200)
-        self.assertFalse(r.json()["received"])
+        self.assertFalse(r.json()["ok"])
 
-    def test_callback_sees_code(self):
+    def test_callback_without_valid_signature_is_refused(self):
+        """Код без нашей подписи не подключает никого (подробности в tests_coros)."""
         r = self.client.get("/v1/integrations/coros/callback?code=abc&state=xyz")
-        self.assertTrue(r.json()["received"])
+        self.assertEqual(r.status_code, 400)
 
     def test_push_accepts_list_of_workouts(self):
         r = self.client.post(

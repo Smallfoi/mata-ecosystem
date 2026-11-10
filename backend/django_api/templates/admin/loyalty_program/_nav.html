@@ -1,0 +1,7 @@
+{% comment %}Раздел «Программа лояльности»: переключатель страниц и сообщение после действия.{% endcomment %}
+<div class="m-tabs">
+  {% for n in nav %}<a class="m-tab {% if n.on %}on{% endif %}" href="{{ n.url }}">{{ n.title }}</a>{% endfor %}
+  {% if program_on %}<span class="m-tag ok">программа включена</span>{% else %}<span class="m-tag off">программа выключена</span>{% endif %}
+</div>
+{% if note %}<div class="{% if note.kind == 'err' %}m-err{% else %}m-good{% endif %}">{{ note.text }}</div>{% endif %}
+{% if not may_edit %}<div class="m-hint">У вас доступ «смотреть»: менять настройки и делать ручные операции нельзя.</div>{% endif %}

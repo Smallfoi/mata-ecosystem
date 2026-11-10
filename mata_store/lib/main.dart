@@ -10,6 +10,7 @@ import 'data/api/api_config.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/loyalty_repository.dart';
 import 'data/repositories/order_repository.dart';
+import 'data/shipping_rates.dart';
 import 'data/repositories/product_repository.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
@@ -65,6 +66,8 @@ void main() async {
       ApiConfig.useApiAuth ? ApiAuthRepository(api!) : MockAuthRepository();
   final OrderRepository orderRepo =
       ApiConfig.useApiOrder ? ApiOrderRepository(api!) : MockOrderRepository();
+  // Цены доставки с сервера (D-110) — фоном, оформление их дождётся само.
+  if (ApiConfig.useApiOrder) ShippingRates.load(api!);
   final LoyaltyRepository loyaltyRepo = ApiConfig.useApiLoyalty
       ? ApiLoyaltyRepository(api!)
       : MockLoyaltyRepository();

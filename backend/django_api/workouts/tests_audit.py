@@ -79,7 +79,7 @@ class WorkoutAuditTests(ApiTestCase):
 
     def test_failed_award_rolls_back_and_retry_awards_once(self):
         item = self._item(km=3, source_id="crash-1")
-        with mock.patch("workouts.views.add_txn", side_effect=RuntimeError("boom")):
+        with mock.patch("workouts.service.add_txn", side_effect=RuntimeError("boom")):
             with self.assertRaises(RuntimeError):
                 self._import([item])
         # Тренировка без начисления не осталась висеть «учтённой».

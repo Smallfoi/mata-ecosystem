@@ -1,5 +1,7 @@
 """Заказы Store (D-13). POST — сохранить заказ пользователя (идемпотентно по id),
 GET — список заказов пользователя (новые сверху). Требуется Bearer-токен."""
+from decimal import Decimal
+
 from django.db import transaction
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -10,7 +12,15 @@ from .awards import redeem_for_order
 from .lifecycle import AWAITING, apply_payment_info, mark_paid, payment_started
 from .models import Order
 from .money import kop_to_float, kop_to_rub, to_kop
-from .pricing import CartError, normalize_items, parse_quantity, total_is_acceptable
+from .money import money
+from .pricing import (
+    CartError,
+    normalize_items,
+    parse_quantity,
+    redeemed_rub,
+    total_is_acceptable,
+)
+from . import shipping
 from .payment import (
     PaymentError,
     create_payment,
@@ -19,6 +29,9 @@ from .payment import (
     payment_reference,
 )
 from .receipt import build_receipt
+
+# Расхождение клиентской суммы с серверной, которое ещё считаем округлением.
+_TOLERANCE = Decimal("1")
 
 # Что из ответа провайдера отдаём клиентам — прежний контракт, без служебных полей
 # сверки (сумма/валюта/reference).
@@ -345,6 +358,17 @@ def orders(request):
             except CartError as e:
                 return Response(e.body(), status=e.status)
 
+            # Способ получения и цену доставки знает сервер (D-110): клиент шлёт
+            # только код способа, его `deliveryCost` больше не учитывается.
+            checkout = d.get("checkoutData") if isinstance(d.get("checkoutData"), dict) else {}
+            try:
+                option = shipping.resolve(checkout.get("deliveryType"))
+                # Курьеру нужен адрес, самовывозу — нет: лишний адрес убираем.
+                checkout = shipping.checkout_for(option, checkout)
+            except shipping.ShippingError as e:
+                return Response({"detail": e.detail}, status=e.status)
+            delivery = shipping.cost(option, cart.goods)
+
             if already and points != already.points_redeemed:
                 # Баллы списаны при первом оформлении ровно на прежнее число.
                 # Записать в заказ новое, не списав его, нельзя: заказ и реестр
@@ -358,21 +382,43 @@ def orders(request):
             # законно снижает порог, но только реально списанная. Не сошлось —
             # откатываем и списание.
             if not already:
-                problem = redeem_for_order(uid, oid, points, float(kop_to_rub(total_kop) + points),
-                                           items=cart.items)
+                # Доля баллов считается от суммы до скидки: товары и доставка.
+                order_sum = (float(cart.goods + delivery) if cart.verified
+                             else float(kop_to_rub(total_kop) + points))
+                problem = redeem_for_order(uid, oid, points, order_sum, items=cart.items)
                 if problem:
                     return Response({"detail": problem}, status=400)
-            # Сумму присылает клиент — сверяем её с ценами каталога (D-37). Иначе
-            # корзину на 50 000 ₽ можно оформить с total: 1 и заплатить рубль.
-            if not total_is_acceptable(kop_to_rub(total_kop), cart, uid, oid):
+            # Итог считает сервер (D-110): товары по каталогу + доставка по способу −
+            # реально списанные баллы. В оплату идёт ИМЕННО он, а не сумма клиента.
+            # Отказ — только если клиент показал покупателю меньше, чем мы спишем
+            # (новая платная доставка, выросшая цена): брать больше показанного нельзя.
+            # Показал больше (старая цена в корзине) — спишем меньше, покупателю не
+            # во вред, а старые сборки не ломаются. Заказ из позиций не из каталога
+            # (оплата выключена, dev) сверяем по-старому — как минимум.
+            if cart.verified:
+                expected = max(Decimal(0), cart.goods + delivery - redeemed_rub(uid, oid))
+                if money(kop_to_rub(total_kop)) < expected - _TOLERANCE:
+                    transaction.set_rollback(True)
+                    return Response({
+                        "detail": "Сумма заказа не совпадает с ценами каталога — "
+                                  "обновите корзину",
+                        "expectedTotal": float(expected),
+                        "deliveryCost": float(delivery),
+                    }, status=400)
+                total_kop = to_kop(expected)
+                total = kop_to_float(total_kop)
+            elif not total_is_acceptable(kop_to_rub(total_kop), cart, uid, oid):
                 transaction.set_rollback(True)
                 return Response(
                     {"detail": "Сумма заказа не совпадает с ценами каталога"}, status=400
                 )
-            payload = {**d, "items": cart.items}
+            payload = {**d, "checkoutData": checkout, "items": cart.items,
+                       "deliveryCost": float(delivery),
+                       "deliveryOption": {"code": option.code, "name": option.name}}
             if cart.verified:
                 # Сумма товаров по ценам каталога — та же, что в строках.
                 payload["subtotal"] = float(cart.goods)
+                payload["total"] = total
             fields = {
                 # Двойная запись: копейки — для расчётов, float — старым клиентам.
                 "total": total,
@@ -409,3 +455,91 @@ def orders(request):
         :200
     ]  # последние заказы (детерминированный срез, ограничение payload)
     return Response([o.to_json() for o in rows])
+
+
+@api_view(["GET"])
+def shipping_options(request):
+    """Способы получения заказа (D-110) — публично, как каталог.
+
+    `?goods=<сумма товаров>` — посчитать цену доставки с учётом «бесплатно от».
+    """
+    goods = request.query_params.get("goods")
+    try:
+        goods = money(goods) if goods not in (None, "") else None
+    except (ArithmeticError, ValueError, TypeError):
+        return Response({"detail": "Некорректная сумма товаров"}, status=400)
+    return Response({"options": [shipping.to_json(o, goods) for o in shipping.active_options()]})
+
+
+def _my_order(request, order_id):
+    """(uid, заказ) текущего пользователя или (uid, None)."""
+    uid = user_id_from_request(request)
+    if not uid:
+        return None, None
+    return uid, Order.objects.filter(user_id=uid, order_id=order_id).first()
+
+
+@api_view(["GET"])
+def return_options(request, order_id):
+    """Что из заказа можно вернуть, причины, сроки и адрес магазина (D-112)."""
+    from .return_requests import options
+
+    uid, order = _my_order(request, order_id)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    if not order:
+        return Response({"detail": "Заказ не найден"}, status=404)
+    return Response(options(order))
+
+
+@api_view(["GET", "POST"])
+def order_return_requests(request, order_id):
+    """Заявки на возврат по заказу: GET — список, POST — оформить новую (D-112)."""
+    from . import return_requests as rr
+
+    uid, order = _my_order(request, order_id)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    if not order:
+        return Response({"detail": "Заказ не найден"}, status=404)
+    if request.method == "POST":
+        try:
+            req = rr.create(order, uid, request.data.get("lines"),
+                            str(request.data.get("method") or ""))
+        except rr.RequestError as e:
+            return Response({"detail": e.detail}, status=e.status)
+        return Response(rr.to_json(req), status=201)
+    return Response([rr.to_json(r) for r in order.return_requests.all()])
+
+
+@api_view(["GET"])
+def my_return_requests(request):
+    """Все заявки на возврат текущего пользователя (D-112)."""
+    from .models import ReturnRequest
+    from .return_requests import to_json
+
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    rows = ReturnRequest.objects.select_related("order", "order_return").filter(
+        user_id=uid)[:100]
+    return Response([to_json(r) for r in rows])
+
+
+@api_view(["POST"])
+def cancel_return_request(request, pk):
+    """Покупатель передумал — пока товар не сдан (D-112)."""
+    from . import return_requests as rr
+    from .models import ReturnRequest
+
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    req = ReturnRequest.objects.filter(pk=pk, user_id=uid).first()
+    if not req:
+        return Response({"detail": "Заявка не найдена"}, status=404)
+    try:
+        req = rr.cancel(req)
+    except rr.RequestError as e:
+        return Response({"detail": e.detail}, status=e.status)
+    return Response(rr.to_json(req))

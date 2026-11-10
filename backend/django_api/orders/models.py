@@ -46,6 +46,11 @@ class Order(models.Model):
     )
     payload = models.JSONField(default=dict, verbose_name="Данные заказа (JSON)")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Создан")
+    paid_at = models.DateTimeField(null=True, blank=True, verbose_name="Оплачен")
+    # Чек оплаты из ЮKassa (предоплата, D-101): его фискальные реквизиты уходят в 1С —
+    # по ним склад пробивает второй чек «полный расчёт» с зачётом этого аванса.
+    # Ведёт `orders/payment_receipt.py`; пусто — чека не ждём.
+    receipt = models.JSONField(default=dict, blank=True, verbose_name="Чек оплаты (ЮKassa)")
 
     # ── Обратный поток «заказ → 1С» (D-62). 1С забирает заказы сама и подтверждает
     # приём: свой сервер 1С обычно за NAT, достучаться до него мы не можем, а без
@@ -181,3 +186,120 @@ class OrderReturn(models.Model):
 
     def __str__(self) -> str:
         return f"{self.order.order_id}: {self.amount_kop / 100:.2f} ₽"
+
+
+class ShippingOption(models.Model):
+    """Способ получения заказа — по образцу ShippingOption из Medusa (D-110).
+
+    Раньше способы и их цена жили в коде приложения и сайта (D-92), а в чек шла
+    `deliveryCost`, присланная клиентом. Теперь способы ведёт владелец в админке,
+    а цену доставки и итог заказа считает сервер (`orders/shipping.py`).
+    `code` — то, что шлют клиенты в `checkoutData.deliveryType`; не менять у
+    существующих способов, иначе старые сборки получат «способ недоступен».
+    """
+
+    PICKUP = "pickup"
+    DELIVERY = "delivery"
+    KIND_CHOICES = [(PICKUP, "Самовывоз"), (DELIVERY, "Доставка")]
+
+    code = models.SlugField(max_length=40, unique=True, verbose_name="Код",
+                            help_text="Как способ называют приложение и сайт (pickup, courier…). "
+                                      "У существующих способов не менять.")
+    name = models.CharField(max_length=80, verbose_name="Название")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=DELIVERY,
+                            verbose_name="Тип")
+    zone = models.CharField(max_length=120, blank=True, default="",
+                            verbose_name="Зона", help_text="Где работает: «Якутск», «вся Россия»…")
+    description = models.CharField(max_length=300, blank=True, default="",
+                                   verbose_name="Пояснение покупателю",
+                                   help_text="Адрес самовывоза, сроки, как связывается курьер.")
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0,
+                                verbose_name="Цена, ₽")
+    free_from = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                    verbose_name="Бесплатно от, ₽",
+                                    help_text="Сумма товаров, с которой способ бесплатный. "
+                                              "Пусто — порога нет.")
+    requires_address = models.BooleanField(default=False, verbose_name="Нужен адрес")
+    is_active = models.BooleanField(default=True, verbose_name="Доступен")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        db_table = "store_shipping_options"
+        ordering = ["sort_order", "id"]
+        verbose_name = "Способ доставки"
+        verbose_name_plural = "Способы доставки"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class ReturnRequest(models.Model):
+    """Заявка покупателя на возврат (D-112, по образцу return request из Medusa).
+
+    Покупатель оформляет её сам в приложении: какие вещи, почему, как сдаёт.
+    Товар он привозит в магазин МАТА сам или присылает посылкой за свой счёт
+    (КС РФ 7-П от 17.02.2026: дистанционно купленное можно вернуть дистанционно).
+    Решение принимаем только после осмотра в магазине: сроки, вид, ярлыки,
+    упаковка, «Честный знак». Одобрили — деньги уходят существующим возвратом
+    по строкам чека (`OrderReturn`, D-73). Брак подтверждён — компенсируем и
+    расходы покупателя на доставку до магазина.
+    """
+
+    AWAITING, RECEIVED, APPROVED, REJECTED, CANCELED, EXPIRED = (
+        "awaiting", "received", "approved", "rejected", "canceled", "expired")
+    STATUS_CHOICES = [
+        (AWAITING, "Ждём товар"),
+        (RECEIVED, "Товар получен — на проверке"),
+        (APPROVED, "Одобрена — деньги возвращаются"),
+        (REJECTED, "Отказ"),
+        (CANCELED, "Отменена покупателем"),
+        (EXPIRED, "Истекла — товар не сдан"),
+    ]
+    ACTIVE = (AWAITING, RECEIVED)
+
+    STORE, PARCEL = "store", "parcel"
+    METHOD_CHOICES = [(STORE, "Принесёт в магазин"), (PARCEL, "Отправит посылкой за свой счёт")]
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="return_requests",
+                              verbose_name="Заказ")
+    user_id = models.CharField(max_length=40, db_index=True, verbose_name="Покупатель (ID)")
+    # [{index, reason, comment}] — индексы позиций чека (receipt.allocate), как у OrderReturn.
+    lines = models.JSONField(default=list, verbose_name="Вещи и причины")
+    method = models.CharField(max_length=10, choices=METHOD_CHOICES, default=STORE,
+                              verbose_name="Как сдаёт")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=AWAITING,
+                              db_index=True, verbose_name="Статус")
+    defect_claimed = models.BooleanField(default=False, verbose_name="Покупатель заявил брак")
+    defect_confirmed = models.BooleanField(
+        null=True, blank=True, verbose_name="Брак подтверждён осмотром",
+        help_text="Да — компенсируем и расходы покупателя на доставку до магазина.")
+    customer_shipping_kop = models.PositiveIntegerField(
+        default=0, verbose_name="Расходы покупателя на доставку, коп.",
+        help_text="По квитанции. Выплачиваются, только если брак подтверждён.")
+    shipping_paid = models.BooleanField(default=False,
+                                        verbose_name="Компенсация доставки выплачена")
+    decision_note = models.CharField(max_length=500, blank=True, default="",
+                                     verbose_name="Решение / причина отказа",
+                                     help_text="Покупатель увидит этот текст. При отказе — обязательно.")
+    order_return = models.OneToOneField(OrderReturn, null=True, blank=True,
+                                        on_delete=models.SET_NULL, related_name="request",
+                                        verbose_name="Возврат денег")
+    bring_until = models.DateTimeField(verbose_name="Сдать товар до")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Создана")
+    received_at = models.DateTimeField(null=True, blank=True, verbose_name="Товар получен")
+    decided_at = models.DateTimeField(null=True, blank=True, verbose_name="Решение")
+    decided_by = models.CharField(max_length=150, blank=True, default="",
+                                  verbose_name="Кто решил")
+
+    class Meta:
+        db_table = "store_return_requests"
+        ordering = ["-created_at"]
+        verbose_name = "Заявка на возврат"
+        verbose_name_plural = "Заявки на возврат"
+
+    def __str__(self) -> str:
+        return f"Заявка {self.number} по заказу {self.order.order_id}"
+
+    @property
+    def number(self) -> str:
+        return f"В-{self.pk}"

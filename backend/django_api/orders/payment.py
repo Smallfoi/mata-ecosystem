@@ -24,6 +24,7 @@ import hashlib
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from .money import rub_str, to_kop
@@ -272,6 +273,12 @@ def _refund_result(data) -> dict:
         "paymentId": data.get("payment_id") or "",
         "amount": str(amount.get("value") or ""),
     }
+
+
+def fetch_receipts(payment_id) -> list:
+    """Чеки, которые касса пробила по платежу (чек оплаты, чеки возвратов)."""
+    query = urllib.parse.urlencode({"payment_id": payment_id})
+    return _request("GET", f"/receipts?{query}").get("items") or []
 
 
 def fetch_refund(refund_id) -> dict:

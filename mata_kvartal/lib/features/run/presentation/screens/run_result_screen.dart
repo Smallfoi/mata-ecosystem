@@ -330,25 +330,55 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
                                     (award != null && award.runId == r.runId)
                                         ? award.points
                                         : null;
+                                // Программа v1: «+10 бонусов» и лимит месяца.
+                                final b = ref.watch(lastRunBonusProvider);
+                                final bonus =
+                                    b != null && b.runId == r.runId ? b : null;
+                                final headline = bonus != null
+                                    ? bonus.headline
+                                    : (points != null
+                                        ? '+$points баллов МАТА'
+                                        : null);
+                                final limit = bonus?.limitLine;
+                                final shown = (headline != null ||
+                                        limit != null) &&
+                                    s3 > 0;
                                 return AnimatedOpacity(
                                   duration:
                                       const Duration(milliseconds: 400),
-                                  opacity:
-                                      points != null && s3 > 0 ? 1 : 0,
+                                  opacity: shown ? 1 : 0,
                                   child: Padding(
                                     padding:
                                         const EdgeInsets.only(top: 8),
-                                    child: Text(
-                                      points != null
-                                          ? '+$points баллов МАТА'
-                                          : ' ',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontFamily: AppTheme.fontDisplay,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFFDFF45F),
-                                      ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (headline != null || limit == null)
+                                          Text(
+                                            headline ?? ' ',
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontFamily: AppTheme.fontDisplay,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFFDFF45F),
+                                            ),
+                                          ),
+                                        if (limit != null)
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 2),
+                                            child: Text(
+                                              limit,
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFFC9D0C6),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 );

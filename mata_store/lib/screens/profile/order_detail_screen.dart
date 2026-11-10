@@ -5,6 +5,7 @@ import '../../providers/order_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/product_image.dart';
 import '../../widgets/remote_text.dart';
+import 'return_request_screen.dart';
 
 class OrderDetailScreen extends StatelessWidget {
   final Order order;
@@ -182,6 +183,22 @@ class OrderDetailScreen extends StatelessWidget {
                     ),
                   ),
 
+                  // ── Возврат (D-112): заявку оформляет покупатель сам ───────
+                  if (_returnable)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ReturnRequestScreen(orderId: order.id),
+                          ),
+                        ),
+                        child: const RemoteText(
+                            'app.orderdetail.return', 'Оформить возврат'),
+                      ),
+                    ),
+
                   const SizedBox(height: 24),
                 ],
               ),
@@ -191,6 +208,12 @@ class OrderDetailScreen extends StatelessWidget {
       ),
     );
   }
+
+  /// Оплаченный заказ можно вернуть (целиком или частями) — сроки и
+  /// что именно, решает сервер на экране заявки.
+  bool get _returnable =>
+      order.paymentStatus == 'paid' ||
+      order.paymentStatus == 'partially_refunded';
 
   String get _deliveryCostText {
     if (order.deliveryCost == 0) return 'Бесплатно';

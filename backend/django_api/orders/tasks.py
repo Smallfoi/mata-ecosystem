@@ -10,9 +10,25 @@ def expire_unpaid_orders():
     return expire_unpaid()
 
 
+@shared_task(name="orders.sync_payment_receipts", ignore_result=True)
+def sync_payment_receipts():
+    """Забрать у ЮKassa чеки оплаты, которые касса уже пробила (номер чека — для 1С)."""
+    from .payment_receipt import sync_waiting
+
+    return sync_waiting()
+
+
 @shared_task(name="orders.reconcile_returns", ignore_result=True)
 def reconcile_returns():
     """Досверить с ЮKassa возвраты «в обработке» (аудит B04)."""
     from .returns import reconcile_returns as run
 
     return run()
+
+
+@shared_task(name="orders.expire_return_requests", ignore_result=True)
+def expire_return_requests():
+    """Заявки на возврат, по которым товар не сдали в срок, — в «истекла» (D-112)."""
+    from .return_requests import expire_stale
+
+    return expire_stale()

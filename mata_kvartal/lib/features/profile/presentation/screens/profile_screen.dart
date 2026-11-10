@@ -899,7 +899,8 @@ class _PointsCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Баллы экосистемы',
+                    // v1: «Доступно» — сколько бонусов можно потратить сейчас.
+                    loyalty.programV1 ? 'Доступно бонусов' : 'Баллы экосистемы',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.onDark.withValues(alpha: 0.66),
                     ),
@@ -908,12 +909,38 @@ class _PointsCard extends ConsumerWidget {
                   Text(
                     loyalty.isLoading && !loyalty.loaded
                         ? '…'
-                        : '${loyalty.balance}',
+                        : '${loyalty.v1?.spendable ?? loyalty.balance}',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: AppColors.lime,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  // v1: шкала до минимума списания, потом — до следующего уровня.
+                  if (loyalty.v1 case final w?) ...[
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: w.belowRedeemMin
+                            ? w.redeemMinProgress
+                            : w.levelProgress,
+                        minHeight: 4,
+                        backgroundColor:
+                            AppColors.onDark.withValues(alpha: 0.12),
+                        valueColor:
+                            const AlwaysStoppedAnimation(AppColors.lime),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      w.belowRedeemMin ? w.redeemMinText : w.levelScaleText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.onDark.withValues(alpha: 0.66),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -984,6 +1011,80 @@ String? pendingPointsLine(LoyaltyState l) {
   }
 }
 
+
+/// Уровень программы v1 в кошельке: привилегии с сервера, шкала до минимума
+/// списания (пока не накоплен), шкала статусных, у пути к Платине — покупки.
+class _LevelV1Block extends StatelessWidget {
+  final LoyaltyV1 v1;
+  const _LevelV1Block({required this.v1});
+
+  Widget _bar(double value) => ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: LinearProgressIndicator(
+          value: value,
+          minHeight: 5,
+          backgroundColor: AppColors.line,
+          valueColor: const AlwaysStoppedAnimation(AppColors.limeDeep),
+        ),
+      );
+
+  Widget _caption(BuildContext context, String text) => Padding(
+        padding: const EdgeInsets.only(top: 5),
+        child: Text(
+          text,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.muted,
+              ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final perk = v1.perkText;
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Уровень: ${v1.level.label}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          if (perk.isNotEmpty) _caption(context, perk),
+          const SizedBox(height: 6),
+          Text(
+            v1.availableText,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          if (v1.belowRedeemMin) ...[
+            const SizedBox(height: 8),
+            _bar(v1.redeemMinProgress),
+            _caption(context, v1.redeemMinText),
+          ],
+          const SizedBox(height: 10),
+          _bar(v1.levelProgress),
+          _caption(context, v1.levelScaleText),
+          if (v1.showSpendScale) ...[
+            const SizedBox(height: 8),
+            _bar(v1.spendProgress),
+            _caption(context, v1.spendScaleText),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 /// История баллов экосистемы (за что начислено/списано). Открывается тапом по карточке.
 class PointsHistoryScreen extends ConsumerStatefulWidget {
@@ -1069,15 +1170,17 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '1 балл = 1 ₽ скидки в МАТА Store',
-                    style: TextStyle(
+                  Text(
+                    loyalty.programV1
+                        ? '1 бонус = 1 ₽ при оплате в МАТА Store'
+                        : '1 балл = 1 ₽ скидки в МАТА Store',
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFFEDEFE8),
                     ),
                   ),
-                  if (stats != null) ...[
+                  if (stats != null && !loyalty.programV1) ...[
                     const SizedBox(height: 3),
                     Text(
                       '+${stats.earned} заработано · −${stats.spent} потрачено',
@@ -1088,7 +1191,25 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
                       ),
                     ),
                   ],
+                  // v1: ожидают, сгорают, долг — строки с сервера.
+                  for (final line in [
+                    loyalty.v1?.heldLine,
+                    loyalty.v1?.expiringLine,
+                    loyalty.v1?.debtLine,
+                  ])
+                    if (line != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        line,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFDFF45F),
+                        ),
+                      ),
+                    ],
                   // Баллы за бег созревают 3 дня / заморожены на проверке.
+                  if (!loyalty.programV1)
                   if (pendingPointsLine(loyalty) case final line?) ...[
                     const SizedBox(height: 3),
                     Text(
@@ -1104,6 +1225,31 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
               ),
             ),
             const SizedBox(height: 12),
+            // v1: уровень и шкалы (статусные; на пути к Платине — покупки),
+            // бонусы на счёте по лотам с датами сгорания.
+            if (loyalty.v1 case final w?) ...[
+              _LevelV1Block(v1: w),
+              const SizedBox(height: 12),
+              if (w.lots.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                  child: Text(
+                    'БОНУСЫ НА СЧЁТЕ',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                      color: AppColors.faint,
+                    ),
+                  ),
+                ),
+                for (final lot in w.lots) ...[
+                  _lotRow(context, lot),
+                  const SizedBox(height: 8),
+                ],
+                const SizedBox(height: 4),
+              ],
+            ],
             // Фильтры.
             Row(
               children: [
@@ -1197,6 +1343,74 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
       out.add(const SizedBox(height: 8));
     }
     return out;
+  }
+
+  /// Лот программы v1: источник, остаток и срок (доступно с / сгорят).
+  Widget _lotRow(BuildContext context, LoyaltyLot lot) {
+    final debt = lot.remaining < 0;
+    final accent = debt
+        ? AppColors.warm
+        : (lot.held ? AppColors.faint : AppColors.limeDeep);
+    final partly = !debt && lot.remaining != lot.amount;
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              lot.held ? CupertinoIcons.clock_fill : CupertinoIcons.star_fill,
+              size: 19,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lot.sourceLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  partly ? '${lot.dateLine} · из ${lot.amount}' : lot.dateLine,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.faint,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${lot.remaining}',
+            style: TextStyle(
+              fontFamily: AppTheme.fontDisplay,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: accent,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _txnRow(BuildContext context, LoyaltyTxn t) {

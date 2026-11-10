@@ -94,7 +94,8 @@ class _Empty extends StatelessWidget {
   if (title.startsWith('Забег не засчитан')) {
     return (icon: CupertinoIcons.exclamationmark_triangle_fill, color: AppColors.error);
   }
-  if (type == 'level' || title.contains('ровень')) {
+  // Лояльность v1 (сервер): смена уровня, бонусы доступны / скоро сгорят.
+  if (type == 'level' || title.contains('ровень') || title.startsWith('Бонус')) {
     return (icon: CupertinoIcons.star_fill, color: AppColors.warning);
   }
   if (title.contains('одобрена')) {

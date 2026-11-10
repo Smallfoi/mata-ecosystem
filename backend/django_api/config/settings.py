@@ -408,19 +408,48 @@ UNFOLD = {
                     {"title": "Заказы", "icon": "shopping_cart",
                      "link": reverse_lazy("admin:orders_order_changelist"),
                      "permission": _tab("orders")},
+                    {"title": "Заявки на возврат", "icon": "assignment_return",
+                     "link": reverse_lazy("admin:orders_returnrequest_changelist"),
+                     "permission": _tab("orders")},
+                    {"title": "Доставка", "icon": "local_shipping",
+                     "link": reverse_lazy("admin:orders_shippingoption_changelist"),
+                     "permission": _tab("orders")},
                     {"title": "Баллы", "icon": "loyalty",
                      # Клиенты с операциями за выбранные дни; журнал — ссылкой со страницы.
                      "link": reverse_lazy("points_clients"),
                      "permission": _tab("loyalty")},
-                    {"title": "Журнал лояльности", "icon": "receipt_long",
-                     "link": reverse_lazy("admin:loyalty_loyaltyevent_changelist"),
-                     "permission": _tab("loyalty")},
-                    {"title": "Настройки лояльности", "icon": "tune",
-                     "link": reverse_lazy("admin:loyalty_loyaltysetting_changelist"),
-                     "permission": _tab("loyalty_settings")},
                     {"title": "Кроссовки", "icon": "directions_run",
                      "link": reverse_lazy("admin:shoes_shoeasset_changelist"),
                      "permission": _tab("shoes")},
+                ],
+            },
+            {
+                # Всё о программе лояльности v1 — владелец настраивает сам (ТЗ 30.09.2026).
+                # Страницы «Уровни»/«Начисления» строятся из реестра loyalty.config.SPECS.
+                "title": "Программа лояльности",
+                "separator": True,
+                "items": [
+                    {"title": "Обзор", "icon": "insights",
+                     "link": reverse_lazy("loyalty_program"),
+                     "permission": _tab("loyalty_settings")},
+                    {"title": "Уровни", "icon": "military_tech",
+                     "link": reverse_lazy("loyalty_levels"),
+                     "permission": _tab("loyalty_settings")},
+                    {"title": "Начисления", "icon": "add_card",
+                     "link": reverse_lazy("loyalty_accruals"),
+                     "permission": _tab("loyalty_settings")},
+                    {"title": "Товары в программе", "icon": "sell",
+                     "link": reverse_lazy("loyalty_products"),
+                     "permission": _tab("loyalty_settings")},
+                    {"title": "Участники", "icon": "card_membership",
+                     "link": reverse_lazy("loyalty_members"),
+                     "permission": _tab("loyalty_settings")},
+                    {"title": "Журнал", "icon": "receipt_long",
+                     "link": reverse_lazy("loyalty_journal"),
+                     "permission": _tab("loyalty_settings")},
+                    {"title": "История настроек", "icon": "history",
+                     "link": reverse_lazy("loyalty_history"),
+                     "permission": _tab("loyalty_settings")},
                 ],
             },
             {
@@ -599,15 +628,33 @@ CELERY_BEAT_SCHEDULE = {
         "task": "core.cleanup_old_data",
         "schedule": crontab(hour=4, minute=0),
     },
+    # Часы COROS: вебхуков у них нет, о новой тренировке узнаём только опросом.
+    # Раз в полчаса — с большим запасом под их лимит (50 файлов на человека в
+    # сутки) и достаточно часто, чтобы пробежка появлялась почти сразу (D-108).
+    "poll-coros-watches": {
+        "task": "integrations.poll_coros_all",
+        "schedule": crontab(minute="*/30"),
+    },
     # Неоплаченные заказы (D-72): не оплатили за 15 минут — отмена и возврат баллов.
     "expire-unpaid-orders": {
         "task": "orders.expire_unpaid_orders",
         "schedule": crontab(minute="*/5"),
     },
+    # Чек оплаты (D-101): касса пробивает его за секунды-минуты после оплаты, а 1С
+    # нужен его номер. Пока чека нет, заказ ждёт выгрузки (не дольше 30 минут).
+    "sync-payment-receipts": {
+        "task": "orders.sync_payment_receipts",
+        "schedule": crontab(minute="*"),
+    },
     # Возвраты «в обработке» (аудит B04): подтверждение ЮKassa могло не дойти.
     "reconcile-order-returns": {
         "task": "orders.reconcile_returns",
         "schedule": crontab(minute="*/5"),
+    },
+    # Заявки на возврат, по которым товар не сдали в срок (D-112).
+    "expire-return-requests": {
+        "task": "orders.expire_return_requests",
+        "schedule": crontab(minute=15),
     },
     # Авто-парсер афиши «Стартов»: раз в сутки в 05:00 (Asia/Yakutsk). Идемпотентно
     # (upsert по source+external_id). Источники — races/importers/.
@@ -647,6 +694,23 @@ RACES_IMPORT_FEED_URL = os.environ.get("RACES_IMPORT_FEED_URL", "")
 # Пусто — приём выключен: лучше отказать, чем принимать номенклатуру без проверки.
 INTEGRATION_1C_TOKEN = os.environ.get("INTEGRATION_1C_TOKEN", "")
 
+# ── Письма покупателям (D-111) ──────────────────────────────────────────────
+# Служебные письма о заказе (оплачен/отправлен/возврат). Провайдер — окружением:
+# EMAIL_PROVIDER пуст — выключено; smtp — любой SMTP (Unisender Go, Yandex 360…);
+# console — в лог (разработка). Логин/пароль SMTP — в секретах (Lockbox), не в коде.
+EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "").strip()
+EMAIL_BACKEND = ("django.core.mail.backends.console.EmailBackend"
+                 if EMAIL_PROVIDER == "console"
+                 else "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "465"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "1") == "1"
+EMAIL_USE_TLS = not EMAIL_USE_SSL and os.environ.get("EMAIL_USE_TLS", "") == "1"
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "МАТА Store <noreply@mata-club.ru>")
+
 # ── Sentry / GlitchTip (видимость ошибок, D-25/D-32: self-host РФ) ───────────
 # Каркас: подключается ТОЛЬКО при заданном SENTRY_DSN. Без ключа — no-op, без
 # накладных расходов. DSN даёт наш self-host GlitchTip (Sentry-совместимый) —
@@ -674,3 +738,7 @@ if SENTRY_DSN:
         before_send=sentry_scrub.before_send,
         before_breadcrumb=sentry_scrub.before_breadcrumb,
     )
+
+# После входа без ?next= Django уводит на /accounts/profile/ — у нас такой страницы нет
+# (сотрудник из приглашения видел 404, 12.10.2026). Вход здесь только в админку.
+LOGIN_REDIRECT_URL = "/admin/"
