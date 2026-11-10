@@ -1380,3 +1380,21 @@ downgrade-блок) ставит устройству versionCode ВЫШЕ оф�
 - **Миграции в параллельных PR одного app** (`accounts/0009` в двух ветках) = две «листовые»
   миграции после вливания обеих → прод не стартует. Перед вливанием второй — перенумеровать
   на свежую ветку.
+
+## Смена ключа S3 — обновить и секреты GitHub (MEDIA_S3_*)
+
+**Симптом (10.11.2026):** Android-релиз (`android-release.yml`) и превью приложения
+(`app-preview.yml`) падают на выкладке: `SignatureDoesNotMatch ... PutObject`. Сборка при этом
+проходит.
+**Причина:** ключ бакета `mata-media` сменили 08.11 (ротация после атаки на Beget) в Lockbox
+и на сервере, а секреты GitHub `MEDIA_S3_ACCESS_KEY` / `MEDIA_S3_SECRET_KEY` остались от
+24.08. CI берёт ключ из GitHub, не из Lockbox.
+**Правило:** ротация ключа S3 = Lockbox + сервер (`refresh-env.sh`) + **GitHub Secrets**.
+Проверка: `gh secret list` — дата у `MEDIA_S3_*` должна быть не старше ротации.
+
+## Android-релиз: Java не по умолчанию — образ раннера перешёл на JDK 25
+
+**Симптом (10.11.2026):** `Build signed APK` → `FAILURE ... What went wrong: 25.0.5`.
+**Причина:** `ubuntu-latest` теперь с JDK 25, а Gradle 8.12 его не понимает.
+**Решение:** в `android-release.yml` перед flutter-action — `actions/setup-java` (temurin 17,
+пин по SHA). Подняли Gradle/AGP — сверить, нужна ли ещё эта строка.

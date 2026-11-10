@@ -55,6 +55,14 @@ jobs:
             echo "${{ matrix.app }} не выбран — пропуск."
           fi
 
+      # Java закреплена явно: образ ubuntu-latest перешёл на JDK 25, а Gradle 8.12
+      # его не понимает — сборка падала с «What went wrong: 25.0.5» (10.11.2026).
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0 (пин по SHA, F05)
+        if: steps.detect.outputs.changed == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0 (пин по SHA, F05)
         if: steps.detect.outputs.changed == 'true'
         with:
