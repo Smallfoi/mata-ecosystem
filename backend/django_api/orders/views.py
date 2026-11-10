@@ -509,7 +509,9 @@ def order_return_requests(request, order_id):
     if request.method == "POST":
         try:
             req = rr.create(order, uid, request.data.get("lines"),
-                            str(request.data.get("method") or ""))
+                            str(request.data.get("method") or ""),
+                            # None — старая сборка без фото: брак без снимка принимаем.
+                            request.data.get("photos"))
         except rr.RequestError as e:
             return Response({"detail": e.detail}, status=e.status)
         return Response(rr.to_json(req), status=201)
@@ -547,3 +549,81 @@ def cancel_return_request(request, pk):
     except rr.RequestError as e:
         return Response({"detail": e.detail}, status=e.status)
     return Response(rr.to_json(req))
+
+
+def _my_request(request, pk):
+    from .models import ReturnRequest
+
+    uid = user_id_from_request(request)
+    if not uid:
+        return None, None
+    return uid, ReturnRequest.objects.select_related("order").filter(pk=pk, user_id=uid).first()
+
+
+@api_view(["POST"])
+def return_request_sent(request, pk):
+    """Покупатель отправил посылку: трек-номер → заявка «в пути» (D-122)."""
+    from . import return_requests as rr
+
+    uid, req = _my_request(request, pk)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    if not req:
+        return Response({"detail": "Заявка не найдена"}, status=404)
+    try:
+        req = rr.mark_sent(req, request.data.get("trackNumber"))
+    except rr.RequestError as e:
+        return Response({"detail": e.detail}, status=e.status)
+    return Response(rr.to_json(req))
+
+
+@api_view(["POST"])
+def return_request_goods_back(request, pk):
+    """Как покупатель забирает вещи, по которым отказано: pickup | ship (D-122)."""
+    from . import return_requests as rr
+
+    uid, req = _my_request(request, pk)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    if not req:
+        return Response({"detail": "Заявка не найдена"}, status=404)
+    try:
+        req = rr.choose_goods_back(req, str(request.data.get("way") or ""))
+    except rr.RequestError as e:
+        return Response({"detail": e.detail}, status=e.status)
+    return Response(rr.to_json(req))
+
+
+@api_view(["POST"])
+def return_photo_upload(request):
+    """Фото к будущей заявке (multipart, поле image) → {id, url}; id передаются в
+    POST /orders/:id/return-requests как photos:[...]. Без EXIF, приватно (D-122)."""
+    from . import return_requests as rr
+
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    try:
+        photo = rr.upload_photo(uid, request.FILES.get("image"))
+    except rr.RequestError as e:
+        return Response({"detail": e.detail}, status=e.status)
+    return Response({"id": photo.pk, "url": photo.image.url}, status=201)
+
+
+@api_view(["POST"])
+def cancel_order(request, order_id):
+    """Покупатель отменяет заказ, пока он не передан курьеру (D-122)."""
+    from .cancel import CancelError, cancel_order as do_cancel, cancel_state
+
+    uid, order = _my_order(request, order_id)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    if not order:
+        return Response({"detail": "Заказ не найден"}, status=404)
+    try:
+        result = do_cancel(order, uid)
+    except CancelError as e:
+        return Response({"detail": e.detail}, status=e.status)
+    order.refresh_from_db()
+    return Response({**result, **cancel_state(order)})
+

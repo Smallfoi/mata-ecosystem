@@ -1,7 +1,11 @@
 """Заказы Store на бэке (D-13). Храним полный payload заказа (контракт SportStore)
 как JSON + несколько колонок для запросов. Заказ привязан к пользователю (Bearer)."""
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.utils import timezone
+
+from common.media import private_storage
 
 from .money import kop_to_float, to_kop
 
@@ -83,6 +87,10 @@ class Order(models.Model):
                                    verbose_name="Статус в 1С")
     onec_status_at = models.DateTimeField(null=True, blank=True,
                                           verbose_name="Статус обновлён")
+    # Покупатель попросил отменить заказ, когда 1С его уже забрала (orders/cancel.py):
+    # склад должен подтвердить, что заказ не передан курьеру, — тогда вернём деньги.
+    cancel_requested_at = models.DateTimeField(null=True, blank=True,
+                                               verbose_name="Покупатель просит отменить")
 
     class Meta:
         db_table = "store_orders"
@@ -276,25 +284,43 @@ class ReturnRequest(models.Model):
     расходы покупателя на доставку до магазина.
     """
 
-    AWAITING, RECEIVED, APPROVED, REJECTED, CANCELED, EXPIRED = (
-        "awaiting", "received", "approved", "rejected", "canceled", "expired")
+    AWAITING, SENT, RECEIVED, APPROVED, PARTIAL, REJECTED, CANCELED, EXPIRED = (
+        "awaiting", "sent", "received", "approved", "partial", "rejected", "canceled",
+        "expired")
     STATUS_CHOICES = [
         (AWAITING, "Ждём товар"),
+        (SENT, "Посылка в пути"),
         (RECEIVED, "Товар получен — на проверке"),
         (APPROVED, "Одобрена — деньги возвращаются"),
+        (PARTIAL, "Одобрена частично"),
         (REJECTED, "Отказ"),
         (CANCELED, "Отменена покупателем"),
         (EXPIRED, "Истекла — товар не сдан"),
     ]
-    ACTIVE = (AWAITING, RECEIVED)
+    # Заявка «в работе»: её вещи заняты, повторно их не заявить.
+    ACTIVE = (AWAITING, SENT, RECEIVED)
+    # Решение вынесено и по части вещей отказано — их надо отдать покупателю.
+    DECIDED = (APPROVED, PARTIAL, REJECTED)
+
+    # Как покупатель забирает вещи, по которым отказано (правила возврата §3).
+    BACK_PICKUP, BACK_SHIP = "pickup", "ship"
+    BACK_CHOICES = [(BACK_PICKUP, "Заберёт в магазине"),
+                    (BACK_SHIP, "Отправить за его счёт (с курьером до ТК)")]
 
     STORE, PARCEL = "store", "parcel"
     METHOD_CHOICES = [(STORE, "Принесёт в магазин"), (PARCEL, "Отправит посылкой за свой счёт")]
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="return_requests",
                               verbose_name="Заказ")
+    # Порядковый номер заявки внутри заказа: номер заявки = «<номер заказа>-В<seq>»
+    # (решение владельца 10.11.2026) — магазин и 1С сразу видят, к какому заказу
+    # возврат. Пусто — заявка до этого решения, номер «В-<pk>».
+    seq = models.PositiveSmallIntegerField(null=True, blank=True, editable=False,
+                                           verbose_name="№ заявки в заказе")
     user_id = models.CharField(max_length=40, db_index=True, verbose_name="Покупатель (ID)")
-    # [{index, reason, comment}] — индексы позиций чека (receipt.allocate), как у OrderReturn.
+    # [{index, reason, comment, decision?, rejectReasons?}] — индексы позиций чека
+    # (receipt.allocate), как у OrderReturn. decision: accept | reject — решение
+    # магазина по вещи после осмотра; rejectReasons — коды REJECT_REASONS.
     lines = models.JSONField(default=list, verbose_name="Вещи и причины")
     method = models.CharField(max_length=10, choices=METHOD_CHOICES, default=STORE,
                               verbose_name="Как сдаёт")
@@ -316,6 +342,16 @@ class ReturnRequest(models.Model):
                                         on_delete=models.SET_NULL, related_name="request",
                                         verbose_name="Возврат денег")
     bring_until = models.DateTimeField(verbose_name="Сдать товар до")
+    # Посылка: трек-номер вписывает покупатель; с ним заявка «в пути» и не истекает,
+    # сколько бы посылка ни ехала — срок возврата соблюдён в день отправки.
+    track_number = models.CharField(max_length=64, blank=True, default="",
+                                    verbose_name="Трек-номер посылки")
+    sent_at = models.DateTimeField(null=True, blank=True, verbose_name="Посылка отправлена")
+    # Вещи, по которым отказано: как покупатель их забирает и отдали ли уже.
+    goods_back = models.CharField(max_length=10, blank=True, default="",
+                                  choices=BACK_CHOICES, verbose_name="Вещи после отказа")
+    goods_back_done = models.BooleanField(default=False,
+                                          verbose_name="Вещи покупателю отданы/отправлены")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Создана")
     received_at = models.DateTimeField(null=True, blank=True, verbose_name="Товар получен")
     decided_at = models.DateTimeField(null=True, blank=True, verbose_name="Решение")
@@ -333,4 +369,53 @@ class ReturnRequest(models.Model):
 
     @property
     def number(self) -> str:
+        if self.seq:
+            return f"{self.order.order_id}-В{self.seq}"
         return f"В-{self.pk}"
+
+    def rejected_lines(self) -> list:
+        return [line for line in self.lines if line.get("decision") == "reject"]
+
+    def accepted_lines(self) -> list:
+        return [line for line in self.lines if line.get("decision") == "accept"]
+
+
+class ReturnPhoto(models.Model):
+    """Фото к заявке на возврат: от покупателя (обязательно при браке) или с осмотра
+    в магазине (что нашли — следы носки, нет ярлыков). Персональные данные:
+    приватное хранилище и подписанные ссылки, без EXIF (common.uploads.prepare_image).
+    Покупатель загружает фото до отправки заявки — тогда `request` ещё пуст."""
+
+    CUSTOMER, INSPECTION = "customer", "inspection"
+    KIND_CHOICES = [(CUSTOMER, "От покупателя"), (INSPECTION, "Осмотр в магазине")]
+
+    request = models.ForeignKey(ReturnRequest, null=True, blank=True,
+                                on_delete=models.CASCADE, related_name="photos",
+                                verbose_name="Заявка")
+    user_id = models.CharField(max_length=40, db_index=True, blank=True, default="",
+                               verbose_name="Загрузил (ID покупателя)")
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES, default=CUSTOMER,
+                            verbose_name="Чьё фото")
+    image = models.FileField(storage=private_storage, upload_to="returns/",
+                             verbose_name="Фото")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Загружено")
+
+    class Meta:
+        db_table = "store_return_photos"
+        ordering = ["created_at"]
+        verbose_name = "Фото к возврату"
+        verbose_name_plural = "Фото к возвратам"
+
+    def __str__(self) -> str:
+        return f"Фото {self.pk}"
+
+
+@receiver(post_delete, sender=ReturnPhoto)
+def _drop_return_photo_file(sender, instance, **kwargs):
+    """Строка удалена (удаление аккаунта, каскад с заказом, чистка) — файл тоже:
+    фото покупателя — персональные данные, сиротой в хранилище им не место."""
+    if instance.image:
+        try:
+            instance.image.delete(save=False)
+        except Exception:  # хранилище недоступно — строку всё равно удаляем
+            pass

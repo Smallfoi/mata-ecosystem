@@ -30,6 +30,19 @@ class OrderReturnInline(TabularInline):
         return f"{obj.amount_kop / 100:.2f}"
 
 
+class CancelRequestedFilter(admin.SimpleListFilter):
+    title = "Просит отменить"
+    parameter_name = "cancel_requested"
+
+    def lookups(self, request, model_admin):
+        return (("yes", "Да"),)
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(cancel_requested_at__isnull=False)
+        return queryset
+
+
 @admin.register(Order)
 class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
     list_display = (
@@ -43,11 +56,12 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
         "created_at",
         # Обмен с 1С: сразу видно, ушёл ли заказ на склад и что там с ним.
         "onec_state",
+        "cancel_mark",
         "courier_note",
     )
     list_display_links = ("order_id",)
     list_editable = ("status",)
-    list_filter = ("status", "payment_status", "onec_status", "is_test")
+    list_filter = ("status", "payment_status", "onec_status", "is_test", CancelRequestedFilter)
     search_fields = ("order_id", "client_ref", "user_id")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
@@ -71,6 +85,13 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
             return ""
         return format_html('<span class="m-tag warn">тест</span>')
 
+    @admin.display(description="Отмена")
+    def cancel_mark(self, obj):
+        """Покупатель просит отменить заказ, уже забранный 1С (orders/cancel.py)."""
+        if not obj.cancel_requested_at:
+            return ""
+        return format_html('<span class="m-tag bad">просит отменить</span>')
+
     @admin.display(description="1С")
     def onec_state(self, obj):
         """Одна колонка вместо четырёх: главное — забран заказ или ещё в очереди."""
@@ -82,7 +103,37 @@ class OrderAdmin(ExportCsvMixin, UserRefMixin, ModelAdmin):
     export_fields = ("order_id", "user_id", "total", "status", "payment_status",
                      "points_redeemed", "created_at")
     actions = ("hand_to_courier", "mark_paid", "mark_shipped", "mark_delivered",
-               "mark_cancelled", "refund_payment", "export_as_csv")
+               "mark_cancelled", "refund_payment", "confirm_cancel", "decline_cancel",
+               "export_as_csv")
+
+    def _cancel_run(self, request, queryset, fn, done):
+        from .cancel import CancelError
+
+        ok = 0
+        for order in queryset:
+            try:
+                fn(order, request.user.get_username())
+            except CancelError as e:
+                self.message_user(request, f"{order.order_id}: {e.detail}", messages.ERROR)
+            else:
+                ok += 1
+                StaffAudit.write(request, f"заказ {order.order_id}: {done}")
+        if ok:
+            self.message_user(request, f"{done}: {ok}", messages.SUCCESS)
+
+    @admin.action(description="Подтвердить отмену (заказ не у курьера) и вернуть деньги",
+                  permissions=["change"])
+    def confirm_cancel(self, request, queryset):
+        from .cancel import confirm_cancel
+
+        self._cancel_run(request, queryset, confirm_cancel, "отмена подтверждена")
+
+    @admin.action(description="Отклонить отмену: заказ уже передан курьеру",
+                  permissions=["change"])
+    def decline_cancel(self, request, queryset):
+        from .cancel import decline_cancel
+
+        self._cancel_run(request, queryset, decline_cancel, "отмена отклонена")
 
     @admin.action(description="Вернуть деньги покупателю целиком (ЮKassa)")
     def refund_payment(self, request, queryset):
@@ -208,29 +259,29 @@ class ShippingOptionAdmin(ModelAdmin):
 
 @admin.register(ReturnRequest)
 class ReturnRequestAdmin(UserRefMixin, ModelAdmin):
-    """Заявки покупателей на возврат (D-112).
+    """Заявки покупателей на возврат (D-112, D-122).
 
-    Порядок работы магазина: покупатель принёс/прислал вещи → «Товар получен» →
-    осмотр (срок, вид, ярлыки, упаковка, «Честный знак»; по браку — проверка
-    качества) → «Одобрить» (деньги по строкам чека) или «Отказать» с причиной в
-    поле «Решение». Брак подтверждён — отметьте это и внесите расходы покупателя
-    на доставку по квитанции: их выплачивают отдельно.
+    Каждый день: «Открыть заявку» → когда вещи пришли — «Товар получен» → осмотр →
+    решение по каждой вещи на странице заявки. Заявлен брак — отказать можно только
+    по итогам проверки качества.
     """
 
-    list_display = ("number_label", "order_link", "user_ref", "status", "method",
-                    "defect_claimed", "bring_until", "created_at")
-    list_filter = ("status", "method", "defect_claimed")
-    search_fields = ("order__order_id", "user_id")
+    list_display = ("number_label", "open_link", "order_link", "user_ref", "status",
+                    "method", "track_number", "defect_claimed", "bring_until", "created_at")
+    list_filter = ("status", "method", "defect_claimed", "goods_back_done")
+    search_fields = ("order__order_id", "user_id", "track_number")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
-    actions = ("act_received", "act_approve", "act_reject")
-    fields = ("order_link", "user_id", "status", "method", "items_view", "bring_until",
-              "defect_claimed", "defect_confirmed", "customer_shipping_kop", "shipping_paid",
-              "decision_note", "order_return", "created_at", "received_at", "decided_at",
+    actions = ("act_received", "act_goods_back_done")
+    fields = ("open_link", "order_link", "user_id", "status", "method", "items_view",
+              "bring_until", "track_number", "sent_at", "defect_claimed", "defect_confirmed",
+              "customer_shipping_kop", "shipping_paid", "decision_note", "goods_back",
+              "goods_back_done", "order_return", "created_at", "received_at", "decided_at",
               "decided_by")
-    readonly_fields = ("order_link", "user_id", "status", "method", "items_view",
-                       "bring_until", "defect_claimed", "order_return", "created_at",
-                       "received_at", "decided_at", "decided_by")
+    readonly_fields = ("open_link", "order_link", "user_id", "status", "method", "items_view",
+                       "bring_until", "track_number", "sent_at", "defect_claimed",
+                       "decision_note", "goods_back", "goods_back_done", "order_return",
+                       "created_at", "received_at", "decided_at", "decided_by")
 
     def has_add_permission(self, request):
         return False  # заявку оформляет покупатель
@@ -242,6 +293,13 @@ class ReturnRequestAdmin(UserRefMixin, ModelAdmin):
     def number_label(self, obj):
         return obj.number
 
+    @admin.display(description="Решение")
+    def open_link(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html('<a class="m-btn" href="{}">Открыть заявку</a>',
+                           reverse("return_request_page", args=[obj.pk]))
+
     @admin.display(description="Заказ")
     def order_link(self, obj):
         return format_html('<a href="{}">{}</a>',
@@ -250,17 +308,27 @@ class ReturnRequestAdmin(UserRefMixin, ModelAdmin):
 
     @admin.display(description="Вещи и причины")
     def items_view(self, obj):
-        from .return_requests import REASONS
+        from .return_requests import REASONS, REJECT_REASONS
 
         try:
             names = {row["index"]: row["name"] for row in return_plan(obj.order)}
         except ReturnError:
             names = {}
+
+        def verdict(line):
+            if line.get("decision") == "accept":
+                return " → принята"
+            if line.get("decision") == "reject":
+                return " → отказ: " + "; ".join(REJECT_REASONS.get(r, r)
+                                                 for r in line.get("rejectReasons") or [])
+            return ""
+
         rows = format_html_join(
-            "", "<li><b>{}</b> — {}{}</li>",
+            "", "<li><b>{}</b> — {}{}{}</li>",
             ((names.get(line["index"], f"позиция {line['index']}"),
               REASONS.get(line["reason"], line["reason"]),
-              f": {line['comment']}" if line.get("comment") else "")
+              f": {line['comment']}" if line.get("comment") else "",
+              verdict(line))
              for line in obj.lines))
         return format_html("<ul>{}</ul>", rows)
 
@@ -279,25 +347,17 @@ class ReturnRequestAdmin(UserRefMixin, ModelAdmin):
         if ok:
             self.message_user(request, f"{done}: {ok}", messages.SUCCESS)
 
-    @admin.action(description="Товар получен — на проверку", permissions=["change"])
+    @admin.action(description="Товар получен — на осмотр", permissions=["change"])
     def act_received(self, request, queryset):
         from .return_requests import mark_received
 
         self._run(request, queryset, lambda r: mark_received(r, request.user.get_username()),
                   "товар получен")
 
-    @admin.action(description="Одобрить и вернуть деньги", permissions=["change"])
-    def act_approve(self, request, queryset):
-        from .return_requests import approve
-
-        self._run(request, queryset, lambda r: approve(r, request.user.get_username()),
-                  "одобрено, деньги возвращаются")
-
-    @admin.action(description="Отказать (причина — в поле «Решение»)",
-                  permissions=["change"])
-    def act_reject(self, request, queryset):
-        from .return_requests import reject
+    @admin.action(description="Вещи после отказа отданы / отправлены", permissions=["change"])
+    def act_goods_back_done(self, request, queryset):
+        from .return_requests import mark_goods_back_done
 
         self._run(request, queryset,
-                  lambda r: reject(r, r.decision_note, request.user.get_username()),
-                  "отказано")
+                  lambda r: mark_goods_back_done(r, request.user.get_username()),
+                  "вещи отданы покупателю")

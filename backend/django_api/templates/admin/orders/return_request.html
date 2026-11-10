@@ -1,0 +1,155 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# Заявка на возврат (D-112, D-122): получили → осмотрели → решение по каждой вещи. #}
+
+{% if note %}<div class="m-note">{{ note }}</div>{% endif %}
+{% if error %}<div class="m-err">{{ error }}</div>{% endif %}
+
+<div class="m-sum">
+  <div class="m-tile"><b>{{ req.get_status_display }}</b><span>статус</span></div>
+  <div class="m-tile"><b>{{ req.get_method_display }}</b><span>как сдаёт</span></div>
+  <div class="m-tile"><b>{{ bring_until }}</b><span>сдать / отправить до</span></div>
+  {% if refund %}<div class="m-tile"><b>{{ refund }} ₽</b><span>возвращено деньгами</span></div>{% endif %}
+</div>
+
+<div class="m-card">
+  <div class="m-head">
+    <div class="m-who">
+      <h3>Заказ <a href="{% url 'admin:orders_order_change' req.order.pk %}">{{ req.order.order_id }}</a></h3>
+      <div class="m-meta">
+        Заявка создана {{ created }}
+        {% if req.track_number %} · трек-номер <b class="m-mono">{{ req.track_number }}</b>{% if sent_at %} (отправлена {{ sent_at }}){% endif %}{% endif %}
+        {% if received %} · товар получен {{ received }}{% endif %}
+        {% if decided %} · решение {{ decided }}{% if req.decided_by %}, {{ req.decided_by }}{% endif %}{% endif %}
+      </div>
+    </div>
+  </div>
+  {% if req.defect_claimed %}
+  <p class="m-strip bad">Покупатель заявил брак. Отказать можно только по итогам проверки качества —
+    ярлыки, упаковка и код маркировки основанием для отказа не служат (ст. 18 ЗоЗПП).
+    Если брак подтвердится, компенсируем и расходы покупателя на доставку до магазина.</p>
+  {% endif %}
+
+  {% if customer_photos %}
+  <div class="m-body">
+    <div class="m-small m-muted">Фото покупателя</div>
+    <div class="m-row">
+      {% for p in customer_photos %}
+        <a href="{{ p.url }}" target="_blank" rel="noopener"><img class="m-thumb" src="{{ p.url }}" alt="Фото покупателя {{ forloop.counter }}" width="120" height="120"></a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if can_receive and may_edit %}
+  <div class="m-acts">
+    <form class="m-inline" method="post">{% csrf_token %}
+      <button class="m-btn" type="submit" name="action" value="received">Товар получен — на осмотр</button>
+    </form>
+    <span class="m-hint m-small">Нажмите, когда вещи у вас в руках: покупатель получит уведомление, что их проверяют.</span>
+  </div>
+  {% endif %}
+</div>
+
+<form method="post" class="m-card">{% csrf_token %}
+  <div class="m-head"><div class="m-who"><h3>Вещи</h3>
+    {% if can_decide %}<div class="m-meta">По каждой вещи: принять (деньги вернутся) или отказать (отметьте причины — покупатель их увидит).</div>{% endif %}
+  </div></div>
+  <div class="m-wrap">
+  <table class="m">
+    <thead><tr><th>Вещь</th><th class="n">Оплачено</th><th>Причина покупателя</th><th>Решение</th></tr></thead>
+    <tbody>
+    {% for line in lines %}
+      <tr>
+        <td><b>{{ line.name }}</b></td>
+        <td class="n">{{ line.paid }} ₽</td>
+        <td>{{ line.reason }}{% if line.comment %}<div class="m-small m-muted">{{ line.comment }}</div>{% endif %}</td>
+        <td>
+          {% if can_decide and may_edit %}
+            <div class="m-row">
+              <label><input type="radio" name="decision_{{ line.index }}" value="accept" {% if line.decision == 'accept' %}checked{% endif %}> Принять</label>
+              <label><input type="radio" name="decision_{{ line.index }}" value="reject" {% if line.decision == 'reject' %}checked{% endif %}> Отказать</label>
+            </div>
+            <details {% if line.decision == 'reject' %}open{% endif %}>
+              <summary class="m-small">Причины отказа</summary>
+              {% for code, label in line.reasons %}
+                <div><label class="m-small"><input type="checkbox" name="reasons_{{ line.index }}" value="{{ code }}" {% if code in line.chosen %}checked{% endif %}> {{ label }}</label></div>
+              {% endfor %}
+            </details>
+          {% elif line.decision == 'accept' %}<span class="m-tag ok">принята</span>
+          {% elif line.decision == 'reject' %}<span class="m-tag bad">отказ</span>
+            <div class="m-small">{{ line.reject_labels|join:"; " }}</div>
+          {% else %}<span class="m-muted m-small">после осмотра</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  {% if can_decide and may_edit %}
+  <div class="m-body m-vstack">
+    {% if req.defect_claimed %}
+    <div class="m-field">
+      <label>Брак подтверждён проверкой?</label>
+      <div class="m-row">
+        <label><input type="radio" name="defect_confirmed" value="yes" {% if req.defect_confirmed %}checked{% endif %}> Да</label>
+        <label><input type="radio" name="defect_confirmed" value="no" {% if req.defect_confirmed is False %}checked{% endif %}> Нет</label>
+      </div>
+      <label for="shipping_rub">Расходы покупателя на доставку до магазина, ₽ (по квитанции)</label>
+      <input class="m-input" id="shipping_rub" name="shipping_rub" inputmode="decimal" value="{{ shipping_rub }}" placeholder="0">
+      <div class="m-hint">Компенсируются, только если брак подтверждён, — отдельно от возврата ЮKassa.</div>
+    </div>
+    {% endif %}
+    <div class="m-field">
+      <label for="note">Комментарий покупателю</label>
+      <input class="m-input wide" id="note" name="note" maxlength="500" value="{{ req.decision_note }}"
+             placeholder="Например: на подошве следы носки, фото осмотра приложены">
+      <div class="m-hint">Обязателен, если отмечено «Другое». Уйдёт покупателю вместе с решением.</div>
+    </div>
+    <div class="m-acts">
+      <button class="m-btn bad" type="submit" name="action" value="decide"
+              onclick="return confirm('Вынести решение? За принятые вещи деньги сразу уйдут покупателю через ЮKassa.')">Вынести решение</button>
+      <span class="m-hint m-small">За принятые вещи деньги уйдут через ЮKassa. Чек возврата пробейте на кассе в 1С.</span>
+    </div>
+  </div>
+  {% endif %}
+</form>
+
+<div class="m-card">
+  <div class="m-head"><div class="m-who"><h3>Фото осмотра</h3>
+    <div class="m-meta">Что нашли при осмотре — покупатель увидит их вместе с решением.</div></div></div>
+  {% if inspection_photos %}
+  <div class="m-body"><div class="m-row">
+    {% for p in inspection_photos %}
+      <a href="{{ p.url }}" target="_blank" rel="noopener"><img class="m-thumb" src="{{ p.url }}" alt="Фото осмотра {{ forloop.counter }}" width="120" height="120"></a>
+    {% endfor %}
+  </div></div>
+  {% endif %}
+  {% if may_edit and inspection_photos|length < max_photos %}
+  <form class="m-acts" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <input type="file" name="photos" accept="image/*" multiple aria-label="Фото осмотра">
+    <button class="m-btn" type="submit" name="action" value="photo">Добавить фото</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if req.status == 'rejected' or req.status == 'partial' %}
+<div class="m-card">
+  <div class="m-head"><div class="m-who"><h3>Вещи, по которым отказано</h3>
+    <div class="m-meta">
+      {% if req.goods_back_done %}Отданы или отправлены покупателю.
+      {% elif req.goods_back %}Покупатель выбрал: <b>{{ req.get_goods_back_display }}</b>.
+      {% else %}Покупатель ещё не выбрал, как их забрать.{% endif %}
+    </div></div></div>
+  {% if needs_goods_back and may_edit %}
+  <form class="m-acts" method="post">{% csrf_token %}
+    <button class="m-btn" type="submit" name="action" value="goods_back_done">Вещи отданы / отправлены</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+<p><a href="{% url 'admin:orders_returnrequest_changelist' %}">← ко всем заявкам</a></p>
+{% endblock %}
