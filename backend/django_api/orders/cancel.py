@@ -15,7 +15,7 @@
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Order
+from .models import Order, OrderReturn
 from .returns import ReturnError, make_return, return_plan
 
 # Заказ уже у курьера или у покупателя — отменять поздно, только возврат.
@@ -65,7 +65,7 @@ def _goods(order) -> list:
 def _refund_all(order, by):
     """Вернуть всё: деньги, доставку, баллы. Ошибка — снимаем пометку отмены."""
     try:
-        return make_return(order.pk, _goods(order), by=by)
+        return make_return(order.pk, _goods(order), by=by, kind=OrderReturn.CANCEL)
     except (ReturnError, CancelError) as e:
         Order.objects.filter(pk=order.pk).update(cancel_requested_at=None)
         raise CancelError(f"Отменить не удалось: {e}") from e

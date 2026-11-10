@@ -25,11 +25,11 @@ import os
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import Order, ReturnPhoto, ReturnRequest
-from .returns import RETURNABLE, ReturnError, make_return, return_plan
+from .returns import RETURNABLE, ReturnError, make_return, next_return_seq, return_plan
 
 # Срок возврата вещи без брака — со дня получения (решение владельца, D-73).
 # ВНИМАНИЕ (ст. 26.1 п. 4): 7 дней законны, только если памятка о возврате вручена
@@ -282,7 +282,7 @@ def create(order, user_id, raw_lines, method, photo_ids=None):
             raise RequestError(opts["reason"] or "Этот заказ вернуть нельзя")
         available = {line["index"] for line in opts["lines"] if line["available"]}
         lines = _parse_lines(raw_lines, available, _windows(order))
-        seq = (order.return_requests.aggregate(m=Max("seq"))["m"] or 0) + 1
+        seq = next_return_seq(order)
         req = ReturnRequest.objects.create(
             order=order, user_id=user_id, lines=lines, method=method, seq=seq,
             defect_claimed=any(line["reason"] in QUALITY for line in lines),
@@ -401,7 +401,7 @@ def decide(req, decisions, note="", by=""):
     ret = None
     if accepted:
         try:
-            ret = make_return(req.order_id, accepted, by=by)
+            ret = make_return(req.order_id, accepted, by=by, seq=req.seq)
         except ReturnError as e:
             raise RequestError(str(e)) from e
 

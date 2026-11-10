@@ -486,6 +486,51 @@ def onec_orders_ack(request):
     return Response(result)
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def onec_returns(request):
+    """Очередь возвратов и отмен для 1С (D-123). Возврат остаётся в очереди, пока 1С
+    не подтвердит приём через `1c/returns/ack`."""
+    started = time.monotonic()
+    if not _onec_authorized(request):
+        return _reject("returns", "Требуется токен обмена", 401)
+    from .log import record
+    from .onec_returns import MAX_RETURNS_PER_PULL, pending_returns, return_to_json
+
+    try:
+        limit = int(request.query_params.get("limit") or MAX_RETURNS_PER_PULL)
+    except (TypeError, ValueError):
+        limit = MAX_RETURNS_PER_PULL
+    rows = pending_returns(limit)
+    result = {"returns": [return_to_json(r) for r in rows]}
+    record("returns", {"received": len(rows), "updated": len(rows)}, started=started)
+    return Response(result)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def onec_returns_ack(request):
+    """1С создала документы возврата: снимаем их с очереди (D-123).
+    {"returnIds": [...], "documents"?: {"<returnId>": "<номер документа в 1С>"}}"""
+    started = time.monotonic()
+    if not _onec_authorized(request):
+        return _reject("returns", "Требуется токен обмена", 401)
+    body = request.data if isinstance(request.data, dict) else {}
+    ids = body.get("returnIds")
+    if isinstance(request.data, list):
+        ids = request.data
+    if not isinstance(ids, list):
+        return _reject("returns", "Ожидается {\"returnIds\": [...]}", 400)
+    from .log import record
+    from .onec_returns import mark_taken
+
+    result = mark_taken(ids, body.get("documents"))
+    record("returns", {"received": len(ids), "updated": result["acked"],
+                       "errors": [f"{r}: возврат не найден" for r in result["unknown"]]},
+           started=started)
+    return Response(result)
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def onec_order_status(request):

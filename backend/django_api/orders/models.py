@@ -217,6 +217,30 @@ class OrderReturn(models.Model):
                                   verbose_name="Кто оформил")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Когда")
 
+    # Что это за возврат для 1С (D-123): «возврат» — товар был у покупателя и вернулся
+    # (чек возврата на кассе, «Честный знак» — в оборот); «отмена» — заказ отменён до
+    # передачи курьеру, товар со склада не уходил, чека продажи не было.
+    RETURN, CANCEL = "return", "cancel"
+    KIND_CHOICES = [(RETURN, "Возврат"), (CANCEL, "Отмена заказа")]
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=RETURN,
+                            verbose_name="Тип")
+    # Номер внутри заказа — общий счётчик с заявками на возврат: номер возврата
+    # «<номер заказа>-В<seq>» совпадает с номером заявки, по которой он сделан.
+    seq = models.PositiveSmallIntegerField(null=True, blank=True, editable=False,
+                                           verbose_name="№ возврата в заказе")
+    # Обмен с 1С: 1С забирает проведённые возвраты сама и подтверждает приём
+    # (integrations/onec_returns.py), как заказы.
+    onec_taken_at = models.DateTimeField(null=True, blank=True, db_index=True,
+                                         verbose_name="Забран в 1С")
+    onec_number = models.CharField(max_length=64, blank=True, default="",
+                                   verbose_name="Документ возврата в 1С")
+
+    @property
+    def number(self) -> str:
+        if self.seq:
+            return f"{self.order.order_id}-В{self.seq}"
+        return f"{self.order.order_id}-В-{self.pk}"
+
     class Meta:
         db_table = "store_order_returns"
         ordering = ["-created_at"]

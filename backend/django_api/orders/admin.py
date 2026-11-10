@@ -18,12 +18,25 @@ class OrderReturnInline(TabularInline):
     model = OrderReturn
     extra = 0
     can_delete = False
-    fields = ("created_at", "amount_rub", "points_returned", "points_revoked",
-              "status", "refund_id", "created_by", "error")
+    fields = ("number_label", "kind", "created_at", "amount_rub", "points_returned",
+              "points_revoked", "status", "refund_id", "onec_state", "created_by", "error")
     readonly_fields = fields
 
     def has_add_permission(self, request, obj=None):
         return False
+
+    @admin.display(description="Номер")
+    def number_label(self, obj):
+        return obj.number if obj and obj.pk else ""
+
+    @admin.display(description="1С")
+    def onec_state(self, obj):
+        """Забрала ли 1С возврат (D-123): по нему пробивают чек возврата на кассе."""
+        if not obj or not obj.onec_taken_at:
+            if obj and obj.status == "done" and not obj.order.onec_taken_at:
+                return "не нужен: 1С заказа не видела"
+            return "ждёт 1С" if obj and obj.status == "done" else "—"
+        return f"забран{f' · {obj.onec_number}' if obj.onec_number else ''}"
 
     @admin.display(description="Сумма, ₽")
     def amount_rub(self, obj):
