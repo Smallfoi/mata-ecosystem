@@ -316,7 +316,7 @@ GET /banners                            → Banner[]
 
 ```
 POST /integrations/1c/categories  { categories: [...] }  → { received, created, updated, errors }
-POST /integrations/1c/catalog     { products: [...] }    → { received, created, updated, skipped, keptByOwner, unknownCategories, errors }
+POST /integrations/1c/catalog     { products: [...] }    → { received, created, updated, skipped, keptByOwner, unknownCategories, barcodes{added,moved,removed}, errors }   (у позиции — `barcodes: [строки]`, D-121; они же в строках заказа для 1С)
 POST /integrations/1c/prices      { prices: [...] }      → { received, updated, keptByOwner, errors }
 GET  /integrations/1c/status                             → { status, service, enabled, time }
 ```

@@ -16,7 +16,7 @@
 """
 from django.utils import timezone
 
-from catalog.models import Product
+from catalog.models import Product, ProductBarcode
 from orders.models import Order
 from orders import payment_receipt
 from orders.money import kop_to_float, to_kop
@@ -61,7 +61,13 @@ def _article_index(payload: dict) -> dict:
     rows = Product.objects.filter(id__in=[i for i in ids if i]).values(
         "id", "article", "external_id"
     )
-    return {r["id"]: r for r in rows}
+    index = {r["id"]: {**r, "barcodes": []} for r in rows}
+    # Штрихкоды позиции (D-121): по ним склад находит вещь сканером.
+    pairs = ProductBarcode.objects.filter(product_id__in=list(index)).values_list(
+        "product_id", "barcode")
+    for pid, code in pairs:
+        index[pid]["barcodes"].append(code)
+    return index
 
 
 def _price(value):
@@ -88,6 +94,7 @@ def order_to_json(order: Order) -> dict:
         items.append({
             "id": known.get("external_id") or "",
             "article": known.get("article") or "",
+            "barcodes": known.get("barcodes") or [],
             "productId": pid,
             "name": raw.get("productName") or "",
             "size": raw.get("size") or "",
