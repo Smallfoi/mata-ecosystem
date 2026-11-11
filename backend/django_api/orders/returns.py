@@ -151,8 +151,24 @@ def preview(order, indexes):
     return _compute(order, indexes)
 
 
-def make_return(order_pk, indexes, by=""):
+def next_return_seq(order) -> int:
+    """Следующий номер возврата в заказе — общий для заявок и возвратов денег (D-123):
+    «<номер заказа>-В<n>». Вызывать под блокировкой заказа."""
+    from django.db.models import Max
+
+    from .models import ReturnRequest
+
+    a = ReturnRequest.objects.filter(order=order).aggregate(m=Max("seq"))["m"] or 0
+    b = OrderReturn.objects.filter(order=order).aggregate(m=Max("seq"))["m"] or 0
+    return max(a, b) + 1
+
+
+def make_return(order_pk, indexes, by="", *, kind=OrderReturn.RETURN, seq=None):
     """Оформить возврат: запрос в ЮKassa, затем — по её подтверждению — баллы и статус.
+
+    `seq` — номер заявки, по которой возврат (номер возврата = номер заявки); без
+    заявки (админка, отмена) — следующий свободный. `kind` — возврат или отмена
+    заказа: от этого зависит, что делает 1С (D-123).
 
     Возвращает OrderReturn: done — деньги ушли; pending — ЮKassa ещё обрабатывает
     или не ответила (досверит вебхук/фоновая сверка). Отказ — ReturnError.
@@ -165,7 +181,8 @@ def make_return(order_pk, indexes, by=""):
         ret = OrderReturn.objects.create(
             order=order, lines=plan["lines"], amount_kop=plan["amount_kop"],
             points_returned=plan["points_back"], points_revoked=plan["points_off"],
-            status="pending", created_by=by[:150],
+            status="pending", created_by=by[:150], kind=kind,
+            seq=seq or next_return_seq(order),
         )
 
     # Запрос в ЮKassa — вне транзакции: сеть не должна держать блокировку заказа.

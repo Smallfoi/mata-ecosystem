@@ -356,7 +356,17 @@ GET  /integrations/1c/orders[?limit=200]              → { orders: [...] }
 POST /integrations/1c/orders/ack     { serverIds?: [], orderIds?: [] }
                                      → { acked, unknown[], ambiguous[], unknownServerIds[] }
 POST /integrations/1c/orders/status  { orders: [...] }→ { received, updated, errors, ambiguous[] }
+GET  /integrations/1c/returns[?limit=200]             → { returns: [{ returnId «<orderId>-В<n>», type: return|cancel, orderId,
+                                                          orderDocument, createdAt, customer, items:[{id, article, barcodes, productId,
+                                                          name, size, color, qty, price, refund, reason, reasonLabel}], deliveryRefund,
+                                                          amount, pointsReturned, pointsRevoked, refundId, test }] }
+POST /integrations/1c/returns/ack    { returnIds: [], documents?: { returnId: номер документа 1С } } → { acked, unknown[] }
 ```
+
+**Возвраты и отмены → 1С (D-123, паспорт §7.4).** В очереди — только проведённые возвраты
+(ЮKassa подтвердила) по заказам, которые 1С забирала. `type: return` — чек возврата на кассе
+и «Честный знак» в оборот; `cancel` — заказ отменён до курьера, чека нет. Номер возврата
+совпадает с номером заявки покупателя. Возвраты до D-123 в очередь не идут (миграция).
 
 **Идентификатор заказа (D-120, заменяет схему аудита B06).** `orderId` — единственный
 номер заказа для 1С. Его выдаёт сервер, он уникален во всей базе (`МАТА-` + 8

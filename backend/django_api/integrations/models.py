@@ -23,6 +23,7 @@ class OneCExchange(models.Model):
         ("prices", "Цены и остатки"),
         ("orders", "Заказы в 1С"),
         ("order-status", "Статусы из 1С"),
+        ("returns", "Возвраты в 1С"),
     ]
     STATUSES = [
         ("ok", "Успешно"),

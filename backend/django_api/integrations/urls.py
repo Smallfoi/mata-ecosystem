@@ -21,5 +21,7 @@ urlpatterns = [
     path("1c/orders", views.onec_orders),
     path("1c/orders/ack", views.onec_orders_ack),
     path("1c/orders/status", views.onec_order_status),
+    path("1c/returns", views.onec_returns),
+    path("1c/returns/ack", views.onec_returns_ack),
     path("1c/status", views.onec_status),
 ]
