@@ -183,7 +183,7 @@ class OrderDetailScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // ── Возврат (D-112): заявку оформляет покупатель сам ───────
+                  // ── Отмена и возврат (D-112, D-123): что можно — решает сервер
                   if (_returnable)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -194,8 +194,8 @@ class OrderDetailScreen extends StatelessWidget {
                                 ReturnRequestScreen(orderId: order.id),
                           ),
                         ),
-                        child: const RemoteText(
-                            'app.orderdetail.return', 'Оформить возврат'),
+                        child: const RemoteText('app.orderdetail.return',
+                            'Отменить или вернуть'),
                       ),
                     ),
 
