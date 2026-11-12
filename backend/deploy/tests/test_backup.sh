@@ -21,7 +21,11 @@ make_sandbox() {
 #!/usr/bin/env bash
 # Заглушка `docker compose ... exec -T db pg_dump ...`: синтетический дамп.
 # STUB_DUMP_BYTES — объём тела; STUB_DUMP_MODE: ok | truncated | fail.
-case " $* " in *" pg_dump "*) ;; *) echo "stub docker: unexpected: $*" >&2; exit 2 ;; esac
+case " $* " in
+  *" backup_mark "*) args="$*"; echo "${args##*backup_mark }" >> "${STUB_MARK_LOG:-/dev/null}"; exit 0 ;;
+  *" pg_dump "*) ;;
+  *) echo "stub docker: unexpected: $*" >&2; exit 2 ;;
+esac
 printf -- '--\n-- PostgreSQL database dump\n--\nSET statement_timeout = 0;\n'
 yes "INSERT INTO public.loyalty_txn VALUES (1, 'synthetic row for backup test', 100);" \
   | head -c "${STUB_DUMP_BYTES:-5000000}"
@@ -100,6 +104,19 @@ STUB_CURL_LOG="$SB/urls.log" STUB_CURL_FAIL=yandexcloud STUB_DUMP_BYTES=5000 run
 [ "$rc" != 0 ] && ok "код $rc" || bad "сбой выгрузки не замечен"
 grep -q 'tw-backups' "$SB/urls.log" 2>/dev/null && ok "Timeweb получил копию" || bad "до Timeweb не дошло"
 grep -q 'ОШИБКА выгрузки (Яндекс)' "$SB/out.log" && ok "ошибка названа" || bad "ошибка не названа"
+
+echo "MARK-1: отметки для мониторинга — только за удачные выгрузки"
+SB="$(make_sandbox)"; add_s3 "$SB"
+STUB_MARK_LOG="$SB/marks.log" STUB_CURL_LOG="$SB/urls.log" STUB_DUMP_BYTES=5000 run_backup "$SB"
+[ "$(cat "$SB/marks.log" 2>/dev/null)" = "dump:1 dump:2" ] && ok "оба хранилища отмечены" \
+  || bad "отметки: '$(cat "$SB/marks.log" 2>/dev/null)'"
+SB="$(make_sandbox)"; add_s3 "$SB"
+STUB_MARK_LOG="$SB/marks.log" STUB_CURL_LOG="$SB/urls.log" STUB_CURL_FAIL=yandexcloud STUB_DUMP_BYTES=5000 run_backup "$SB"
+[ "$(cat "$SB/marks.log" 2>/dev/null)" = "dump:2" ] && ok "Яндекс упал — отмечен только Timeweb" \
+  || bad "отметки при сбое Яндекса: '$(cat "$SB/marks.log" 2>/dev/null)'"
+SB="$(make_sandbox)"; add_s3 "$SB"
+STUB_MARK_LOG="$SB/marks.log" STUB_CURL_LOG="$SB/urls.log" STUB_DUMP_MODE=fail STUB_DUMP_BYTES=5000 run_backup "$SB"
+[ ! -s "$SB/marks.log" ] && ok "дамп упал — отметок нет" || bad "отметка при упавшем дампе"
 
 if command -v shellcheck >/dev/null 2>&1; then
   (cd "$HERE/.." && shellcheck -S warning backup.sh) && ok "shellcheck backup.sh" || bad "shellcheck backup.sh"

@@ -89,3 +89,25 @@ class AdminColumns(models.Model):
 
     def __str__(self):
         return f"{self.user_id} · {self.model_label}"
+
+
+class BackupMark(models.Model):
+    """Когда последний раз УДАЧНО легла резервная копия — по каждому хранилищу.
+
+    Ставят сами скрипты бэкапа на сервере (manage.py backup_mark) после успешной
+    выгрузки: dump:1/dump:2 — ночной pg_dump в Яндекс/Timeweb (deploy/backup.sh),
+    pgbr:1/pgbr:2 — копия pgBackRest (deploy/pgbr.sh backup). /v1/health
+    сравнивает с порогом и сообщает об устаревших (core/backups.py) — с августа по
+    сентябрь 2026 ночные дампы молча не доходили до бакета почти месяц.
+    """
+
+    name = models.CharField(max_length=32, primary_key=True, verbose_name="Копия")
+    at = models.DateTimeField(verbose_name="Последняя удачная")
+
+    class Meta:
+        db_table = "backup_marks"
+        verbose_name = "Отметка бэкапа"
+        verbose_name_plural = "Отметки бэкапов"
+
+    def __str__(self):
+        return f"{self.name} · {self.at:%Y-%m-%d %H:%M}"

@@ -21,6 +21,7 @@
 | Фото, баннеры, превью приложения | Yandex Object Storage `mata-media` | не менять — ссылки зашиты в базе |
 | Непрерывная копия БД (каждое изменение ≤1 мин) | pgBackRest → Yandex, путь `/pgbackrest` в `mata-club-backups`, и Timeweb Cloud S3 `mata-backups-2` (D-117, D-119) | `deploy/pgbr.sh check / info / restore 1` |
 | Ночные дампы БД (07:00 МСК) | Yandex `mata-club-backups/db/` + Timeweb Cloud S3 `mata-backups-2` (D-119) | `deploy/backup.sh`, восстановление — `fetch-latest-backup.sh` (+ `BACKUP_FROM=2`) |
+| Сторож бэкапов | `/v1/health` → `backupWarnings` (`core/backups.py`): отметки `dump:1/2`, `pgbr:1/2` ставят скрипты после удачной выгрузки, старше 26 ч = тревога; `wal` — PostgreSQL не может отправить журнал. GitHub `backup-watch.yml` раз в час → те же каналы, что Uptime | тревога пришла: `pgbr.sh check`, `/var/log/mata-backup.log`, `/var/log/mata-pgbr.log`; отметить вручную — `docker compose … exec web python manage.py backup_mark dump:1` |
 | Секреты | Yandex Lockbox `mata-prod-secrets` | поменяли → в Cloud Shell `beget-up.sh` с `HOST=87.242.100.147 SSH_USER=user1 SECRETS_ONLY=1` |
 
 Почему так — D-118: 2.11.2026 атака на Beget уничтожила их облако вместе с прежним VPS

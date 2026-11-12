@@ -26,6 +26,12 @@ SPOOL="$DATA/pgbackrest-spool"
 PG_UID=999   # пользователь postgres в образе postgis/postgis
 
 pgbr() { "${COMPOSE[@]}" exec -T -u postgres db pgbackrest --stanza=mata "$@"; }
+# Отметка «копия легла в хранилище N» для /v1/health и мониторинга (core/backups.py).
+# Не записалась — копию не валим: через сутки мониторинг всё равно поднимет тревогу.
+mark_ok() {
+  "${COMPOSE[@]}" exec -T web python manage.py backup_mark "pgbr:$1" >/dev/null 2>&1 \
+    || echo "ВНИМАНИЕ: отметка pgbr:$1 не записана (web недоступен?)"
+}
 
 host_of() { local u="${1#*://}"; u="${u%%/*}"; echo "${u%%:*}"; }   # https://host:port/... → host
 port_of() { local u="${1#*://}"; u="${u%%/*}"; case "$u" in *:*) echo "${u##*:}" ;; *) echo 443 ;; esac; }
@@ -122,13 +128,15 @@ print(" ".join(sorted({str(b["database"]["repo-key"]) for b in (d[0].get("backup
       grep -q "^repo${repo}-type=" "$CONF_DIR/pgbackrest.conf" || continue
       case " $have " in
         *" $repo "*) echo "Хранилище $repo: полная копия уже есть." ;;
-        *) echo "== Первая полная копия → хранилище $repo =="; pgbr --repo="$repo" --type=full backup ;;
+        *) echo "== Первая полная копия → хранилище $repo =="; pgbr --repo="$repo" --type=full backup && mark_ok "$repo" ;;
       esac
     done
     pgbr info
     ;;
   backup)
-    # Крон зовёт и там, где копия ещё не настроена (нет ключей хранилищ) — тихо выходим.
+    # Крон зовёт и там, где копия ещё не настроена (нет ключей хранилищ) — выходим без
+    # ошибки. Тихим это больше не остаётся: если archive_mode включён, а отметок pgbr:N
+    # нет, через сутки /v1/health и мониторинг поднимут тревогу (core/backups.py).
     [ -s "$CONF_DIR/pgbackrest.conf" ] || { echo "pgBackRest не настроен (./deploy/pgbr.sh setup) — пропуск"; exit 0; }
     type="${2:-diff}"
     case "$type" in full|diff|incr) ;; *) echo "Тип копии: full | diff | incr"; exit 1 ;; esac
@@ -137,7 +145,11 @@ print(" ".join(sorted({str(b["database"]["repo-key"]) for b in (d[0].get("backup
     for repo in 1 2; do
       grep -q "^repo${repo}-type=" "$CONF_DIR/pgbackrest.conf" 2>/dev/null || continue
       echo "== Копия $type → хранилище $repo =="
-      pgbr --repo="$repo" --type="$type" backup || { echo "ОШИБКА: хранилище $repo"; rc=1; }
+      if pgbr --repo="$repo" --type="$type" backup; then
+        mark_ok "$repo"
+      else
+        echo "ОШИБКА: хранилище $repo"; rc=1
+      fi
     done
     exit "$rc"
     ;;
