@@ -11,6 +11,7 @@ on:
     branches: [main]
     paths:
       - 'mata_store/**'
+      - 'packages/**'
       - 'tools/upload_app_preview.py'
       - '.github/workflows/app-preview.yml'
 

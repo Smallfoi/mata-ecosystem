@@ -64,6 +64,9 @@ dependencies:
   intl: ^0.20.2
   equatable: ^2.0.7
   qr_flutter: ^4.1.0
+  # Общие виджеты экосистемы (карта лояльности, знак, маска телефона) — D-126.
+  mata_ui:
+    path: ../packages/mata_ui
   mobile_scanner: ^7.2.0
   image_picker: ^1.1.2
 

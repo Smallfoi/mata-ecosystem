@@ -28,6 +28,9 @@ dependencies:
   sentry_flutter: ^9.26.0
   video_player: ^2.10.1
   qr_flutter: ^4.1.0
+  # Общие виджеты экосистемы (карта лояльности, знак, маска телефона) — D-126.
+  mata_ui:
+    path: ../packages/mata_ui
   url_launcher: ^6.3.1  # открыть банковское приложение по ссылке СБП
   package_info_plus: ^8.1.1  # текущий versionCode для проверки обновлений
 

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/mata_logo.dart';
 import '../../widgets/remote_text.dart';
 
 class SplashScreen extends StatefulWidget {
