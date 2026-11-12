@@ -12,7 +12,7 @@ from datetime import datetime, timezone as dt_tz
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from catalog.models import Category, Product, ProductBarcode
+from catalog.models import Category, Product, ProductBarcode, ProductPhoto
 from integrations import onec_daily
 from integrations.models import OneCDay, OneCDayVersion, OneCExchange, ParetaAccess
 
@@ -195,3 +195,18 @@ class ParetaApiTests(TestCase):
         self.assertEqual(item["barcodes"], ["4601234567890"])
         self.assertEqual({v["size"]: v["available"] for v in item["variants"]},
                          {"42": 3, "43": 0})
+
+    def test_catalog_groups_model_and_takes_photos_of_its_colour(self):
+        for pid, color in (("g1", "Чёрный"), ("g2", "Белый")):
+            Product.objects.create(id=pid, name=f"BMAI PURE {color} 42", category_id="shoes",
+                                   price=9990, article=f"PURE-{pid}", external_id=f"GUID-{pid}",
+                                   colors=[color], sizes=["42"], model_key_override="BMAI PURE")
+        ProductPhoto.objects.create(model_key="BMAI PURE", color="Чёрный", order=0,
+                                    image="uploads/photos/black.webp")
+        ProductPhoto.objects.create(model_key="BMAI PURE", color="Белый", order=0,
+                                    image="uploads/photos/white.webp")
+        items = {i["productId"]: i for i in self.get("/v1/analytics/catalog").json()["items"]}
+        self.assertEqual(items["g1"]["modelKey"], items["g2"]["modelKey"])
+        self.assertEqual(items["g1"]["color"], "Чёрный")
+        self.assertTrue(items["g1"]["photos"][0].endswith("black.webp"))
+        self.assertTrue(items["g2"]["photos"][0].endswith("white.webp"))

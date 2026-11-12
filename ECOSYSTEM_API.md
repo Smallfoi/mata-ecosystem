@@ -377,7 +377,7 @@ GET  /integrations/1c/daily/status   (без токена) → { expected, yeste
 ```
 GET /analytics/daily?updatedSince=<ISO>|cursor=<next>&limit≤500 → { days:[{date, version, generatedAt, receivedAt, totals, rows}], next }
 GET /analytics/daily/<ГГГГ-ММ-ДД>                               → { date, version, generatedAt, receivedAt, payload }
-GET /analytics/catalog?cursor=<next>&limit≤1000                 → { items:[{id (1С), productId, article, name, title, brand, category,
+GET /analytics/catalog?cursor=<next>&limit≤1000                 → { items:[{id (1С), productId, modelKey, color, article, name, title, brand, category,
                                                                     categoryId, sizes, colors, barcodes, active, published, price1c,
                                                                     oldPrice1c, variants:[{size, available}], photos, updatedAt}], next }
 ```

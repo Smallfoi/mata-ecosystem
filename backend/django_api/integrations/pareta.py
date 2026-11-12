@@ -150,15 +150,23 @@ def _variants(product, held):
     return out
 
 
-def _photos(product):
-    urls = []
+def _color(product) -> str:
+    """Цвет позиции — только из поля 1С (как на витрине, `models_api`)."""
+    return next((str(c).strip() for c in (product.colors or []) if str(c).strip()), "")
+
+
+def _photos(product, gallery):
+    """Фото именно этой модели и этого цвета — из той же галереи, что видит
+    покупатель на витрине (`ProductPhoto`, до 6 на цвет). Нет галереи — старое
+    фото позиции. По этим фото Pareta показывает клиенту «вы про эту модель?»,
+    так что фото чужого цвета здесь недопустимо."""
+    from catalog import photos as photolib
+
+    shots = photolib.pick(gallery.get(product.shop_model_key or product.id), _color(product))
+    if shots:
+        return [s.to_json()["url"] for s in shots]
     main = product.network_image_url()
-    if main:
-        urls.append(main)
-    for u in product.image_urls or []:
-        if u and u not in urls:
-            urls.append(u)
-    return urls
+    return [main] if main else []
 
 
 @api_view(["GET"])
@@ -181,12 +189,18 @@ def catalog(request):
     page = page[:limit]
     held = reserved_units({p.id: p for p in page})
     names = dict(Category.objects.values_list("id", "name"))
+    from catalog import photos as photolib
+    gallery = photolib.by_model({p.shop_model_key or p.id for p in page})
     items = []
     for p in page:
         src = p.from_1c or {}
         items.append({
             "id": p.external_id or None,          # ключ позиции в 1С — общий с итогами дня
             "productId": p.id,                    # ключ в МАТА
+            # Модель целиком: все размеры и цвета одной модели — один modelKey.
+            # Клиент спрашивает про модель, а 1С ведёт каждую пару отдельной позицией.
+            "modelKey": p.shop_model_key or p.id,
+            "color": _color(p),
             "article": p.article,
             "name": p.name,                       # как в 1С
             "title": p.shop_title,                # как видит покупатель
@@ -202,7 +216,7 @@ def catalog(request):
             "price1c": src.get("price"),
             "oldPrice1c": src.get("oldPrice"),
             "variants": _variants(p, held),
-            "photos": _photos(p),
+            "photos": _photos(p, gallery),
             "updatedAt": _iso(p.source_updated_at),
         })
     _log(request, 200, len(items))
