@@ -24,6 +24,7 @@ class OneCExchange(models.Model):
         ("orders", "Заказы в 1С"),
         ("order-status", "Статусы из 1С"),
         ("returns", "Возвраты в 1С"),
+        ("daily", "Итоги дня из 1С"),
     ]
     STATUSES = [
         ("ok", "Успешно"),
@@ -154,3 +155,76 @@ class McpClient(models.Model):
     def __str__(self):
         return f"{self.source}: {self.client_id[:12]}…"
 
+
+
+class OneCDay(models.Model):
+    """Итоги одного дня из 1С (поток 6, D-124): как прислала 1С, целиком.
+
+    Строки продаж не разбираем в таблицы — в МАТА им пока нет потребителя, а Pareta
+    должна получить ровно то, что прислала 1С. Повторная отправка дня заменяет
+    запись; прежняя версия уходит в `OneCDayVersion`.
+    """
+
+    date = models.DateField(primary_key=True, verbose_name="День")
+    payload = models.JSONField(verbose_name="Итоги как прислала 1С")
+    totals = models.JSONField(default=dict, verbose_name="Контрольные суммы")
+    counts = models.JSONField(default=dict, verbose_name="Строк по спискам")
+    version = models.PositiveIntegerField(default=1, verbose_name="Версия")
+    generated_at = models.DateTimeField(null=True, blank=True, verbose_name="Сформирован в 1С")
+    received_at = models.DateTimeField(default=timezone.now, db_index=True,
+                                       verbose_name="Получен")
+
+    class Meta:
+        ordering = ["-date"]
+        verbose_name = "Итоги дня из 1С"
+        verbose_name_plural = "Итоги дней из 1С"
+
+    def __str__(self):
+        return f"{self.date} · v{self.version}"
+
+
+class OneCDayVersion(models.Model):
+    """Заменённая версия дня — для разбора «что изменилось». Держим KEEP_DAYS."""
+
+    KEEP_DAYS = 90
+
+    date = models.DateField(db_index=True, verbose_name="День")
+    version = models.PositiveIntegerField(verbose_name="Версия")
+    payload = models.JSONField(verbose_name="Итоги как прислала 1С")
+    totals = models.JSONField(default=dict, verbose_name="Контрольные суммы")
+    received_at = models.DateTimeField(verbose_name="Получен")
+    replaced_at = models.DateTimeField(default=timezone.now, db_index=True,
+                                       verbose_name="Заменён")
+
+    class Meta:
+        ordering = ["-replaced_at"]
+        verbose_name = "Прежняя версия дня"
+        verbose_name_plural = "Прежние версии дней"
+
+    @classmethod
+    def prune(cls) -> int:
+        edge = timezone.now() - timedelta(days=cls.KEEP_DAYS)
+        return cls.objects.filter(replaced_at__lt=edge).delete()[0]
+
+
+class ParetaAccess(models.Model):
+    """Журнал доступа Pareta к /v1/analytics/* (D-124): там себестоимость и продавцы,
+    поэтому каждое обращение видно — когда, куда, сколько записей ушло."""
+
+    KEEP_DAYS = 90
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True,
+                                      verbose_name="Когда")
+    path = models.CharField(max_length=200, verbose_name="Адрес")
+    status = models.PositiveSmallIntegerField(default=200, verbose_name="Ответ")
+    rows = models.PositiveIntegerField(default=0, verbose_name="Записей")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Доступ Pareta"
+        verbose_name_plural = "Журнал доступа Pareta"
+
+    @classmethod
+    def prune(cls) -> int:
+        edge = timezone.now() - timedelta(days=cls.KEEP_DAYS)
+        return cls.objects.filter(created_at__lt=edge).delete()[0]

@@ -2,6 +2,11 @@
 
 **Версия 2 · 12.11.2026** · решение владельца — D-124 · формат от 1С — `INTEGRATION_1C.md` §15
 
+> **Статус (12.11.2026): §2–§4 сделаны.** Приём `POST /v1/integrations/1c/daily`, хранение
+> с версиями, журнал обмена, проверка «день не пришёл» и выдача Pareta работают. Что
+> осталось владельцу: завести `PARETA_READ_TOKEN` в Lockbox и отдать его в Pareta; после
+> первой живой отправки 1С — включить `ONEC_DAILY_EXPECTED=1`. Точный вид ответов — §8.
+
 Заменяет ТЗ «аналитический API (Level C)» от 28.09.2026 в части продаж и остатков. Главное
 отличие: продажи берутся **из 1С**, а не из заказов МАТА, — только 1С видит продажи магазина.
 
@@ -133,3 +138,49 @@ Payload дня как прислан, плюс `version` и `receivedAt`. `404`,
    сойтись до рубля. Не сошлись — разбираемся до того, как отключить Excel.
 5. **1С:** ежедневная отправка. **МАТА:** `ONEC_DAILY_EXPECTED=1`.
 6. Ручная воскресная выгрузка в Pareta отменяется.
+
+---
+
+## 8. Как сделано (12.11.2026)
+
+Код: `backend/django_api/integrations/onec_daily.py` (приём), `integrations/pareta.py`
+(выдача), тесты `integrations/tests_onec_daily.py`.
+
+**Хранение.** `OneCDay` — одна запись на день (`payload` как прислан, `totals`, число строк,
+`version`, `generated_at`, `received_at`). Замена — в одной транзакции, прежняя версия уходит
+в `OneCDayVersion` и держится 90 дней. Журнал обмена — операция `daily`: в нём дата, версия и
+число строк, **без строк дня и без себестоимости**.
+
+**Отказы приёма:** `400` — нет `date`/списка/обязательного поля, число строкой, у заказа МАТА
+нет `orderId` (`errors` — где именно, до 50 замечаний); `413` — больше 20 000 строк;
+`422` — `totals` не сошлись (`mismatch` по каждому показателю). При любом отказе прежняя
+версия дня остаётся.
+
+**«День не пришёл».** `GET /v1/integrations/1c/daily/status` — без токена, данных дня не
+отдаёт: `{expected, yesterday, received, late}`. `503` — только когда `ONEC_DAILY_EXPECTED=1`,
+уже 06:00 по Якутску, а вчерашнего дня нет. Адрес в списке `uptime.yml`: тревога уходит теми
+же каналами, что «сайт упал» (ntfy / WhatsApp / письмо GitHub).
+
+**Выдача Pareta** (заголовок `Authorization: Bearer <PARETA_READ_TOKEN>`; пустой токен —
+выдача выключена, `401`; токен 1С не подходит):
+
+```
+GET /v1/analytics/daily?updatedSince=<ISO>&limit=500
+→ {"days": [{"date","version","generatedAt","receivedAt","totals","rows"}], "next": "<cursor>|null"}
+GET /v1/analytics/daily?cursor=<next>          — продолжить с того же места
+GET /v1/analytics/daily/2026-11-11
+→ {"date","version","generatedAt","receivedAt","payload": <день как прислала 1С>}
+GET /v1/analytics/catalog?cursor=<next>&limit=1000
+→ {"items": [{"id" (1С), "productId" (МАТА), "article", "name" (1С), "title" (витрина),
+   "brand", "category", "categoryId", "sizes", "colors", "barcodes", "active", "published",
+   "price1c", "oldPrice1c", "variants": [{"size","available"}], "photos", "updatedAt"}],
+   "next": "<cursor>|null"}
+```
+
+Дни идут по возрастанию `receivedAt`: Pareta хранит последний `next` (или время последнего
+полученного дня) и забирает только новое — перепроведённый день придёт снова, с новой
+`version`. Каталог отдаётся целиком страницами по `productId` (поля «изменён в МАТА» у товара
+нет; `updatedAt` — когда позицию последний раз меняла 1С). `available` — остаток 1С минус
+придержанное под ждущими оплату и оплаченными, но ещё не забранными 1С заказами; `null` —
+остаток не ведётся. Каждое обращение — строка в журнале доступа `ParetaAccess` (90 дней).
+

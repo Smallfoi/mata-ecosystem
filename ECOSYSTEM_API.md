@@ -361,6 +361,25 @@ GET  /integrations/1c/returns[?limit=200]             → { returns: [{ returnId
                                                           name, size, color, qty, price, refund, reason, reasonLabel}], deliveryRefund,
                                                           amount, pointsReturned, pointsRevoked, refundId, test }] }
 POST /integrations/1c/returns/ack    { returnIds: [], documents?: { returnId: номер документа 1С } } → { acked, unknown[] }
+POST /integrations/1c/daily          { date, generatedAt?, sales[], returns[], receipts[], stockEnd[], totals{} }
+                                     → { status, date, replaced, version, received{…}, errors[] }
+                                     400 { errors[] } · 413 · 422 { mismatch{показатель: {sent, counted}} }
+GET  /integrations/1c/daily/status   (без токена) → { expected, yesterday, received, late }; 503 = late
+```
+
+**Итоги дня из 1С (D-124, паспорт §15).** День целиком, повтор — замена целиком (прежняя
+версия — архив 90 дней). Не сошлись `totals` — день не принят. Строки дня с себестоимостью
+не пишутся в журнал обмена.
+
+**Выдача Pareta (D-124, `docs/ANALYTICS_FOR_PARETA.md` §8)** — `Authorization: Bearer
+<PARETA_READ_TOKEN>`, только чтение, каждое обращение в журнале доступа:
+
+```
+GET /analytics/daily?updatedSince=<ISO>|cursor=<next>&limit≤500 → { days:[{date, version, generatedAt, receivedAt, totals, rows}], next }
+GET /analytics/daily/<ГГГГ-ММ-ДД>                               → { date, version, generatedAt, receivedAt, payload }
+GET /analytics/catalog?cursor=<next>&limit≤1000                 → { items:[{id (1С), productId, article, name, title, brand, category,
+                                                                    categoryId, sizes, colors, barcodes, active, published, price1c,
+                                                                    oldPrice1c, variants:[{size, available}], photos, updatedAt}], next }
 ```
 
 **Возвраты и отмены → 1С (D-123, паспорт §7.4).** В очереди — только проведённые возвраты

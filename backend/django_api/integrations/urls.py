@@ -23,5 +23,7 @@ urlpatterns = [
     path("1c/orders/status", views.onec_order_status),
     path("1c/returns", views.onec_returns),
     path("1c/returns/ack", views.onec_returns_ack),
+    path("1c/daily", views.onec_daily),
+    path("1c/daily/status", views.onec_daily_status),
     path("1c/status", views.onec_status),
 ]
