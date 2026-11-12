@@ -96,6 +96,28 @@
     });
   }
 
+  // Файл на сервер (multipart, поле image) — фото к возврату. Content-Type не
+  // задаём: браузер сам проставит границу частей.
+  function upload(path, file) {
+    var form = new FormData();
+    form.append("image", file);
+    var headers = {};
+    var t = getToken();
+    if (t) headers["Authorization"] = "Bearer " + t;
+    return fetch(API + path, { method: "POST", headers: headers, body: form }).then(function (r) {
+      return r.text().then(function (txt) {
+        var data = null;
+        try { data = txt ? JSON.parse(txt) : null; } catch (e) {}
+        if (!r.ok) {
+          var err = new Error((data && data.detail) || "Фото не загрузилось");
+          err.status = r.status;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
+
   // Подсказка после отправки кода: боевой ли вход и каким каналом придёт код (D-50).
   function codeHint(data) {
     if (!data || !data.smsEnabled) return "Тестовый режим: код 1234";
@@ -1138,6 +1160,7 @@
     // Внешние хуки экосистемы (вход/профиль/выход/данные).
     window.STAW = window.STAW || {};
     window.STAW.api = api; // авторизованный fetch к бэкенду (Bearer) для других модулей
+    window.STAW.upload = upload; // multipart-загрузка (фото к возврату, D-123)
     window.STAW.token = getToken;
     window.STAW.refreshAccount = refresh; // обновить баллы/профиль (напр. после заказа)
     window.STAW.openLogin = function () { openModal("login"); };

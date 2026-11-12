@@ -973,6 +973,8 @@ function prSetView(view) {
   if (lv) lv.hidden = view !== "levels";
   const ov = prModal.querySelector("[data-pr-orders-view]");
   if (ov) ov.hidden = view !== "orders";
+  const rv = prModal.querySelector("[data-pr-return-view]");
+  if (rv) rv.hidden = view !== "return";
   const gear = prModal.querySelector("[data-pr-gear]");
   if (gear) {
     gear.textContent = view === "menu" ? "⚙" : "←";
@@ -1051,10 +1053,24 @@ function prRenderOrders(orders) {
         '<div class="pr-order-bot">' +
         '<span class="pr-order-src">' + escapeHtml(prOrderSource(o)) + " · " + escapeHtml(prOrderDate(o)) + "</span>" +
         '<span class="pr-order-total">' + formatPrice(o.total || 0) + "</span>" +
-        "</div></div>"
+        "</div>" +
+        // Отмена и возврат (D-123): что именно можно — решит сервер на экране.
+        (typeof rtOrderEligible === "function" && rtOrderEligible(o)
+          ? '<button type="button" class="rt-open" data-pr-return="' + escapeHtml(o.id || "") +
+            '">Отменить или вернуть</button>'
+          : "") +
+        "</div>"
       );
     })
     .join("");
+  if (typeof list.querySelectorAll !== "function") return;
+  list.querySelectorAll("[data-pr-return]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      if (window.STAW && typeof window.STAW.openReturn === "function") {
+        window.STAW.openReturn(b.getAttribute("data-pr-return"));
+      }
+    });
+  });
 }
 
 function prDemoMode() {
@@ -1572,7 +1588,9 @@ if (prModal) {
   if (prGear)
     prGear.addEventListener("click", () => {
       const onMenu = !prModal.querySelector("[data-pr-menu]").hidden;
-      if (onMenu) prShowEdit();
+      const rv = prModal.querySelector("[data-pr-return-view]");
+      if (rv && !rv.hidden) prShowOrders(); // с возврата — назад к заказам
+      else if (onMenu) prShowEdit();
       else prShowMenu();
     });
   const prLevelsBtn = prModal.querySelector("[data-pr-levels-open]");

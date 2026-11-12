@@ -2422,6 +2422,243 @@ html.js.motion-off .hero .brand-wordmark span {
   color: var(--ink);
 }
 
+/* — Отмена и возврат заказа (returns.js, D-123) — только токены сайта — */
+.rt-open {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+
+.rt-open:hover,
+.rt-link:hover {
+  text-decoration: underline;
+}
+
+.rt-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.rt-h {
+  margin: 4px 0 0;
+  font-size: 16px;
+}
+
+.rt-text,
+.rt-note,
+.rt-hint {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.rt-note,
+.rt-hint {
+  color: var(--muted);
+}
+
+.rt-hint {
+  font-size: 13px;
+}
+
+.rt-error {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #c0392b;
+}
+
+.rt-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.rt-row .pr-addr-add-btn {
+  padding: 0 18px;
+}
+
+.rt-row .rt-input {
+  flex: 1 1 180px;
+}
+
+.rt-outline {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid var(--graphite);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rt-link {
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+
+.rt-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+}
+
+.rt-line.is-on {
+  border-color: var(--accent);
+}
+
+.rt-check,
+.rt-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.rt-check input,
+.rt-radio input {
+  margin-top: 3px;
+  accent-color: var(--graphite);
+}
+
+.rt-check span,
+.rt-radio span {
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.rt-check small,
+.rt-radio small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.rt-select,
+.rt-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.rt-select:focus-visible,
+.rt-input:focus-visible,
+.rt-outline:focus-visible,
+.rt-link:focus-visible,
+.rt-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.rt-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rt-photo,
+.rt-photo-add {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.rt-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rt-photo.is-loading img {
+  opacity: 0.45;
+}
+
+.rt-photo.is-failed {
+  outline: 2px solid #c0392b;
+}
+
+.rt-photo button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--graphite);
+  color: var(--on-dark);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rt-photo-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 26px;
+  cursor: pointer;
+}
+
+.rt-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.rt-submit:disabled {
+  opacity: 0.45;
+  transform: none;
+  cursor: default;
+}
+
+.rt-req-line,
+.rt-refund {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.rt-refund {
+  font-weight: 800;
+}
+
+.rt-req-reject {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: #c0392b;
+}
+
 /* — Адреса в редактировании профиля (централизованные) — */
 .pr-addr {
   margin-top: 2px;
