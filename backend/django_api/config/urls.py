@@ -43,6 +43,7 @@ from shoes import views as shoes_views
 from territories import views as territories_views
 from blocks import views as blocks_views
 from analytics import views as analytics_views
+from integrations import pareta as pareta_views
 from config.errors_view import error_detail, errors_console
 from config.data_check_view import data_check, data_check_closed, data_check_item
 from config.onec_fill_view import onec_fill
@@ -177,6 +178,10 @@ urlpatterns = [
     path("v1/friends/<str:other_id>", friends_views.friend_remove),
     # Подключение часов: адреса нужны в заявке к COROS до выдачи ключей.
     path("v1/integrations/", include("integrations.urls")),
+    # Выдача Pareta (D-124): итоги дня из 1С и каталог, токен только на чтение.
+    path("v1/analytics/daily", pareta_views.daily_list),
+    path("v1/analytics/daily/<str:day>", pareta_views.daily_detail),
+    path("v1/analytics/catalog", pareta_views.catalog),
     # Тренировки из внешних источников (часы, файлы).
     path("v1/workouts/", include("workouts.urls")),
     # Территории (PostGIS, D-09)

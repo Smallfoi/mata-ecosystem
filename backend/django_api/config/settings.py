@@ -696,6 +696,13 @@ RACES_IMPORT_FEED_URL = os.environ.get("RACES_IMPORT_FEED_URL", "")
 # Пусто — приём выключен: лучше отказать, чем принимать номенклатуру без проверки.
 INTEGRATION_1C_TOKEN = os.environ.get("INTEGRATION_1C_TOKEN", "")
 
+# Поток 6 «итоги дня» (D-124): тревога «день не пришёл» включается после первой живой
+# отправки — иначе звенела бы каждое утро, пока 1С не начала слать.
+ONEC_DAILY_EXPECTED = os.environ.get("ONEC_DAILY_EXPECTED", "")
+# Выдача Pareta /v1/analytics/* — отдельный токен только на чтение (в Lockbox).
+# Пусто — выдача выключена. Токен 1С сюда не годится: он умеет писать.
+PARETA_READ_TOKEN = os.environ.get("PARETA_READ_TOKEN", "")
+
 # ── Письма покупателям (D-111) ──────────────────────────────────────────────
 # Служебные письма о заказе (оплачен/отправлен/возврат). Провайдер — окружением:
 # EMAIL_PROVIDER пуст — выключено; smtp — любой SMTP (Unisender Go, Yandex 360…);

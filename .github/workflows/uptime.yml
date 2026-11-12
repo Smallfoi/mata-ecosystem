@@ -45,6 +45,9 @@ jobs:
             ["МАТА API"]="https://api.mata-club.ru/v1/health"
             ["МАТА сайт"]="https://mata-club.ru/"
             ["Pareta"]="https://pareta.ru/api/health"
+            # Итоги дня из 1С (D-124): 503, только когда их ждут (ONEC_DAILY_EXPECTED=1),
+            # уже после 06:00 по Якутску, а вчерашнего дня нет. Иначе всегда 200.
+            ["1С: итоги дня"]="https://api.mata-club.ru/v1/integrations/1c/daily/status"
           )
           down=()
           for name in "${!TARGETS[@]}"; do

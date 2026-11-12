@@ -554,6 +554,47 @@ def onec_order_status(request):
     return Response(result)
 
 
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def onec_daily(request):
+    """Итоги дня из 1С (поток 6, D-124). День целиком; повтор — замена целиком."""
+    started = time.monotonic()
+    if not _onec_authorized(request):
+        return _reject("daily", "Требуется токен обмена", 401)
+    from .log import record
+    from .onec_daily import DayError, save
+    try:
+        result = save(request.data)
+    except DayError as e:
+        # В журнал — только суть отказа: строки дня с себестоимостью туда не пишем.
+        _reject("daily", e.detail, e.status)
+        body = {"status": "error", "detail": e.detail}
+        if e.errors:
+            body["errors"] = e.errors
+        if e.mismatch:
+            body["mismatch"] = e.mismatch
+        return Response(body, status=e.status)
+    record("daily", {
+        "received": sum(result["received"].values()),
+        "created": 0 if result["replaced"] else 1,
+        "updated": 1 if result["replaced"] else 0,
+        "sample": {"date": result["date"], "version": result["version"],
+                   "rows": result["received"]},
+    }, started=started)
+    return Response(result)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def onec_daily_status(request):
+    """Пришли ли итоги вчерашнего дня — опрашивает мониторинг (uptime.yml).
+    503 — только когда итоги ждём (ONEC_DAILY_EXPECTED=1), уже после 06:00 по
+    Якутску, а вчерашнего дня нет. Данных дня здесь нет — только «есть / нет»."""
+    from .onec_daily import watch_state
+    state = watch_state()
+    return Response(state, status=503 if state["late"] else 200)
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def onec_status(request):
