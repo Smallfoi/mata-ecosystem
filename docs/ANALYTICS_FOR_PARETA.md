@@ -171,7 +171,7 @@ GET /v1/analytics/daily?cursor=<next>          — продолжить с то�
 GET /v1/analytics/daily/2026-11-11
 → {"date","version","generatedAt","receivedAt","payload": <день как прислала 1С>}
 GET /v1/analytics/catalog?cursor=<next>&limit=1000
-→ {"items": [{"id" (1С), "productId" (МАТА), "article", "name" (1С), "title" (витрина),
+→ {"items": [{"id" (1С), "productId" (МАТА), "modelKey", "color", "article", "name" (1С), "title" (витрина),
    "brand", "category", "categoryId", "sizes", "colors", "barcodes", "active", "published",
    "price1c", "oldPrice1c", "variants": [{"size","available"}], "photos", "updatedAt"}],
    "next": "<cursor>|null"}
@@ -182,5 +182,7 @@ GET /v1/analytics/catalog?cursor=<next>&limit=1000
 `version`. Каталог отдаётся целиком страницами по `productId` (поля «изменён в МАТА» у товара
 нет; `updatedAt` — когда позицию последний раз меняла 1С). `available` — остаток 1С минус
 придержанное под ждущими оплату и оплаченными, но ещё не забранными 1С заказами; `null` —
-остаток не ведётся. Каждое обращение — строка в журнале доступа `ParetaAccess` (90 дней).
+остаток не ведётся. `modelKey` — одна модель на все её размеры и цвета (в 1С каждая
+pара — отдельная позиция); `photos` — галерея именно этой модели и этого цвета (та же, что
+на витрине), по ним Pareta показывает клиенту «вы про эту модель?». Каждое обращение — строка в журнале доступа `ParetaAccess` (90 дней).
 
