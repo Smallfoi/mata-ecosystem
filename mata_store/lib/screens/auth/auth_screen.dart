@@ -5,13 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../data/api/api_client.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/mata_logo.dart';
 import '../../widgets/otp_verify_boxes.dart';
-import '../../widgets/phone_mask.dart';
 import '../../widgets/remote_text.dart';
 import '../profile/legal_documents_screen.dart';
 

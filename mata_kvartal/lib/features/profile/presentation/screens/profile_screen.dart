@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/api/api_config.dart';
 import '../../../../core/config/app_config_provider.dart';
@@ -13,7 +14,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../auth/data/auth_provider.dart';
 import '../../../loyalty/data/loyalty_provider.dart';
 import '../../../friends/data/friends_provider.dart';
-import '../../../loyalty/presentation/widgets/loyalty_card.dart';
 import '../../../notifications/data/notifications_provider.dart';
 import '../../../run/data/completed_runs_provider.dart';
 import '../../../medals/data/medal_defs.dart';

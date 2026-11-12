@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:sport_store/widgets/loyalty_card.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 void main() {
   // Идл-циклы «живой» карты бесконечны, поэтому pumpAndSettle с картой

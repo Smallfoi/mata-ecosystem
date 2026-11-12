@@ -11,12 +11,14 @@ on:
     paths:
       - 'mata_kvartal/**'
       - 'mata_store/**'
+      - 'packages/**'
       - '.github/workflows/ios-build.yml'
   push:
     branches: [main]
     paths:
       - 'mata_kvartal/**'
       - 'mata_store/**'
+      - 'packages/**'
       - '.github/workflows/ios-build.yml'
 
 concurrency:

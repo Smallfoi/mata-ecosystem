@@ -5,12 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../providers/catalog_provider.dart';
 import '../../providers/notifications_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/remote_image.dart';
-import '../../widgets/mata_logo.dart';
 import '../../widgets/remote_text.dart';
 
 class HomeScreen extends StatefulWidget {

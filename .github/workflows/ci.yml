@@ -30,6 +30,9 @@ jobs:
             dir: mata_kvartal
           - app: sport_store
             dir: mata_store
+          # Общий пакет виджетов (D-126): свой analyze и тесты карты лояльности.
+          - app: mata_ui
+            dir: packages/mata_ui
     defaults:
       run:
         working-directory: ${{ matrix.dir }}

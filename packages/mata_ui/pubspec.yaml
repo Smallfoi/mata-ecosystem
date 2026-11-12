@@ -1,0 +1,20 @@
+name: mata_ui
+description: >-
+  Общие виджеты экосистемы МАТА для МАТА Store и Квартала: карта лояльности,
+  знак МАТА, маска телефона, фирменные цвета. Один источник — правка сразу в
+  обоих приложениях (D-126).
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  qr_flutter: ^4.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

@@ -21,12 +21,6 @@ mata_store/lib/screens/profile/legal_documents_screen.dart	обязательн�
 mata_store/lib/screens/profile/legal_documents_screen.dart	принят
 mata_store/lib/screens/search/search_screen.dart	Отмена
 mata_store/lib/screens/search/search_screen.dart	Проверьте написание или\nпопробуйте другой запрос
-mata_store/lib/widgets/loyalty_card.dart	ДЕРЖАТЕЛЬ
-mata_store/lib/widgets/loyalty_card.dart	ЕДИНАЯ КАРТА
-mata_store/lib/widgets/loyalty_card.dart	ПОКАЖИ НА КАССЕ
-mata_store/lib/widgets/loyalty_card.dart	ПОКАЖИТЕ КАССИРУ
-mata_store/lib/widgets/loyalty_card.dart	баллов
-mata_store/lib/widgets/loyalty_card.dart	тап — закрыть
 mata_store/lib/widgets/product_card.dart	НОВИНКА
 mata_store/lib/widgets/remote_anim.dart	Анимация появления
 mata_store/lib/widgets/remote_anim.dart	Удалить

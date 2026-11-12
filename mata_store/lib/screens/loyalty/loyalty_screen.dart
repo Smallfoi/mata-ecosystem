@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../models/loyalty.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/loyalty_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/loyalty_card.dart';
 import '../../widgets/remote_text.dart';
 
 class LoyaltyScreen extends StatelessWidget {
