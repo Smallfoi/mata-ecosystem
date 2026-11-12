@@ -4,42 +4,109 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../theme/app_theme.dart';
+/// Цвета ячеек OTP V5 под тему приложения (D-126).
+///
+/// Хореография (тайминги, кривые, геометрия) общая и в стиль НЕ выносится —
+/// это стандарт экосистемы. Различаются только цвета и одна деталь поведения
+/// ([cursorRequiresFocus]). Готовые стили — в приложениях: Store
+/// (`storeOtpBoxesStyle`) и Квартал (`kvartalOtpBoxesStyle()`).
+class OtpBoxesStyle {
+  /// Рамка текущей ячейки и мигающий курсор.
+  final Color accent;
+
+  /// Тень текущей ячейки (цвет уже с прозрачностью) и её размытие.
+  final Color currentShadow;
+  final double currentShadowBlur;
+
+  /// Рамка заполненной ячейки.
+  final Color filledBorder;
+
+  /// Рамка пустой ячейки.
+  final Color emptyBorder;
+
+  /// Фон ячейки.
+  final Color cellBackground;
+
+  /// Цвет цифр.
+  final Color digit;
+
+  /// Рамка и цифры при ошибке.
+  final Color error;
+
+  /// Рамка, галочка и кольца успеха.
+  final Color success;
+
+  /// Фон и тень (цвет уже с прозрачностью) финальной ячейки с галочкой.
+  final Color verifiedBackground;
+  final Color verifiedShadow;
+
+  /// Цвет искр финала.
+  final Color spark;
+
+  /// true — курсор/подсветка текущей ячейки только когда скрытое поле в
+  /// фокусе (Store); false — всегда, пока не идёт проверка (Квартал).
+  final bool cursorRequiresFocus;
+
+  const OtpBoxesStyle({
+    required this.accent,
+    required this.currentShadow,
+    required this.currentShadowBlur,
+    required this.filledBorder,
+    required this.emptyBorder,
+    required this.cellBackground,
+    required this.digit,
+    required this.error,
+    required this.success,
+    required this.verifiedBackground,
+    required this.verifiedShadow,
+    required this.spark,
+    this.cursorRequiresFocus = false,
+  });
+}
 
 /// Ввод кода подтверждения с хореографией «OTP V5» (стандарт экосистемы МАТА
-/// для всех верификаций кодом). Светлая версия под тему Store (чёрный акцент).
+/// для всех верификаций кодом, директива владельца 2026-08-18).
 ///
 /// Фазы одной величины прогресса prog 0..3:
 ///   0..1  строка ячеек разлетается в окружность (380 мс, easeOutCubic)
 ///   1..2  связка вращается 2 оборота ЖЁСТКО — цифры крутятся вместе с
-///         ячейками (1250 мс, easeInOutCubic); пока сервер думает — связка
-///         докручивает дополнительные обороты (вращение = «загрузка»)
+///         ячейками (1250 мс, easeInOutCubic); если сервер ещё не ответил,
+///         связка докручивает дополнительные обороты (вращение = «загрузка»)
 ///   2..3  схлопывание в центр с доворотом 40° (420 мс, easeInBack)
-/// Успех: рамка зеленеет, кольца-ripple, искры, галочка прорисовывается.
+/// Успех: рамка зеленеет, два кольца-ripple, 6 искр, галочка прорисовывается.
 /// Ошибка: связка возвращается в строку + горизонтальный shake.
 ///
 /// Движение считается в AnimatedBuilder от контроллеров — без setState на кадр.
 /// При MediaQuery.disableAnimations состояния меняются мгновенно, без движения.
 class OtpVerifyBoxes extends StatefulWidget {
+  /// Количество цифр кода (dev-бэкенд — 4; при включении SMSC станет 6).
   final int length;
+
+  /// Фокус на скрытое поле сразу при показе (клавиатура открывается сама).
   final bool autofocus;
 
-  /// Проверка кода на сервере: true — успех, false — ошибка.
+  /// Цвета под тему приложения.
+  final OtpBoxesStyle style;
+
+  /// Проверка кода на сервере. Виджет играет разлёт+вращение, пока Future не
+  /// завершится; true — успех (схлопывание+галочка), false — ошибка (возврат).
   final Future<bool> Function(String code) onSubmit;
 
-  /// После завершения анимации успеха (навигация/закрытие).
+  /// Вызывается после завершения анимации успеха — здесь навигация.
   final VoidCallback onSuccess;
 
-  /// После возврата из анимации ошибки (показать текст ошибки).
+  /// Вызывается после возврата из анимации ошибки (показать текст, refocus
+  /// делает сам виджет).
   final VoidCallback? onFailed;
 
-  /// Подсветить ячейки красным (текст ошибки показывает родитель).
+  /// Подсветить ячейки красным (ошибка показывается родителем).
   final bool hasError;
 
   const OtpVerifyBoxes({
     super.key,
     this.length = 4,
     this.autofocus = false,
+    required this.style,
     required this.onSubmit,
     required this.onSuccess,
     this.onFailed,
@@ -54,26 +121,27 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
     with TickerProviderStateMixin {
   static const double _cellW = 60;
   static const double _cellH = 72;
-  static const double _gap = 76;
-  static const double _radius = 62;
-  static const int _turns = 2;
-
-  static const _verifiedBg = Color(0xFFEAF4EC);
-  static const _spark = Color(0xFF66BB6A);
+  static const double _gap = 76; // шаг ячеек в строке (60 + 2×8)
+  static const double _radius = 62; // радиус орбиты
+  static const int _turns = 2; // оборотов за основную фазу вращения
 
   final _text = TextEditingController();
   final _focus = FocusNode();
 
+  /// prog 0..3 — вся хореография.
   late final AnimationController _phase = AnimationController(
     vsync: this,
     upperBound: 3,
   );
+
+  /// Дополнительные обороты, пока ждём сервер (1 цикл = 1 оборот).
   late final AnimationController _extra = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 800),
   );
   int _extraTurns = 0;
 
+  /// Финал успеха: кольца + искры (0..1) и галочка (0..1).
   late final AnimationController _ring = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1300),
@@ -82,13 +150,15 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
     vsync: this,
     duration: const Duration(milliseconds: 450),
   );
+
+  /// Shake при ошибке (0..1).
   late final AnimationController _shake = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 320),
   );
 
-  bool _busy = false;
-  bool _verified = false;
+  bool _busy = false; // идёт проверка/анимация — ввод заблокирован
+  bool _verified = false; // финал успеха показан
 
   bool get _reduceMotion => MediaQuery.of(context).disableAnimations;
 
@@ -130,6 +200,7 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
     final verifyFuture = widget.onSubmit(code);
 
     if (_reduceMotion) {
+      // Без движения: дождаться результата и мгновенно показать состояние.
       final ok = await verifyFuture;
       if (!mounted) return;
       if (ok) {
@@ -145,6 +216,7 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
       return;
     }
 
+    // Пауза 260 мс после последней цифры → разлёт → вращение (2 оборота).
     await Future.delayed(const Duration(milliseconds: 260));
     if (!mounted) return;
     await _phase.animateTo(
@@ -160,6 +232,7 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
     );
     if (!mounted) return;
 
+    // Сервер ещё думает — докручиваем по обороту (вращение = индикатор).
     bool? result;
     unawaited(
       verifyFuture.then((v) => result = v).catchError((_) => result = false),
@@ -185,6 +258,7 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
       await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) widget.onSuccess();
     } else {
+      // Возврат в строку + shake.
       await _phase.animateBack(
         0,
         duration: const Duration(milliseconds: 420),
@@ -211,6 +285,7 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
     _focus.requestFocus();
   }
 
+  /// Угол связки в градусах из prog + доп. оборотов.
   double _spinDeg(double prog) {
     double spin;
     if (prog <= 1) {
@@ -238,6 +313,7 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
+            // Скрытый input — источник значения.
             SizedBox(
               width: 0,
               height: 0,
@@ -255,6 +331,7 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
                 onChanged: _onChanged,
               ),
             ),
+            // Кольца + искры финала.
             AnimatedBuilder(
               animation: _ring,
               builder: (context, _) => _verified
@@ -262,12 +339,13 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
                       size: const Size(220, 220),
                       painter: _RipplePainter(
                         progress: _ring.value,
-                        color: AppColors.success,
-                        sparkColor: _spark,
+                        color: widget.style.success,
+                        sparkColor: widget.style.spark,
                       ),
                     )
                   : const SizedBox.shrink(),
             ),
+            // Ячейки: позиции считаются от контроллеров, без setState на кадр.
             AnimatedBuilder(
               animation: Listenable.merge([_phase, _extra, _shake]),
               builder: (context, _) {
@@ -305,7 +383,8 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
                         ? 1 - (shrink - 0.75) / 0.25
                         : 1.0;
 
-                    // Порядок: translate → rotate → scale (см. спеку OTP V5).
+                    // Порядок: translate → rotate → scale (иначе траектория
+                    // поедет — см. спеку OTP V5).
                     final m = Matrix4.identity()
                       ..translate(x + shakeX, y)
                       ..rotateZ(rotRad)
@@ -330,47 +409,51 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
   }
 
   Widget _cell(int i) {
+    final st = widget.style;
     final value = i < _text.text.length ? _text.text[i] : null;
-    final isCurrent = !_busy && _focus.hasFocus && i == _text.text.length;
+    final isCurrent =
+        !_busy &&
+        (!st.cursorRequiresFocus || _focus.hasFocus) &&
+        i == _text.text.length;
     final showCheck = _verified && i == 0;
 
     final Color border;
     double width = 1;
     if (showCheck) {
-      border = AppColors.success;
+      border = st.success;
       width = 2;
     } else if (widget.hasError) {
-      border = AppColors.red;
+      border = st.error;
       width = 2;
     } else if (isCurrent) {
-      border = AppColors.black;
+      border = st.accent;
       width = 2;
     } else if (value != null) {
-      border = AppColors.grey800;
+      border = st.filledBorder;
       width = 2;
     } else {
-      border = AppColors.grey200;
+      border = st.emptyBorder;
     }
 
     return Container(
       width: _cellW,
       height: _cellH,
       decoration: BoxDecoration(
-        color: showCheck ? _verifiedBg : AppColors.white,
+        color: showCheck ? st.verifiedBackground : st.cellBackground,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: border, width: width),
         boxShadow: showCheck
             ? [
                 BoxShadow(
-                  color: AppColors.success.withValues(alpha: 0.3),
+                  color: st.verifiedShadow,
                   blurRadius: 24,
                 ),
               ]
             : isCurrent
             ? [
                 BoxShadow(
-                  color: AppColors.black.withValues(alpha: 0.12),
-                  blurRadius: 14,
+                  color: st.currentShadow,
+                  blurRadius: st.currentShadowBlur,
                 ),
               ]
             : null,
@@ -383,7 +466,7 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
                 size: const Size(30, 30),
                 painter: _CheckPainter(
                   progress: Curves.easeInOut.transform(_check.value),
-                  color: AppColors.success,
+                  color: st.success,
                 ),
               ),
             )
@@ -393,19 +476,19 @@ class OtpVerifyBoxesState extends State<OtpVerifyBoxes>
               style: TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.w800,
-                color: widget.hasError ? AppColors.red : AppColors.black,
+                color: widget.hasError ? st.error : st.digit,
               ),
             )
           : isCurrent
-          ? Container(width: 2, height: 28, color: AppColors.black)
+          ? Container(width: 2, height: 28, color: st.accent)
           : null,
     );
   }
 }
 
-/// Два расходящихся кольца (сдвиг второго) + 6 искр.
+/// Два расходящихся кольца (сдвиг второго 220 мс) + 6 искр.
 class _RipplePainter extends CustomPainter {
-  final double progress;
+  final double progress; // 0..1
   final Color color;
   final Color sparkColor;
 
@@ -425,14 +508,15 @@ class _RipplePainter extends CustomPainter {
     void ringAt(double t) {
       if (t <= 0 || t >= 1) return;
       final eased = Curves.easeOutCubic.transform(t);
-      final r = 40 + eased * 95;
+      final r = 40 + eased * 95; // scale .55 → 3.4 от базовых 80px
       stroke.color = color.withValues(alpha: 0.9 * (1 - eased));
       canvas.drawCircle(center, r, stroke);
     }
 
     ringAt(progress);
-    ringAt((progress - 0.17).clamp(0.0, 1.0) / 0.83);
+    ringAt((progress - 0.17).clamp(0.0, 1.0) / 0.83); // второе кольцо, сдвиг
 
+    // Искры: 6 точек, разлёт 20 → 92 px со ступенчатой задержкой.
     final dot = Paint()..style = PaintingStyle.fill;
     for (var i = 0; i < 6; i++) {
       final delay = i * 0.06;
@@ -458,7 +542,7 @@ class _RipplePainter extends CustomPainter {
 
 /// Галочка, прорисовывающаяся как stroke-dashoffset 30 → 0.
 class _CheckPainter extends CustomPainter {
-  final double progress;
+  final double progress; // 0..1
   final Color color;
 
   _CheckPainter({required this.progress, required this.color});
