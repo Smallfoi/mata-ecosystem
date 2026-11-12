@@ -1,0 +1,127 @@
+# Сторож резервных копий МАТА: раз в час читает /v1/health → backupWarnings
+# (core/backups.py) и поднимает тревогу, если копия устарела или журнал (WAL) не пишется.
+#
+# Зачем отдельно от uptime.yml: сервер может быть жив и отвечать 200, а бэкапы при
+# этом молча не ложиться — так было с конца августа по 28.09.2026, заметили только на
+# аудите. Падение сервера ловит uptime.yml; здесь — только копии.
+#
+# Пишет ОДИН раз при поломке и ОДИН раз при восстановлении (по смене исхода
+# относительно прошлого планового запуска). Каналы и секреты — те же, что у uptime.yml.
+# Проверить вручную: Actions → Backup watch → Run workflow (test=true — тест каналов).
+name: Backup watch
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Отправить тестовое сообщение во все каналы"
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: backup-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read backupWarnings
+        id: check
+        run: |
+          set -u
+          body=""
+          for attempt in 1 2 3; do
+            body=$(curl -fsS -m 20 https://api.mata-club.ru/v1/health) && break
+            body=""; sleep 15
+          done
+          if [ -z "$body" ]; then
+            # Сервер не отвечает — это забота uptime.yml; про копии сейчас не знаем ничего.
+            echo "API недоступен — пропуск (тревогу о падении шлёт Uptime)."
+            echo "state=ok" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          names=$(echo "$body" | jq -r '(.backupWarnings // []) | join(" ")')
+          if [ -z "$names" ]; then
+            echo "Копии свежие."
+            echo "state=ok" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          human=""
+          for n in $names; do
+            case "$n" in
+              dump:1) h="ночной дамп → Яндекс" ;;
+              dump:2) h="ночной дамп → Timeweb" ;;
+              pgbr:1) h="pgBackRest → Яндекс" ;;
+              pgbr:2) h="pgBackRest → Timeweb" ;;
+              wal)    h="непрерывный журнал (WAL) не отправляется" ;;
+              check-failed) h="проверка бэкапов сама упала — смотреть логи web" ;;
+              *)      h="$n" ;;
+            esac
+            human="${human:+$human; }$h"
+          done
+          echo "ПРОБЛЕМА: $human"
+          echo "stale=$human" >> "$GITHUB_OUTPUT"
+          echo "state=stale" >> "$GITHUB_OUTPUT"
+
+      - name: Previous result
+        id: prev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prev=$(gh api "repos/${{ github.repository }}/actions/workflows/backup-watch.yml/runs?status=completed&per_page=1&event=schedule" \
+                   --jq '.workflow_runs[0].conclusion // "success"' 2>/dev/null || echo success)
+          echo "Предыдущий исход: $prev"
+          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+
+      - name: Notify
+        env:
+          STATE: ${{ steps.check.outputs.state }}
+          STALE: ${{ steps.check.outputs.stale }}
+          PREV: ${{ steps.prev.outputs.prev }}
+          TEST: ${{ inputs.test }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -u
+          msg=""
+          if [ "$TEST" = "true" ]; then
+            msg="Проверка тревог бэкапов МАТА: канал работает. Сейчас: ${STATE}${STALE:+ — $STALE}"
+          elif [ "$STATE" = stale ] && [ "$PREV" = success ]; then
+            msg="🟠 БЭКАП МАТА не ложится: $STALE. Сервер при этом работает. Порядок разбора — docs/DEPLOY.md (pgbr.sh check, /var/log/mata-backup.log). $RUN_URL"
+          elif [ "$STATE" = ok ] && [ "$PREV" = failure ]; then
+            msg="🟢 Бэкапы МАТА снова ложатся."
+          fi
+          if [ -n "$msg" ]; then
+            echo "$msg"
+            sent=0
+            if [ -n "$NTFY_TOPIC" ]; then
+              curl -fsS -m 20 -H "Title: МАТА бэкапы" -H "Priority: high" \
+                   -d "$msg" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null && { echo "ntfy: ok"; sent=1; } || echo "ntfy: FAIL"
+            fi
+            if [ -n "$CALLMEBOT_PHONE" ] && [ -n "$CALLMEBOT_APIKEY" ]; then
+              curl -fsS -m 30 -G "https://api.callmebot.com/whatsapp.php" \
+                   --data-urlencode "phone=$CALLMEBOT_PHONE" --data-urlencode "text=$msg" \
+                   --data-urlencode "apikey=$CALLMEBOT_APIKEY" >/dev/null && { echo "whatsapp: ok"; sent=1; } || echo "whatsapp: FAIL"
+            fi
+            if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+              curl -fsS -m 20 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                   --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" --data-urlencode "text=$msg" >/dev/null \
+                   && { echo "telegram: ok"; sent=1; } || echo "telegram: FAIL"
+            fi
+            [ $sent = 1 ] || echo "Ни один канал не подключён — осталось только письмо GitHub о красном запуске."
+          else
+            echo "Состояние не изменилось ($PREV → $STATE) — молчу."
+          fi
+          # Красный запуск = копии не ложатся: так и письмо GitHub придёт, и следующий
+          # запуск узнает прошлое состояние.
+          [ "$STATE" != stale ] || exit 1

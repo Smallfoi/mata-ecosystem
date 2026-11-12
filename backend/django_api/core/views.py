@@ -6,6 +6,7 @@ from rest_framework.decorators import api_view, throttle_classes
 from rest_framework.response import Response
 
 from common.prodcheck import config_warnings
+from core.backups import backup_warnings
 
 
 def _db_ok():
@@ -44,6 +45,10 @@ def health(_request):
             # значений). Прод с ними работает, но в неполном/опасном режиме — видно
             # мониторингу и владельцу без захода на сервер. В dev всегда [].
             "configWarnings": config_warnings(),
+            # Резервные копии, которые устарели или не пишутся (имена: dump:1, pgbr:2, wal).
+            # Сбой бэкапа не должен быть тихим — это поле читает мониторинг
+            # (.github/workflows/backup-watch.yml). В dev всегда [].
+            "backupWarnings": backup_warnings(),
         }
     )
 

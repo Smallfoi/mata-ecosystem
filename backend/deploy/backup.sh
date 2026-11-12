@@ -66,9 +66,10 @@ fi
 # 8.10.2026 пожар в ЦОД Яндекса показал: всё у одного провайдера — одна точка отказа.
 # Одно место недоступно — во второе всё равно грузим; итоговый код 1 скажет о сбое.
 FAILED=0
+MARKS=()   # куда копия легла — отметим для мониторинга (core/backups.py)
 
-s3_put() {  # s3_put <имя> <endpoint> <регион> <бакет> <ключ> <секрет>
-  local name="$1" endpoint="$2" region="$3" bucket="$4" key="$5" secret="$6" dest code
+s3_put() {  # s3_put <имя> <endpoint> <регион> <бакет> <ключ> <секрет> <отметка>
+  local name="$1" endpoint="$2" region="$3" bucket="$4" key="$5" secret="$6" mark="$7" dest code
   [ -n "$key" ] && [ -n "$secret" ] || {
     echo "ОШИБКА ($name): бакет $bucket задан, но ключи доступа пусты"; FAILED=1; return; }
   dest="${endpoint%/}/${bucket}/db/$(basename "$OUT")"
@@ -79,6 +80,7 @@ s3_put() {  # s3_put <имя> <endpoint> <регион> <бакет> <ключ> 
            --upload-file "$OUT" "$dest") || code="000"
   if [ "$code" = "200" ]; then
     echo "Выгружено в бакет ${bucket}."
+    MARKS+=("$mark")
   else
     echo "ОШИБКА выгрузки ($name): HTTP $code"; FAILED=1
   fi
@@ -91,7 +93,8 @@ if [ -n "${BACKUP_S3_BUCKET:-}" ]; then
     "${BACKUP_S3_REGION:-${MEDIA_S3_REGION:-ru-central1}}" \
     "$BACKUP_S3_BUCKET" \
     "${BACKUP_S3_ACCESS_KEY:-${MEDIA_S3_ACCESS_KEY:-}}" \
-    "${BACKUP_S3_SECRET_KEY:-${MEDIA_S3_SECRET_KEY:-}}"
+    "${BACKUP_S3_SECRET_KEY:-${MEDIA_S3_SECRET_KEY:-}}" \
+    "dump:1"
 else
   echo "ВНИМАНИЕ: BACKUP_S3_BUCKET не задан — в Яндекс дамп не выгружен."
 fi
@@ -102,13 +105,25 @@ if [ -n "${BACKUP2_S3_BUCKET:-}" ]; then
     "${BACKUP2_S3_REGION:-ru-1}" \
     "$BACKUP2_S3_BUCKET" \
     "${BACKUP2_S3_ACCESS_KEY:-}" \
-    "${BACKUP2_S3_SECRET_KEY:-}"
+    "${BACKUP2_S3_SECRET_KEY:-}" \
+    "dump:2"
 else
   echo "ВНИМАНИЕ: BACKUP2_S3_BUCKET не задан — копии бэкапа у второго провайдера нет."
 fi
 
 if [ -z "${BACKUP_S3_BUCKET:-}" ] && [ -z "${BACKUP2_S3_BUCKET:-}" ]; then
   echo "ВНИМАНИЕ: ни одно хранилище не задано — дамп остался ТОЛЬКО на диске сервера."
+fi
+
+# Отметка «копия легла» — по ней /v1/health и мониторинг (backup-watch.yml) видят, что
+# бэкап перестал доходить. Ставим ТОЛЬКО за удачные выгрузки. Сама отметка не валит
+# бэкап: не записалась — через сутки мониторинг всё равно поднимет тревогу.
+if [ ${#MARKS[@]} -gt 0 ]; then
+  if $COMPOSE exec -T web python manage.py backup_mark "${MARKS[@]}" >/dev/null 2>&1; then
+    echo "Отмечено для мониторинга: ${MARKS[*]}"
+  else
+    echo "ВНИМАНИЕ: отметка ${MARKS[*]} не записана (web недоступен?)"
+  fi
 fi
 
 # Ротация ЛОКАЛЬНЫХ дампов старше KEEP_DAYS дней (в бакете — политика жизненного цикла).

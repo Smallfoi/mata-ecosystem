@@ -1,4 +1,5 @@
 """Авто-удаление данных по срокам хранения (152-ФЗ §2)."""
+import os
 from datetime import timedelta
 
 from django.core.management import call_command
@@ -148,3 +149,97 @@ class ErrorsConsoleTests(TestCase):
         r = self.client.get("/admin/errors/5/")
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Все ошибки")  # ссылка назад к списку
+
+
+class BackupWatchTests(TestCase):
+    """Свежесть бэкапов в /v1/health (core/backups.py): сбой копии не должен быть тихим."""
+
+    PROD = {"DJANGO_DEBUG": "0", "BACKUP_S3_BUCKET": "b1", "BACKUP2_S3_BUCKET": "b2"}
+
+    def _warn(self, env=None, *, archive=False, wal=False, now=None):
+        from unittest import mock
+
+        from core.backups import backup_warnings
+
+        with mock.patch("core.backups._archive_mode_on", return_value=archive), \
+                mock.patch("core.backups.wal_failing", return_value=wal):
+            return backup_warnings(env or self.PROD, now=now)
+
+    def test_dev_is_silent(self):
+        from core.backups import backup_warnings
+
+        self.assertEqual(backup_warnings({"DJANGO_DEBUG": "1", "BACKUP_S3_BUCKET": "b"}), [])
+
+    def test_first_sight_starts_clock_instead_of_alarm(self):
+        from core.models import BackupMark
+
+        self.assertEqual(self._warn(), [])
+        self.assertEqual(set(BackupMark.objects.values_list("name", flat=True)), {"dump:1", "dump:2"})
+
+    def test_copy_that_never_arrives_alarms_after_max_age(self):
+        t0 = timezone.now()
+        self._warn(now=t0)
+        self.assertEqual(self._warn(now=t0 + timedelta(hours=25)), [])
+        self.assertEqual(self._warn(now=t0 + timedelta(hours=27)), ["dump:1", "dump:2"])
+
+    def test_stale_store_named_fresh_one_not(self):
+        from core.backups import mark
+
+        now = timezone.now()
+        mark("dump:1", now - timedelta(hours=30))
+        mark("dump:2", now - timedelta(hours=2))
+        self.assertEqual(self._warn(now=now), ["dump:1"])
+
+    def test_only_configured_stores_are_expected(self):
+        from core.backups import mark
+
+        now = timezone.now()
+        mark("dump:2", now - timedelta(days=10))  # Timeweb отключили — старая отметка не тревожит
+        mark("dump:1", now)
+        self.assertEqual(self._warn({"DJANGO_DEBUG": "0", "BACKUP_S3_BUCKET": "b1"}, now=now), [])
+
+    def test_pgbackrest_expected_only_with_archive_mode(self):
+        from core.models import BackupMark
+
+        self._warn(archive=True)
+        self.assertEqual(set(BackupMark.objects.values_list("name", flat=True)),
+                         {"dump:1", "dump:2", "pgbr:1", "pgbr:2"})
+
+    def test_wal_archiving_failure_is_reported(self):
+        from core.backups import mark
+
+        now = timezone.now()
+        for n in ("dump:1", "dump:2", "pgbr:1", "pgbr:2"):
+            mark(n, now)
+        self.assertEqual(self._warn(archive=True, wal=True, now=now), ["wal"])
+        # без archive_mode журнал не ждём вовсе
+        self.assertEqual(self._warn(archive=False, wal=True, now=now), [])
+
+    def test_check_error_does_not_break_health(self):
+        from unittest import mock
+
+        from core.backups import backup_warnings
+
+        with mock.patch("core.backups._archive_mode_on", side_effect=RuntimeError("boom")):
+            self.assertEqual(backup_warnings(self.PROD), ["check-failed"])
+
+    def test_real_database_queries_work(self):
+        from core.backups import _archive_mode_on, wal_failing
+
+        self.assertIsInstance(_archive_mode_on(), bool)
+        self.assertIsInstance(wal_failing(), bool)
+
+    def test_mark_command_and_validation(self):
+        from django.core.management.base import CommandError
+
+        from core.models import BackupMark
+
+        call_command("backup_mark", "pgbr:2", "dump:1", stdout=open(os.devnull, "w"))
+        self.assertEqual(set(BackupMark.objects.values_list("name", flat=True)), {"pgbr:2", "dump:1"})
+        with self.assertRaises(CommandError):
+            call_command("backup_mark", "dump:3", stdout=open(os.devnull, "w"))
+
+    def test_health_carries_backup_warnings(self):
+        d = self.client.get("/v1/health").json()
+        self.assertIn("backupWarnings", d)
+        self.assertIsInstance(d["backupWarnings"], list)
