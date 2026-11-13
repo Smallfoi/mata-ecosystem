@@ -149,7 +149,7 @@ class _RunPlate extends StatelessWidget {
             size: isActive ? 33 : 30,
             animated: isActive,
             glow: false,
-            outline: const Color(0xFFEDEFE8),
+            outline: const Color(0xFFEFF1EA),
             fill: AppColors.lime,
           ),
         ),

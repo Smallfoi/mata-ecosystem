@@ -33,7 +33,7 @@ class SplashScreen extends ConsumerStatefulWidget {
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   static const _bg = Color(0xFF2A302C); // ровно как нативный splash_background
-  static const _light = Color(0xFFEDEFE8);
+  static const _light = Color(0xFFEFF1EA);
   static const _limeBright = Color(0xFFDFF45F);
 
   // Куда улетает знак: центр знака в чипе шапки карты (замер по скриншоту,
@@ -233,7 +233,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             'Замкни маршрут. Забери квартал.',
                             style: TextStyle(
                               fontSize: 14,
-                              color: Color(0xFF9AA59D),
+                              color: Color(0xFFB9C1BB),
                               letterSpacing: 0.8,
                             ),
                           ),

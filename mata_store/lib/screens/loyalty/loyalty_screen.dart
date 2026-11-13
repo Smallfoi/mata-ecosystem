@@ -409,7 +409,7 @@ class _LotTile extends StatelessWidget {
                   partly ? '${lot.dateLine} · из ${lot.amount}' : lot.dateLine,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: AppColors.grey400,
+                    color: AppColors.grey500,
                   ),
                 ),
               ],
@@ -422,7 +422,7 @@ class _LotTile extends StatelessWidget {
               fontWeight: FontWeight.w800,
               color: debt
                   ? AppColors.red
-                  : (lot.held ? AppColors.grey400 : const Color(0xFF2E7D32)),
+                  : (lot.held ? AppColors.grey400 : const Color(0xFF246227)),
             ),
           ),
         ],
@@ -584,7 +584,7 @@ class _TxnTile extends StatelessWidget {
                   _date(tx.createdAt),
                   style: const TextStyle(
                     fontSize: 12,
-                    color: AppColors.grey400,
+                    color: AppColors.grey500,
                   ),
                 ),
               ],
@@ -595,7 +595,7 @@ class _TxnTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: positive ? const Color(0xFF2E7D32) : AppColors.red,
+              color: positive ? const Color(0xFF246227) : AppColors.red,
             ),
           ),
         ],

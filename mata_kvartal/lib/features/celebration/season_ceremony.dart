@@ -58,8 +58,8 @@ class _SeasonCeremonyState extends State<_SeasonCeremony>
 
   static const _lime = Color(0xFFDFF45F);
   static const _ink = Color(0xFF171C19);
-  static const _light = Color(0xFFEDEFE8);
-  static const _dim = Color(0xFF9AA59D);
+  static const _light = Color(0xFFEFF1EA);
+  static const _dim = Color(0xFFB9C1BB);
 
   @override
   void initState() {
@@ -303,7 +303,7 @@ class _SeasonBurstPainter extends CustomPainter {
   const _SeasonBurstPainter({required this.progress});
 
   static const _lime = Color(0xFFDFF45F);
-  static const _light = Color(0xFFEDEFE8);
+  static const _light = Color(0xFFEFF1EA);
 
   @override
   void paint(Canvas canvas, Size size) {

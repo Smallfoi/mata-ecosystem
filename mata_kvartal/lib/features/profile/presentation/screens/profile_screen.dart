@@ -1177,7 +1177,7 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFFEDEFE8),
+                      color: Color(0xFFEFF1EA),
                     ),
                   ),
                   if (stats != null && !loyalty.programV1) ...[

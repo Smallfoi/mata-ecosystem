@@ -465,7 +465,7 @@ class _StartCard extends ConsumerWidget {
                   child: const Center(
                     child: KvartalLogoMark(
                       size: 58,
-                      outline: Color(0xFFEDEFE8), // светлый контур на тёмной карточке
+                      outline: Color(0xFFEFF1EA), // светлый контур на тёмной карточке
                     ),
                   ),
                 ),
@@ -1048,7 +1048,7 @@ class _FirstQuestCard extends StatelessWidget {
               fontFamily: AppTheme.fontDisplay,
               fontSize: 19,
               fontWeight: FontWeight.w800,
-              color: Color(0xFFEDEFE8),
+              color: Color(0xFFEFF1EA),
             ),
           ),
           const SizedBox(height: 4),
@@ -1059,7 +1059,7 @@ class _FirstQuestCard extends StatelessWidget {
               fontSize: 12.5,
               height: 1.45,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF9AA59D),
+              color: Color(0xFFB9C1BB),
             ),
           ),
         ],

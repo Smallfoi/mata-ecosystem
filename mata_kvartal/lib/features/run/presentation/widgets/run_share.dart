@@ -28,7 +28,7 @@ const _instaChannel = MethodChannel('kvartal/instagram_share');
 
 const _bg = Color(0xFF12161B);
 const _panel = Color(0xFF1B2129);
-const _ink = Color(0xFFEDEFE8);
+const _ink = Color(0xFFEFF1EA);
 const _muted = Color(0xFF97A0A6);
 const _lime = Color(0xFFDFF45F);
 const _cyan = Color(0xFF6FD3E0);

@@ -530,7 +530,7 @@ class _SizeSelector extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: !available
-                        ? AppColors.grey400
+                        ? AppColors.grey500
                         : (isSelected ? AppColors.lime : AppColors.black),
                     decoration:
                         available ? TextDecoration.none : TextDecoration.lineThrough,
@@ -816,7 +816,7 @@ class _AddedToCartSheet extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '$size  ·  $color',
-                      style: const TextStyle(fontSize: 12, color: AppColors.grey400),
+                      style: const TextStyle(fontSize: 12, color: AppColors.grey500),
                     ),
                     const SizedBox(height: 6),
                     Text(

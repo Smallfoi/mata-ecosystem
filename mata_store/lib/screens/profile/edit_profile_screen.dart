@@ -278,7 +278,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             if (user.avatarPath != null) ...[
                               const Text(
                                 ' · ',
-                                style: TextStyle(color: AppColors.grey400),
+                                style: TextStyle(color: AppColors.grey500),
                               ),
                               GestureDetector(
                                 onTap: _removeAvatar,
@@ -659,7 +659,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             duration: const Duration(milliseconds: 150),
                             height: 52,
                             color: _saved
-                                ? const Color(0xFF2E7D32)
+                                ? const Color(0xFF246227)
                                 : a.isLoading
                                 ? AppColors.grey800
                                 : AppColors.black,
@@ -846,7 +846,7 @@ class _FieldState extends State<_Field> {
               decoration: InputDecoration(
                 hintText: widget.hint,
                 hintStyle: const TextStyle(
-                  color: AppColors.grey400,
+                  color: AppColors.grey500,
                   fontSize: 14,
                 ),
                 prefixIcon: Icon(

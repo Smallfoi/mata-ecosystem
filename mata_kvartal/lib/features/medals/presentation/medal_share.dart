@@ -56,7 +56,7 @@ Future<bool> saveShareImageToGallery(String path) async {
 // Палитра карточек — константы сторис-мира (карточка живёт в чужой ленте,
 // от темы приложения не зависит).
 const _bg = Color(0xFF12161B);
-const _ink = Color(0xFFEDEFE8);
+const _ink = Color(0xFFEFF1EA);
 const _muted = Color(0xFF97A0A6);
 const _lime = Color(0xFFDFF45F);
 

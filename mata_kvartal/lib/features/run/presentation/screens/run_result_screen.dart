@@ -111,8 +111,8 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
   bool _medalsShown = false;
 
   static const _bg = Color(0xFF20252B);
-  static const _light = Color(0xFFEDEFE8);
-  static const _dim = Color(0xFF9AA59D);
+  static const _light = Color(0xFFEFF1EA);
+  static const _dim = Color(0xFFB9C1BB);
 
   @override
   void initState() {
@@ -434,7 +434,7 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
       padding: EdgeInsets.symmetric(horizontal: 8),
       child: Text(
         '·',
-        style: TextStyle(fontSize: 14, color: Color(0xFF9AA59D)),
+        style: TextStyle(fontSize: 14, color: Color(0xFFB9C1BB)),
       ),
     ),
   );
@@ -467,7 +467,7 @@ class _StatsPanel extends ConsumerWidget {
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: .8,
-              color: Color(0xFF5F665E),
+              color: Color(0xFF505650),
             ),
           ),
         ],
@@ -891,7 +891,7 @@ class RoutePainter extends CustomPainter {
         ..strokeWidth = 5
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
-        ..color = const Color(0xFFEDEFE8),
+        ..color = const Color(0xFFEFF1EA),
     );
 
     // Бегун ведёт линию.
@@ -917,7 +917,7 @@ class RoutePainter extends CustomPainter {
       canvas.drawCircle(
         Offset(start.dx * scale + dx, start.dy * scale + dy),
         4,
-        Paint()..color = const Color(0xFFEDEFE8),
+        Paint()..color = const Color(0xFFEFF1EA),
       );
     }
   }

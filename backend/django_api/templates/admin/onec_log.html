@@ -44,7 +44,7 @@
     <option value="error"{% if status == "error" %} selected{% endif %}>Ошибка</option>
   </select>
   <input type="submit" value="Показать" class="default">
-  {% if last_ok %}<span style="margin-left:auto;color:#6f7278;font-size:.85rem">Последний удачный обмен: {{ last_ok }}</span>{% endif %}
+  {% if last_ok %}<span style="margin-left:auto;color:#5e6066;font-size:.85rem">Последний удачный обмен: {{ last_ok }}</span>{% endif %}
 </form>
 
 {% if rows %}
@@ -117,11 +117,11 @@
 {% endif %}
 {% if can_clear %}</form>{% endif %}
 </div>
-<p style="font-size:.8rem;color:#9ca3af;margin-top:1rem">
+<p style="font-size:.8rem;color:#677080;margin-top:1rem">
   Показано {{ rows|length }} из {{ total }} записей по фильтру. Журнал хранит последние 90 дней.
   «Оставлено за владельцем» — поля, которые 1С прислала, но не перезаписала: там правка из Конструктора.
 </p>
 {% else %}
-<p style="color:#6f7278">Записей по этому фильтру нет.</p>
+<p style="color:#5e6066">Записей по этому фильтру нет.</p>
 {% endif %}
 {% endblock %}

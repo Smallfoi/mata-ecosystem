@@ -329,7 +329,7 @@ class _StatusBar extends StatelessWidget {
       case OrderStatus.shipped:
         return const Color(0xFF6A1B9A);
       case OrderStatus.delivered:
-        return const Color(0xFF2E7D32);
+        return const Color(0xFF246227);
       case OrderStatus.cancelled:
         return AppColors.red;
     }
@@ -467,7 +467,7 @@ class _ItemRow extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.grey400,
+                      color: AppColors.grey500,
                       letterSpacing: 1,
                     ),
                   ),

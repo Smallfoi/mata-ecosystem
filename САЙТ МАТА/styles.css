@@ -15,12 +15,12 @@
 
   /* — Цвет: текст — */
   --ink: #111317;         /* основной текст */
-  --muted: #6f7278;       /* вторичный текст */
+  --muted: #595b60;       /* вторичный текст */
   --line: rgba(17, 19, 23, 0.12); /* тонкие границы */
 
   /* — Цвет: акцент — */
   --accent: #57bcd8;      /* технический голубой (главный сигнал) */
-  --accent-ink: #167a95;  /* затемнённый голубой для текста по светлому */
+  --accent-ink: #126278;  /* затемнённый голубой для текста по светлому */
   --accent-2: #dff45f;    /* лайм — спортивный сигнал, дозированно */
   --on-dark: #ffffff;     /* текст/иконки на графите */
 
@@ -350,7 +350,7 @@ img {
 
 .eyebrow {
   margin: 0 0 16px;
-  color: #167a95;
+  color: #126278;
   font-size: 12px;
   font-weight: 950;
   letter-spacing: 0.18em;
@@ -799,7 +799,7 @@ html.js.motion-off .hero .brand-wordmark span {
 
 .catalog-sort select:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
 }
 
 .catalog-tools {
@@ -822,7 +822,7 @@ html.js.motion-off .hero .brand-wordmark span {
 
 .catalog-search:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
 }
 
 .filter {
@@ -1201,7 +1201,7 @@ html.js.motion-off .hero .brand-wordmark span {
 }
 
 .pv-sizes button:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
 }
 
 .pv-sizes button.is-out {
@@ -1334,7 +1334,7 @@ html.js.motion-off .hero .brand-wordmark span {
 
 .btn-ghost.btn-ghost-dark:hover {
   background: var(--panel);
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
   color: var(--accent-ink);
 }
 
@@ -1361,7 +1361,7 @@ html.js.motion-off .hero .brand-wordmark span {
 .ml-cap { position: absolute; left: 0; right: 0; top: 20px; z-index: 8; text-align: center; pointer-events: none; }
 .ml-cap-t { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: .4px; color: #EEF1F5; }
 .ml-cap-t b { color: var(--ml-lime); }
-.ml-cap-s { font-size: 12.5px; color: #AEB6C0; margin-top: 4px; letter-spacing: .2px; }
+.ml-cap-s { font-size: 14px; font-weight: 500; color: #AFB7C1; margin-top: 4px; letter-spacing: .2px; }
 .ml-dots { position: absolute; left: 0; right: 0; bottom: 22px; z-index: 8; display: flex; gap: 14px; justify-content: center; }
 .ml-dots button { width: 9px; height: 9px; border-radius: 99px; padding: 0; cursor: pointer; background: transparent;
   border: 1.5px solid rgba(255,255,255,.55); transition: transform .3s var(--ease-out), background .3s, border-color .3s; }
@@ -1855,7 +1855,7 @@ html.js.motion-off .hero .brand-wordmark span {
 
 .co-group input:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
 }
 
 .co-radio,
@@ -2324,7 +2324,7 @@ html.js.motion-off .hero .brand-wordmark span {
 
 .pr-edit input:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
 }
 
 .pr-edit-actions {
@@ -2525,7 +2525,7 @@ html.js.motion-off .hero .brand-wordmark span {
 }
 
 .rt-line.is-on {
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
 }
 
 .rt-check,
@@ -2738,7 +2738,7 @@ html.js.motion-off .hero .brand-wordmark span {
 
 .pr-addr-add input:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
 }
 
 /* Дом · корпус · квартира — в одну строку (структурный адрес). */
@@ -2914,7 +2914,7 @@ html.js.motion-off .hero .brand-wordmark span {
 }
 
 .footer-apps a:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
   color: var(--accent-ink);
 }
 
@@ -2973,7 +2973,7 @@ html.js.motion-off .hero .brand-wordmark span {
 
 .footer-form input:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
 }
 
 .footer-form button {
@@ -3019,7 +3019,7 @@ html.js.motion-off .hero .brand-wordmark span {
 }
 
 .footer-social a:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
   color: var(--accent-ink);
 }
 

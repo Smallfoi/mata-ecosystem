@@ -241,7 +241,7 @@
       + "border-radius:12px;background:#20252b;color:#fff;font:inherit;font-weight:700;cursor:pointer}"
       + ".eco-card .eco-primary[disabled]{opacity:.5;cursor:default}"
       + ".eco-card .eco-link{display:inline-block;margin-top:10px;background:none;border:none;"
-      + "color:#6f7278;font:inherit;font-size:13px;text-decoration:underline;cursor:pointer}"
+      + "color:#595b60;font:inherit;font-size:13px;text-decoration:underline;cursor:pointer}"
       + ".eco-card .eco-link:hover{color:#20252b}"
       + ".eco-err{color:#c0392b;font-size:13px;min-height:18px;margin:6px 0 0}"
       // «Глазок» в поле пароля: кнопка внутри поля справа, текст под неё не заезжает.
