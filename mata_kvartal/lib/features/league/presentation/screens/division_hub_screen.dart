@@ -449,7 +449,7 @@ class _DivisionCard extends StatelessWidget {
               fontFamily: AppTheme.fontDisplay,
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: Color(0xFFEDEFE8),
+              color: Color(0xFFEFF1EA),
             ),
           ),
           const SizedBox(height: 2),
@@ -458,7 +458,7 @@ class _DivisionCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF9AA59D),
+              color: Color(0xFFB9C1BB),
             ),
           ),
           const SizedBox(height: 10),
@@ -472,7 +472,7 @@ class _DivisionCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF9AA59D),
+                  color: Color(0xFFB9C1BB),
                 ),
               ),
             ),
@@ -485,7 +485,7 @@ class _DivisionCard extends StatelessWidget {
               fontSize: 9.5,
               fontWeight: FontWeight.w600,
               letterSpacing: .6,
-              color: Color(0xFF9AA59D),
+              color: Color(0xFFB9C1BB),
             ),
           ),
         ],
@@ -605,7 +605,7 @@ class _PositionLadder extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF9AA59D),
+                      color: Color(0xFFB9C1BB),
                     ),
                   ),
                 ),
@@ -639,7 +639,7 @@ class _WeekForm extends StatelessWidget {
                   : const Color(0xFF31382F),
               borderRadius: BorderRadius.circular(5),
               border: i == today
-                  ? Border.all(color: const Color(0xFF9AA59D), width: 1)
+                  ? Border.all(color: const Color(0xFFB9C1BB), width: 1)
                   : null,
             ),
           ),
@@ -999,7 +999,7 @@ class _HubRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: me ? FontWeight.w800 : FontWeight.w600,
-                    color: me ? const Color(0xFFEDEFE8) : AppColors.ink,
+                    color: me ? const Color(0xFFEFF1EA) : AppColors.ink,
                   ),
                 ),
                 if ((row.club ?? '').isNotEmpty)
@@ -1009,7 +1009,7 @@ class _HubRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      color: me ? const Color(0xFF9AA59D) : AppColors.faint,
+                      color: me ? const Color(0xFFB9C1BB) : AppColors.faint,
                     ),
                   ),
               ],
@@ -1358,7 +1358,7 @@ class _TrailsBody extends ConsumerWidget {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF9AA59D),
+                            color: Color(0xFFB9C1BB),
                           ),
                         ),
                       ),

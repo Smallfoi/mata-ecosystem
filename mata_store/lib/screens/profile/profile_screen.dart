@@ -814,7 +814,7 @@ class _OrderCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             OrderProvider.deliveryLabel(data.deliveryType),
-            style: const TextStyle(fontSize: 12, color: AppColors.grey400),
+            style: const TextStyle(fontSize: 12, color: AppColors.grey500),
           ),
         ],
       ),

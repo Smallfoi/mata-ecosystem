@@ -339,7 +339,7 @@ class _BlackHeader extends StatelessWidget {
                   fontSize: 13,
                   fontStyle: FontStyle.italic,
                   fontWeight: FontWeight.w200,
-                  color: AppColors.lavender,
+                  color: AppColors.lavenderText,
                 ),
               ).animate().fadeIn(duration: 400.ms, delay: 60.ms),
               const SizedBox(height: 4),
@@ -599,7 +599,7 @@ class _SmsForm extends StatelessWidget {
             child: Text(
               _codeHint(context.watch<AuthProvider>().codeInfo),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: AppColors.grey400, fontFeatures: const [FontFeature.tabularFigures()]),
+              style: TextStyle(fontSize: 12, color: AppColors.grey500, fontFeatures: const [FontFeature.tabularFigures()]),
             ),
           ),
         ],
@@ -608,7 +608,7 @@ class _SmsForm extends StatelessWidget {
           'app.auth.consent',
           'Продолжая, вы соглашаетесь с условиями использования и политикой конфиденциальности',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11, color: AppColors.grey400, height: 1.5),
+          style: TextStyle(fontSize: 11, color: AppColors.grey500, height: 1.5),
         ),
         const SizedBox(height: 6),
         Center(

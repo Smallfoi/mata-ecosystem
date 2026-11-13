@@ -8,14 +8,16 @@ class AppColors {
   static const black = Color(0xFF2A302C); // графит 2A302C (60-50-50-50)
   static const white = Color(0xFFFFFFFF);
   static const lime = Color(0xFFEEEA83); // акцент EEEA83 (10-0-60-0)
-  static const lavender = Color(0xFFB6B7BF); // вторичный B6B7BF (30-20-20-0)
+  static const lavender = Color(0xFFB6B7BF); // вторичный B6B7BF (30-20-20-0) — украшение и текст по графиту
+  static const lavenderText = Color(0xFF6A6B78); // лавандовый как текст по светлому (D-127)
   static const grey100 = Color(0xFFF4F4F0); // тёплые серые под графит
-  static const grey200 = Color(0xFFE4E5E0);
-  static const grey400 = Color(0xFFA7AEA7);
-  static const grey600 = Color(0xFF5A625B);
+  static const grey200 = Color(0xFFEFEFEC);
+  static const grey400 = Color(0xFFA7AEA7); // неактивное/иконки/рамки
+  static const grey500 = Color(0xFF666E66); // третий уровень ТЕКСТА (D-127)
+  static const grey600 = Color(0xFF515852);
   static const grey800 = Color(0xFF333A35);
-  static const red = Color(0xFFE53935); // только ошибки форм; скидки — lime
-  static const success = Color(0xFF2E7D32);
+  static const red = Color(0xFFA21815); // только ошибки форм; скидки — lime
+  static const success = Color(0xFF246227);
 }
 
 class AppTheme {

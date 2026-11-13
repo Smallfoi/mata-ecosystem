@@ -41,7 +41,7 @@ class PriceText extends StatelessWidget {
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w400,
-              color: AppColors.lavender,
+              color: AppColors.lavenderText,
               decoration: TextDecoration.lineThrough,
             ),
           ),

@@ -211,7 +211,7 @@ class _SearchBar extends StatelessWidget {
                         hintText: 'Поиск товаров',
                         hintStyle: TextStyle(
                           fontSize: 15,
-                          color: AppColors.grey400,
+                          color: AppColors.grey500,
                         ),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,

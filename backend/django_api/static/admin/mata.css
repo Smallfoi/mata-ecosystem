@@ -20,18 +20,18 @@
   --m-card: #fff;
   --m-border: #e2e6ea;
   --m-line: #eceff1;
-  --m-muted: #6f7278;
-  --m-dim: #9ca3af;
+  --m-muted: #5e6066;
+  --m-dim: #677080;
   --m-text: #20252b;
   --m-accent: #20252b;
   --m-accent-text: #fff;
   --m-soft: #fafbfc;
-  --m-control: #cbd2d6;
+  --m-control: #7f909a;
   --m-hover: #f2f5f7;
-  --m-ok: #16a34a;
-  --m-warn: #b45309;
-  --m-bad: #dc2626;
-  --m-danger: #e5484d;
+  --m-ok: #0f6d32;
+  --m-warn: #994708;
+  --m-bad: #b31d1d;
+  --m-danger: #e12f35;
   --m-radius: .7rem;
   --m-radius-sm: .45rem;
 }
@@ -40,17 +40,17 @@
   --m-card: #1f2937;
   --m-border: #374151;
   --m-line: #374151;
-  --m-muted: #9ca3af;
-  --m-dim: #6b7280;
-  --m-text: #e5e7eb;
-  --m-accent: #57bcd8;
+  --m-muted: #b8bdc5;
+  --m-dim: #9ca2ac;
+  --m-text: #eceef1;
+  --m-accent: #74c8df;
   --m-accent-text: #0d0d0d;
   --m-soft: #111827;
-  --m-control: #4b5563;
+  --m-control: #707f93;
   --m-hover: #2a3645;
-  --m-ok: #34d399;
+  --m-ok: #37d49a;
   --m-warn: #fbbf24;
-  --m-bad: #f87171;
+  --m-bad: #fba6a6;
 }
 
 /* ── Плитки с итогами ───────────────────────────────────────────────────── */
@@ -151,11 +151,11 @@ form.m-inline { display: inline; }
   display: inline-block; padding: .12rem .55rem; border-radius: 1rem;
   font-size: .72rem; font-weight: 700; color: #fff; white-space: nowrap;
 }
-.m-tag.ok { background: #16a34a; }
+.m-tag.ok { background: #12883e; }
 .m-tag.warn { background: #f5a623; color: #2b2b2b; }
-.m-tag.bad { background: #e5484d; }
+.m-tag.bad { background: #e12f35; }
 .m-tag.info { background: #57bcd8; color: #0b2a33; }
-.m-tag.off { background: #9ca3af; }
+.m-tag.off { background: #6e7788; }
 .m-tag.soft { background: #eef2ff; color: #3730a3; }
 .dark .m-tag.soft { background: #312e81; color: #c7d2fe; }
 
@@ -227,7 +227,7 @@ form.m-inline { display: inline; }
 }
 .m-log { font-size: .8rem; color: var(--m-muted); }
 .m-log div { padding: .3rem 0; border-bottom: 1px solid var(--m-line); }
-.m-tag.review { background: #8b5cf6; }
+.m-tag.review { background: #8655f6; }
 .m-link-on { font-weight: 600; color: var(--m-text); text-decoration: none; }
 .m-card.narrow { max-width: 680px; }
 table.m.top td, table.m.top th { vertical-align: top; }
@@ -246,15 +246,15 @@ table.m.top td, table.m.top th { vertical-align: top; }
 }
 .m-good .m-input { background: #fff; color: #111; border-color: #a7f3d0; }
 /* Статусы сотрудника приходят из данных: active | invited | expired | off. */
-.m-tag.b-active { background: #16a34a; }
+.m-tag.b-active { background: #12883e; }
 .m-tag.b-invited { background: #57bcd8; color: #0b2a33; }
 .m-tag.b-expired { background: #f5a623; color: #2b2b2b; }
-.m-tag.b-off { background: #9ca3af; }
+.m-tag.b-off { background: #6e7788; }
 /* Уровни ошибок трекера приходят из данных. */
-.m-tag.lvl-error, .m-tag.lvl-fatal { background: #e5484d; }
+.m-tag.lvl-error, .m-tag.lvl-fatal { background: #e12f35; }
 .m-tag.lvl-warning { background: #f5a623; color: #2b2b2b; }
 .m-tag.lvl-info { background: #57bcd8; color: #0b2a33; }
-.m-tag.lvl-debug, .m-tag.lvl-sample { background: #8b93a1; }
+.m-tag.lvl-debug, .m-tag.lvl-sample { background: #6e7788; }
 table.m.compact td, table.m.compact th { padding: .35rem .6rem; font-size: .85rem; }
 .m-inapp { background: #fff8e1; }
 .dark .m-inapp { background: #3a3117; }

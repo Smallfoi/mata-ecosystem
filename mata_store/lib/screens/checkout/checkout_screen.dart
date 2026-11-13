@@ -1081,7 +1081,7 @@ class _ReviewStep extends StatelessWidget {
                             note, // staw-static — причина с сервера
                             style: const TextStyle(
                               fontSize: 11,
-                              color: AppColors.grey400,
+                              color: AppColors.grey500,
                             ),
                           ),
                       ],
@@ -1209,7 +1209,7 @@ class _ReviewStep extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF2E7D32),
+                    color: Color(0xFF246227),
                   ),
                 ),
               ],
@@ -1604,7 +1604,7 @@ class _FieldState extends State<_Field> {
               decoration: InputDecoration(
                 hintText: widget.hint,
                 hintStyle: const TextStyle(
-                  color: AppColors.grey400,
+                  color: AppColors.grey500,
                   fontSize: 14,
                 ),
                 prefixIcon: Icon(
