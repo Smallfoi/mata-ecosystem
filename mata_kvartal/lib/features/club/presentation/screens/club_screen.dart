@@ -1355,7 +1355,7 @@ class _InviteCodeCard extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Text(
                   '\u0438\u043b\u0438 \u043a\u043e\u0434 \u0432\u0440\u0443\u0447\u043d\u0443\u044e',
-                  style: TextStyle(color: AppColors.faint, fontSize: 11),
+                  style: TextStyle(color: AppColors.muted, fontSize: 11),
                 ),
               ),
               Expanded(child: Divider(color: AppColors.line)),

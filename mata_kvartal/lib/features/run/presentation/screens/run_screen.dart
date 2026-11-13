@@ -344,7 +344,7 @@ class _QuickStat extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 color: AppColors.textSecondary,
               ),
             ),

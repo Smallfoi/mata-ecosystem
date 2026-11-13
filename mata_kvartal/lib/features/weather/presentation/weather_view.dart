@@ -385,8 +385,8 @@ class _BestRunBlock extends StatelessWidget {
                 Text(
                   hh(hours[i].timeLocal),
                   style: TextStyle(
-                    color: AppColors.textTertiary,
-                    fontSize: 9.5,
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
                   ),
                 ),
             ],
@@ -451,7 +451,7 @@ class _StatTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             label,
-            style: TextStyle(color: AppColors.textTertiary, fontSize: 11),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
           ),
           const SizedBox(height: 2),
           Text(

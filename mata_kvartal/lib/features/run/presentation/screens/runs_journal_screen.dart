@@ -101,7 +101,7 @@ class _MonthHeader extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textTertiary,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
@@ -179,7 +179,7 @@ class RunTileCard extends StatelessWidget {
                     '${run.dateLabel.toUpperCase()} · '
                     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: .5,
                       color: AppColors.textSecondary,
@@ -264,8 +264,8 @@ class RunTileCard extends StatelessWidget {
                 Text(
                   '${run.paceFormatted} /км',
                   style: TextStyle(
-                    fontSize: 10.5,
-                    color: AppColors.textTertiary,
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
