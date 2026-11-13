@@ -1236,10 +1236,10 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
                   child: Text(
                     'БОНУСЫ НА СЧЁТЕ',
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
-                      color: AppColors.faint,
+                      color: AppColors.muted,
                     ),
                   ),
                 ),
@@ -1330,10 +1330,10 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
             child: Text(
               day.toUpperCase(),
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.2,
-                color: AppColors.faint,
+                color: AppColors.muted,
               ),
             ),
           ),

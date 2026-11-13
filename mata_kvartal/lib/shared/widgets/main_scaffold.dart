@@ -250,7 +250,7 @@ class _RunNavItem extends StatelessWidget {
             Text(
               AppStrings.tabRun,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 height: 1.0,
                 letterSpacing: -0.2,
                 fontWeight: FontWeight.w700, // центр — акцент

@@ -168,9 +168,9 @@ class _MedalCell extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: medal.earned ? AppColors.ink : AppColors.faint,
+              color: medal.earned ? AppColors.ink : AppColors.muted,
             ),
           ),
         ],

@@ -1482,8 +1482,8 @@ class _KvartalTopLogo extends StatelessWidget {
               Text(
                 '\u0433\u043e\u0440\u043e\u0434 ',
                 style: TextStyle(
-                  color: AppColors.faint,
-                  fontSize: 9,
+                  color: AppColors.muted,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                   height: 1,
                 ),
@@ -1933,10 +1933,10 @@ class _TodayCard extends StatelessWidget {
                   Text(
                     title.toUpperCase(),
                     style: TextStyle(
-                      fontSize: 8.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: .6,
-                      color: AppColors.faint,
+                      color: AppColors.muted,
                     ),
                   ),
                   Text(
