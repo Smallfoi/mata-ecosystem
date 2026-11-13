@@ -3039,6 +3039,17 @@ html.js.motion-off .hero .brand-wordmark span {
   margin: 0;
 }
 
+/* Реквизиты продавца: видны всегда, но тише остального — это сведения для
+   проверяющего и для закона, а не часть разговора с покупателем. */
+.footer-entity {
+  flex-basis: 100%;
+  order: 1;
+  max-width: 62ch;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .footer-legal {
   display: flex;
   flex-wrap: wrap;
