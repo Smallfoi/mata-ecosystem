@@ -231,6 +231,13 @@ jobs:
       - name: Admin-style guard (один стиль на всю админку)
         run: python tools/check_admin_styles.py
 
+      # Контраст (D-127): палитра экосистемы проверяется ДВУМЯ шкалами сразу —
+      # APCA (Lc) как цель и WCAG 2 (4,5:1) как обязательный пол. Падение значит,
+      # что новый цвет не читается; подобрать проходящий того же тона поможет
+      # `python tools/check_contrast.py --fix`. Лесенка уровней — docs/DESIGN.md.
+      - name: Contrast guard (APCA + WCAG)
+        run: python tools/check_contrast.py
+
   deploy-scripts:
     name: Deploy · scripts
     runs-on: ubuntu-latest
