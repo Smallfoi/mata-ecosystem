@@ -104,6 +104,21 @@ for k in POSTGRES_PASSWORD DJANGO_SECRET_KEY JWT_SECRET; do
   grep -q "^$k=" .env || { echo "FATAL: $k отсутствует (секреты не пришли) — abort"; exit 1; }
 done
 
+# Ключи, которые выпускает САМ сервер (GlitchTip: glitchtip.sh connect), — в Lockbox их нет.
+# Живут в отдельном файле: обновление секретов (beget-up.sh SECRETS_ONLY=1) переписывает
+# файл секретов целиком и раньше стирало их (12.11.2026 — ошибки перестали доходить до GlitchTip).
+# Добавляем последними, совпадающие ключи из Lockbox заменяются.
+SERVER_KEYS_FILE="${MATA_SERVER_KEYS_FILE:-/root/mata-server-keys.env}"
+if [ -s "$SERVER_KEYS_FILE" ]; then
+  keys="$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$SERVER_KEYS_FILE" | paste -sd'|')"
+  if [ -n "$keys" ]; then
+    grep -Ev "^(${keys})=" ".env" > ".env.keys" || true
+    cat ".env.keys" > ".env"; rm -f ".env.keys"
+  fi
+  cat "$SERVER_KEYS_FILE" >> ".env"
+  echo "Ключи сервера: из $SERVER_KEYS_FILE"
+fi
+
 # Доп. секрет фотопайплайна (mata-eco-image): OPENAI_API_KEY (+ опц. OPENAI_BASE_URL).
 # Тот же сервисный аккаунт ВМ читает его (lockbox.payloadViewer на уровне папки).
 # ОПЦИОНАЛЬНО: нет секрета/ключа → фотопайплайн просто не гоняет GPT (no-op), деплой не падает.

@@ -17,7 +17,7 @@
 # (mata-prod-secrets + mata-eco-image) — тот же источник, что и в prod-deploy.sh.
 # Без set -x — чтобы секреты не попали в лог/serial.
 set -euo pipefail
-cd /opt/mata/backend
+cd "${MATA_BACKEND_DIR:-/opt/mata/backend}"
 
 # На VPS (Beget, D-115) Lockbox с сервера недоступен: секреты кладёт beget-up.sh в этот файл.
 # Он есть только на VPS — по нему и различаем площадки.
@@ -86,6 +86,21 @@ done
 
 # доп. секрет фотопайплайна (опционально — без него пайплайн просто в no-op)
 PULL_SECRET "$ECO_IMAGE_SECRET_ID" >> "$TMP"
+fi
+
+# Ключи, которые выпускает САМ сервер (GlitchTip: glitchtip.sh connect), — в Lockbox их нет.
+# Живут в отдельном файле: обновление секретов (beget-up.sh SECRETS_ONLY=1) переписывает
+# $SECRETS_FILE целиком и раньше стирало их (12.11.2026 — ошибки перестали доходить до GlitchTip).
+# Добавляем последними, совпадающие ключи из Lockbox заменяются.
+SERVER_KEYS_FILE="${MATA_SERVER_KEYS_FILE:-/root/mata-server-keys.env}"
+if [ -s "$SERVER_KEYS_FILE" ]; then
+  keys="$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$SERVER_KEYS_FILE" | paste -sd'|')"
+  if [ -n "$keys" ]; then
+    grep -Ev "^(${keys})=" "$TMP" > "$TMP.keys" || true
+    cat "$TMP.keys" > "$TMP"; rm -f "$TMP.keys"
+  fi
+  cat "$SERVER_KEYS_FILE" >> "$TMP"
+  echo "Ключи сервера: из $SERVER_KEYS_FILE"
 fi
 
 # ВАЛИДАЦИЯ: без критичных ключей .env НЕ заменяем
