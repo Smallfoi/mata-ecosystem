@@ -44,11 +44,12 @@
    - Windows PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("ключ.json"))`
    - Mac: `base64 -i ключ.json | tr -d '\n'`
 
-   На сервере дописать строку `PLAY_INTEGRITY_SA_KEY_B64=<эта строка>` в файл
-   секретов `/root/mata-secrets.env` (`sudo nano /root/mata-secrets.env`) и выполнить
-   `sudo bash /opt/mata/backend/deploy/refresh-env.sh`. Ту же запись добавить в
-   Lockbox `mata-prod-secrets` — чтобы ключ пережил пересоздание сервера. Файл
-   ключа после этого удалить с компьютера.
+   Добавить запись `PLAY_INTEGRITY_SA_KEY_B64` = эта строка в Lockbox
+   `mata-prod-secrets` (там живут все секреты прода) и доставить секреты на сервер
+   как обычно: в Cloud Shell `beget-up.sh` с `HOST=87.242.100.147 SSH_USER=user1
+   SECRETS_ONLY=1` (docs/DEPLOY.md). Дописывать ключ руками в `/root/mata-secrets.env`
+   НЕ надо: этот файл целиком переписывается из Lockbox (PITFALLS, 15.11.2026).
+   Файл ключа после этого удалить с компьютера.
 5. **Номер проекта в сборку.** GitHub → репозиторий → Settings → Secrets and
    variables → Actions → вкладка **Variables** → New repository variable:
    `PLAY_INTEGRITY_PROJECT` = номер проекта из п. 1 (это не секрет). Со следующей
@@ -56,11 +57,11 @@
 6. **(Желательно) отпечаток нашей подписи** — чтобы ловить пересобранные копии
    приложения. Раздаём APK не через Google Play, поэтому Google не знает, какая
    подпись «наша»; сервер сравнит сам. Отпечаток SHA-256 ключа подписи
-   (`keytool -list -v -keystore <файл keystore>`, строка SHA256) положить в секреты
-   сервера как `PLAY_INTEGRITY_CERT_SHA256`. Могу посчитать его сам, если дадите
+   (`keytool -list -v -keystore <файл keystore>`, строка SHA256) добавить в Lockbox
+   как `PLAY_INTEGRITY_CERT_SHA256` (доставка — так же, п. 4). Могу посчитать его сам, если дадите
    доступ к keystore на время.
 
-## Переключатели (секреты сервера, всё по умолчанию выключено)
+## Переключатели (Lockbox `mata-prod-secrets`, всё по умолчанию выключено)
 
 | Имя | Что делает |
 |---|---|
