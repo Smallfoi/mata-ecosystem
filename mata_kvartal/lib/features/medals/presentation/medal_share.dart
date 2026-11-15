@@ -14,6 +14,7 @@ import '../../auth/data/auth_provider.dart';
 import '../data/medal_defs.dart';
 import '../data/medals_provider.dart';
 import 'medal_widgets.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Шаринг медалей и Зала славы в сторис (дизайн «Хвастовство в сторис»,
 /// утверждён владельцем 05.09.2026 с правками: кнопка — «Поделиться»,
@@ -193,7 +194,7 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
                   minimumSize: const Size(64, 48),
                 ),
                 onPressed: _busy ? null : _saveToGallery,
-                icon: const Icon(Icons.download_rounded, size: 19),
+                icon: const Icon(CupertinoIcons.arrow_down_circle, size: 19),
                 label: const Text('Сохранить в галерею'),
               ),
             ),

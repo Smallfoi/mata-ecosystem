@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../profile/data/legal_provider.dart';
 import '../../data/auth_provider.dart';
 import '../widgets/otp_verify_boxes.dart';
+import 'package:flutter/cupertino.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
   const OtpScreen({super.key});
@@ -166,7 +167,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(CupertinoIcons.back),
           onPressed: () => context.go('/auth/phone'),
         ),
       ),

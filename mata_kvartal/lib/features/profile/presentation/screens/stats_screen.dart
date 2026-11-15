@@ -4,6 +4,7 @@ import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/me_stats_provider.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Личная статистика (/v1/me/stats): бег + баллы + заказы — единая витрина
 /// экосистемы (данные из общего бэка, одинаковы во всех приложениях).
@@ -40,20 +41,20 @@ class StatsScreen extends ConsumerWidget {
             const _SectionTitle('Бег'),
             _StatRow([
               _Stat('Забегов', '${s.runsCount}', Icons.directions_run),
-              _Stat('Дистанция', '${_km(s.totalKm)} км', Icons.route_outlined),
+              _Stat('Дистанция', '${_km(s.totalKm)} км', CupertinoIcons.arrow_branch),
             ]),
             const SizedBox(height: 20),
             const _SectionTitle('Баллы'),
             _StatRow([
-              _Stat('Баланс', '${s.balance}', Icons.star_border),
-              _Stat('Заработано', '${s.earned}', Icons.trending_up),
-              _Stat('Потрачено', '${s.spent}', Icons.trending_down),
+              _Stat('Баланс', '${s.balance}', CupertinoIcons.star),
+              _Stat('Заработано', '${s.earned}', CupertinoIcons.arrow_up_right),
+              _Stat('Потрачено', '${s.spent}', CupertinoIcons.arrow_down_right),
             ]),
             const SizedBox(height: 20),
             const _SectionTitle('Заказы'),
             _StatRow([
-              _Stat('Заказов', '${s.ordersCount}', Icons.shopping_bag_outlined),
-              _Stat('На сумму', '${s.totalSpent} ₽', Icons.payments_outlined),
+              _Stat('Заказов', '${s.ordersCount}', CupertinoIcons.bag),
+              _Stat('На сумму', '${s.totalSpent} ₽', CupertinoIcons.creditcard),
             ]),
             const SizedBox(height: 22),
             Text(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/shoes_provider.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Лист выбора кроссовок ПЕРЕД стартом забега: в каких бежим — с этой пары и
 /// спишется ресурс (км). Поддерживает несколько пар + вариант «без кроссовок».
@@ -155,7 +156,7 @@ class _ShoeOption extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.chevron_right, color: AppColors.textTertiary),
+                Icon(CupertinoIcons.chevron_right, color: AppColors.textTertiary),
               ],
             ),
           ),
@@ -180,7 +181,7 @@ class _NoShoesOption extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
           child: Row(
             children: [
-              Icon(Icons.block, size: 20, color: AppColors.textTertiary),
+              Icon(CupertinoIcons.nosign, size: 20, color: AppColors.textTertiary),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(

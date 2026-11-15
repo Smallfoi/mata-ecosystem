@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/tick_feedback.dart';
 import '../../logic/interval_plan.dart';
 import '../widgets/tool_widgets.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Интервальный таймер: настраиваешь работу/отдых/раунды барабанами и бежишь
 /// по сигналам (звук + вибро на сменах фаз). Звук — встроенный системный клик.
@@ -243,7 +244,7 @@ class _IntervalTimerScreenState extends State<IntervalTimerScreen> {
           height: 54,
           child: FilledButton.icon(
             onPressed: _start,
-            icon: const Icon(Icons.play_arrow),
+            icon: const Icon(CupertinoIcons.play_fill),
             label: const Text('Старт'),
           ),
         ),
@@ -330,7 +331,7 @@ class _IntervalTimerScreenState extends State<IntervalTimerScreen> {
                       foregroundColor: AppColors.textPrimary,
                       side: BorderSide(color: AppColors.separator),
                     ),
-                    icon: Icon(_paused ? Icons.play_arrow : Icons.pause),
+                    icon: Icon(_paused ? CupertinoIcons.play_fill : CupertinoIcons.pause_fill),
                     label: Text(_paused ? 'Продолжить' : 'Пауза'),
                   ),
                 ),
@@ -344,7 +345,7 @@ class _IntervalTimerScreenState extends State<IntervalTimerScreen> {
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.error,
                     ),
-                    icon: const Icon(Icons.stop),
+                    icon: const Icon(CupertinoIcons.stop_fill),
                     label: const Text('Стоп'),
                   ),
                 ),
