@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_states.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../medals/data/medal_defs.dart';
 import '../../../medals/data/medals_provider.dart';
@@ -186,18 +187,15 @@ class _Offline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Зал наград не открылся — нет связи',
-            style: TextStyle(fontSize: 14, color: AppColors.muted),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(onPressed: onRetry, child: const Text('Повторить')),
-        ],
-      ),
+    return MataError(
+      title: 'Зал наград не открылся',
+      titleStyle: AppStates.title,
+      hint: 'Нет связи с сервером.',
+      hintStyle: AppStates.hint,
+      iconColor: AppStates.icon,
+      retryLabel: 'Повторить',
+      onRetry: onRetry,
+      retryBuilder: AppStates.retry,
     );
   }
 }

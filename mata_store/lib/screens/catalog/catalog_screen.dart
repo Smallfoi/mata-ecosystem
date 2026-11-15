@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:mata_ui/mata_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 import '../../models/product.dart';
 import '../../providers/catalog_provider.dart';
+import '../../theme/app_states.dart';
 import '../../theme/app_theme.dart';
 import '../../util/console_bridge.dart';
 import '../../widgets/product_card.dart';
@@ -323,43 +325,35 @@ class _EmptyResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.search_off, size: 56, color: AppColors.grey200),
-          const SizedBox(height: 12),
-          const RemoteText(
-            'app.catalog.empty.title',
-            'Ничего не найдено',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          const RemoteText(
-            'app.catalog.empty.subtitle',
-            'Попробуйте изменить фильтры',
-            style: TextStyle(fontSize: 14, color: AppColors.grey600),
-          ),
-          const SizedBox(height: 20),
-          GestureDetector(
-            onTap: onReset,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              color: AppColors.black,
-              child: RemoteText(
-                'app.catalog.empty.reset',
-                'СБРОСИТЬ ФИЛЬТРЫ',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.white,
-                  letterSpacing: 1.5,
-                ),
-              ),
+    return MataEmpty(
+      icon: Icons.search_off,
+      iconColor: AppStates.icon,
+      titleWidget: const RemoteText(
+        'app.catalog.empty.title',
+        'Ничего не найдено',
+        style: AppStates.title,
+      ),
+      hintWidget: const RemoteText(
+        'app.catalog.empty.subtitle',
+        'Попробуйте изменить фильтры',
+        style: AppStates.hint,
+      ),
+      action: GestureDetector(
+        onTap: onReset,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          color: AppColors.black,
+          child: const RemoteText(
+            'app.catalog.empty.reset',
+            'СБРОСИТЬ ФИЛЬТРЫ',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.white,
+              letterSpacing: 1.5,
             ),
           ),
-        ],
+        ),
       ),
     );
   }

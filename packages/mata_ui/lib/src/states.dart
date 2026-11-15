@@ -1,11 +1,43 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator, CupertinoIcons;
 
 /// Единые состояния экрана для Store и Квартала (пункт «states», утверждён
 /// владельцем 15.11.2026).
 ///
-/// До этого каждый экран рисовал их по-своему: где-то крутилка Android,
-/// где-то iOS, где-то просто пустота. Здесь — один стандарт; цвета приходят
-/// из приложения, потому что темы у них разные.
+/// До этого каждый экран рисовал их по-своему: иконка 40 / 44 / 54 / 56 / 64,
+/// отступ под ней 12 / 16 / 20, заголовок 15 / 16 / 18 / 20 пунктов,
+/// полужирный то w700, то w800. Здесь — один стандарт размеров и отступов;
+/// цвета и шрифты приходят из приложения, потому что темы у них разные.
+///
+/// Текст можно передать строкой (`title`) или готовым виджетом (`titleWidget`).
+/// Виджет нужен МАТА Store: там видимый контент идёт через `RemoteText`, чтобы
+/// владелец правил его в Конструкторе.
+
+/// Размеры состояний. Один набор на экосистему — чтобы «пусто» и «ошибка»
+/// выглядели одинаково в любом разделе обоих приложений.
+abstract final class MataStateMetrics {
+  /// Иконка состояния.
+  static const double iconSize = 52;
+
+  /// Иконка → заголовок.
+  static const double gapIconTitle = 16;
+
+  /// Заголовок → пояснение.
+  static const double gapTitleHint = 6;
+
+  /// Пояснение → кнопка действия.
+  static const double gapHintAction = 20;
+
+  /// Поля вокруг блока.
+  static const EdgeInsets padding =
+      EdgeInsets.symmetric(horizontal: 32, vertical: 24);
+
+  /// Запасные стили: применяются, если приложение не задало свои. Цвет не
+  /// указан намеренно — его подхватит `DefaultTextStyle` экрана.
+  static const TextStyle titleStyle =
+      TextStyle(fontSize: 17, fontWeight: FontWeight.w700);
+  static const TextStyle hintStyle = TextStyle(fontSize: 14, height: 1.4);
+}
 
 /// Ожидание. Одна крутилка на всю экосистему — в стиле iOS, как и иконки.
 class MataLoading extends StatelessWidget {
@@ -34,19 +66,41 @@ class MataLoading extends StatelessWidget {
 class MataEmpty extends StatelessWidget {
   const MataEmpty({
     super.key,
-    required this.title,
-    required this.titleStyle,
+    this.title,
+    this.titleWidget,
+    this.titleStyle,
     this.hint,
+    this.hintWidget,
     this.hintStyle,
     this.icon,
     this.iconColor,
     this.action,
-  });
+  }) : assert(
+          title != null || titleWidget != null,
+          'состояние без заголовка не объясняет пользователю ничего',
+        ),
+        assert(
+          title == null || titleWidget == null,
+          'заголовок задаётся либо строкой, либо виджетом',
+        ),
+        assert(
+          hint == null || hintWidget == null,
+          'пояснение задаётся либо строкой, либо виджетом',
+        );
 
-  final String title;
-  final TextStyle titleStyle;
+  /// Заголовок строкой.
+  final String? title;
+
+  /// Заголовок готовым виджетом — для `RemoteText` в МАТА Store.
+  final Widget? titleWidget;
+  final TextStyle? titleStyle;
+
   final String? hint;
+
+  /// Пояснение готовым виджетом — для `RemoteText` в МАТА Store.
+  final Widget? hintWidget;
   final TextStyle? hintStyle;
+
   final IconData? icon;
   final Color? iconColor;
 
@@ -55,23 +109,38 @@ class MataEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titleChild = titleWidget ??
+        Text(
+          title!,
+          textAlign: TextAlign.center,
+          style: titleStyle ?? MataStateMetrics.titleStyle,
+        );
+    final hintChild = hintWidget ??
+        (hint == null
+            ? null
+            : Text(
+                hint!,
+                textAlign: TextAlign.center,
+                style: hintStyle ?? MataStateMetrics.hintStyle,
+              ));
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        padding: MataStateMetrics.padding,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 34, color: iconColor),
-              const SizedBox(height: 14),
+              Icon(icon, size: MataStateMetrics.iconSize, color: iconColor),
+              const SizedBox(height: MataStateMetrics.gapIconTitle),
             ],
-            Text(title, textAlign: TextAlign.center, style: titleStyle),
-            if (hint != null) ...[
-              const SizedBox(height: 6),
-              Text(hint!, textAlign: TextAlign.center, style: hintStyle),
+            titleChild,
+            if (hintChild != null) ...[
+              const SizedBox(height: MataStateMetrics.gapTitleHint),
+              hintChild,
             ],
             if (action != null) ...[
-              const SizedBox(height: 18),
+              const SizedBox(height: MataStateMetrics.gapHintAction),
               action!,
             ],
           ],
@@ -85,21 +154,27 @@ class MataEmpty extends StatelessWidget {
 class MataError extends StatelessWidget {
   const MataError({
     super.key,
-    required this.title,
-    required this.titleStyle,
+    this.title,
+    this.titleWidget,
+    this.titleStyle,
     required this.retryLabel,
     required this.onRetry,
     required this.retryBuilder,
     this.hint,
+    this.hintWidget,
     this.hintStyle,
     this.icon,
     this.iconColor,
   });
 
-  final String title;
-  final TextStyle titleStyle;
+  final String? title;
+  final Widget? titleWidget;
+  final TextStyle? titleStyle;
+
   final String? hint;
+  final Widget? hintWidget;
   final TextStyle? hintStyle;
+
   final IconData? icon;
   final Color? iconColor;
 
@@ -114,8 +189,10 @@ class MataError extends StatelessWidget {
   Widget build(BuildContext context) {
     return MataEmpty(
       title: title,
+      titleWidget: titleWidget,
       titleStyle: titleStyle,
       hint: hint,
+      hintWidget: hintWidget,
       hintStyle: hintStyle,
       icon: icon ?? CupertinoIcons.exclamationmark_triangle,
       iconColor: iconColor,

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_states.dart';
 import '../../../auth/data/auth_provider.dart';
 import '../../data/legal_provider.dart';
 
@@ -26,16 +27,24 @@ class LegalDocumentsScreen extends ConsumerWidget {
       body: SafeArea(
         child: async.when(
           loading: () => const Center(child: MataLoading(radius: 11)),
-          error: (e, _) => _Message(
+          error: (e, _) => MataError(
             icon: CupertinoIcons.wifi_slash,
-            text: 'Не удалось загрузить документы.\nПроверьте соединение.',
-            onRetry: () => ref.refresh(legalDocumentsProvider),
+            iconColor: AppStates.icon,
+            title: 'Не удалось загрузить документы',
+            titleStyle: AppStates.title,
+            hint: 'Проверьте соединение.',
+            hintStyle: AppStates.hint,
+            retryLabel: 'Повторить',
+            onRetry: () => ref.invalidate(legalDocumentsProvider),
+            retryBuilder: AppStates.retry,
           ),
           data: (docs) {
             if (docs.isEmpty) {
-              return const _Message(
+              return MataEmpty(
                 icon: CupertinoIcons.doc_text,
-                text: 'Документы пока не опубликованы.',
+                iconColor: AppStates.icon,
+                title: 'Документы пока не опубликованы',
+                titleStyle: AppStates.title,
               );
             }
             return RefreshIndicator(
@@ -212,33 +221,6 @@ class _LegalDocView extends StatelessWidget {
   /// Убираем простую inline-разметку (**жирный**, `код`, таблицы |).
   String _stripInline(String s) =>
       s.replaceAll('**', '').replaceAll('`', '').replaceAll('|', '  ');
-}
-
-class _Message extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final VoidCallback? onRetry;
-  const _Message({required this.icon, required this.text, this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 44, color: AppColors.textDisabled),
-          const SizedBox(height: 12),
-          Text(text,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary)),
-          if (onRetry != null) ...[
-            const SizedBox(height: 16),
-            OutlinedButton(onPressed: onRetry, child: const Text('Повторить')),
-          ],
-        ],
-      ),
-    );
-  }
 }
 
 /// Экран-гейт согласия: показывается ПОСЛЕ входа, если у пользователя есть

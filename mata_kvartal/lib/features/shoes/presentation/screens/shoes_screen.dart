@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_states.dart';
 import '../../data/shoes_provider.dart';
 
 /// Трекер износа кроссовок: купленные в Store пары и остаток их ресурса.
@@ -110,36 +112,18 @@ class _Empty extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         const SizedBox(height: 120),
-        Icon(
-          loading ? CupertinoIcons.clock : Icons.directions_run,
-          size: 56,
-          color: AppColors.textDisabled,
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: Text(
-            loading ? 'Загрузка…' : 'Пока нет кроссовок',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
+        if (loading)
+          MataLoading(color: AppColors.textSecondary)
+        else
+          MataEmpty(
+            icon: Icons.directions_run,
+            iconColor: AppStates.icon,
+            title: 'Пока нет кроссовок',
+            titleStyle: AppStates.title,
+            hint: 'Купи кроссовки в МАТА Store — мы спросим, добавить ли их '
+                'в трекер, и будем считать пробег и износ.',
+            hintStyle: AppStates.hint,
           ),
-        ),
-        if (!loading) ...[
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              'Купи кроссовки в МАТА Store — мы спросим, добавить ли их '
-              'в трекер, и будем считать пробег и износ.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppColors.textTertiary),
-            ),
-          ),
-        ],
       ],
     );
   }

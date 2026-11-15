@@ -50,6 +50,25 @@ void main() {
     expect(find.byType(CupertinoButton), findsNothing);
   });
 
+  testWidgets('пусто: размер иконки один на экосистему', (tester) async {
+    await tester.pumpWidget(wrap(const MataEmpty(
+      title: 'Пусто',
+      icon: CupertinoIcons.bell,
+    )));
+    final icon = tester.widget<Icon>(find.byType(Icon));
+    expect(icon.size, MataStateMetrics.iconSize);
+  });
+
+  testWidgets('пусто: текст можно отдать виджетом (RemoteText в Store)',
+      (tester) async {
+    await tester.pumpWidget(wrap(const MataEmpty(
+      titleWidget: Text('Корзина пуста'),
+      hintWidget: Text('Добавьте товары из каталога'),
+    )));
+    expect(find.text('Корзина пуста'), findsOneWidget);
+    expect(find.text('Добавьте товары из каталога'), findsOneWidget);
+  });
+
   testWidgets('ошибка: всегда есть «Повторить» и он срабатывает',
       (tester) async {
     var retries = 0;

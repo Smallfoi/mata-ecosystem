@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_states.dart';
 import '../../data/races_provider.dart';
 
 const _months = [
@@ -134,8 +135,16 @@ class _RacesScreenState extends ConsumerState<RacesScreen> {
                 loading: () => Center(
                   child: MataLoading(color: AppColors.electricBlue, radius: 11),
                 ),
-                error: (_, __) =>
-                    const _Empty('Не удалось загрузить старты. Проверьте связь.'),
+                error: (_, __) => MataError(
+                  title: 'Не удалось загрузить старты',
+                  titleStyle: AppStates.title,
+                  hint: 'Проверьте связь и попробуйте ещё раз.',
+                  hintStyle: AppStates.hint,
+                  iconColor: AppStates.icon,
+                  retryLabel: 'Повторить',
+                  onRetry: () => ref.invalidate(racesProvider),
+                  retryBuilder: AppStates.retry,
+                ),
                 data: (feed) {
                   final list = feed.items
                       .where((r) => _segment == 0 ? !r.isPast : r.isPast)
@@ -147,13 +156,25 @@ class _RacesScreenState extends ConsumerState<RacesScreen> {
                   });
                   if (list.isEmpty) {
                     if (sel.mode == RegionMode.saved) {
-                      return const _Empty(
-                          'В «Моих стартах» пока пусто.\nОтметь забег «Планирую поехать» — он появится здесь.');
+                      return MataEmpty(
+                        icon: CupertinoIcons.calendar,
+                        iconColor: AppStates.icon,
+                        title: 'В «Моих стартах» пока пусто',
+                        titleStyle: AppStates.title,
+                        hint: 'Отметь забег «Планирую поехать» — '
+                            'он появится здесь.',
+                        hintStyle: AppStates.hint,
+                      );
                     }
                     final where = region.isNotEmpty ? ' в регионе «$region»' : '';
-                    return _Empty(_segment == 0
-                        ? 'Пока нет ближайших стартов$where'
-                        : 'Архив пуст$where');
+                    return MataEmpty(
+                      icon: CupertinoIcons.calendar,
+                      iconColor: AppStates.icon,
+                      title: _segment == 0
+                          ? 'Пока нет ближайших стартов$where'
+                          : 'Архив пуст$where',
+                      titleStyle: AppStates.title,
+                    );
                   }
                   return RefreshIndicator(
                     color: AppColors.electricBlue,
@@ -687,28 +708,4 @@ class _RaceCard extends StatelessWidget {
           ],
         ),
       );
-}
-
-class _Empty extends StatelessWidget {
-  final String text;
-  const _Empty(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(CupertinoIcons.calendar, size: 44, color: AppColors.textTertiary),
-            const SizedBox(height: 12),
-            Text(text,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
-          ],
-        ),
-      ),
-    );
-  }
 }

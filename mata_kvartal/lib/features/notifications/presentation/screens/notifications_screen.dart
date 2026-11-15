@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_states.dart';
 import '../../data/notifications_provider.dart';
 
 /// Лента уведомлений: клубные события (заявки/одобрения) и события аккаунта.
@@ -55,6 +57,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 }
 
+/// Пусто или ещё грузится. Список остаётся прокручиваемым, иначе не работает
+/// «потянуть, чтобы обновить».
 class _Empty extends StatelessWidget {
   final bool loading;
   const _Empty({required this.loading});
@@ -64,19 +68,18 @@ class _Empty extends StatelessWidget {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        const SizedBox(height: 130),
-        Icon(loading ? CupertinoIcons.clock : CupertinoIcons.bell,
-            size: 54, color: AppColors.textDisabled),
-        const SizedBox(height: 16),
-        Center(
-          child: Text(
-            loading ? 'Загрузка…' : 'Пока нет уведомлений',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
+        const SizedBox(height: 120),
+        if (loading)
+          MataLoading(color: AppColors.textSecondary)
+        else
+          MataEmpty(
+            icon: CupertinoIcons.bell,
+            iconColor: AppStates.icon,
+            title: 'Пока нет уведомлений',
+            titleStyle: AppStates.title,
+            hint: 'Здесь появятся клубные события и новости по аккаунту.',
+            hintStyle: AppStates.hint,
           ),
-        ),
       ],
     );
   }

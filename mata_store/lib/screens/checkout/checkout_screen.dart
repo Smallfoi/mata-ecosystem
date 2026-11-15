@@ -11,6 +11,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/loyalty_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../theme/app_states.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/product_image.dart';
 import '../../widgets/remote_text.dart';
@@ -382,59 +383,38 @@ class _EmptyCheckout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.shopping_bag_outlined,
-              size: 64,
-              color: AppColors.grey200,
+    return MataEmpty(
+      icon: Icons.shopping_bag_outlined,
+      iconColor: AppStates.icon,
+      titleWidget: const RemoteText(
+        'app.checkout.empty',
+        'Оформлять пока нечего',
+        textAlign: TextAlign.center,
+        style: AppStates.title,
+      ),
+      hintWidget: const RemoteText(
+        'app.checkout.empty.subtitle',
+        'Добавьте товары в корзину, чтобы перейти к доставке и оплате',
+        textAlign: TextAlign.center,
+        style: AppStates.hint,
+      ),
+      action: GestureDetector(
+        onTap: () => context.go('/catalog'),
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          color: AppColors.black,
+          alignment: Alignment.center,
+          child: const RemoteText(
+            'app.checkout.toCatalog',
+            'ПЕРЕЙТИ В КАТАЛОГ',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.white,
+              letterSpacing: 2,
             ),
-            const SizedBox(height: 16),
-            const RemoteText(
-              'app.checkout.empty',
-              'Оформлять пока нечего',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.black,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const RemoteText(
-              'app.checkout.empty.subtitle',
-              'Добавьте товары в корзину, чтобы перейти к доставке и оплате',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.grey600,
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 28),
-            GestureDetector(
-              onTap: () => context.go('/catalog'),
-              child: Container(
-                height: 52,
-                color: AppColors.black,
-                alignment: Alignment.center,
-                child: RemoteText(
-                  'app.checkout.toCatalog',
-                  'ПЕРЕЙТИ В КАТАЛОГ',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.white,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.06);
