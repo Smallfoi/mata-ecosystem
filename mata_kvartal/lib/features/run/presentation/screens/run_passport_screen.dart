@@ -301,7 +301,7 @@ class _BackupTrackHeroState extends ConsumerState<_BackupTrackHero> {
               'данные», чтобы новые маршруты переживали переустановку и смену телефона.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 14, height: 1.4, color: AppColors.textSecondary),
+                  fontSize: 12.5, height: 1.4, color: AppColors.textPrimary),
             ),
           ),
         );
@@ -395,9 +395,9 @@ class _TrackHero extends StatelessWidget {
               child: Text(
                 '${hm(started)} – ${hm(run.finishedAt)}',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -503,11 +503,11 @@ class _SplitsBlock extends StatelessWidget {
                         Text(
                           pace(splits[i]),
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: splits[i] == best
                                 ? AppColors.lime
-                                : AppColors.textSecondary,
+                                : AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -537,9 +537,9 @@ class _SplitsBlock extends StatelessWidget {
                         Text(
                           '${i + 1}',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -620,8 +620,8 @@ class _AwardsBlock extends StatelessWidget {
                           Text(
                             'медаль · тап — карточка и шаринг',
                             style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],
@@ -679,9 +679,9 @@ class _PointsBlock extends StatelessWidget {
                       ? 'баллы экосистемы за бег и захват · тратятся в МАТА Store'
                       : 'баллы экосистемы за бег · тратятся в МАТА Store'),
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 11,
                 height: 1.4,
-                color: AppColors.textSecondary,
+                color: AppColors.textPrimary,
               ),
             ),
           ),
