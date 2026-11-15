@@ -24,7 +24,7 @@ import 'providers/wishlist_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Шрифты (Inter/Oswald) встроены в assets/fonts — берём их локально, без обращения
+  // Шрифты (Inter/Roboto Serif) встроены в assets/fonts — берём их локально, без обращения
   // к fonts.gstatic.com (офлайн + приватность §2: не шлём IP в Google). Файлы байт-в-байт
   // те же, что google_fonts скачал бы по сети, поэтому вид не меняется (D-01).
   GoogleFonts.config.allowRuntimeFetching = false;
