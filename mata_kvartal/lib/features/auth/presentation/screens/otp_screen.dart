@@ -6,8 +6,8 @@ import 'package:mata_ui/mata_ui.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../profile/data/legal_provider.dart';
 import '../../data/auth_provider.dart';
-import '../widgets/otp_verify_boxes.dart';
 import 'package:flutter/cupertino.dart';
+import '../widgets/otp_boxes_style.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
   const OtpScreen({super.key});
@@ -196,6 +196,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 _WaitingOnPhone(busy: _confirming)
               else
                 OtpVerifyBoxes(
+                  style: kvartalOtpBoxesStyle(),
+                  autofocus: true,
                   hasError: _localError != null,
                   onSubmit: _submit,
                   onSuccess: _onSuccess,

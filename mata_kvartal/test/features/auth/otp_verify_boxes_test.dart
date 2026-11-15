@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kvartal_app/features/auth/presentation/widgets/otp_verify_boxes.dart';
+import 'package:kvartal_app/features/auth/presentation/widgets/otp_boxes_style.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 Widget _wrap(Widget child) =>
     MaterialApp(home: Scaffold(body: Center(child: child)));
@@ -24,6 +25,8 @@ void main() {
     await tester.pumpWidget(
       _wrap(
         OtpVerifyBoxes(
+          style: kvartalOtpBoxesStyle(),
+          autofocus: true,
           onSubmit: (code) async {
             expect(code, '1234');
             return true;
@@ -52,6 +55,8 @@ void main() {
     await tester.pumpWidget(
       _wrap(
         OtpVerifyBoxes(
+          style: kvartalOtpBoxesStyle(),
+          autofocus: true,
           onSubmit: (code) async => false,
           onSuccess: () => success = true,
           onFailed: () => failed = true,
@@ -82,6 +87,8 @@ void main() {
           child: Scaffold(
             body: Center(
               child: OtpVerifyBoxes(
+   style: kvartalOtpBoxesStyle(),
+   autofocus: true,
                 onSubmit: (code) async => true,
                 onSuccess: () => success = true,
               ),

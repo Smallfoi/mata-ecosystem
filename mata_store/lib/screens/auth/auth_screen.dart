@@ -10,7 +10,7 @@ import '../../data/api/api_client.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/otp_verify_boxes.dart';
+import '../../theme/otp_boxes_style.dart';
 import '../../widgets/remote_text.dart';
 import '../profile/legal_documents_screen.dart';
 
@@ -589,6 +589,7 @@ class _SmsForm extends StatelessWidget {
           else
             // Ввод кода — хореография «OTP V5» (стандарт анимаций экосистемы МАТА).
             OtpVerifyBoxes(
+              style: storeOtpBoxesStyle,
               hasError: error != null,
               onSubmit: onVerify,
               onSuccess: onVerified,
