@@ -617,7 +617,8 @@ loyalty: { awarded, monthLeft, capped, text }   ← КОНТРАКТ КЛИЕН�
 ### Runs (история пробежек + серверный расчёт очков — анти-чит S-04)
 ```
 GET  /runs                              → Run[]   (сводки забегов пользователя, новые сверху)
-POST /runs  { id, distanceMeters, elapsedSeconds, finishedAtMs, capturedTerritory, capturedZones, mockDetected? }
+POST /runs  { id, distanceMeters, elapsedSeconds, finishedAtMs, capturedTerritory, capturedZones, mockDetected?,
+             integrity? }
                                         → { ok, duplicate, flagged, flagReason, pointsAwarded, run,
                                             dailyCapReached?, pointsCapped?, capReason?,
                                             bonus?, monthCapReached? }
@@ -631,6 +632,12 @@ POST /runs  { id, distanceMeters, elapsedSeconds, finishedAtMs, capturedTerritor
             срезано, capReason — текст для человека. Дубль отдаёт те же поля.
             mockDetected: bool (опц.) — клиент сообщает о подделке геолокации (Android mock-GPS)
             → сервер флагает забег (0 очков); накопление флагов помечает аккаунт «на ревью» (S-04).
+            integrity: { platform: "android"|"ios", token? } (опц., D-129) — проверка подлинности
+            приложения. Android: токен Play Integrity (стандартный запрос), в который вшит
+            requestHash = sha256("mata-run-v1|{id}|{floor(distanceMeters)}|{elapsedSeconds}|{finishedAtMs}")
+            (нет finishedAtMs — пустое место). Токен просить на КАЖДУЮ попытку отправки (свежесть
+            10 мин). Режим «наблюдение»: ответ и баллы от поля НЕ зависят, вердикт сервер проверяет
+            в фоне и показывает модератору. Нет поля / iOS / старые сборки — всё как раньше.
 ```
 ```
 GET /runs/:id/track                     → { points: [[lat, lng, ts], ...] }

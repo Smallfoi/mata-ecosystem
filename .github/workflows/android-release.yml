@@ -94,9 +94,12 @@ jobs:
           # SENTRY_DSN — из секрета: пуст → крэш-репортинг no-op (D-32), появится
           # секрет → включится без правок кода. SENTRY_RELEASE привязывает крэши к
           # конкретной сборке (app@version+build).
+          # PLAY_INTEGRITY_PROJECT — номер облачного проекта Google (не секрет, переменная
+          # репозитория): пуст → проверка подлинности выключена (D-129), Store его не читает.
           flutter build apk --release --target-platform android-arm64 --build-number="$BUILD_NUMBER" \
             --dart-define=CARTO_API_KEY="${{ secrets.CARTO_API_KEY }}" \
             --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}" \
+            --dart-define=PLAY_INTEGRITY_PROJECT="${{ vars.PLAY_INTEGRITY_PROJECT }}" \
             --dart-define=SENTRY_RELEASE="${{ matrix.app }}@$VERSION_NAME+$BUILD_NUMBER"
 
       - name: Publish to S3

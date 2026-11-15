@@ -57,8 +57,9 @@ TABS = (
         hint="Аккаунты покупателей и бегунов, баны, рассылка уведомлений."),
     Tab("notifications", "Уведомления", "Сообщество", ("notifications.notification",)),
 
-    Tab("runs", "Забеги (анти-чит)", "Бег и модерация", ("runs.run",),
-        hint="Разбор подозрительных забегов."),
+    Tab("runs", "Забеги (анти-чит)", "Бег и модерация",
+        ("runs.run", "attestation.integritycheck"),
+        hint="Разбор подозрительных забегов и проверки подлинности приложения."),
 
     Tab("legal", "Документы и согласия", "Право и согласия",
         ("legal.legaldocument", "legal.userconsent", "legal.consentclient"),

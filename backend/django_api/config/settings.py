@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "notifications",
     "legal",
     "runs",
+    "attestation",
     "analytics",
     "races",
     # Лига: профиль бегуна и зачёты (docs/LEAGUE_PLAN.md, Э1).
@@ -489,6 +490,10 @@ UNFOLD = {
                      "permission": _tab("runs")},
                     {"title": "Забеги (анти-чит)", "icon": "sports_score",
                      "link": reverse_lazy("admin:runs_run_changelist"),
+                     "permission": _tab("runs")},
+                    # D-129: вердикты Play Integrity — сигнал, не приговор.
+                    {"title": "Подлинность приложения", "icon": "verified_user",
+                     "link": reverse_lazy("admin:attestation_integritycheck_changelist"),
                      "permission": _tab("runs")},
                 ],
             },
