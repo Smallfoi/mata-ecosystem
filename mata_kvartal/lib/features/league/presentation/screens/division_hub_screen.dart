@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/config/app_config_provider.dart';
@@ -814,7 +815,7 @@ class _BoardBody extends ConsumerWidget {
       loading: () => const SliverToBoxAdapter(
         child: Padding(
           padding: EdgeInsets.only(top: 60),
-          child: Center(child: CupertinoActivityIndicator()),
+          child: MataLoading(),
         ),
       ),
       error: (_, __) => const SliverToBoxAdapter(
@@ -1313,7 +1314,7 @@ class _TrailsBody extends ConsumerWidget {
       loading: () => const SliverToBoxAdapter(
         child: Padding(
           padding: EdgeInsets.only(top: 60),
-          child: Center(child: CupertinoActivityIndicator()),
+          child: MataLoading(),
         ),
       ),
       error: (_, __) => const SliverToBoxAdapter(

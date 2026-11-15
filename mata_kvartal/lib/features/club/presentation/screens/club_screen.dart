@@ -2469,12 +2469,7 @@ class _DistrictWarCard extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           async.when(
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.all(12),
-                child: CupertinoActivityIndicator(),
-              ),
-            ),
+            loading: () => const MataLoading(padding: EdgeInsets.all(12)),
             error: (_, __) => Text(
               'Не удалось загрузить районы — потяни вниз, чтобы обновить.',
               style: TextStyle(fontSize: 14, color: AppColors.muted),

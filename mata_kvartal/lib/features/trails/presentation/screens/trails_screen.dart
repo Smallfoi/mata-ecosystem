@@ -2,8 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_states.dart';
 import '../../../../shared/widgets/tab_visibility.dart';
 import '../../data/trails_provider.dart';
 
@@ -51,18 +53,31 @@ class _TrailsScreenState extends ConsumerState<TrailsScreen> with TabVisibility 
               child: RefreshIndicator(
                 onRefresh: () async => ref.invalidate(trailsProvider),
                 child: async.when(
-                  loading: () => const Center(child: CupertinoActivityIndicator()),
-                  error: (_, __) => _message(
-                    context,
-                    'Не удалось загрузить тропы',
-                    'Проверьте подключение и потяните вниз.',
+                  loading: () => const MataLoading(),
+                  error: (_, __) => _scrollable(
+                    MataError(
+                      title: 'Не удалось загрузить тропы',
+                      titleStyle: AppStates.title,
+                      hint: 'Проверьте подключение.',
+                      hintStyle: AppStates.hint,
+                      iconColor: AppStates.icon,
+                      retryLabel: 'Повторить',
+                      onRetry: () => ref.invalidate(trailsProvider),
+                      retryBuilder: AppStates.retry,
+                    ),
                   ),
                   data: (items) => items.isEmpty
-                      ? _message(
-                          context,
-                          'Троп пока нет',
-                          'Тропы появятся, когда их отметят бегуны или клубы. '
-                          'Твои пробежки на них засчитаются автоматически.',
+                      ? _scrollable(
+                          MataEmpty(
+                            icon: CupertinoIcons.map,
+                            iconColor: AppStates.icon,
+                            title: 'Троп пока нет',
+                            titleStyle: AppStates.title,
+                            hint: 'Тропы появятся, когда их отметят бегуны '
+                                'или клубы. Твои пробежки на них засчитаются '
+                                'автоматически.',
+                            hintStyle: AppStates.hint,
+                          ),
                         )
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -79,33 +94,11 @@ class _TrailsScreenState extends ConsumerState<TrailsScreen> with TabVisibility 
     );
   }
 
-  Widget _message(BuildContext context, String title, String text) => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-    children: [
-      Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: AppColors.panel,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.separator),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              text,
-              style: TextStyle(fontSize: 14, color: AppColors.muted, height: 1.45),
-            ),
-          ],
-        ),
-      ),
-    ],
+  /// Состояние внутри прокручиваемого списка: без этого не работает
+  /// «потянуть, чтобы обновить».
+  Widget _scrollable(Widget child) => ListView(
+    physics: const AlwaysScrollableScrollPhysics(),
+    children: [const SizedBox(height: 60), child],
   );
 }
 
@@ -229,12 +222,16 @@ class TrailDetailScreen extends ConsumerWidget {
             ),
             Expanded(
               child: async.when(
-                loading: () => const Center(child: CupertinoActivityIndicator()),
-                error: (_, __) => Center(
-                  child: Text(
-                    'Не удалось загрузить доску',
-                    style: TextStyle(color: AppColors.muted),
-                  ),
+                loading: () => const MataLoading(),
+                error: (_, __) => MataError(
+                  title: 'Не удалось загрузить доску',
+                  titleStyle: AppStates.title,
+                  hint: 'Проверьте подключение.',
+                  hintStyle: AppStates.hint,
+                  iconColor: AppStates.icon,
+                  retryLabel: 'Повторить',
+                  onRetry: () => ref.invalidate(trailBoardDataProvider(trail.id)),
+                  retryBuilder: AppStates.retry,
                 ),
                 data: (data) => _BoardBody(trail: trail, data: data),
               ),
