@@ -398,7 +398,7 @@ class _Section extends StatelessWidget {
       fontSize: 11,
       fontWeight: FontWeight.w700,
       letterSpacing: 1.2,
-      color: AppColors.grey600,
+      color: AppColors.black,
     );
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
@@ -467,7 +467,7 @@ class _ItemRow extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.grey600,
+                      color: AppColors.black,
                       letterSpacing: 1,
                     ),
                   ),
@@ -527,7 +527,7 @@ class _Tag extends StatelessWidget {
       child: Text(
         text,
         style: const TextStyle(
-          fontSize: 11,
+          fontSize: 14,
           fontWeight: FontWeight.w600,
           color: AppColors.grey600,
         ),
@@ -563,10 +563,10 @@ class _InfoRow extends StatelessWidget {
               contentKey == null
                   ? Text(label,
                       style: const TextStyle(
-                          fontSize: 12, color: AppColors.grey600))
+                          fontSize: 14, color: AppColors.grey600))
                   : RemoteText(contentKey!, label,
                       style: const TextStyle(
-                          fontSize: 12, color: AppColors.grey600)),
+                          fontSize: 14, color: AppColors.grey600)),
               if (value.isNotEmpty)
                 Text(value,
                     style: const TextStyle(

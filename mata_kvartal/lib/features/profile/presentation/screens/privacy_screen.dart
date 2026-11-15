@@ -160,7 +160,7 @@ class _SectionTitle extends StatelessWidget {
         child: Text(
           text.toUpperCase(),
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textPrimary,
             fontSize: 12,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.5,
@@ -210,7 +210,7 @@ class _PrivacyToggle extends StatelessWidget {
             style: TextStyle(
                 color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle,
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
         value: value,
         activeColor: AppColors.electricBlue,
         onChanged: onChanged,

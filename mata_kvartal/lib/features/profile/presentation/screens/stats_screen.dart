@@ -143,7 +143,7 @@ class _StatCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               stat.label,
-              style: TextStyle(fontSize: 12, color: AppColors.muted),
+              style: TextStyle(fontSize: 14, color: AppColors.muted),
             ),
           ],
         ),

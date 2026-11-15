@@ -288,7 +288,7 @@ class _WeatherBody extends StatelessWidget {
                   'Морозный бонус к баллам за бег в холод — скоро',
                   style: TextStyle(
                     color: AppColors.textSecondary.withValues(alpha: 0.9),
-                    fontSize: 12,
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -386,7 +386,7 @@ class _BestRunBlock extends StatelessWidget {
                   hh(hours[i].timeLocal),
                   style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 11,
+                    fontSize: 14,
                   ),
                 ),
             ],
@@ -451,7 +451,7 @@ class _StatTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             label,
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 2),
           Text(

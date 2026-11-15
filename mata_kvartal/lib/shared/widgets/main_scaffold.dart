@@ -254,7 +254,7 @@ class _RunNavItem extends StatelessWidget {
                 height: 1.0,
                 letterSpacing: -0.2,
                 fontWeight: FontWeight.w700, // центр — акцент
-                color: isActive ? AppColors.ink : AppColors.muted,
+                color: isActive ? AppColors.ink : AppColors.ink,
               ),
             ),
             const SizedBox(height: 8),

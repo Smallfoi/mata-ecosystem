@@ -339,7 +339,7 @@ class _Benefit extends StatelessWidget {
                     '$keyBase.subtitle',
                     subtitle,
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: AppColors.grey600,
                       height: 1.4,
                     ),
@@ -796,7 +796,7 @@ class _OrderCard extends StatelessWidget {
                 child: Text(
                   OrderProvider.statusLabel(order.status),
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.grey600,
                   ),
@@ -814,7 +814,7 @@ class _OrderCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             OrderProvider.deliveryLabel(data.deliveryType),
-            style: const TextStyle(fontSize: 12, color: AppColors.grey600),
+            style: const TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
         ],
       ),

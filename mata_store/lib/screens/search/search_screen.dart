@@ -359,7 +359,7 @@ class _SectionLabel extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
-              color: AppColors.grey600,
+              color: AppColors.black,
             ),
           ),
           if (action != null)
@@ -368,7 +368,7 @@ class _SectionLabel extends StatelessWidget {
               child: Text(
                 action!,
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: AppColors.grey600,
                 ),

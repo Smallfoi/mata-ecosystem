@@ -907,7 +907,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                 Text(
                   _heldLabel(capturedAtMs),
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.muted,
                   ),
@@ -1355,7 +1355,7 @@ class _LoopChip extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               loop.distanceLabel,
-              style: TextStyle(color: AppColors.muted, fontSize: 11),
+              style: TextStyle(color: AppColors.muted, fontSize: 14),
             ),
           ],
         ),
@@ -1420,7 +1420,7 @@ class _TrailsLayerChip extends ConsumerWidget {
               'Тропы',
               style: TextStyle(
                 color: on ? AppColors.ink : AppColors.muted,
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1483,7 +1483,7 @@ class _KvartalTopLogo extends StatelessWidget {
                 '\u0433\u043e\u0440\u043e\u0434 ',
                 style: TextStyle(
                   color: AppColors.muted,
-                  fontSize: 11,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   height: 1,
                 ),
@@ -1811,7 +1811,7 @@ class _Stat extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               label,
-              style: TextStyle(fontSize: 11.5, color: AppColors.muted),
+              style: TextStyle(fontSize: 14, color: AppColors.muted),
             ),
           ],
         ),
@@ -1936,7 +1936,7 @@ class _TodayCard extends StatelessWidget {
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: .6,
-                      color: AppColors.muted,
+                      color: AppColors.ink,
                     ),
                   ),
                   Text(
@@ -2164,7 +2164,7 @@ class _PartnerCard extends StatelessWidget {
                             : partner.address,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: AppColors.muted, fontSize: 12.5),
+                        style: TextStyle(color: AppColors.muted, fontSize: 14),
                       ),
                     ),
                   ],
@@ -2299,7 +2299,7 @@ class _FriendMapCard extends StatelessWidget {
                               fontWeight: FontWeight.w800)),
                       const SizedBox(height: 3),
                       Text('$status · район ~150 м',
-                          style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                          style: TextStyle(color: AppColors.muted, fontSize: 14)),
                     ],
                   ),
                 ),

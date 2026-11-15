@@ -99,7 +99,7 @@ class _InteriorTile extends StatelessWidget {
                     Text(
                       option.hint,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 14,
                         height: 1.35,
                         color: AppColors.muted,
                       ),

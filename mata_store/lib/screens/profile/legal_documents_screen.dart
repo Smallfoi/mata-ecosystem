@@ -131,7 +131,7 @@ class _DocTile extends StatelessWidget {
         child: Row(
           children: [
             Text('ред. ${doc.version}',
-                style: const TextStyle(fontSize: 12, color: AppColors.grey600)),
+                style: const TextStyle(fontSize: 14, color: AppColors.grey600)),
             if (doc.required) ...[
               const SizedBox(width: 8),
               Container(
@@ -150,7 +150,7 @@ class _DocTile extends StatelessWidget {
               const Icon(Icons.check_circle, size: 14, color: AppColors.grey600),
               const SizedBox(width: 3),
               const Text('принят',
-                  style: TextStyle(fontSize: 11, color: AppColors.grey600)),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey600)),
             ],
           ],
         ),
@@ -186,7 +186,7 @@ class _LegalDocView extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
         children: [
           Text('Редакция ${doc.version}',
-              style: const TextStyle(fontSize: 12, color: AppColors.grey600)),
+              style: const TextStyle(fontSize: 14, color: AppColors.grey600)),
           const SizedBox(height: 12),
           ..._renderMarkdown(doc.body),
         ],
@@ -455,7 +455,7 @@ class _ConsentGateScreenState extends State<ConsentGateScreen> {
                                       color: AppColors.black)),
                               subtitle: const Text('нажмите, чтобы прочитать',
                                   style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 14,
                                       color: AppColors.grey600)),
                               trailing: const Icon(Icons.chevron_right,
                                   size: 20, color: AppColors.grey400),

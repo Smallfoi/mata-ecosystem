@@ -188,7 +188,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
             Center(
               child: Text(
                 '© МАТА. Экосистема: Квартал · Store · сайт',
-                style: TextStyle(fontSize: 12, color: AppColors.muted),
+                style: TextStyle(fontSize: 14, color: AppColors.muted),
               ),
             ),
           ],

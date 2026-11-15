@@ -344,7 +344,7 @@ class _QuickStat extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 14,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -600,7 +600,7 @@ class _ActiveRunView extends ConsumerWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 4,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 32),
