@@ -273,6 +273,12 @@ def runs(request):
         return Response({"detail": "Некорректные числа в забеге"}, status=400)
 
     mock = bool(d.get("mockDetected"))  # клиент сообщает о mock-GPS (Android)
+    # Отпечаток запроса для проверки подлинности (D-129) — по тем же числам,
+    # что разобрали выше; клиент считает его так же (integrity_service.dart).
+    from attestation.service import run_request_hash
+
+    request_hash = run_request_hash(rid, distance_m, duration_s,
+                                    bounded_int(ms, 0, _MAX_TIMESTAMP_MS) if ms is not None else None)
 
     # Забег и начисление — одно целое (аудит C05): сбой посередине откатывает оба,
     # и повтор из офлайн-очереди проходит заново. Run.id (PK) — уникальный ключ:
@@ -324,6 +330,12 @@ def runs(request):
         if not existing or existing.user_id != uid:
             return Response({"detail": "Конфликт id"}, status=409)
         return Response(_dup_payload(existing))
+
+    # Проверка подлинности приложения (D-129), режим «наблюдение»: забег уже
+    # принят как обычно; токен проверится в фоне и станет сигналом модератору.
+    from attestation.service import record as record_integrity
+
+    record_integrity(uid, "run", rid, d.get("integrity"), request_hash)
 
     # Вехи пожизненных километров (Квартал 2.0, Ф4) — идемпотентно.
     if not flagged:

@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/security/integrity_service.dart';
 import '../../../core/storage/account_scope.dart';
 import '../../auth/data/auth_provider.dart';
 import '../../trails/data/trails_provider.dart';
@@ -403,6 +404,14 @@ class CompletedRunsNotifier extends StateNotifier<List<CompletedRun>> {
   Future<bool> _sendSummary(CompletedRun run, String owner, String token) async {
     final Response<dynamic> res;
     try {
+      // Проверка подлинности (D-129): токен просим на КАЖДУЮ попытку — он
+      // одноразовый и свежий; не вышло — забег уходит без него, как раньше.
+      final integrity = await integrityForRun(
+        runId: run.id,
+        distanceMeters: run.distanceMeters,
+        elapsedSeconds: run.elapsed.inSeconds,
+        finishedAtMs: run.finishedAt.millisecondsSinceEpoch,
+      );
       res = await _dio.post<dynamic>(
         '/runs',
         data: {
@@ -413,6 +422,7 @@ class CompletedRunsNotifier extends StateNotifier<List<CompletedRun>> {
           'capturedTerritory': run.capturedTerritory,
           'capturedZones': run.capturedZones,
           'mockDetected': run.mockDetected,
+          if (integrity != null) 'integrity': integrity,
         },
         options: _auth(token),
       );

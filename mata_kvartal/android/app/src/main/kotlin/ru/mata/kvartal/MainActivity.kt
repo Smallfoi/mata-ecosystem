@@ -28,6 +28,8 @@ class MainActivity : FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+        // Проверка подлинности приложения (Play Integrity, D-129).
+        IntegrityChannel(this).register(flutterEngine.dartExecutor.binaryMessenger)
         // Шаринг в сторис Инстаграма (нативный интент, как у Стравы):
         // стикер ложится ПОВЕРХ фона, который бегун выбирает сам; карточка —
         // фоном целиком. Без Meta App ID Инстаграм интент игнорирует, поэтому
