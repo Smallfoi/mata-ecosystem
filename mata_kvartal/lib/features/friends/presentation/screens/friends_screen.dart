@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/friends_provider.dart';
@@ -236,7 +237,7 @@ class _Empty extends StatelessWidget {
           const SizedBox(height: 6),
           Text(sub,
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)),
+              style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.4)),
         ]),
       ),
     );
@@ -319,7 +320,7 @@ class _Requests extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(2, 8, 0, 8),
         child: Text(t.toUpperCase(),
             style: TextStyle(
-                color: AppColors.muted,
+                color: AppColors.ink,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: .6)),
@@ -439,7 +440,7 @@ class _AddPanel extends ConsumerWidget {
               if (contactsLoading)
                 const SizedBox(
                     width: 16, height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))
+                    child: MataLoading(radius: 8))
               else
                 Icon(CupertinoIcons.chevron_right, size: 16, color: AppColors.muted),
             ]),
@@ -478,7 +479,7 @@ class _AddPanel extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(2, 0, 0, 10),
         child: Text(t.toUpperCase(),
             style: TextStyle(
-                color: AppColors.muted,
+                color: AppColors.ink,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: .6)),
@@ -486,6 +487,6 @@ class _AddPanel extends ConsumerWidget {
 
   Widget _muted(String t) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(t, style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)),
+        child: Text(t, style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.4)),
       );
 }

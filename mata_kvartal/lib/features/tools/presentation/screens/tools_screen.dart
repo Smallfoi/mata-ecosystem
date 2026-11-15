@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
@@ -35,7 +34,7 @@ final _tools = <({
     anim: _ToolAnim.beat,
   ),
   (
-    icon: Icons.straighten,
+    icon: CupertinoIcons.arrow_left_right,
     title: 'Размер обуви',
     sub: 'RU / EU / US',
     route: '/tools/shoe-size',
@@ -43,7 +42,7 @@ final _tools = <({
     anim: _ToolAnim.slide,
   ),
   (
-    icon: Icons.music_note,
+    icon: CupertinoIcons.music_note,
     title: 'Метроном',
     sub: 'ритм шагов (каденс)',
     route: '/tools/metronome',
@@ -51,7 +50,7 @@ final _tools = <({
     anim: _ToolAnim.swing,
   ),
   (
-    icon: Icons.timer,
+    icon: CupertinoIcons.timer,
     title: 'Интервалы',
     sub: 'таймер тренировки',
     route: '/tools/interval',
@@ -89,7 +88,7 @@ class ToolsScreen extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
               child: Text(
                 'Офлайн-помощники для бега',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
             ),
             Expanded(
@@ -181,7 +180,7 @@ class _ToolCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   entry.sub,
-                  style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                  style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                 ),
               ],
             ),

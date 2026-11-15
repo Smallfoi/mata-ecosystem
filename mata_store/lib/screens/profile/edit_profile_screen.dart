@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../data/api/api_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
@@ -278,7 +279,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             if (user.avatarPath != null) ...[
                               const Text(
                                 ' · ',
-                                style: TextStyle(color: AppColors.grey400),
+                                style: TextStyle(color: AppColors.grey500),
                               ),
                               GestureDetector(
                                 onTap: _removeAvatar,
@@ -312,7 +313,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           'app.editprofile.phoneLogin',
                           'Вход по номеру телефона',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 14,
                             color: AppColors.grey600,
                           ),
                         ),
@@ -441,7 +442,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     const RemoteText(
                       'app.editprofile.noAddresses',
                       'Нет сохранённых адресов',
-                      style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                      style: TextStyle(fontSize: 14, color: AppColors.grey600),
                     ),
 
                   // Address list
@@ -477,7 +478,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
-                                        color: AppColors.grey600,
+                                        color: AppColors.black,
                                         letterSpacing: 0.5,
                                       ),
                                     ),
@@ -541,7 +542,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 : 'app.editprofile.addAddress',
                             _showAddressForm ? 'Отмена' : 'Добавить адрес',
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppColors.grey600,
                             ),
@@ -659,7 +660,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             duration: const Duration(milliseconds: 150),
                             height: 52,
                             color: _saved
-                                ? const Color(0xFF2E7D32)
+                                ? const Color(0xFF246227)
                                 : a.isLoading
                                 ? AppColors.grey800
                                 : AppColors.black,
@@ -690,10 +691,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 ? const SizedBox(
                                     width: 22,
                                     height: 22,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
+                                    child: MataLoading(color: Colors.white, radius: 8),
                                   )
                                 : RemoteText(
                                     'app.editprofile.save',
@@ -824,7 +822,7 @@ class _FieldState extends State<_Field> {
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
-            color: AppColors.grey600,
+            color: AppColors.black,
           ),
         ),
         const SizedBox(height: 6),
@@ -846,7 +844,7 @@ class _FieldState extends State<_Field> {
               decoration: InputDecoration(
                 hintText: widget.hint,
                 hintStyle: const TextStyle(
-                  color: AppColors.grey400,
+                  color: AppColors.grey500,
                   fontSize: 14,
                 ),
                 prefixIcon: Icon(

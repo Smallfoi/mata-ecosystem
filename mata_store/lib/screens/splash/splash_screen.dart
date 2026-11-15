@@ -227,7 +227,7 @@ class _SplashScreenState extends State<SplashScreen>
                             'СПОРТИВНАЯ ОДЕЖДА И ЭКИПИРОВКА',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: 11,
                               color: Color(0xFF9BA39C),
                               letterSpacing: 3.0,
                               fontWeight: FontWeight.w400,

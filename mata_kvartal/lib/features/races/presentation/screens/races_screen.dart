@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/races_provider.dart';
@@ -108,7 +109,7 @@ class _RacesScreenState extends ConsumerState<RacesScreen> {
                 children: [
                   Text(
                     'Календарь беговых событий',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                   ),
                   const SizedBox(height: 6),
                   // Кликабельный чип региона — открывает выбор (мой регион / вся Россия /
@@ -131,7 +132,7 @@ class _RacesScreenState extends ConsumerState<RacesScreen> {
             Expanded(
               child: async.when(
                 loading: () => Center(
-                  child: CircularProgressIndicator(color: AppColors.electricBlue),
+                  child: MataLoading(color: AppColors.electricBlue, radius: 11),
                 ),
                 error: (_, __) =>
                     const _Empty('Не удалось загрузить старты. Проверьте связь.'),
@@ -321,8 +322,7 @@ class _RegionPicker extends ConsumerWidget {
                       Padding(
                         padding: EdgeInsets.all(18),
                         child: Center(
-                          child: CircularProgressIndicator(
-                              color: AppColors.electricBlue),
+                          child: MataLoading(color: AppColors.electricBlue, radius: 11),
                         ),
                       ),
                     ],
@@ -415,7 +415,7 @@ class _RegionOption extends StatelessWidget {
                       child: Text(
                         subtitle!,
                         style: TextStyle(
-                            color: AppColors.textTertiary, fontSize: 11.5),
+                            color: AppColors.textSecondary, fontSize: 14),
                       ),
                     ),
                 ],
@@ -463,8 +463,8 @@ class _Segmented extends StatelessWidget {
                   child: Text(
                     labels[i],
                     style: TextStyle(
-                      color: i == index ? AppColors.ink : AppColors.textTertiary,
-                      fontSize: 13.5,
+                      color: i == index ? AppColors.ink : AppColors.textSecondary,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -579,7 +579,7 @@ class _RaceCard extends StatelessWidget {
                           [race.city, race.place].where((s) => s.isNotEmpty).join(' · '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                         ),
                       ),
                     ],
@@ -682,7 +682,7 @@ class _RaceCard extends StatelessWidget {
             Text(
               _months[d.month].toUpperCase(),
               style: TextStyle(
-                  color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1),
+                  color: AppColors.ink, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1),
             ),
           ],
         ),

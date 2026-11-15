@@ -74,7 +74,7 @@ class _MainShellState extends State<MainShell> {
                       '${cart.itemCount}',
                       style: const TextStyle(
                         color: AppColors.white,
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -90,7 +90,7 @@ class _MainShellState extends State<MainShell> {
                       '${cart.itemCount}',
                       style: const TextStyle(
                         color: AppColors.white,
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

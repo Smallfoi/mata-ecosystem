@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../data/api/api_client.dart';
 import '../../data/shipping_rates.dart';
 import '../../models/loyalty.dart';
@@ -527,7 +528,7 @@ class _Header extends StatelessWidget {
                                         fontWeight: FontWeight.w700,
                                         color: current
                                             ? Colors.white
-                                            : Colors.white38,
+                                            : AppColors.lavender,
                                       ),
                                     ),
                             ),
@@ -536,12 +537,12 @@ class _Header extends StatelessWidget {
                               'app.checkout.step.${_stepKeys[i]}',
                               _labels[i],
                               style: TextStyle(
-                                fontSize: 8,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.5,
                                 color: done || current
                                     ? Colors.white
-                                    : Colors.white38,
+                                    : AppColors.lavender,
                               ),
                             ),
                           ],
@@ -595,7 +596,7 @@ class _ContactStep extends StatelessWidget {
           const RemoteText(
             'app.checkout.contactsSubtitle',
             'Укажите данные для связи по заказу',
-            style: TextStyle(fontSize: 13, color: AppColors.grey600),
+            style: TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
           const SizedBox(height: 24),
           _Field(
@@ -682,7 +683,7 @@ class _DeliveryStep extends StatelessWidget {
             'app.checkout.delivery.note',
             'Доставка по Якутску: свяжемся после заказа и договоримся о времени. '
                 'Стоимость доставки в оплату не входит.',
-            style: TextStyle(fontSize: 13, color: AppColors.grey600, height: 1.4),
+            style: TextStyle(fontSize: 14, color: AppColors.grey600, height: 1.4),
           ),
           if (needAddress) ...[
             const SizedBox(height: 20),
@@ -827,7 +828,7 @@ class _DeliveryOption extends StatelessWidget {
                     'app.checkout.opt.${type.name}.subtitle',
                     subtitle,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: selected ? Colors.white60 : AppColors.grey600,
                     ),
                   ),
@@ -937,7 +938,7 @@ class _PaymentOption extends StatelessWidget {
                     'app.checkout.opt.${type.name}.subtitle',
                     subtitle,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: selected ? Colors.white60 : AppColors.grey600,
                     ),
                   ),
@@ -1071,7 +1072,7 @@ class _ReviewStep extends StatelessWidget {
                         Text(
                           '${item.size} · ${item.color} · ×${item.quantity}',
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 14,
                             color: AppColors.grey600,
                           ),
                         ),
@@ -1080,8 +1081,8 @@ class _ReviewStep extends StatelessWidget {
                           Text(
                             note, // staw-static — причина с сервера
                             style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.grey400,
+                              fontSize: 14,
+                              color: AppColors.grey600,
                             ),
                           ),
                       ],
@@ -1140,7 +1141,7 @@ class _ReviewStep extends StatelessWidget {
                     child: Text(
                       pv.disabledText, // staw-static — пояснение с сервера
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 14,
                         color: AppColors.grey600,
                       ),
                     ),
@@ -1175,7 +1176,7 @@ class _ReviewStep extends StatelessWidget {
                     'У вас ${loyalty.balance} баллов. Списать можно от '
                     '${LoyaltyAccount.minRedeem} при заказе крупнее',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: AppColors.grey600,
                     ),
                   ),
@@ -1202,14 +1203,14 @@ class _ReviewStep extends StatelessWidget {
                 const RemoteText(
                   'app.checkout.pointsLabel',
                   'Баллы',
-                  style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey600),
                 ),
                 Text(
                   '−$redeem ₽',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF2E7D32),
+                    color: Color(0xFF246227),
                   ),
                 ),
               ],
@@ -1240,7 +1241,7 @@ class _ReviewStep extends StatelessWidget {
             Text(
               priceWithBonuses(total.toInt(), redeem),
               textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 13, color: AppColors.grey600),
+              style: const TextStyle(fontSize: 14, color: AppColors.grey600),
             ),
           ],
         ],
@@ -1299,7 +1300,7 @@ class _RedeemPointsTile extends StatelessWidget {
                   Text(
                     'Скидка −$maxRedeem ₽ · доступно $balance',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: applied ? Colors.white60 : AppColors.grey600,
                     ),
                   ),
@@ -1378,7 +1379,7 @@ class _RedeemSliderTile extends StatelessWidget {
                     Text(
                       'от ${preview.redeemMin} до $max · доступно ${preview.available}',
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 14,
                         color: AppColors.grey600,
                       ),
                     ),
@@ -1501,10 +1502,7 @@ class _NavBar extends StatelessWidget {
                     ? const SizedBox(
                         width: 22,
                         height: 22,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
+                        child: MataLoading(color: Colors.white, radius: 8),
                       )
                     : RemoteText(
                         step < 3 ? 'app.checkout.next' : 'app.checkout.confirm',
@@ -1579,10 +1577,10 @@ class _FieldState extends State<_Field> {
         Text(
           widget.label.toUpperCase(),
           style: const TextStyle(
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
-            color: AppColors.grey600,
+            color: AppColors.black,
           ),
         ),
         const SizedBox(height: 6),
@@ -1604,7 +1602,7 @@ class _FieldState extends State<_Field> {
               decoration: InputDecoration(
                 hintText: widget.hint,
                 hintStyle: const TextStyle(
-                  color: AppColors.grey400,
+                  color: AppColors.grey500,
                   fontSize: 14,
                 ),
                 prefixIcon: Icon(

@@ -144,12 +144,12 @@ class _TrailCard extends StatelessWidget {
                       if (trail.attemptedByMe) 'ты здесь бегал',
                       if (trail.createdByMe) 'твоя тропа',
                     ].join(' · '),
-                    style: TextStyle(fontSize: 13, color: AppColors.muted),
+                    style: TextStyle(fontSize: 14, color: AppColors.muted),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: AppColors.muted),
+            Icon(CupertinoIcons.chevron_right, color: AppColors.muted),
           ],
         ),
       ),
@@ -185,7 +185,7 @@ class TrailDetailScreen extends ConsumerWidget {
                 children: [
                   Text(
                     '${trail.lengthLabel} · ${board.hint}',
-                    style: TextStyle(fontSize: 13, color: AppColors.muted),
+                    style: TextStyle(fontSize: 14, color: AppColors.muted),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -214,7 +214,7 @@ class TrailDetailScreen extends ConsumerWidget {
                             child: Text(
                               b.title,
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: active ? AppColors.bg : AppColors.muted,
                               ),
@@ -416,8 +416,8 @@ class _BoardBody extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textTertiary,
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                   ],

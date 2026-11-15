@@ -27,7 +27,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
   int _index = 0;
 
   static const _bg = Color(0xFF20252B);
-  static const _dim = Color(0xFF9AA59D);
+  static const _dim = Color(0xFFB9C1BB);
   static const _lime = Color(0xFFDFF45F);
 
   @override
@@ -165,7 +165,7 @@ class _PageShell extends StatelessWidget {
               fontSize: 25,
               fontWeight: FontWeight.w800,
               height: 1.15,
-              color: Color(0xFFEDEFE8),
+              color: Color(0xFFEFF1EA),
             ),
           ),
           const SizedBox(height: 12),
@@ -176,7 +176,7 @@ class _PageShell extends StatelessWidget {
               fontSize: 14.5,
               height: 1.55,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF9AA59D),
+              color: Color(0xFFB9C1BB),
             ),
           ),
         ],
@@ -199,7 +199,7 @@ class _PromisePage extends StatelessWidget {
         builder: (_, __) => CustomPaint(
           size: const Size(132, 132),
           painter: KvartalMarkPainter(
-            outline: const Color(0xFFEDEFE8),
+            outline: const Color(0xFFEFF1EA),
             fill: const Color(0xFFDFF45F),
             close: 1,
             fillScale: .92 + .08 * (loop.value < .5 ? loop.value * 2 : (1 - loop.value) * 2),
@@ -232,7 +232,7 @@ class _MechanicPage extends StatelessWidget {
           return CustomPaint(
             size: const Size(132, 132),
             painter: KvartalMarkPainter(
-              outline: const Color(0xFFEDEFE8),
+              outline: const Color(0xFFEFF1EA),
               fill: const Color(0xFFDFF45F),
               close: close,
               draw: draw,
@@ -267,7 +267,7 @@ class _OwnershipPage extends StatelessWidget {
               CustomPaint(
                 size: const Size(84, 84),
                 painter: KvartalMarkPainter(
-                  outline: const Color(0xFFEDEFE8),
+                  outline: const Color(0xFFEFF1EA),
                   fill: const Color(0xFFDFF45F),
                   close: 1,
                 ),
@@ -294,7 +294,7 @@ class _OwnershipPage extends StatelessWidget {
                   child: CustomPaint(
                     size: const Size(84, 84),
                     painter: KvartalMarkPainter(
-                      outline: const Color(0xFF9AA59D),
+                      outline: const Color(0xFFB9C1BB),
                       fill: const Color(0xFF3A423C),
                       close: 1,
                     ),
@@ -307,7 +307,7 @@ class _OwnershipPage extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF9AA59D),
+                  color: Color(0xFFB9C1BB),
                 ),
               ),
             ],
@@ -367,7 +367,7 @@ class _PointsVisual extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF9AA59D),
+              color: Color(0xFFB9C1BB),
             ),
           ),
         ],

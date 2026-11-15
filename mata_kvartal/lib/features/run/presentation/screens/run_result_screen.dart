@@ -17,6 +17,7 @@ import '../../../auth/data/auth_provider.dart';
 import '../../../trails/data/trails_provider.dart';
 import '../../data/completed_runs_provider.dart';
 import '../widgets/run_share.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Итог пробежки для церемонии (Ф1 «Праздник», утверждено 31.08.2026).
 class RunResult {
@@ -111,8 +112,8 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
   bool _medalsShown = false;
 
   static const _bg = Color(0xFF20252B);
-  static const _light = Color(0xFFEDEFE8);
-  static const _dim = Color(0xFF9AA59D);
+  static const _light = Color(0xFFEFF1EA);
+  static const _dim = Color(0xFFB9C1BB);
 
   @override
   void initState() {
@@ -434,7 +435,7 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
       padding: EdgeInsets.symmetric(horizontal: 8),
       child: Text(
         '·',
-        style: TextStyle(fontSize: 14, color: Color(0xFF9AA59D)),
+        style: TextStyle(fontSize: 14, color: Color(0xFFB9C1BB)),
       ),
     ),
   );
@@ -464,10 +465,10 @@ class _StatsPanel extends ConsumerWidget {
           Text(
             label.toUpperCase(),
             style: const TextStyle(
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: .8,
-              color: Color(0xFF5F665E),
+              color: Color(0xFF505650),
             ),
           ),
         ],
@@ -601,7 +602,7 @@ class _TrailHitsCard extends ConsumerWidget {
               child: Row(
                 children: [
                   const Icon(
-                    Icons.route_outlined,
+                    CupertinoIcons.arrow_branch,
                     size: 18,
                     color: Color(0xFF20252B),
                   ),
@@ -631,7 +632,7 @@ class _TrailHitsCard extends ConsumerWidget {
                       child: const Text(
                         'рекорд',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF20252B),
                         ),
@@ -718,7 +719,7 @@ class _MakeTrailButtonState extends ConsumerState<_MakeTrailButton> {
     }
     return TextButton.icon(
       onPressed: _busy ? null : _create,
-      icon: const Icon(Icons.add_road_outlined, size: 18),
+      icon: const Icon(CupertinoIcons.plus_circle, size: 18),
       label: Text(_busy ? 'Создаём…' : 'Сделать тропой'),
       style: TextButton.styleFrom(foregroundColor: const Color(0xFF20252B)),
     );
@@ -891,7 +892,7 @@ class RoutePainter extends CustomPainter {
         ..strokeWidth = 5
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
-        ..color = const Color(0xFFEDEFE8),
+        ..color = const Color(0xFFEFF1EA),
     );
 
     // Бегун ведёт линию.
@@ -917,7 +918,7 @@ class RoutePainter extends CustomPainter {
       canvas.drawCircle(
         Offset(start.dx * scale + dx, start.dy * scale + dy),
         4,
-        Paint()..color = const Color(0xFFEDEFE8),
+        Paint()..color = const Color(0xFFEFF1EA),
       );
     }
   }

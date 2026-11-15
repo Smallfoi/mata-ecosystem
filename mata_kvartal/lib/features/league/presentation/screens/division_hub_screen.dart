@@ -317,7 +317,7 @@ class _DivisionHeaderDelegate extends SliverPersistentHeaderDelegate {
                           level?.roman ?? '–',
                           style: const TextStyle(
                             fontFamily: AppTheme.fontDisplay,
-                            fontSize: 9.5,
+                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF171C19),
                           ),
@@ -449,7 +449,7 @@ class _DivisionCard extends StatelessWidget {
               fontFamily: AppTheme.fontDisplay,
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: Color(0xFFEDEFE8),
+              color: Color(0xFFEFF1EA),
             ),
           ),
           const SizedBox(height: 2),
@@ -458,7 +458,7 @@ class _DivisionCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF9AA59D),
+              color: Color(0xFFB9C1BB),
             ),
           ),
           const SizedBox(height: 10),
@@ -472,7 +472,7 @@ class _DivisionCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF9AA59D),
+                  color: Color(0xFFB9C1BB),
                 ),
               ),
             ),
@@ -482,10 +482,10 @@ class _DivisionCard extends StatelessWidget {
           const Text(
             'форма недели · пн–вс',
             style: TextStyle(
-              fontSize: 9.5,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: .6,
-              color: Color(0xFF9AA59D),
+              color: Color(0xFFB9C1BB),
             ),
           ),
         ],
@@ -523,7 +523,7 @@ class _PositionLadder extends StatelessWidget {
                 child: Text(
                   'ВЫЛЕТ',
                   style: TextStyle(
-                    fontSize: 7.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: .5,
                     color: AppColors.warm.withValues(alpha: .9),
@@ -536,7 +536,7 @@ class _PositionLadder extends StatelessWidget {
                 child: const Text(
                   'ВЫШЕ',
                   style: TextStyle(
-                    fontSize: 7.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: .5,
                     color: AppColors.lime,
@@ -587,7 +587,7 @@ class _PositionLadder extends StatelessWidget {
                       '#$place',
                       style: const TextStyle(
                         fontFamily: AppTheme.fontDisplay,
-                        fontSize: 8,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF171C19),
                       ),
@@ -603,9 +603,9 @@ class _PositionLadder extends StatelessWidget {
                     'пробеги в этом периоде — займёшь место',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 9,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF9AA59D),
+                      color: Color(0xFFB9C1BB),
                     ),
                   ),
                 ),
@@ -639,7 +639,7 @@ class _WeekForm extends StatelessWidget {
                   : const Color(0xFF31382F),
               borderRadius: BorderRadius.circular(5),
               border: i == today
-                  ? Border.all(color: const Color(0xFF9AA59D), width: 1)
+                  ? Border.all(color: const Color(0xFFB9C1BB), width: 1)
                   : null,
             ),
           ),
@@ -670,7 +670,7 @@ class _PeriodToggle extends ConsumerWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: active ? AppColors.bg : AppColors.muted,
             ),
@@ -740,7 +740,7 @@ class _HubChips extends ConsumerWidget {
               child: Text(
                 tab.title,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: active ? AppColors.bg : AppColors.muted,
                 ),
@@ -921,7 +921,7 @@ class _TopThree extends StatelessWidget {
               Text(
                 _amount(row.value, unit),
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   fontFeatures: const [FontFeature.tabularFigures()],
                   color: AppColors.muted,
@@ -999,7 +999,7 @@ class _HubRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: me ? FontWeight.w800 : FontWeight.w600,
-                    color: me ? const Color(0xFFEDEFE8) : AppColors.ink,
+                    color: me ? const Color(0xFFEFF1EA) : AppColors.ink,
                   ),
                 ),
                 if ((row.club ?? '').isNotEmpty)
@@ -1008,8 +1008,8 @@ class _HubRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 12,
-                      color: me ? const Color(0xFF9AA59D) : AppColors.faint,
+                      fontSize: 14,
+                      color: me ? const Color(0xFFB9C1BB) : AppColors.muted,
                     ),
                   ),
               ],
@@ -1096,7 +1096,7 @@ void showRivalProfileSheet(BuildContext context, LeagueRow row, String unit) {
                           Text(
                             row.club!,
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 14,
                               color: AppColors.muted,
                             ),
                           ),
@@ -1130,9 +1130,9 @@ void showRivalProfileSheet(BuildContext context, LeagueRow row, String unit) {
                 'Маршруты и кварталы соперника скрыты — в Лиге видны '
                 'только цифры. Твои треки другим тоже не видны.',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 14,
                   height: 1.45,
-                  color: AppColors.faint,
+                  color: AppColors.muted,
                 ),
               ),
             ],
@@ -1187,7 +1187,7 @@ class _SelfProgress extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  me.improved ? Icons.trending_up : Icons.trending_flat,
+                  me.improved ? CupertinoIcons.arrow_up_right : CupertinoIcons.arrow_right,
                   size: 18,
                   color: me.improved ? AppColors.success : AppColors.muted,
                 ),
@@ -1358,7 +1358,7 @@ class _TrailsBody extends ConsumerWidget {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF9AA59D),
+                            color: Color(0xFFB9C1BB),
                           ),
                         ),
                       ),
@@ -1439,7 +1439,7 @@ class _TrailRow extends StatelessWidget {
                       meta,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: AppColors.faint),
+                      style: TextStyle(fontSize: 14, color: AppColors.muted),
                     ),
                   ],
                 ),

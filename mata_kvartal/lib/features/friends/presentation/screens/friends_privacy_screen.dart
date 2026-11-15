@@ -28,7 +28,7 @@ class FriendsPrivacyScreen extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
           Text('Друзья на карте. Меняешь только ты.',
-              style: TextStyle(color: AppColors.muted, fontSize: 13)),
+              style: TextStyle(color: AppColors.muted, fontSize: 14)),
           const SizedBox(height: 16),
 
           _Card(children: [
@@ -61,7 +61,7 @@ class FriendsPrivacyScreen extends ConsumerWidget {
             Text('ТЕНЬ — СКРЫТЬСЯ НА ВРЕМЯ', style: _labelStyle),
             const SizedBox(height: 4),
             Text('Пока в тени: тебя не видно, и ты не видишь друзей.',
-                style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.4)),
+                style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.4)),
             const SizedBox(height: 12),
             if (prefs.inShadow)
               Row(children: [
@@ -124,7 +124,7 @@ class FriendsPrivacyScreen extends ConsumerWidget {
 
           Text(
             '🔒 Геопозиция — персональные данные (152-ФЗ). Собираем только пока открыта карта, огрублённо, и делимся лишь со взаимными друзьями. Live-слой — с 16 лет.',
-            style: TextStyle(color: AppColors.faint, fontSize: 11.5, height: 1.5),
+            style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.5),
           ),
         ],
       ),
@@ -138,7 +138,7 @@ class FriendsPrivacyScreen extends ConsumerWidget {
   }
 
   static final _labelStyle = TextStyle(
-      color: AppColors.muted,
+      color: AppColors.ink,
       fontSize: 11.5,
       fontWeight: FontWeight.w700,
       letterSpacing: .6);
@@ -181,7 +181,7 @@ class _ToggleRow extends StatelessWidget {
                       color: AppColors.ink, fontSize: 14.5, fontWeight: FontWeight.w700)),
               const SizedBox(height: 3),
               Text(desc,
-                  style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.4)),
+                  style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.4)),
             ]),
           ),
           const SizedBox(width: 12),
@@ -248,14 +248,14 @@ class _BeaconCardState extends ConsumerState<_BeaconCard> {
         const SizedBox(width: 8),
         Text('МАЯК',
             style: TextStyle(
-                color: AppColors.muted,
+                color: AppColors.ink,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: .6)),
       ]),
       const SizedBox(height: 6),
       Text('Точный трек 1–3 доверенным на время — на случай безопасности.',
-          style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.4)),
+          style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.4)),
       const SizedBox(height: 12),
       if (prefs.beaconActive)
         Row(children: [
@@ -272,7 +272,7 @@ class _BeaconCardState extends ConsumerState<_BeaconCard> {
         ])
       else if (friends.isEmpty)
         Text('Сначала добавь друзей — из них выберешь доверенных.',
-            style: TextStyle(color: AppColors.faint, fontSize: 12.5))
+            style: TextStyle(color: AppColors.muted, fontSize: 14))
       else ...[
         Wrap(
           spacing: 8,

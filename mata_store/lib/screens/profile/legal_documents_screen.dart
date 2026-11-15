@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../data/api/api_client.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
@@ -71,7 +72,7 @@ class _LegalDocumentsScreenState extends State<LegalDocumentsScreen> {
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: MataLoading(radius: 11));
           }
           if (snap.hasError) {
             return _Message(
@@ -131,7 +132,7 @@ class _DocTile extends StatelessWidget {
         child: Row(
           children: [
             Text('ред. ${doc.version}',
-                style: const TextStyle(fontSize: 12, color: AppColors.grey600)),
+                style: const TextStyle(fontSize: 14, color: AppColors.grey600)),
             if (doc.required) ...[
               const SizedBox(width: 8),
               Container(
@@ -142,7 +143,7 @@ class _DocTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(3),
                 ),
                 child: const Text('обязательный',
-                    style: TextStyle(fontSize: 10, color: AppColors.white)),
+                    style: TextStyle(fontSize: 11, color: AppColors.white)),
               ),
             ],
             if (doc.accepted == true) ...[
@@ -150,7 +151,7 @@ class _DocTile extends StatelessWidget {
               const Icon(Icons.check_circle, size: 14, color: AppColors.grey600),
               const SizedBox(width: 3),
               const Text('принят',
-                  style: TextStyle(fontSize: 11, color: AppColors.grey600)),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey600)),
             ],
           ],
         ),
@@ -186,7 +187,7 @@ class _LegalDocView extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
         children: [
           Text('Редакция ${doc.version}',
-              style: const TextStyle(fontSize: 12, color: AppColors.grey600)),
+              style: const TextStyle(fontSize: 14, color: AppColors.grey600)),
           const SizedBox(height: 12),
           ..._renderMarkdown(doc.body),
         ],
@@ -223,7 +224,7 @@ class _LegalDocView extends StatelessWidget {
           ),
           child: SelectableText(_stripInline(line.substring(2)),
               style: const TextStyle(
-                  fontSize: 13, color: AppColors.grey600, height: 1.4)),
+                  fontSize: 14, color: AppColors.grey600, height: 1.4)),
         ));
       } else if (RegExp(r'^[-*] ').hasMatch(line)) {
         widgets.add(Padding(
@@ -416,15 +417,15 @@ class _ConsentGateScreenState extends State<ConsentGateScreen> {
           future: _future,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             if (snap.hasError) {
               _leave(); // fail-open
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             final pending = snap.data ?? const <_LegalDoc>[];
             if (pending.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             return Column(
               children: [
@@ -455,7 +456,7 @@ class _ConsentGateScreenState extends State<ConsentGateScreen> {
                                       color: AppColors.black)),
                               subtitle: const Text('нажмите, чтобы прочитать',
                                   style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 14,
                                       color: AppColors.grey600)),
                               trailing: const Icon(Icons.chevron_right,
                                   size: 20, color: AppColors.grey400),
@@ -524,8 +525,7 @@ class _ConsentGateScreenState extends State<ConsentGateScreen> {
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: AppColors.white),
+                                  child: MataLoading(color: AppColors.white, radius: 8),
                                 )
                               : const Text('ПРИНЯТЬ И ПРОДОЛЖИТЬ'),
                         ),

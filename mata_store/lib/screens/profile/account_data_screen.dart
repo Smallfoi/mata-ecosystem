@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
@@ -86,7 +87,7 @@ class _AccountDataScreenState extends State<AccountDataScreen> {
         title: const RemoteText('app.account.title', 'Конфиденциальность и данные'),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: MataLoading(radius: 11))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -110,7 +111,7 @@ class _AccountDataScreenState extends State<AccountDataScreen> {
                     'app.account.privacyHint',
                     'Видимость маршрутов и положения в реальном времени настраивается '
                     'в приложении «Квартал» (аккаунт общий).',
-                    style: TextStyle(color: AppColors.grey600, fontSize: 13),
+                    style: TextStyle(color: AppColors.grey600, fontSize: 14),
                   ),
                 ),
                 const SizedBox(height: 28),
@@ -120,7 +121,7 @@ class _AccountDataScreenState extends State<AccountDataScreen> {
                   child: Text(
                     'Удаление аккаунта стирает все ваши данные без возможности '
                     'восстановления (152-ФЗ).',
-                    style: TextStyle(color: AppColors.grey600, fontSize: 13),
+                    style: TextStyle(color: AppColors.grey600, fontSize: 14),
                   ),
                 ),
                 OutlinedButton.icon(
@@ -135,8 +136,7 @@ class _AccountDataScreenState extends State<AccountDataScreen> {
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.red),
+                          child: MataLoading(color: AppColors.red, radius: 8),
                         )
                       : const Icon(Icons.delete_outline, size: 20),
                   label: const RemoteText('app.account.deleteAccount', 'Удалить аккаунт',
@@ -157,7 +157,7 @@ class _SectionTitle extends StatelessWidget {
         child: Text(
           text.toUpperCase(),
           style: const TextStyle(
-            color: AppColors.grey600,
+            color: AppColors.black,
             fontSize: 12,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.5,

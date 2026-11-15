@@ -339,7 +339,7 @@ class _Benefit extends StatelessWidget {
                     '$keyBase.subtitle',
                     subtitle,
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: AppColors.grey600,
                       height: 1.4,
                     ),
@@ -716,7 +716,7 @@ class _OrdersTab extends StatelessWidget {
                 RemoteText(
                   'app.profile.orders.emptySub',
                   'Ваши заказы появятся здесь',
-                  style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey600),
                 ),
               ],
             ),
@@ -796,7 +796,7 @@ class _OrderCard extends StatelessWidget {
                 child: Text(
                   OrderProvider.statusLabel(order.status),
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.grey600,
                   ),
@@ -809,12 +809,12 @@ class _OrderCard extends StatelessWidget {
             '${order.items.length} '
             '${_plural(order.items.length)} · '
             '${order.total.toInt()} ₽',
-            style: const TextStyle(fontSize: 13, color: AppColors.grey600),
+            style: const TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
           const SizedBox(height: 4),
           Text(
             OrderProvider.deliveryLabel(data.deliveryType),
-            style: const TextStyle(fontSize: 12, color: AppColors.grey400),
+            style: const TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
         ],
       ),
@@ -853,7 +853,7 @@ class _WishlistTab extends StatelessWidget {
                 RemoteText(
                   'app.profile.wishlist.emptySub',
                   'Добавляйте понравившиеся товары',
-                  style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey600),
                 ),
               ],
             ),

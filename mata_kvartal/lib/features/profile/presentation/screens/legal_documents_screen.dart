@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/data/auth_provider.dart';
@@ -24,7 +25,7 @@ class LegalDocumentsScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: MataLoading(radius: 11)),
           error: (e, _) => _Message(
             icon: CupertinoIcons.wifi_slash,
             text: 'Не удалось загрузить документы.\nПроверьте соединение.',
@@ -81,7 +82,7 @@ class _DocTile extends StatelessWidget {
             children: [
               Text('ред. ${doc.version}',
                   style: TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary)),
+                      fontSize: 14, color: AppColors.textSecondary)),
               if (doc.required) ...[
                 const SizedBox(width: 8),
                 Container(
@@ -93,7 +94,7 @@ class _DocTile extends StatelessWidget {
                   ),
                   child: Text('обязательный',
                       style: TextStyle(
-                          fontSize: 10, color: AppColors.accentBlue)),
+                          fontSize: 11, color: AppColors.accentBlue)),
                 ),
               ],
             ],
@@ -129,7 +130,7 @@ class _LegalDocView extends StatelessWidget {
           children: [
             Text('Редакция ${doc.version}',
                 style: TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
+                    fontSize: 14, color: AppColors.textSecondary)),
             const SizedBox(height: 12),
             ..._renderMarkdown(doc.body),
           ],
@@ -167,7 +168,7 @@ class _LegalDocView extends StatelessWidget {
           ),
           child: SelectableText(_stripInline(line.substring(2)),
               style: TextStyle(
-                  fontSize: 13, color: AppColors.textSecondary, height: 1.4)),
+                  fontSize: 14, color: AppColors.textSecondary, height: 1.4)),
         ));
       } else if (RegExp(r'^[-*] ').hasMatch(line)) {
         widgets.add(Padding(
@@ -177,7 +178,7 @@ class _LegalDocView extends StatelessWidget {
             children: [
               Padding(
                 padding: EdgeInsets.only(top: 7, right: 8),
-                child: Icon(Icons.circle, size: 5, color: AppColors.accentBlue),
+                child: Icon(CupertinoIcons.circle, size: 5, color: AppColors.accentBlue),
               ),
               Expanded(
                 child: SelectableText(_stripInline(line.substring(2)),
@@ -327,16 +328,16 @@ class _ConsentGateScreenState extends ConsumerState<ConsentGateScreen> {
           future: _future,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             final pending = snap.data ?? const <LegalDoc>[];
             if (snap.hasError) {
               // Fail-open: не удалось проверить — не запираем, уводим в приложение.
               _leave();
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             if (pending.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             return Column(
               children: [
@@ -370,7 +371,7 @@ class _ConsentGateScreenState extends ConsumerState<ConsentGateScreen> {
                               subtitle: Text('нажмите, чтобы прочитать',
                                   style: TextStyle(
                                       color: AppColors.textSecondary,
-                                      fontSize: 12)),
+                                      fontSize: 14)),
                               trailing: Icon(
                                   CupertinoIcons.chevron_right,
                                   color: AppColors.textDisabled,
@@ -471,7 +472,7 @@ class _AcceptBar extends StatelessWidget {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: MataLoading(radius: 8),
                     )
                   : const Text('Принять и продолжить'),
             ),

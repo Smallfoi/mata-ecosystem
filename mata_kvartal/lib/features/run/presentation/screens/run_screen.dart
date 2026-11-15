@@ -344,7 +344,7 @@ class _QuickStat extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 14,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -465,7 +465,7 @@ class _StartCard extends ConsumerWidget {
                   child: const Center(
                     child: KvartalLogoMark(
                       size: 58,
-                      outline: Color(0xFFEDEFE8), // светлый контур на тёмной карточке
+                      outline: Color(0xFFEFF1EA), // светлый контур на тёмной карточке
                     ),
                   ),
                 ),
@@ -600,7 +600,7 @@ class _ActiveRunView extends ConsumerWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 4,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 32),
@@ -947,7 +947,7 @@ class _EmptyRunsHint extends StatelessWidget {
       ),
       child: Text(
         'Завершённые пробежки появятся здесь после первого старта.',
-        style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
       ),
     );
   }
@@ -1035,7 +1035,7 @@ class _FirstQuestCard extends StatelessWidget {
           const Text(
             'ПЕРВЫЙ КВЕСТ',
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.6,
               color: Color(0xFFDFF45F),
@@ -1048,7 +1048,7 @@ class _FirstQuestCard extends StatelessWidget {
               fontFamily: AppTheme.fontDisplay,
               fontSize: 19,
               fontWeight: FontWeight.w800,
-              color: Color(0xFFEDEFE8),
+              color: Color(0xFFEFF1EA),
             ),
           ),
           const SizedBox(height: 4),
@@ -1059,7 +1059,7 @@ class _FirstQuestCard extends StatelessWidget {
               fontSize: 12.5,
               height: 1.45,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF9AA59D),
+              color: Color(0xFFB9C1BB),
             ),
           ),
         ],

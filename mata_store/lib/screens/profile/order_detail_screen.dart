@@ -329,7 +329,7 @@ class _StatusBar extends StatelessWidget {
       case OrderStatus.shipped:
         return const Color(0xFF6A1B9A);
       case OrderStatus.delivered:
-        return const Color(0xFF2E7D32);
+        return const Color(0xFF246227);
       case OrderStatus.cancelled:
         return AppColors.red;
     }
@@ -398,7 +398,7 @@ class _Section extends StatelessWidget {
       fontSize: 11,
       fontWeight: FontWeight.w700,
       letterSpacing: 1.2,
-      color: AppColors.grey600,
+      color: AppColors.black,
     );
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
@@ -465,9 +465,9 @@ class _ItemRow extends StatelessWidget {
                   Text(
                     item.productBrand.toUpperCase(),
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.grey400,
+                      color: AppColors.black,
                       letterSpacing: 1,
                     ),
                   ),
@@ -527,7 +527,7 @@ class _Tag extends StatelessWidget {
       child: Text(
         text,
         style: const TextStyle(
-          fontSize: 11,
+          fontSize: 14,
           fontWeight: FontWeight.w600,
           color: AppColors.grey600,
         ),
@@ -563,10 +563,10 @@ class _InfoRow extends StatelessWidget {
               contentKey == null
                   ? Text(label,
                       style: const TextStyle(
-                          fontSize: 12, color: AppColors.grey600))
+                          fontSize: 14, color: AppColors.grey600))
                   : RemoteText(contentKey!, label,
                       style: const TextStyle(
-                          fontSize: 12, color: AppColors.grey600)),
+                          fontSize: 14, color: AppColors.grey600)),
               if (value.isNotEmpty)
                 Text(value,
                     style: const TextStyle(
@@ -599,7 +599,7 @@ class _PriceRow extends StatelessWidget {
       children: [
         RemoteText(contentKey, label,
             style: const TextStyle(
-                fontSize: 13, color: AppColors.grey600)),
+                fontSize: 14, color: AppColors.grey600)),
         Text(value,
             style: const TextStyle(
                 fontSize: 13,

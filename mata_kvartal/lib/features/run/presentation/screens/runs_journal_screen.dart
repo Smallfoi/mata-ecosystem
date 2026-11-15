@@ -99,9 +99,9 @@ class _MonthHeader extends StatelessWidget {
               parts.join(' · '),
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textTertiary,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
@@ -179,10 +179,10 @@ class RunTileCard extends StatelessWidget {
                     '${run.dateLabel.toUpperCase()} · '
                     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: .5,
-                      color: AppColors.textSecondary,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -208,7 +208,7 @@ class RunTileCard extends StatelessWidget {
                         '+${run.capturedZones} '
                         '${run.capturedZones == 1 ? 'КВАРТАЛ' : 'КВАРТАЛА'}',
                         style: const TextStyle(
-                          fontSize: 8.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF171C19),
                         ),
@@ -236,7 +236,7 @@ class RunTileCard extends StatelessWidget {
                           Text(
                             'НА ПРОВЕРКЕ',
                             style: TextStyle(
-                              fontSize: 8.5,
+                              fontSize: 11,
                               fontWeight: FontWeight.w800,
                               letterSpacing: .3,
                               color: AppColors.warning,
@@ -264,8 +264,8 @@ class RunTileCard extends StatelessWidget {
                 Text(
                   '${run.paceFormatted} /км',
                   style: TextStyle(
-                    fontSize: 10.5,
-                    color: AppColors.textTertiary,
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],

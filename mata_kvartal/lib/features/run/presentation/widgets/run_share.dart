@@ -15,6 +15,7 @@ import '../../../auth/data/auth_provider.dart';
 import '../../../medals/data/medal_defs.dart';
 import '../../../medals/data/medals_provider.dart';
 import '../../data/completed_runs_provider.dart' show lastRunPointsProvider;
+import 'package:flutter/cupertino.dart';
 import '../../../medals/presentation/medal_share.dart'
     show BrandMark, InstagramButtonLabel, StickerHint, saveShareImageToGallery;
 
@@ -28,7 +29,7 @@ const _instaChannel = MethodChannel('kvartal/instagram_share');
 
 const _bg = Color(0xFF12161B);
 const _panel = Color(0xFF1B2129);
-const _ink = Color(0xFFEDEFE8);
+const _ink = Color(0xFFEFF1EA);
 const _muted = Color(0xFF97A0A6);
 const _lime = Color(0xFFDFF45F);
 const _cyan = Color(0xFF6FD3E0);
@@ -206,7 +207,7 @@ class _RunShareSheetState extends ConsumerState<_RunShareSheet> {
                   minimumSize: const Size(64, 48),
                 ),
                 onPressed: _busy ? null : _saveToGallery,
-                icon: const Icon(Icons.download_rounded, size: 19),
+                icon: const Icon(CupertinoIcons.arrow_down_circle, size: 19),
                 label: const Text('Сохранить в галерею'),
               ),
             ),
@@ -403,7 +404,7 @@ class RunStoryCard extends StatelessWidget {
                       )
                     : Center(
                         child: Icon(
-                          Icons.route,
+                          CupertinoIcons.arrow_branch,
                           size: 64,
                           color: _lime.withValues(alpha: .4),
                         ),
@@ -441,7 +442,7 @@ class RunStoryCard extends StatelessWidget {
                         ),
                         maxLines: 1,
                         style: const TextStyle(
-                          fontSize: 7.5,
+                          fontSize: 11,
                           letterSpacing: .8,
                           fontWeight: FontWeight.w700,
                           color: _muted,
@@ -562,7 +563,7 @@ class RunStoryCard extends StatelessWidget {
                   Text(
                     items[i].$2,
                     style: const TextStyle(
-                      fontSize: 7,
+                      fontSize: 11,
                       letterSpacing: 1.2,
                       fontWeight: FontWeight.w700,
                       color: _muted,
@@ -615,7 +616,7 @@ class _RunMedalPlaque extends StatelessWidget {
                     'МЕДАЛЬ «${medal.def.name.toUpperCase()}» — ВЗЯТА В ЭТОМ ЗАБЕГЕ${extra > 0 ? ' +$extra' : ''}',
                     maxLines: 1,
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: .4,
                       color: _ink,
@@ -629,7 +630,7 @@ class _RunMedalPlaque extends StatelessWidget {
                   child: Text(
                     sub,
                     maxLines: 1,
-                    style: const TextStyle(fontSize: 8, color: _muted),
+                    style: const TextStyle(fontSize: 11, color: _muted),
                   ),
                 ),
               ],

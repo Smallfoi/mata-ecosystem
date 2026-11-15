@@ -6,6 +6,7 @@ import 'package:mata_ui/mata_ui.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../profile/data/legal_provider.dart';
 import '../../data/auth_provider.dart';
+import 'package:flutter/cupertino.dart';
 import '../widgets/otp_boxes_style.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
@@ -166,7 +167,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(CupertinoIcons.back),
           onPressed: () => context.go('/auth/phone'),
         ),
       ),
@@ -217,9 +218,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               const SizedBox(height: 16),
               if (_resending)
                 Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.electricBlue,
-                  ),
+                  child: MataLoading(color: AppColors.electricBlue, radius: 11),
                 )
               else if (_secondsLeft > 0)
                 Center(
@@ -290,10 +289,7 @@ class _WaitingOnPhone extends StatelessWidget {
           SizedBox(
             width: 26,
             height: 26,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.4,
-              color: AppColors.electricBlue,
-            ),
+            child: MataLoading(color: AppColors.electricBlue, radius: 11),
           ),
           const SizedBox(width: 16),
           Expanded(

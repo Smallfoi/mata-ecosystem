@@ -192,7 +192,7 @@ class _NotificationsBell extends StatelessWidget {
                 unread > 9 ? '9+' : '$unread',
                 style: const TextStyle(
                   color: _badgeInk,
-                  fontSize: 9,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
                   height: 1,
                 ),
@@ -676,7 +676,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: MataLoading(radius: 8),
                         )
                       : const Text('Сохранить'),
                 ),
@@ -999,7 +999,7 @@ String? pendingPointsLine(LoyaltyState l) {
     case 'runnerTerritory':
       return (icon: CupertinoIcons.flag_fill, label: 'Захват территории');
     case 'runnerCompetition':
-      return (icon: Icons.emoji_events, label: 'Соревнование');
+      return (icon: CupertinoIcons.rosette, label: 'Соревнование');
     case 'registration':
       return (icon: CupertinoIcons.gift_fill, label: 'Бонус');
     case 'purchase':
@@ -1177,7 +1177,7 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFFEDEFE8),
+                      color: Color(0xFFEFF1EA),
                     ),
                   ),
                   if (stats != null && !loyalty.programV1) ...[
@@ -1236,10 +1236,10 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
                   child: Text(
                     'БОНУСЫ НА СЧЁТЕ',
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
-                      color: AppColors.faint,
+                      color: AppColors.ink,
                     ),
                   ),
                 ),
@@ -1280,7 +1280,7 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
                       child: Text(
                         label,
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: _filter == idx
                               ? AppColors.bg
@@ -1330,10 +1330,10 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
             child: Text(
               day.toUpperCase(),
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.2,
-                color: AppColors.faint,
+                color: AppColors.ink,
               ),
             ),
           ),
@@ -1801,7 +1801,7 @@ class _ActivityHeatmap extends ConsumerWidget {
                 child: Text(
                   '$day',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     color: active ? AppColors.ink : AppColors.textDisabled,
                   ),
                 ),
@@ -1856,7 +1856,7 @@ class _LevelHeader extends ConsumerWidget {
                 Text(
                   'УРОВЕНЬ · ${level.roman}',
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.6,
                     color: dimmed,
@@ -1991,7 +1991,7 @@ class _StreakRow extends ConsumerWidget {
                           ? 'Эта неделя уже в серии — так держать'
                           : 'Пробеги на этой неделе, чтобы серия жила')
                       : 'Одна пробежка в неделю — и серия пошла',
-                  style: TextStyle(fontSize: 12, color: AppColors.muted),
+                  style: TextStyle(fontSize: 14, color: AppColors.muted),
                 ),
               ],
             ),
@@ -2086,7 +2086,7 @@ class _TrophyEntryRow extends ConsumerWidget {
                       unlocked == null
                           ? 'Штамп МАТА · $total наград'
                           : '$unlocked из $total медалей',
-                      style: TextStyle(fontSize: 12, color: AppColors.muted),
+                      style: TextStyle(fontSize: 14, color: AppColors.muted),
                     ),
                   ],
                 ),

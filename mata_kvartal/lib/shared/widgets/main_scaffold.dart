@@ -149,7 +149,7 @@ class _RunPlate extends StatelessWidget {
             size: isActive ? 33 : 30,
             animated: isActive,
             glow: false,
-            outline: const Color(0xFFEDEFE8),
+            outline: const Color(0xFFEFF1EA),
             fill: AppColors.lime,
           ),
         ),
@@ -250,11 +250,11 @@ class _RunNavItem extends StatelessWidget {
             Text(
               AppStrings.tabRun,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 height: 1.0,
                 letterSpacing: -0.2,
                 fontWeight: FontWeight.w700, // центр — акцент
-                color: isActive ? AppColors.ink : AppColors.muted,
+                color: isActive ? AppColors.ink : AppColors.ink,
               ),
             ),
             const SizedBox(height: 8),
@@ -313,7 +313,7 @@ class _NavItem extends StatelessWidget {
               textAlign: TextAlign.center,
               overflow: TextOverflow.visible,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 height: 1.0,
                 letterSpacing: -0.2,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,

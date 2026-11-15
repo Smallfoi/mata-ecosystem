@@ -907,7 +907,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                 Text(
                   _heldLabel(capturedAtMs),
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.muted,
                   ),
@@ -1057,7 +1057,7 @@ class _MapErrorNotice extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '\u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u043d\u0442\u0435\u0440\u043d\u0435\u0442 \u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c\u00bb.',
-            style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.25),
+            style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.25),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 14),
@@ -1355,7 +1355,7 @@ class _LoopChip extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               loop.distanceLabel,
-              style: TextStyle(color: AppColors.muted, fontSize: 11),
+              style: TextStyle(color: AppColors.muted, fontSize: 14),
             ),
           ],
         ),
@@ -1420,7 +1420,7 @@ class _TrailsLayerChip extends ConsumerWidget {
               'Тропы',
               style: TextStyle(
                 color: on ? AppColors.ink : AppColors.muted,
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1482,8 +1482,8 @@ class _KvartalTopLogo extends StatelessWidget {
               Text(
                 '\u0433\u043e\u0440\u043e\u0434 ',
                 style: TextStyle(
-                  color: AppColors.faint,
-                  fontSize: 9,
+                  color: AppColors.muted,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   height: 1,
                 ),
@@ -1492,7 +1492,7 @@ class _KvartalTopLogo extends StatelessWidget {
                 '\u042f\u043a\u0443\u0442\u0441\u043a',
                 style: TextStyle(
                   color: AppColors.ink,
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
                   height: 1,
                 ),
@@ -1649,7 +1649,7 @@ class _LegendDot extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 5),
-        Text(label, style: TextStyle(color: AppColors.ink, fontSize: 10)),
+        Text(label, style: TextStyle(color: AppColors.ink, fontSize: 11)),
       ],
     );
   }
@@ -1811,7 +1811,7 @@ class _Stat extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               label,
-              style: TextStyle(fontSize: 11.5, color: AppColors.muted),
+              style: TextStyle(fontSize: 14, color: AppColors.muted),
             ),
           ],
         ),
@@ -1933,10 +1933,10 @@ class _TodayCard extends StatelessWidget {
                   Text(
                     title.toUpperCase(),
                     style: TextStyle(
-                      fontSize: 8.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: .6,
-                      color: AppColors.faint,
+                      color: AppColors.ink,
                     ),
                   ),
                   Text(
@@ -2164,7 +2164,7 @@ class _PartnerCard extends StatelessWidget {
                             : partner.address,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: AppColors.muted, fontSize: 12.5),
+                        style: TextStyle(color: AppColors.muted, fontSize: 14),
                       ),
                     ),
                   ],
@@ -2299,7 +2299,7 @@ class _FriendMapCard extends StatelessWidget {
                               fontWeight: FontWeight.w800)),
                       const SizedBox(height: 3),
                       Text('$status · район ~150 м',
-                          style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                          style: TextStyle(color: AppColors.muted, fontSize: 14)),
                     ],
                   ),
                 ),

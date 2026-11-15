@@ -29,7 +29,7 @@ class ThemeScreen extends ConsumerWidget {
                 'Графит не слепит на улице и в темноте — '
                 'карта и цифры читаются с руки.',
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: 14,
                   height: 1.45,
                   color: AppColors.muted,
                 ),
@@ -99,7 +99,7 @@ class _InteriorTile extends StatelessWidget {
                     Text(
                       option.hint,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 14,
                         height: 1.35,
                         color: AppColors.muted,
                       ),

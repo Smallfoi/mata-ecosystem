@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/data/auth_provider.dart';
@@ -134,8 +135,7 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
                     ? SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.error),
+                        child: MataLoading(color: AppColors.error, radius: 8),
                       )
                     : Icon(CupertinoIcons.trash, color: AppColors.error, size: 20),
                 title: Text('Удалить аккаунт',
@@ -160,7 +160,7 @@ class _SectionTitle extends StatelessWidget {
         child: Text(
           text.toUpperCase(),
           style: TextStyle(
-            color: AppColors.textTertiary,
+            color: AppColors.textPrimary,
             fontSize: 12,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.5,
@@ -176,7 +176,7 @@ class _Hint extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
         child: Text(text,
-            style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
       );
 }
 
@@ -210,7 +210,7 @@ class _PrivacyToggle extends StatelessWidget {
             style: TextStyle(
                 color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle,
-            style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
         value: value,
         activeColor: AppColors.electricBlue,
         onChanged: onChanged,

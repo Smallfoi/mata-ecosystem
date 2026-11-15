@@ -137,7 +137,7 @@ class _NotificationBell extends StatelessWidget {
                   child: Text(
                     notif.unreadCount > 9 ? '9+' : '${notif.unreadCount}',
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
@@ -333,7 +333,7 @@ class _SectionHeader extends StatelessWidget {
             contentKey,
             title,
             style: const TextStyle(
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: AppColors.grey600,
               letterSpacing: 1.5,
@@ -350,7 +350,7 @@ class _SectionHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.grey600,
+                      color: AppColors.black,
                       letterSpacing: 1.5,
                     ),
                   ),

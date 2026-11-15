@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/me_stats_provider.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Личная статистика (/v1/me/stats): бег + баллы + заказы — единая витрина
 /// экосистемы (данные из общего бэка, одинаковы во всех приложениях).
@@ -22,7 +24,7 @@ class StatsScreen extends ConsumerWidget {
         title: const Text('Моя статистика'),
       ),
       body: stats.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: MataLoading(radius: 11)),
         error: (_, __) => Center(
           child: Padding(
             padding: EdgeInsets.all(24),
@@ -39,26 +41,26 @@ class StatsScreen extends ConsumerWidget {
             const _SectionTitle('Бег'),
             _StatRow([
               _Stat('Забегов', '${s.runsCount}', Icons.directions_run),
-              _Stat('Дистанция', '${_km(s.totalKm)} км', Icons.route_outlined),
+              _Stat('Дистанция', '${_km(s.totalKm)} км', CupertinoIcons.arrow_branch),
             ]),
             const SizedBox(height: 20),
             const _SectionTitle('Баллы'),
             _StatRow([
-              _Stat('Баланс', '${s.balance}', Icons.star_border),
-              _Stat('Заработано', '${s.earned}', Icons.trending_up),
-              _Stat('Потрачено', '${s.spent}', Icons.trending_down),
+              _Stat('Баланс', '${s.balance}', CupertinoIcons.star),
+              _Stat('Заработано', '${s.earned}', CupertinoIcons.arrow_up_right),
+              _Stat('Потрачено', '${s.spent}', CupertinoIcons.arrow_down_right),
             ]),
             const SizedBox(height: 20),
             const _SectionTitle('Заказы'),
             _StatRow([
-              _Stat('Заказов', '${s.ordersCount}', Icons.shopping_bag_outlined),
-              _Stat('На сумму', '${s.totalSpent} ₽', Icons.payments_outlined),
+              _Stat('Заказов', '${s.ordersCount}', CupertinoIcons.bag),
+              _Stat('На сумму', '${s.totalSpent} ₽', CupertinoIcons.creditcard),
             ]),
             const SizedBox(height: 22),
             Text(
               'Статистика едина во всех приложениях экосистемы: покупки и заказы '
               'учитываются из МАТА Store.',
-              style: TextStyle(fontSize: 13, height: 1.4, color: AppColors.muted),
+              style: TextStyle(fontSize: 14, height: 1.4, color: AppColors.muted),
             ),
           ],
         ),
@@ -143,7 +145,7 @@ class _StatCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               stat.label,
-              style: TextStyle(fontSize: 12, color: AppColors.muted),
+              style: TextStyle(fontSize: 14, color: AppColors.muted),
             ),
           ],
         ),

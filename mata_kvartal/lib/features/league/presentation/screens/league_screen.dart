@@ -120,7 +120,7 @@ class _PeriodToggle extends ConsumerWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: active ? AppColors.bg : AppColors.muted,
             ),
@@ -181,7 +181,7 @@ class _BoardPicker extends ConsumerWidget {
               child: Text(
                 board.title,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: active ? AppColors.bg : AppColors.muted,
                 ),
@@ -346,7 +346,7 @@ class _PersonalCard extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  me.improved ? Icons.trending_up : Icons.trending_flat,
+                  me.improved ? CupertinoIcons.arrow_up_right : CupertinoIcons.arrow_right,
                   size: 18,
                   color: me.improved ? AppColors.success : AppColors.muted,
                 ),
@@ -412,7 +412,7 @@ class _Row extends StatelessWidget {
                     row.club!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   ),
               ],
             ),
@@ -569,7 +569,7 @@ Future<void> showRunnerProfileSheet(BuildContext context, WidgetRef ref) async {
                 const SizedBox(height: 4),
                 Text(
                   'Нужны только для того, чтобы собрать твою группу сравнения.',
-                  style: TextStyle(fontSize: 13, color: AppColors.muted),
+                  style: TextStyle(fontSize: 14, color: AppColors.muted),
                 ),
                 const SizedBox(height: 18),
                 const Text(

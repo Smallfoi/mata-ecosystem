@@ -339,7 +339,7 @@ class _BlackHeader extends StatelessWidget {
                   fontSize: 13,
                   fontStyle: FontStyle.italic,
                   fontWeight: FontWeight.w200,
-                  color: AppColors.lavender,
+                  color: AppColors.lavenderText,
                 ),
               ).animate().fadeIn(duration: 400.ms, delay: 60.ms),
               const SizedBox(height: 4),
@@ -463,7 +463,7 @@ class _PrimaryButton extends StatelessWidget {
         child: busy
             ? const SizedBox(
                 width: 20, height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white),
+                child: MataLoading(color: AppColors.white, radius: 8),
               )
             : Text(label.toUpperCase(),
                 style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1.2, fontSize: 14)),
@@ -516,7 +516,7 @@ class _LoginForm extends StatelessWidget {
         Center(
           child: TextButton(
             onPressed: onForgot,
-            child: const Text('Забыл пароль?', style: TextStyle(color: AppColors.grey600, fontSize: 13)), // staw-static
+            child: const Text('Забыл пароль?', style: TextStyle(color: AppColors.grey600, fontSize: 14)), // staw-static
           ),
         ),
       ],
@@ -600,7 +600,7 @@ class _SmsForm extends StatelessWidget {
             child: Text(
               _codeHint(context.watch<AuthProvider>().codeInfo),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: AppColors.grey400, fontFeatures: const [FontFeature.tabularFigures()]),
+              style: TextStyle(fontSize: 14, color: AppColors.grey600, fontFeatures: const [FontFeature.tabularFigures()]),
             ),
           ),
         ],
@@ -609,7 +609,7 @@ class _SmsForm extends StatelessWidget {
           'app.auth.consent',
           'Продолжая, вы соглашаетесь с условиями использования и политикой конфиденциальности',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11, color: AppColors.grey400, height: 1.5),
+          style: TextStyle(fontSize: 14, color: AppColors.grey600, height: 1.5),
         ),
         const SizedBox(height: 6),
         Center(
@@ -677,7 +677,7 @@ class _InputFieldState extends State<_InputField> {
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
-            color: AppColors.grey600,
+            color: AppColors.black,
           ),
         ),
         const SizedBox(height: 6),
@@ -814,7 +814,7 @@ class _WaitingOnPhone extends StatelessWidget {
           const SizedBox(
             width: 24,
             height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.black),
+            child: MataLoading(color: AppColors.black, radius: 11),
           ),
           const SizedBox(width: 16),
           Expanded(

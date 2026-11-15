@@ -35,7 +35,7 @@ class CartScreen extends StatelessWidget {
                 child: const RemoteText(
                   'app.cart.clear',
                   'Очистить',
-                  style: TextStyle(color: AppColors.grey600, fontSize: 13),
+                  style: TextStyle(color: AppColors.grey600, fontSize: 14),
                 ),
               );
             },
@@ -219,9 +219,9 @@ class _CartItemTileState extends State<_CartItemTile> {
                 Text(
                   widget.item.product.brand.toUpperCase(),
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.grey600,
+                    color: AppColors.black,
                     letterSpacing: 1,
                   ),
                 ),
@@ -239,8 +239,8 @@ class _CartItemTileState extends State<_CartItemTile> {
                 Text(
                   '${widget.item.size}  ·  ${widget.item.color}',
                   style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.grey400,
+                    fontSize: 14,
+                    color: AppColors.grey600,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -387,12 +387,12 @@ class _OrderSummary extends StatelessWidget {
               const RemoteText(
                 'app.cart.delivery',
                 'Доставка',
-                style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                style: TextStyle(fontSize: 14, color: AppColors.grey600),
               ),
               const RemoteText(
                 'app.cart.deliveryNote',
                 'Рассчитывается при оформлении',
-                style: TextStyle(fontSize: 12, color: AppColors.grey400),
+                style: TextStyle(fontSize: 14, color: AppColors.grey600),
               ),
             ],
           ),

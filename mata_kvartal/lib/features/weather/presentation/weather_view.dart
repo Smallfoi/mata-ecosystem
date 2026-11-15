@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../data/weather_provider.dart';
@@ -128,9 +129,7 @@ class _WeatherDetailSheet extends ConsumerWidget {
                 loading: () => Padding(
                   padding: EdgeInsets.symmetric(vertical: 28),
                   child: Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.electricBlue,
-                    ),
+                    child: MataLoading(color: AppColors.electricBlue, radius: 11),
                   ),
                 ),
                 error: (_, __) => Padding(
@@ -288,7 +287,7 @@ class _WeatherBody extends StatelessWidget {
                   'Морозный бонус к баллам за бег в холод — скоро',
                   style: TextStyle(
                     color: AppColors.textSecondary.withValues(alpha: 0.9),
-                    fontSize: 12,
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -385,8 +384,8 @@ class _BestRunBlock extends StatelessWidget {
                 Text(
                   hh(hours[i].timeLocal),
                   style: TextStyle(
-                    color: AppColors.textTertiary,
-                    fontSize: 9.5,
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
                   ),
                 ),
             ],
@@ -451,7 +450,7 @@ class _StatTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             label,
-            style: TextStyle(color: AppColors.textTertiary, fontSize: 11),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 2),
           Text(

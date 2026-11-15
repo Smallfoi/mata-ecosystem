@@ -112,7 +112,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                 const RemoteText(
                   'app.about.tagline',
                   'Магазин экосистемы МАТА: одежда, обувь, аксессуары',
-                  style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey600),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -157,7 +157,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                     : Text(
                         _checkNote!,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           color: hasUpdate
                               ? AppColors.success
                               : AppColors.grey600,
@@ -205,7 +205,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                 ),
                 subtitle: const Text(
                   'mata-club.ru/app.html', // staw-static
-                  style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey600),
                 ),
                 onTap: () => _open(_testersPage),
               ),
@@ -216,7 +216,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
             child: RemoteText(
               'app.about.footer',
               '© МАТА. Экосистема: Квартал · Store · сайт',
-              style: TextStyle(fontSize: 12, color: AppColors.grey600),
+              style: TextStyle(fontSize: 14, color: AppColors.grey600),
             ),
           ),
         ],

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../data/api/api_config.dart';
 import '../../models/product.dart';
 import '../../models/review.dart';
@@ -169,7 +170,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.grey600,
+                          color: AppColors.black,
                           letterSpacing: 1,
                         ),
                       ),
@@ -200,7 +201,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           Text(
                             '(${product.reviewCount} отзывов)',
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 14,
                               color: AppColors.grey600,
                             ),
                           ),
@@ -230,7 +231,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           'app.product.brandLine',
                           'Рядом с тобой в любом состоянии',
                           style: GoogleFonts.robotoSerif(
-                            fontSize: 13,
+                            fontSize: 14,
                             fontStyle: FontStyle.italic,
                             fontWeight: FontWeight.w200,
                             color: AppColors.grey600,
@@ -286,7 +287,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1,
-                          color: AppColors.grey600,
+                          color: AppColors.black,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -480,7 +481,7 @@ class _SizeSelector extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1,
-                color: AppColors.grey600,
+                color: AppColors.black,
               ),
             ),
             if (selected != null) ...[
@@ -527,10 +528,10 @@ class _SizeSelector extends StatelessWidget {
                 child: Text(
                   size,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: !available
-                        ? AppColors.grey400
+                        ? AppColors.grey600
                         : (isSelected ? AppColors.lime : AppColors.black),
                     decoration:
                         available ? TextDecoration.none : TextDecoration.lineThrough,
@@ -578,7 +579,7 @@ class _ColorSelector extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1,
-                color: AppColors.grey600,
+                color: AppColors.black,
               ),
             ),
             if (selected != null) ...[
@@ -799,8 +800,8 @@ class _AddedToCartSheet extends StatelessWidget {
                     Text(
                       product.brand.toUpperCase(),
                       style: const TextStyle(
-                        fontSize: 10, fontWeight: FontWeight.w600,
-                        color: AppColors.grey600, letterSpacing: 1,
+                        fontSize: 11, fontWeight: FontWeight.w600,
+                        color: AppColors.black, letterSpacing: 1,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -816,7 +817,7 @@ class _AddedToCartSheet extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '$size  ·  $color',
-                      style: const TextStyle(fontSize: 12, color: AppColors.grey400),
+                      style: const TextStyle(fontSize: 14, color: AppColors.grey600),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -1085,7 +1086,7 @@ class _ReviewsSectionState extends State<_ReviewsSection> {
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1,
-                color: AppColors.grey600,
+                color: AppColors.black,
               ),
             ),
             if (d != null && d.canReview)
@@ -1106,7 +1107,7 @@ class _ReviewsSectionState extends State<_ReviewsSection> {
         if (_loading)
           const Padding(
             padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: MataLoading(radius: 11)),
           )
         else if (d == null || d.reviews.isEmpty)
           RemoteText(
@@ -1290,7 +1291,7 @@ class _ReviewFormState extends State<_ReviewForm> {
                             child: SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: MataLoading(radius: 8),
                             ),
                           )
                         : const Icon(
@@ -1315,10 +1316,7 @@ class _ReviewFormState extends State<_ReviewForm> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.white,
-                      ),
+                      child: MataLoading(color: AppColors.white, radius: 8),
                     )
                   : const RemoteText('app.product.submit', 'Отправить'),
             ),

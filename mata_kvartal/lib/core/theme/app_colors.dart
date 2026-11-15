@@ -30,7 +30,7 @@ class AppColors {
 
   /// Подложка чипов, аватаров, неактивных состояний.
   static Color get soft =>
-      isGraphite ? const Color(0xFF343B35) : const Color(0xFFE8E6DA);
+      isGraphite ? const Color(0xFF343B35) : const Color(0xFFEFEDE3);
 
   /// Контраст-блок (главные кнопки, «своя» строка). На графите — глубже фона.
   static Color get block =>
@@ -45,16 +45,16 @@ class AppColors {
 
   // ── Текст ─────────────────────────────────────────────────────────────────
   static Color get ink =>
-      isGraphite ? const Color(0xFFEDEFE8) : const Color(0xFF20252B);
+      isGraphite ? const Color(0xFFEFF1EA) : const Color(0xFF20252B);
   static Color get muted =>
-      isGraphite ? const Color(0xFF9AA59D) : const Color(0xFF5F665E);
+      isGraphite ? const Color(0xFFB9C1BB) : const Color(0xFF505650);
   static Color get faint =>
-      isGraphite ? const Color(0xFF7F8880) : const Color(0xFF767E74);
+      isGraphite ? const Color(0xFF9FA6A0) : const Color(0xFF666D65);
   static Color get disabled =>
-      isGraphite ? const Color(0xFF5A625C) : const Color(0xFFA9ACA4);
+      isGraphite ? const Color(0xFF7E8981) : const Color(0xFFA9ACA4);
 
   /// Текст на тёмных заливках (контраст-блок, teal-шапка).
-  static Color get onDark => const Color(0xFFEDEFE8);
+  static Color get onDark => const Color(0xFFEFF1EA);
 
   /// Тонкие границы.
   static Color get line =>
@@ -78,15 +78,15 @@ class AppColors {
 
   /// Мелкий акцентный текст/иконки/ссылки: на графите teal высветлен.
   static Color get accentInk =>
-      isGraphite ? const Color(0xFF9CC9BF) : const Color(0xFF2E6E64);
+      isGraphite ? const Color(0xFF9CC9BF) : const Color(0xFF275D55);
 
   // ── Статусы ───────────────────────────────────────────────────────────────
   static Color get success =>
-      isGraphite ? const Color(0xFF9CD89A) : const Color(0xFF1F7A44);
+      isGraphite ? const Color(0xFF9CD89A) : const Color(0xFF186036);
   static Color get warning =>
-      isGraphite ? const Color(0xFFD9B25C) : const Color(0xFF8F6209);
+      isGraphite ? const Color(0xFFDDBA6D) : const Color(0xFF714D07);
   static Color get error =>
-      isGraphite ? const Color(0xFFE08A73) : const Color(0xFFB33328);
+      isGraphite ? const Color(0xFFEBB2A3) : const Color(0xFF982B22);
   static Color get info => accentInk;
 
   // ── Зоны на карте (словарь цвета Ф2) ─────────────────────────────────────
@@ -107,8 +107,8 @@ class AppColors {
   // ── Ночная поверхность (историческое имя; теперь это и есть графит Ф8) ───
   static Color get nightBg => const Color(0xFF20252B);
   static Color get nightPaper => const Color(0xFF2A302C);
-  static Color get nightInk => const Color(0xFFEDEFE8);
-  static Color get nightMuted => const Color(0xFF9AA59D);
+  static Color get nightInk => const Color(0xFFEFF1EA);
+  static Color get nightMuted => const Color(0xFFB9C1BB);
   static Color get nightLine => const Color(0xFF3A423C);
 
   // ── Переходные псевдонимы ─────────────────────────────────────────────────

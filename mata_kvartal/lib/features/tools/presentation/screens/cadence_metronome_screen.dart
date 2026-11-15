@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/tick_feedback.dart';
 import '../../logic/interval_plan.dart';
 import '../widgets/tool_widgets.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Метроном каденса: задаёт частоту шагов (шагов/мин) звуком + вибро.
 /// Каденс выбирается барабаном. Звук — встроенный системный клик.
@@ -159,7 +160,7 @@ class _CadenceMetronomeScreenState extends State<CadenceMetronomeScreen> {
                         ? AppColors.error
                         : AppColors.electricBlue,
                   ),
-                  icon: Icon(_running ? Icons.stop : Icons.play_arrow),
+                  icon: Icon(_running ? CupertinoIcons.stop_fill : CupertinoIcons.play_fill),
                   label: Text(_running ? 'Стоп' : 'Старт'),
                 ),
               ),

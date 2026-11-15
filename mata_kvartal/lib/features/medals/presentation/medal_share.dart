@@ -14,6 +14,7 @@ import '../../auth/data/auth_provider.dart';
 import '../data/medal_defs.dart';
 import '../data/medals_provider.dart';
 import 'medal_widgets.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Шаринг медалей и Зала славы в сторис (дизайн «Хвастовство в сторис»,
 /// утверждён владельцем 05.09.2026 с правками: кнопка — «Поделиться»,
@@ -56,7 +57,7 @@ Future<bool> saveShareImageToGallery(String path) async {
 // Палитра карточек — константы сторис-мира (карточка живёт в чужой ленте,
 // от темы приложения не зависит).
 const _bg = Color(0xFF12161B);
-const _ink = Color(0xFFEDEFE8);
+const _ink = Color(0xFFEFF1EA);
 const _muted = Color(0xFF97A0A6);
 const _lime = Color(0xFFDFF45F);
 
@@ -193,7 +194,7 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
                   minimumSize: const Size(64, 48),
                 ),
                 onPressed: _busy ? null : _saveToGallery,
-                icon: const Icon(Icons.download_rounded, size: 19),
+                icon: const Icon(CupertinoIcons.arrow_down_circle, size: 19),
                 label: const Text('Сохранить в галерею'),
               ),
             ),
@@ -346,7 +347,7 @@ class StickerHint extends StatelessWidget {
       'В сторис своё фото добавляй фоном (значок галереи) — стикер ляжет '
       'поверх. А стикер из галереи можно класть и на видео.',
       textAlign: TextAlign.center,
-      style: TextStyle(fontSize: 10.5, height: 1.35, color: _muted),
+      style: TextStyle(fontSize: 11, height: 1.35, color: _muted),
     );
   }
 }
@@ -513,7 +514,7 @@ class MedalStoryCard extends StatelessWidget {
                   child: Text(
                     '${e.v} · ${e.u}',
                     style: const TextStyle(
-                      fontSize: 9.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: .5,
                       color: _lime,
@@ -526,7 +527,7 @@ class MedalStoryCard extends StatelessWidget {
                 Text(
                   'ПОЛУЧЕНА ${_fmt(date)}${city == null ? '' : ' · ${city!.toUpperCase()}'}',
                   style: const TextStyle(
-                    fontSize: 8.5,
+                    fontSize: 11,
                     letterSpacing: 1.3,
                     fontWeight: FontWeight.w600,
                     color: _muted,
@@ -547,7 +548,7 @@ class MedalStoryCard extends StatelessWidget {
                 Text(
                   'ШТАМП МАТА · МЕДАЛЬ $hallEarned ИЗ ${kMedals.length}',
                   style: const TextStyle(
-                    fontSize: 8,
+                    fontSize: 11,
                     letterSpacing: 1.2,
                     fontWeight: FontWeight.w700,
                     color: _muted,
@@ -629,7 +630,7 @@ class MedalSticker extends StatelessWidget {
                   Text(
                     '${e.v} · ${e.u}'.toUpperCase(),
                     style: const TextStyle(
-                      fontSize: 9,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: .5,
                       color: _lime,
@@ -677,7 +678,7 @@ class HallStoryCard extends StatelessWidget {
           const Text(
             'ЗАЛ СЛАВЫ',
             style: TextStyle(
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 3,
               color: _lime,
@@ -696,7 +697,7 @@ class HallStoryCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '${earned.length} из ${kMedals.length} · Штамп МАТА',
-            style: const TextStyle(fontSize: 10, color: _muted),
+            style: const TextStyle(fontSize: 11, color: _muted),
           ),
           const Spacer(),
           Padding(

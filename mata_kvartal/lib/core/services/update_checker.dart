@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/app_colors.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Проверка обновлений тест-сборки (Android).
 ///
@@ -90,7 +91,7 @@ class UpdateChecker {
     messenger.showMaterialBanner(
       MaterialBanner(
         backgroundColor: AppColors.bgSurface,
-        leading: Icon(Icons.system_update, color: AppColors.accent),
+        leading: Icon(CupertinoIcons.cloud_download, color: AppColors.accent),
         content: Text(
           versionName.isNotEmpty
               ? 'Доступна новая версия $versionName. Обновить приложение?'

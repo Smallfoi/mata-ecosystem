@@ -338,7 +338,7 @@ class _EmptyResult extends StatelessWidget {
           const RemoteText(
             'app.catalog.empty.subtitle',
             'Попробуйте изменить фильтры',
-            style: TextStyle(fontSize: 13, color: AppColors.grey600),
+            style: TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
           const SizedBox(height: 20),
           GestureDetector(
@@ -400,7 +400,7 @@ class _FilterButton extends StatelessWidget {
               child: Text(
                 '$activeCount',
                 style: const TextStyle(
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
@@ -520,7 +520,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       'Сбросить',
                       style: TextStyle(
                         color: AppColors.grey600,
-                        fontSize: 13,
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -693,7 +693,7 @@ class _SectionTitle extends StatelessWidget {
         fontSize: 12,
         fontWeight: FontWeight.w700,
         letterSpacing: 1,
-        color: AppColors.grey600,
+        color: AppColors.black,
       ),
     );
   }
@@ -935,7 +935,7 @@ class _SortSheet extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1,
-                  color: AppColors.grey600,
+                  color: AppColors.black,
                 ),
               ),
             ),

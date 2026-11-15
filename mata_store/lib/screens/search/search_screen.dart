@@ -211,7 +211,7 @@ class _SearchBar extends StatelessWidget {
                         hintText: 'Поиск товаров',
                         hintStyle: TextStyle(
                           fontSize: 15,
-                          color: AppColors.grey400,
+                          color: AppColors.grey500,
                         ),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
@@ -359,7 +359,7 @@ class _SectionLabel extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
-              color: AppColors.grey600,
+              color: AppColors.black,
             ),
           ),
           if (action != null)
@@ -368,7 +368,7 @@ class _SectionLabel extends StatelessWidget {
               child: Text(
                 action!,
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: AppColors.grey600,
                 ),
@@ -730,7 +730,7 @@ class _ResultsView extends StatelessWidget {
           child: Text(
             '${allResults.length} ${_plural(allResults.length)} по запросу «$query»',
             style: const TextStyle(
-              fontSize: 13,
+              fontSize: 14,
               color: AppColors.grey600,
             ),
           ),

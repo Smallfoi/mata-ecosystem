@@ -248,7 +248,7 @@ class _LevelCard extends StatelessWidget {
           const RemoteText(
             'app.loyalty.levelPerk',
             '1 балл = 1 ₽ скидки · до 30% от заказа',
-            style: TextStyle(fontSize: 12, color: AppColors.grey600),
+            style: TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
           if (next != null) ...[
             const SizedBox(height: 14),
@@ -264,7 +264,7 @@ class _LevelCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               'До уровня «${next.label}» — ${loyalty.pointsToNextLevel} баллов',
-              style: const TextStyle(fontSize: 12, color: AppColors.grey600),
+              style: const TextStyle(fontSize: 14, color: AppColors.grey600),
             ),
           ],
         ],
@@ -294,7 +294,7 @@ class _LevelCardV1 extends StatelessWidget {
         padding: const EdgeInsets.only(top: 6),
         child: Text(
           text, // staw-static — числа с сервера
-          style: const TextStyle(fontSize: 12, color: AppColors.grey600),
+          style: const TextStyle(fontSize: 14, color: AppColors.grey600),
         ),
       );
 
@@ -339,7 +339,7 @@ class _LevelCardV1 extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               perk, // staw-static — ставки уровня с сервера
-              style: const TextStyle(fontSize: 12, color: AppColors.grey600),
+              style: const TextStyle(fontSize: 14, color: AppColors.grey600),
             ),
           ],
           const SizedBox(height: 10),
@@ -408,8 +408,8 @@ class _LotTile extends StatelessWidget {
                 Text(
                   partly ? '${lot.dateLine} · из ${lot.amount}' : lot.dateLine,
                   style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.grey400,
+                    fontSize: 14,
+                    color: AppColors.grey600,
                   ),
                 ),
               ],
@@ -422,7 +422,7 @@ class _LotTile extends StatelessWidget {
               fontWeight: FontWeight.w800,
               color: debt
                   ? AppColors.red
-                  : (lot.held ? AppColors.grey400 : const Color(0xFF2E7D32)),
+                  : (lot.held ? AppColors.grey400 : const Color(0xFF246227)),
             ),
           ),
         ],
@@ -488,7 +488,7 @@ class _EarnHint extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
-              color: AppColors.grey600,
+              color: AppColors.black,
             ),
           ),
           const SizedBox(height: 10),
@@ -583,8 +583,8 @@ class _TxnTile extends StatelessWidget {
                 Text(
                   _date(tx.createdAt),
                   style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.grey400,
+                    fontSize: 14,
+                    color: AppColors.grey600,
                   ),
                 ),
               ],
@@ -595,7 +595,7 @@ class _TxnTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: positive ? const Color(0xFF2E7D32) : AppColors.red,
+              color: positive ? const Color(0xFF246227) : AppColors.red,
             ),
           ),
         ],

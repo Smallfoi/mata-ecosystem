@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' show Distance, LatLng, LengthUnit;
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -211,10 +212,10 @@ class RunPassportScreen extends ConsumerWidget {
               Text(
                 l,
                 style: TextStyle(
-                  fontSize: 8.5,
+                  fontSize: 11,
                   letterSpacing: 1.3,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -270,8 +271,7 @@ class _BackupTrackHeroState extends ConsumerState<_BackupTrackHero> {
             child: SizedBox(
               width: 22,
               height: 22,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.textTertiary),
+              child: MataLoading(color: AppColors.textTertiary, radius: 8),
             ),
           );
         }
@@ -301,7 +301,7 @@ class _BackupTrackHeroState extends ConsumerState<_BackupTrackHero> {
               'данные», чтобы новые маршруты переживали переустановку и смену телефона.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 12.5, height: 1.4, color: AppColors.textTertiary),
+                  fontSize: 12.5, height: 1.4, color: AppColors.textPrimary),
             ),
           ),
         );
@@ -372,12 +372,12 @@ class _TrackHero extends StatelessWidget {
               child: Text(
                 captured ? 'ЗАХВАТ' : 'СВОБОДНАЯ',
                 style: TextStyle(
-                  fontSize: 9,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1,
                   color: captured
                       ? const Color(0xFF171C19)
-                      : AppColors.textSecondary,
+                      : AppColors.textPrimary,
                 ),
               ),
             ),
@@ -395,9 +395,9 @@ class _TrackHero extends StatelessWidget {
               child: Text(
                 '${hm(started)} – ${hm(run.finishedAt)}',
                 style: TextStyle(
-                  fontSize: 9.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -448,10 +448,10 @@ class _KmRow extends StatelessWidget {
         Text(
           date,
           style: TextStyle(
-            fontSize: 10,
+            fontSize: 11,
             letterSpacing: 1.2,
             fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
+            color: AppColors.textPrimary,
           ),
         ),
       ],
@@ -482,10 +482,10 @@ class _SplitsBlock extends StatelessWidget {
           Text(
             'ТЕМП ПО КИЛОМЕТРАМ',
             style: TextStyle(
-              fontSize: 9.5,
+              fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.6,
-              color: AppColors.textSecondary,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -503,11 +503,11 @@ class _SplitsBlock extends StatelessWidget {
                         Text(
                           pace(splits[i]),
                           style: TextStyle(
-                            fontSize: 9,
+                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: splits[i] == best
                                 ? AppColors.lime
-                                : AppColors.textSecondary,
+                                : AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -537,9 +537,9 @@ class _SplitsBlock extends StatelessWidget {
                         Text(
                           '${i + 1}',
                           style: TextStyle(
-                            fontSize: 8.5,
+                            fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textTertiary,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -574,10 +574,10 @@ class _AwardsBlock extends StatelessWidget {
           Text(
             'НАГРАДЫ ЭТОЙ ПРОБЕЖКИ',
             style: TextStyle(
-              fontSize: 9.5,
+              fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.6,
-              color: AppColors.textSecondary,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 10),
@@ -620,8 +620,8 @@ class _AwardsBlock extends StatelessWidget {
                           Text(
                             'медаль · тап — карточка и шаринг',
                             style: TextStyle(
-                              fontSize: 10.5,
-                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],
@@ -681,7 +681,7 @@ class _PointsBlock extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 height: 1.4,
-                color: AppColors.textSecondary,
+                color: AppColors.textPrimary,
               ),
             ),
           ),

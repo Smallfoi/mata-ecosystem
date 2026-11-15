@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
@@ -30,7 +31,7 @@ class _StatsScreenState extends State<StatsScreen> {
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: MataLoading(radius: 11));
           }
           if (snap.hasError || !snap.hasData) {
             return const Center(
@@ -73,7 +74,7 @@ class _StatsScreenState extends State<StatsScreen> {
                 'Статистика едина во всех приложениях экосистемы: бег и баллы '
                 'зарабатываются в «Квартале», покупки — здесь.',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   height: 1.4,
                   color: AppColors.grey600,
                 ),
@@ -159,7 +160,7 @@ class _StatCard extends StatelessWidget {
             RemoteText(
               stat.contentKey,
               stat.label,
-              style: const TextStyle(fontSize: 12, color: AppColors.grey600),
+              style: const TextStyle(fontSize: 14, color: AppColors.grey600),
             ),
           ],
         ),

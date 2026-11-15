@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/club_provider.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Полноэкранный сканер QR-кода приглашения в клуб (как в Тинькофф/Taobao):
 /// навёл штатную камеру на QR → вступаем в клуб и возвращаемся назад.
@@ -68,13 +69,13 @@ class _ClubScanScreenState extends ConsumerState<ClubScanScreen> {
                   children: [
                     IconButton(
                       tooltip: 'Назад',
-                      icon: Icon(Icons.arrow_back, color: AppColors.ink),
+                      icon: Icon(CupertinoIcons.back, color: AppColors.ink),
                       onPressed: () => context.pop(),
                     ),
                     const Spacer(),
                     IconButton(
                       tooltip: 'Фонарик',
-                      icon: Icon(Icons.flash_on, color: AppColors.ink),
+                      icon: Icon(CupertinoIcons.bolt_fill, color: AppColors.ink),
                       onPressed: () => _controller.toggleTorch(),
                     ),
                   ],

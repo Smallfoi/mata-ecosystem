@@ -53,7 +53,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 child: const RemoteText(
                   'app.notif.clear',
                   'Очистить',
-                  style: TextStyle(color: AppColors.grey600, fontSize: 13),
+                  style: TextStyle(color: AppColors.grey600, fontSize: 14),
                 ),
               );
             },
@@ -200,7 +200,7 @@ class _NotificationTile extends StatelessWidget {
                   Text(
                     notification.body,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       color: AppColors.grey600,
                       height: 1.4,
                     ),
@@ -209,8 +209,8 @@ class _NotificationTile extends StatelessWidget {
                   Text(
                     _timeAgo(notification.createdAt),
                     style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.grey400,
+                      fontSize: 14,
+                      color: AppColors.grey600,
                     ),
                   ),
                 ],
@@ -259,7 +259,7 @@ class _EmptyNotifications extends StatelessWidget {
           RemoteText(
             'app.notif.empty.subtitle',
             'Здесь появятся обновления по заказам',
-            style: TextStyle(fontSize: 13, color: AppColors.grey600),
+            style: TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
         ],
       ),

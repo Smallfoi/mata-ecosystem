@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../auth/data/auth_provider.dart';
 import '../data/medals_provider.dart';
@@ -26,7 +27,7 @@ class TrophyHallScreen extends ConsumerStatefulWidget {
 }
 
 // Палитра зала — константы, не токены темы (зал не инвертируется).
-const _hallInk = Color(0xFFEDEFE8);
+const _hallInk = Color(0xFFEFF1EA);
 const _hallMuted = Color(0xFF97A0A6);
 const _hallFaint = Color(0xFF6B7378);
 const _hallLime = Color(0xFFDFF45F);
@@ -66,7 +67,7 @@ class _TrophyHallScreenState extends ConsumerState<TrophyHallScreen>
         child: SafeArea(
           child: medals.when(
             loading: () => const Center(
-              child: CircularProgressIndicator(color: _hallLime),
+              child: MataLoading(color: _hallLime, radius: 11),
             ),
             error: (e, _) => _Offline(
               onRetry: () => ref.invalidate(medalsProvider),
@@ -157,7 +158,7 @@ class _TopBar extends StatelessWidget {
               const Text(
                 'ЗАЛ СЛАВЫ',
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 3,
                   color: _hallLime,
@@ -330,7 +331,7 @@ class _HeroPage extends StatelessWidget {
               Text(
                 'ПОЛУЧЕНА ${_date(medal.state.earnedAtMs!)}',
                 style: const TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 11,
                   letterSpacing: 1.4,
                   fontWeight: FontWeight.w600,
                   color: _hallMuted,
@@ -467,7 +468,7 @@ class _ShelfSlot extends StatelessWidget {
           Text(
             medal?.def.name ?? 'скоро',
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               color: medal != null ? _hallMuted : _hallFaint,
             ),
@@ -593,7 +594,7 @@ class _BeamPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFFEDEFE8).withValues(alpha: .10),
+            const Color(0xFFEFF1EA).withValues(alpha: .10),
             const Color(0x00EDEFE8),
           ],
           stops: const [0, .82],
@@ -601,7 +602,7 @@ class _BeamPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
     );
     // Пылинки в свете — статичные, детерминированные (никаких пульсов).
-    final dot = Paint()..color = const Color(0xFFEDEFE8).withValues(alpha: .07);
+    final dot = Paint()..color = const Color(0xFFEFF1EA).withValues(alpha: .07);
     const pts = [
       (.36, .18, 1.1), (.62, .12, .8), (.45, .3, .9), (.57, .38, 1.2),
       (.34, .46, .8), (.66, .5, 1.0), (.5, .08, .7), (.42, .58, .9),

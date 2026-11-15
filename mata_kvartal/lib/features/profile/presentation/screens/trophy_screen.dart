@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -29,7 +30,7 @@ class MedalCatalogScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: medals.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: MataLoading(radius: 11)),
           error: (e, _) =>
               _Offline(onRetry: () => ref.invalidate(medalsProvider)),
           data: (list) => _Hall(list: list),
@@ -54,7 +55,7 @@ class _Hall extends StatelessWidget {
           child: Text(
             'Штамп МАТА · открыто $earned из ${list.length} · '
             'накопленное не отнимается',
-            style: TextStyle(fontSize: 13, color: AppColors.muted),
+            style: TextStyle(fontSize: 14, color: AppColors.muted),
           ),
         ),
         for (final cat in MedalCat.values) ...[
@@ -106,9 +107,9 @@ class _CatSection extends StatelessWidget {
               Text(
                 '$earned / ${medals.length}',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: earned > 0 ? AppColors.accentInk : AppColors.faint,
+                  color: earned > 0 ? AppColors.accentInk : AppColors.muted,
                 ),
               ),
             ],
@@ -117,7 +118,7 @@ class _CatSection extends StatelessWidget {
           Text(
             cat.note,
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: 14,
               height: 1.35,
               color: AppColors.muted,
             ),
@@ -168,9 +169,9 @@ class _MedalCell extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: medal.earned ? AppColors.ink : AppColors.faint,
+              color: medal.earned ? AppColors.ink : AppColors.muted,
             ),
           ),
         ],
@@ -191,7 +192,7 @@ class _Offline extends StatelessWidget {
         children: [
           Text(
             'Зал наград не открылся — нет связи',
-            style: TextStyle(fontSize: 13.5, color: AppColors.muted),
+            style: TextStyle(fontSize: 14, color: AppColors.muted),
           ),
           const SizedBox(height: 10),
           OutlinedButton(onPressed: onRetry, child: const Text('Повторить')),

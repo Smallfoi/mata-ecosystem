@@ -115,7 +115,8 @@ class Command(BaseCommand):
             raw = path.read_text(encoding="utf-8")
             body, ver = _subst(raw)
             # Оставшиеся незаполненные [плейсхолдеры] — сообщим (но не блокируем).
-            left = sorted(set(re.findall(r"\[[^\]\n]{1,40}\]", body)))
+            # Ссылки между документами — «[Политика](02-privacy.md)» — не заглушки.
+            left = sorted(set(re.findall(r"\[[^\]\n]{1,40}\](?!\()", body)))
             if left:
                 leftovers[fname] = left
 
