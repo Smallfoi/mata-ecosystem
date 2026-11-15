@@ -827,7 +827,7 @@ class _DeliveryOption extends StatelessWidget {
                     'app.checkout.opt.${type.name}.subtitle',
                     subtitle,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: selected ? Colors.white60 : AppColors.grey600,
                     ),
                   ),
@@ -937,7 +937,7 @@ class _PaymentOption extends StatelessWidget {
                     'app.checkout.opt.${type.name}.subtitle',
                     subtitle,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: selected ? Colors.white60 : AppColors.grey600,
                     ),
                   ),
@@ -1071,7 +1071,7 @@ class _ReviewStep extends StatelessWidget {
                         Text(
                           '${item.size} · ${item.color} · ×${item.quantity}',
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 14,
                             color: AppColors.grey600,
                           ),
                         ),
@@ -1080,7 +1080,7 @@ class _ReviewStep extends StatelessWidget {
                           Text(
                             note, // staw-static — причина с сервера
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 14,
                               color: AppColors.grey600,
                             ),
                           ),
@@ -1140,7 +1140,7 @@ class _ReviewStep extends StatelessWidget {
                     child: Text(
                       pv.disabledText, // staw-static — пояснение с сервера
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 14,
                         color: AppColors.grey600,
                       ),
                     ),
@@ -1175,7 +1175,7 @@ class _ReviewStep extends StatelessWidget {
                     'У вас ${loyalty.balance} баллов. Списать можно от '
                     '${LoyaltyAccount.minRedeem} при заказе крупнее',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: AppColors.grey600,
                     ),
                   ),
@@ -1299,7 +1299,7 @@ class _RedeemPointsTile extends StatelessWidget {
                   Text(
                     'Скидка −$maxRedeem ₽ · доступно $balance',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: applied ? Colors.white60 : AppColors.grey600,
                     ),
                   ),
@@ -1378,7 +1378,7 @@ class _RedeemSliderTile extends StatelessWidget {
                     Text(
                       'от ${preview.redeemMin} до $max · доступно ${preview.available}',
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 14,
                         color: AppColors.grey600,
                       ),
                     ),
@@ -1582,7 +1582,7 @@ class _FieldState extends State<_Field> {
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
-            color: AppColors.grey600,
+            color: AppColors.black,
           ),
         ),
         const SizedBox(height: 6),

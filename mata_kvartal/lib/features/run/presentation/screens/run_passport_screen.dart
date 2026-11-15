@@ -214,7 +214,7 @@ class RunPassportScreen extends ConsumerWidget {
                   fontSize: 11,
                   letterSpacing: 1.3,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -301,7 +301,7 @@ class _BackupTrackHeroState extends ConsumerState<_BackupTrackHero> {
               'данные», чтобы новые маршруты переживали переустановку и смену телефона.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 12.5, height: 1.4, color: AppColors.textSecondary),
+                  fontSize: 12.5, height: 1.4, color: AppColors.textPrimary),
             ),
           ),
         );
@@ -377,7 +377,7 @@ class _TrackHero extends StatelessWidget {
                   letterSpacing: 1,
                   color: captured
                       ? const Color(0xFF171C19)
-                      : AppColors.textSecondary,
+                      : AppColors.textPrimary,
                 ),
               ),
             ),
@@ -397,7 +397,7 @@ class _TrackHero extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -451,7 +451,7 @@ class _KmRow extends StatelessWidget {
             fontSize: 11,
             letterSpacing: 1.2,
             fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
+            color: AppColors.textPrimary,
           ),
         ),
       ],
@@ -485,7 +485,7 @@ class _SplitsBlock extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.6,
-              color: AppColors.textSecondary,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -507,7 +507,7 @@ class _SplitsBlock extends StatelessWidget {
                             fontWeight: FontWeight.w800,
                             color: splits[i] == best
                                 ? AppColors.lime
-                                : AppColors.textSecondary,
+                                : AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -539,7 +539,7 @@ class _SplitsBlock extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -577,7 +577,7 @@ class _AwardsBlock extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.6,
-              color: AppColors.textSecondary,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 10),
@@ -621,7 +621,7 @@ class _AwardsBlock extends StatelessWidget {
                             'медаль · тап — карточка и шаринг',
                             style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.textSecondary,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],
@@ -681,7 +681,7 @@ class _PointsBlock extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 height: 1.4,
-                color: AppColors.textSecondary,
+                color: AppColors.textPrimary,
               ),
             ),
           ),

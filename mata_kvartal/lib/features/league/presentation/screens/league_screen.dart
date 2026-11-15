@@ -120,7 +120,7 @@ class _PeriodToggle extends ConsumerWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: active ? AppColors.bg : AppColors.muted,
             ),
@@ -412,7 +412,7 @@ class _Row extends StatelessWidget {
                     row.club!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   ),
               ],
             ),

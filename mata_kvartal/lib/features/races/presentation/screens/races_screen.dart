@@ -415,7 +415,7 @@ class _RegionOption extends StatelessWidget {
                       child: Text(
                         subtitle!,
                         style: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 11.5),
+                            color: AppColors.textSecondary, fontSize: 14),
                       ),
                     ),
                 ],
@@ -579,7 +579,7 @@ class _RaceCard extends StatelessWidget {
                           [race.city, race.place].where((s) => s.isNotEmpty).join(' · '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                         ),
                       ),
                     ],
@@ -682,7 +682,7 @@ class _RaceCard extends StatelessWidget {
             Text(
               _months[d.month].toUpperCase(),
               style: TextStyle(
-                  color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1),
+                  color: AppColors.ink, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1),
             ),
           ],
         ),

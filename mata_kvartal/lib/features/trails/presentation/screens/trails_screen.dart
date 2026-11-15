@@ -416,7 +416,7 @@ class _BoardBody extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           color: AppColors.textSecondary,
                         ),
                       ),

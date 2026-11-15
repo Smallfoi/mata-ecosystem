@@ -169,7 +169,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.grey600,
+                          color: AppColors.black,
                           letterSpacing: 1,
                         ),
                       ),
@@ -286,7 +286,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1,
-                          color: AppColors.grey600,
+                          color: AppColors.black,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -480,7 +480,7 @@ class _SizeSelector extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1,
-                color: AppColors.grey600,
+                color: AppColors.black,
               ),
             ),
             if (selected != null) ...[
@@ -578,7 +578,7 @@ class _ColorSelector extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1,
-                color: AppColors.grey600,
+                color: AppColors.black,
               ),
             ),
             if (selected != null) ...[
@@ -800,7 +800,7 @@ class _AddedToCartSheet extends StatelessWidget {
                       product.brand.toUpperCase(),
                       style: const TextStyle(
                         fontSize: 11, fontWeight: FontWeight.w600,
-                        color: AppColors.grey600, letterSpacing: 1,
+                        color: AppColors.black, letterSpacing: 1,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -816,7 +816,7 @@ class _AddedToCartSheet extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '$size  ·  $color',
-                      style: const TextStyle(fontSize: 12, color: AppColors.grey600),
+                      style: const TextStyle(fontSize: 14, color: AppColors.grey600),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -1085,7 +1085,7 @@ class _ReviewsSectionState extends State<_ReviewsSection> {
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1,
-                color: AppColors.grey600,
+                color: AppColors.black,
               ),
             ),
             if (d != null && d.canReview)

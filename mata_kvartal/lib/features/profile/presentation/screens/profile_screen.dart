@@ -1239,7 +1239,7 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
-                      color: AppColors.muted,
+                      color: AppColors.ink,
                     ),
                   ),
                 ),
@@ -1280,7 +1280,7 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
                       child: Text(
                         label,
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: _filter == idx
                               ? AppColors.bg
@@ -1333,7 +1333,7 @@ class _PointsHistoryScreenState extends ConsumerState<PointsHistoryScreen> {
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.2,
-                color: AppColors.muted,
+                color: AppColors.ink,
               ),
             ),
           ),
@@ -1991,7 +1991,7 @@ class _StreakRow extends ConsumerWidget {
                           ? 'Эта неделя уже в серии — так держать'
                           : 'Пробеги на этой неделе, чтобы серия жила')
                       : 'Одна пробежка в неделю — и серия пошла',
-                  style: TextStyle(fontSize: 12, color: AppColors.muted),
+                  style: TextStyle(fontSize: 14, color: AppColors.muted),
                 ),
               ],
             ),
@@ -2086,7 +2086,7 @@ class _TrophyEntryRow extends ConsumerWidget {
                       unlocked == null
                           ? 'Штамп МАТА · $total наград'
                           : '$unlocked из $total медалей',
-                      style: TextStyle(fontSize: 12, color: AppColors.muted),
+                      style: TextStyle(fontSize: 14, color: AppColors.muted),
                     ),
                   ],
                 ),

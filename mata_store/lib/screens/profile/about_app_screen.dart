@@ -216,7 +216,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
             child: RemoteText(
               'app.about.footer',
               '© МАТА. Экосистема: Квартал · Store · сайт',
-              style: TextStyle(fontSize: 12, color: AppColors.grey600),
+              style: TextStyle(fontSize: 14, color: AppColors.grey600),
             ),
           ),
         ],

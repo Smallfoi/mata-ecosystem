@@ -221,7 +221,7 @@ class _CartItemTileState extends State<_CartItemTile> {
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.grey600,
+                    color: AppColors.black,
                     letterSpacing: 1,
                   ),
                 ),
@@ -239,7 +239,7 @@ class _CartItemTileState extends State<_CartItemTile> {
                 Text(
                   '${widget.item.size}  ·  ${widget.item.color}',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     color: AppColors.grey600,
                   ),
                 ),
@@ -392,7 +392,7 @@ class _OrderSummary extends StatelessWidget {
               const RemoteText(
                 'app.cart.deliveryNote',
                 'Рассчитывается при оформлении',
-                style: TextStyle(fontSize: 12, color: AppColors.grey600),
+                style: TextStyle(fontSize: 14, color: AppColors.grey600),
               ),
             ],
           ),

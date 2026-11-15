@@ -81,7 +81,7 @@ class _DocTile extends StatelessWidget {
             children: [
               Text('ред. ${doc.version}',
                   style: TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary)),
+                      fontSize: 14, color: AppColors.textSecondary)),
               if (doc.required) ...[
                 const SizedBox(width: 8),
                 Container(
@@ -129,7 +129,7 @@ class _LegalDocView extends StatelessWidget {
           children: [
             Text('Редакция ${doc.version}',
                 style: TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
+                    fontSize: 14, color: AppColors.textSecondary)),
             const SizedBox(height: 12),
             ..._renderMarkdown(doc.body),
           ],
@@ -370,7 +370,7 @@ class _ConsentGateScreenState extends ConsumerState<ConsentGateScreen> {
                               subtitle: Text('нажмите, чтобы прочитать',
                                   style: TextStyle(
                                       color: AppColors.textSecondary,
-                                      fontSize: 12)),
+                                      fontSize: 14)),
                               trailing: Icon(
                                   CupertinoIcons.chevron_right,
                                   color: AppColors.textDisabled,

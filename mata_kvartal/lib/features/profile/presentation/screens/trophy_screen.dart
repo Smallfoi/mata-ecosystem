@@ -106,7 +106,7 @@ class _CatSection extends StatelessWidget {
               Text(
                 '$earned / ${medals.length}',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: earned > 0 ? AppColors.accentInk : AppColors.muted,
                 ),
@@ -117,7 +117,7 @@ class _CatSection extends StatelessWidget {
           Text(
             cat.note,
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: 14,
               height: 1.35,
               color: AppColors.muted,
             ),
@@ -168,7 +168,7 @@ class _MedalCell extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: medal.earned ? AppColors.ink : AppColors.muted,
             ),

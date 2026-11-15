@@ -319,7 +319,7 @@ class _Requests extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(2, 8, 0, 8),
         child: Text(t.toUpperCase(),
             style: TextStyle(
-                color: AppColors.muted,
+                color: AppColors.ink,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: .6)),
@@ -478,7 +478,7 @@ class _AddPanel extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(2, 0, 0, 10),
         child: Text(t.toUpperCase(),
             style: TextStyle(
-                color: AppColors.muted,
+                color: AppColors.ink,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: .6)),

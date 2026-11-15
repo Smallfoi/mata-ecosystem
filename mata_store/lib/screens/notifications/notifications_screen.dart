@@ -209,7 +209,7 @@ class _NotificationTile extends StatelessWidget {
                   Text(
                     _timeAgo(notification.createdAt),
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 14,
                       color: AppColors.grey600,
                     ),
                   ),

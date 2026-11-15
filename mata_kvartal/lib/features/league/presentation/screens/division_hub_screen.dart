@@ -670,7 +670,7 @@ class _PeriodToggle extends ConsumerWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: active ? AppColors.bg : AppColors.muted,
             ),
@@ -921,7 +921,7 @@ class _TopThree extends StatelessWidget {
               Text(
                 _amount(row.value, unit),
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   fontFeatures: const [FontFeature.tabularFigures()],
                   color: AppColors.muted,
@@ -1008,7 +1008,7 @@ class _HubRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: me ? const Color(0xFFB9C1BB) : AppColors.muted,
                     ),
                   ),
@@ -1096,7 +1096,7 @@ void showRivalProfileSheet(BuildContext context, LeagueRow row, String unit) {
                           Text(
                             row.club!,
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 14,
                               color: AppColors.muted,
                             ),
                           ),
@@ -1130,7 +1130,7 @@ void showRivalProfileSheet(BuildContext context, LeagueRow row, String unit) {
                 'Маршруты и кварталы соперника скрыты — в Лиге видны '
                 'только цифры. Твои треки другим тоже не видны.',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 14,
                   height: 1.45,
                   color: AppColors.muted,
                 ),
@@ -1439,7 +1439,7 @@ class _TrailRow extends StatelessWidget {
                       meta,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: AppColors.muted),
+                      style: TextStyle(fontSize: 14, color: AppColors.muted),
                     ),
                   ],
                 ),
