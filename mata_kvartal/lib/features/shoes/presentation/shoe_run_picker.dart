@@ -52,7 +52,8 @@ Future<bool> showRunShoePicker(BuildContext context, WidgetRef ref) async {
               ),
               const SizedBox(height: 4),
               Text(
-                'Ресурс (км) спишется с выбранной пары',
+                'Километры спишутся с выбранной пары. Расчёт ресурса '
+                'ориентировочный — подробнее в трекере износа',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.textTertiary,
                     ),
