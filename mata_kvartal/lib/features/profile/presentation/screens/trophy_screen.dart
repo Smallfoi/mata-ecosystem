@@ -108,7 +108,7 @@ class _CatSection extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
-                  color: earned > 0 ? AppColors.accentInk : AppColors.faint,
+                  color: earned > 0 ? AppColors.accentInk : AppColors.muted,
                 ),
               ),
             ],

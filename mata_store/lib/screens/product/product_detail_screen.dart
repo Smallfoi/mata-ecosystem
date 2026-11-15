@@ -530,7 +530,7 @@ class _SizeSelector extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: !available
-                        ? AppColors.grey500
+                        ? AppColors.grey600
                         : (isSelected ? AppColors.lime : AppColors.black),
                     decoration:
                         available ? TextDecoration.none : TextDecoration.lineThrough,
@@ -799,7 +799,7 @@ class _AddedToCartSheet extends StatelessWidget {
                     Text(
                       product.brand.toUpperCase(),
                       style: const TextStyle(
-                        fontSize: 10, fontWeight: FontWeight.w600,
+                        fontSize: 11, fontWeight: FontWeight.w600,
                         color: AppColors.grey600, letterSpacing: 1,
                       ),
                     ),
@@ -816,7 +816,7 @@ class _AddedToCartSheet extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '$size  ·  $color',
-                      style: const TextStyle(fontSize: 12, color: AppColors.grey500),
+                      style: const TextStyle(fontSize: 12, color: AppColors.grey600),
                     ),
                     const SizedBox(height: 6),
                     Text(

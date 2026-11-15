@@ -317,7 +317,7 @@ class _DivisionHeaderDelegate extends SliverPersistentHeaderDelegate {
                           level?.roman ?? '–',
                           style: const TextStyle(
                             fontFamily: AppTheme.fontDisplay,
-                            fontSize: 9.5,
+                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF171C19),
                           ),
@@ -482,7 +482,7 @@ class _DivisionCard extends StatelessWidget {
           const Text(
             'форма недели · пн–вс',
             style: TextStyle(
-              fontSize: 9.5,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: .6,
               color: Color(0xFFB9C1BB),
@@ -523,7 +523,7 @@ class _PositionLadder extends StatelessWidget {
                 child: Text(
                   'ВЫЛЕТ',
                   style: TextStyle(
-                    fontSize: 7.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: .5,
                     color: AppColors.warm.withValues(alpha: .9),
@@ -536,7 +536,7 @@ class _PositionLadder extends StatelessWidget {
                 child: const Text(
                   'ВЫШЕ',
                   style: TextStyle(
-                    fontSize: 7.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: .5,
                     color: AppColors.lime,
@@ -587,7 +587,7 @@ class _PositionLadder extends StatelessWidget {
                       '#$place',
                       style: const TextStyle(
                         fontFamily: AppTheme.fontDisplay,
-                        fontSize: 8,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF171C19),
                       ),
@@ -603,7 +603,7 @@ class _PositionLadder extends StatelessWidget {
                     'пробеги в этом периоде — займёшь место',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 9,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: Color(0xFFB9C1BB),
                     ),
@@ -1009,7 +1009,7 @@ class _HubRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      color: me ? const Color(0xFFB9C1BB) : AppColors.faint,
+                      color: me ? const Color(0xFFB9C1BB) : AppColors.muted,
                     ),
                   ),
               ],
@@ -1132,7 +1132,7 @@ void showRivalProfileSheet(BuildContext context, LeagueRow row, String unit) {
                 style: TextStyle(
                   fontSize: 12.5,
                   height: 1.45,
-                  color: AppColors.faint,
+                  color: AppColors.muted,
                 ),
               ),
             ],
@@ -1439,7 +1439,7 @@ class _TrailRow extends StatelessWidget {
                       meta,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: AppColors.faint),
+                      style: TextStyle(fontSize: 12, color: AppColors.muted),
                     ),
                   ],
                 ),

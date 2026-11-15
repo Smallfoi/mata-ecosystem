@@ -223,7 +223,7 @@ form.m-inline { display: inline; }
 .m-group { margin: 0 0 1.1rem; }
 .m-group-title {
   font-size: .72rem; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--m-dim); font-weight: 700; margin: 0 0 .35rem;
+  color: var(--m-muted); font-weight: 700; margin: 0 0 .35rem;
 }
 .m-log { font-size: .8rem; color: var(--m-muted); }
 .m-log div { padding: .3rem 0; border-bottom: 1px solid var(--m-line); }
@@ -519,7 +519,7 @@ pre.m-mono { white-space: pre-wrap; margin: .4rem 0 0; max-height: 320px; overfl
 .m-examples figure.is-bad img { border-color: #e5484d; }
 
 /* ── Программа лояльности: поля настроек (имя ключа мелко, число узко) ────── */
-.m-key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .7rem; color: var(--m-dim); }
+.m-key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .7rem; color: var(--m-muted); }
 .m-help { font-size: .76rem; color: var(--m-muted); line-height: 1.45; margin-top: .15rem; max-width: 62ch; }
 .m-input.num { width: 6.5rem; text-align: right; }
 .m-input.err { border-color: var(--m-bad); }

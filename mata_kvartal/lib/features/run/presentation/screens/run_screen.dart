@@ -1035,7 +1035,7 @@ class _FirstQuestCard extends StatelessWidget {
           const Text(
             'ПЕРВЫЙ КВЕСТ',
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.6,
               color: Color(0xFFDFF45F),

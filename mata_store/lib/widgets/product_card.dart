@@ -80,7 +80,7 @@ class _ProductCardState extends State<ProductCard> {
                             child: const Text(
                               'НОВИНКА',
                               style: TextStyle(
-                                fontSize: 9,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.lime,
                                 letterSpacing: 0.5,
@@ -104,7 +104,7 @@ class _ProductCardState extends State<ProductCard> {
                             child: Text(
                               '−${p.discountPercent}%',
                               style: const TextStyle(
-                                fontSize: 9,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.black,
                               ),

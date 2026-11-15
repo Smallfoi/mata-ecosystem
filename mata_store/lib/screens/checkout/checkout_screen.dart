@@ -536,7 +536,7 @@ class _Header extends StatelessWidget {
                               'app.checkout.step.${_stepKeys[i]}',
                               _labels[i],
                               style: TextStyle(
-                                fontSize: 8,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.5,
                                 color: done || current
@@ -1081,7 +1081,7 @@ class _ReviewStep extends StatelessWidget {
                             note, // staw-static — причина с сервера
                             style: const TextStyle(
                               fontSize: 11,
-                              color: AppColors.grey500,
+                              color: AppColors.grey600,
                             ),
                           ),
                       ],
@@ -1579,7 +1579,7 @@ class _FieldState extends State<_Field> {
         Text(
           widget.label.toUpperCase(),
           style: const TextStyle(
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
             color: AppColors.grey600,

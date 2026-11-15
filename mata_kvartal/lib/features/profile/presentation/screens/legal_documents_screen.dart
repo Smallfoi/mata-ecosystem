@@ -93,7 +93,7 @@ class _DocTile extends StatelessWidget {
                   ),
                   child: Text('обязательный',
                       style: TextStyle(
-                          fontSize: 10, color: AppColors.accentBlue)),
+                          fontSize: 11, color: AppColors.accentBlue)),
                 ),
               ],
             ],

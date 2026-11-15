@@ -192,7 +192,7 @@ class _NotificationsBell extends StatelessWidget {
                 unread > 9 ? '9+' : '$unread',
                 style: const TextStyle(
                   color: _badgeInk,
-                  fontSize: 9,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
                   height: 1,
                 ),
@@ -1801,7 +1801,7 @@ class _ActivityHeatmap extends ConsumerWidget {
                 child: Text(
                   '$day',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     color: active ? AppColors.ink : AppColors.textDisabled,
                   ),
                 ),
@@ -1856,7 +1856,7 @@ class _LevelHeader extends ConsumerWidget {
                 Text(
                   'УРОВЕНЬ · ${level.roman}',
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.6,
                     color: dimmed,

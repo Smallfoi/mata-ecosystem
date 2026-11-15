@@ -2476,13 +2476,13 @@ class _DistrictWarCard extends ConsumerWidget {
             ),
             error: (_, __) => Text(
               'Не удалось загрузить районы — потяни вниз, чтобы обновить.',
-              style: TextStyle(fontSize: 12.5, color: AppColors.faint),
+              style: TextStyle(fontSize: 12.5, color: AppColors.muted),
             ),
             data: (war) {
               if (war.standings.isEmpty && war.threats.isEmpty) {
                 return Text(
                   'Пока никто не захватил территорию. Замкни первый круг!',
-                  style: TextStyle(fontSize: 12.5, color: AppColors.faint),
+                  style: TextStyle(fontSize: 12.5, color: AppColors.muted),
                 );
               }
               final maxArea = war.standings

@@ -415,7 +415,7 @@ class _RegionOption extends StatelessWidget {
                       child: Text(
                         subtitle!,
                         style: TextStyle(
-                            color: AppColors.textTertiary, fontSize: 11.5),
+                            color: AppColors.textSecondary, fontSize: 11.5),
                       ),
                     ),
                 ],
@@ -463,7 +463,7 @@ class _Segmented extends StatelessWidget {
                   child: Text(
                     labels[i],
                     style: TextStyle(
-                      color: i == index ? AppColors.ink : AppColors.textTertiary,
+                      color: i == index ? AppColors.ink : AppColors.textSecondary,
                       fontSize: 13.5,
                       fontWeight: FontWeight.w600,
                     ),

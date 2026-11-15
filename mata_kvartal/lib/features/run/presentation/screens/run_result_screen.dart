@@ -464,7 +464,7 @@ class _StatsPanel extends ConsumerWidget {
           Text(
             label.toUpperCase(),
             style: const TextStyle(
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: .8,
               color: Color(0xFF505650),
@@ -631,7 +631,7 @@ class _TrailHitsCard extends ConsumerWidget {
                       child: const Text(
                         'рекорд',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF20252B),
                         ),

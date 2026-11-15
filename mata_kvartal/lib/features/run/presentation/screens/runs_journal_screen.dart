@@ -208,7 +208,7 @@ class RunTileCard extends StatelessWidget {
                         '+${run.capturedZones} '
                         '${run.capturedZones == 1 ? 'КВАРТАЛ' : 'КВАРТАЛА'}',
                         style: const TextStyle(
-                          fontSize: 8.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF171C19),
                         ),
@@ -236,7 +236,7 @@ class RunTileCard extends StatelessWidget {
                           Text(
                             'НА ПРОВЕРКЕ',
                             style: TextStyle(
-                              fontSize: 8.5,
+                              fontSize: 11,
                               fontWeight: FontWeight.w800,
                               letterSpacing: .3,
                               color: AppColors.warning,

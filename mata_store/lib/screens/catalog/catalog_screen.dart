@@ -400,7 +400,7 @@ class _FilterButton extends StatelessWidget {
               child: Text(
                 '$activeCount',
                 style: const TextStyle(
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),

@@ -346,7 +346,7 @@ class StickerHint extends StatelessWidget {
       'В сторис своё фото добавляй фоном (значок галереи) — стикер ляжет '
       'поверх. А стикер из галереи можно класть и на видео.',
       textAlign: TextAlign.center,
-      style: TextStyle(fontSize: 10.5, height: 1.35, color: _muted),
+      style: TextStyle(fontSize: 11, height: 1.35, color: _muted),
     );
   }
 }
@@ -513,7 +513,7 @@ class MedalStoryCard extends StatelessWidget {
                   child: Text(
                     '${e.v} · ${e.u}',
                     style: const TextStyle(
-                      fontSize: 9.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: .5,
                       color: _lime,
@@ -526,7 +526,7 @@ class MedalStoryCard extends StatelessWidget {
                 Text(
                   'ПОЛУЧЕНА ${_fmt(date)}${city == null ? '' : ' · ${city!.toUpperCase()}'}',
                   style: const TextStyle(
-                    fontSize: 8.5,
+                    fontSize: 11,
                     letterSpacing: 1.3,
                     fontWeight: FontWeight.w600,
                     color: _muted,
@@ -547,7 +547,7 @@ class MedalStoryCard extends StatelessWidget {
                 Text(
                   'ШТАМП МАТА · МЕДАЛЬ $hallEarned ИЗ ${kMedals.length}',
                   style: const TextStyle(
-                    fontSize: 8,
+                    fontSize: 11,
                     letterSpacing: 1.2,
                     fontWeight: FontWeight.w700,
                     color: _muted,
@@ -629,7 +629,7 @@ class MedalSticker extends StatelessWidget {
                   Text(
                     '${e.v} · ${e.u}'.toUpperCase(),
                     style: const TextStyle(
-                      fontSize: 9,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: .5,
                       color: _lime,
@@ -677,7 +677,7 @@ class HallStoryCard extends StatelessWidget {
           const Text(
             'ЗАЛ СЛАВЫ',
             style: TextStyle(
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 3,
               color: _lime,
@@ -696,7 +696,7 @@ class HallStoryCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '${earned.length} из ${kMedals.length} · Штамп МАТА',
-            style: const TextStyle(fontSize: 10, color: _muted),
+            style: const TextStyle(fontSize: 11, color: _muted),
           ),
           const Spacer(),
           Padding(

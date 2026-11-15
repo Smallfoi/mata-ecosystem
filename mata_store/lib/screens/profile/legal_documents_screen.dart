@@ -142,7 +142,7 @@ class _DocTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(3),
                 ),
                 child: const Text('обязательный',
-                    style: TextStyle(fontSize: 10, color: AppColors.white)),
+                    style: TextStyle(fontSize: 11, color: AppColors.white)),
               ),
             ],
             if (doc.accepted == true) ...[

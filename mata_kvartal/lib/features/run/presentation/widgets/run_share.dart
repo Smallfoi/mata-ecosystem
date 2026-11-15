@@ -441,7 +441,7 @@ class RunStoryCard extends StatelessWidget {
                         ),
                         maxLines: 1,
                         style: const TextStyle(
-                          fontSize: 7.5,
+                          fontSize: 11,
                           letterSpacing: .8,
                           fontWeight: FontWeight.w700,
                           color: _muted,
@@ -562,7 +562,7 @@ class RunStoryCard extends StatelessWidget {
                   Text(
                     items[i].$2,
                     style: const TextStyle(
-                      fontSize: 7,
+                      fontSize: 11,
                       letterSpacing: 1.2,
                       fontWeight: FontWeight.w700,
                       color: _muted,
@@ -615,7 +615,7 @@ class _RunMedalPlaque extends StatelessWidget {
                     'МЕДАЛЬ «${medal.def.name.toUpperCase()}» — ВЗЯТА В ЭТОМ ЗАБЕГЕ${extra > 0 ? ' +$extra' : ''}',
                     maxLines: 1,
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: .4,
                       color: _ink,
@@ -629,7 +629,7 @@ class _RunMedalPlaque extends StatelessWidget {
                   child: Text(
                     sub,
                     maxLines: 1,
-                    style: const TextStyle(fontSize: 8, color: _muted),
+                    style: const TextStyle(fontSize: 11, color: _muted),
                   ),
                 ),
               ],
