@@ -27,6 +27,8 @@ fi
 usermod -aG docker ubuntu || true
 
 rm -rf /opt/mata && git clone --depth 1 https://github.com/Smallfoi/mata-ecosystem.git /opt/mata
+# MTU 1500: образ Cloud.ru ставит 9000, крупные пакеты в интернет теряются (deploy/net-mtu.sh).
+bash /opt/mata/backend/deploy/net-mtu.sh || echo "WARN: net-mtu.sh не отработал"
 # Ограниченный канал обслуживания (D-103): ключ claude-ops, прибитый к обёртке с белым списком
 # команд. Ставим сразу — на новой ВМ (авария зоны, D-114) его иначе нет, и проверить сервер
 # можно только руками владельца. Ключ владельца (cloud-init) остаётся полным доступом.
