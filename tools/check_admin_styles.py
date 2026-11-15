@@ -21,6 +21,12 @@ import re
 import sys
 from pathlib import Path
 
+try:  # вывод со «птичкой» и кириллицей падал локально на Windows-cp1251 (в CI UTF-8)
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 ADMIN_TEMPLATES = Path("backend/django_api/templates/admin")
 STYLESHEET = Path("backend/django_api/static/admin/mata.css")
 

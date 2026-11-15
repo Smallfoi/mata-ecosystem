@@ -238,6 +238,13 @@ jobs:
       - name: Contrast guard (APCA + WCAG)
         run: python tools/check_contrast.py
 
+      # Контракт API (D05): ECOSYSTEM_API.md — единый источник правды по эндпоинтам для
+      # трёх продуктов. Источник правды, который врёт, хуже отсутствия документа: по нему
+      # пишут клиентов. Страж сверяет обе стороны — новый маршрут без описания и описанный
+      # адрес без маршрута. Подробности: tools/check_api_contract.py.
+      - name: API contract guard (ECOSYSTEM_API.md ↔ urls.py)
+        run: python tools/check_api_contract.py
+
   deploy-scripts:
     name: Deploy · scripts
     runs-on: ubuntu-latest
