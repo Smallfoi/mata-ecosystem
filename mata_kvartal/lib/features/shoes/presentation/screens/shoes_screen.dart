@@ -79,6 +79,8 @@ class _ShoesScreenState extends ConsumerState<ShoesScreen> {
                         _ShoeTile(shoe: s),
                         const SizedBox(height: 12),
                       ],
+                      const SizedBox(height: 4),
+                      const _WearNote(),
                     ],
                   ],
                 ),
@@ -288,7 +290,7 @@ class _ShoeTile extends ConsumerWidget {
                     const SizedBox(height: 3),
                     Text(
                       shoe.retired
-                          ? 'Ресурс исчерпан · ${shoe.totalKm.toStringAsFixed(0)} км'
+                          ? 'Ресурс пройден · ${shoe.totalKm.toStringAsFixed(0)} км'
                           : 'Осталось ${shoe.remainingKm.toStringAsFixed(0)} из ${shoe.maxKm.toStringAsFixed(0)} км',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppColors.textTertiary,
@@ -299,7 +301,7 @@ class _ShoeTile extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               shoe.retired
-                  ? _Badge(text: 'Заменить', color: AppColors.error)
+                  ? _Badge(text: 'Проверить', color: AppColors.error)
                   : Text(
                       '${shoe.wearPercent}%',
                       style: TextStyle(
@@ -328,6 +330,61 @@ class _ShoeTile extends ConsumerWidget {
               minHeight: 7,
               backgroundColor: AppColors.bgElevated,
               valueColor: AlwaysStoppedAnimation<Color>(accent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Оговорка под цифрами износа (§11 `docs/LAUNCH_READINESS.md`).
+///
+/// Счётчик знает ровно одно — сколько километров пробежали в этой паре. Ресурс
+/// кроссовка зависит от веса, техники, покрытия и модели, поэтому цифра на экране
+/// это приглашение посмотреть на обувь, а не заключение о её состоянии и тем более
+/// не медицинский совет.
+class _WearNote extends StatelessWidget {
+  const _WearNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.separator),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 18, color: AppColors.textTertiary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Расчёт ориентировочный',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Мы считаем километры, пройденные в этой паре, от типового ресурса '
+                  'модели. Сколько она проживёт на самом деле, зависит от веса, техники '
+                  'бега, покрытия и самой пары — бывает и 400 км, и больше тысячи. Это '
+                  'повод присмотреться к обуви, а не оценка её состояния и не '
+                  'медицинский совет: боль при беге — вопрос к врачу, а не к счётчику.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.45,
+                      ),
+                ),
+              ],
             ),
           ),
         ],

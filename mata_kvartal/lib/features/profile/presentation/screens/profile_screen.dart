@@ -1652,10 +1652,10 @@ class _ShoesCard extends ConsumerWidget {
       subtitle = 'купи в МАТА Store';
       value = null;
     } else if (active != null) {
-      subtitle = 'активная пара · износ ${active.wearPercent}%';
+      subtitle = 'активная пара · износ ≈${active.wearPercent}%';
       value = '${active.remainingKm.toStringAsFixed(0)} км';
     } else {
-      subtitle = 'ресурс исчерпан — пора заменить';
+      subtitle = 'расчётный ресурс пройден — присмотрись к паре';
       value = null;
     }
 
