@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_states.dart';
 import '../../data/friends_provider.dart';
 
 /// Друзья (D-82, этап 2a): взаимные друзья, заявки, добавление.
@@ -217,43 +218,19 @@ Widget _pill(String text, {Color? bg, Color? fg, VoidCallback? onTap, IconData? 
   return onTap == null ? child : GestureDetector(onTap: onTap, child: child);
 }
 
-class _Empty extends StatelessWidget {
-  final String title;
-  final String sub;
-  final IconData icon;
-  const _Empty({required this.title, required this.sub, required this.icon});
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 40, color: AppColors.muted),
-          const SizedBox(height: 12),
-          Text(title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: AppColors.ink, fontSize: 16, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text(sub,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.4)),
-        ]),
-      ),
-    );
-  }
-}
-
 class _FriendsList extends ConsumerWidget {
   final FriendsData data;
   const _FriendsList({required this.data});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (data.friends.isEmpty) {
-      return const _Empty(
+      return MataEmpty(
         icon: CupertinoIcons.person_2,
+        iconColor: AppStates.icon,
         title: 'Пока нет друзей',
-        sub: 'Найди своих на вкладке «Добавить» — по имени, из клуба или по контактам.',
+        titleStyle: AppStates.title,
+        hint: 'Найди своих на вкладке «Добавить» — по имени, из клуба или по контактам.',
+        hintStyle: AppStates.hint,
       );
     }
     final act = ref.read(friendsActionsProvider);
@@ -277,10 +254,13 @@ class _Requests extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (data.incoming.isEmpty && data.outgoing.isEmpty) {
-      return const _Empty(
+      return MataEmpty(
         icon: CupertinoIcons.tray,
+        iconColor: AppStates.icon,
         title: 'Заявок нет',
-        sub: 'Входящие и отправленные заявки в друзья появятся здесь.',
+        titleStyle: AppStates.title,
+        hint: 'Входящие и отправленные заявки в друзья появятся здесь.',
+        hintStyle: AppStates.hint,
       );
     }
     final act = ref.read(friendsActionsProvider);

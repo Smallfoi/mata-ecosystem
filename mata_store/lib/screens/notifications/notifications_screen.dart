@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 import 'package:provider/provider.dart';
 import '../../models/app_notification.dart';
 import '../../providers/notifications_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../theme/app_states.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/remote_text.dart';
 import '../profile/order_detail_screen.dart';
@@ -244,24 +246,18 @@ class _EmptyNotifications extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.notifications_none, size: 56, color: AppColors.grey200),
-          SizedBox(height: 12),
-          RemoteText(
-            'app.notif.empty.title',
-            'Нет уведомлений',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          SizedBox(height: 4),
-          RemoteText(
-            'app.notif.empty.subtitle',
-            'Здесь появятся обновления по заказам',
-            style: TextStyle(fontSize: 14, color: AppColors.grey600),
-          ),
-        ],
+    return const MataEmpty(
+      icon: Icons.notifications_none,
+      iconColor: AppStates.icon,
+      titleWidget: RemoteText(
+        'app.notif.empty.title',
+        'Нет уведомлений',
+        style: AppStates.title,
+      ),
+      hintWidget: RemoteText(
+        'app.notif.empty.subtitle',
+        'Здесь появятся обновления по заказам',
+        style: AppStates.hint,
       ),
     );
   }

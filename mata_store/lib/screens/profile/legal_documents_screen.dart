@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:mata_ui/mata_ui.dart';
 import '../../data/api/api_client.dart';
 import '../../providers/auth_provider.dart';
+import '../../theme/app_states.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/remote_text.dart';
 
 /// Загрузить опубликованные документы. С токеном (ApiClient его подставляет)
 /// у каждого проставлен `accepted` (принят ли пользователем).
@@ -75,17 +77,37 @@ class _LegalDocumentsScreenState extends State<LegalDocumentsScreen> {
             return const Center(child: MataLoading(radius: 11));
           }
           if (snap.hasError) {
-            return _Message(
+            return MataError(
               icon: Icons.wifi_off,
-              text: 'Не удалось загрузить документы.\nПроверьте соединение.',
+              iconColor: AppStates.icon,
+              titleWidget: const RemoteText(
+                'app.legal.error.title',
+                'Не удалось загрузить документы',
+                textAlign: TextAlign.center,
+                style: AppStates.title,
+              ),
+              hintWidget: const RemoteText(
+                'app.legal.error.hint',
+                'Проверьте соединение.',
+                textAlign: TextAlign.center,
+                style: AppStates.hint,
+              ),
+              retryLabel: 'Повторить',
               onRetry: _reload,
+              retryBuilder: AppStates.retry,
             );
           }
           final docs = snap.data ?? const <_LegalDoc>[];
           if (docs.isEmpty) {
-            return const _Message(
+            return const MataEmpty(
               icon: Icons.description_outlined,
-              text: 'Документы пока не опубликованы.',
+              iconColor: AppStates.icon,
+              titleWidget: RemoteText(
+                'app.legal.empty',
+                'Документы пока не опубликованы',
+                textAlign: TextAlign.center,
+                style: AppStates.title,
+              ),
             );
           }
           return RefreshIndicator(
@@ -271,36 +293,6 @@ class _LegalDocView extends StatelessWidget {
     s = s.replaceAllMapped(
         RegExp(r'\[([^\]]+)\]\([^)]*\)'), (m) => m[1] ?? '');
     return s.replaceAll('**', '').replaceAll('`', '').replaceAll('|', '  ');
-  }
-}
-
-class _Message extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final Future<void> Function()? onRetry;
-  const _Message({required this.icon, required this.text, this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 44, color: AppColors.grey400),
-          const SizedBox(height: 12),
-          Text(text,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.grey600)),
-          if (onRetry != null) ...[
-            const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: onRetry,
-              child: const Text('Повторить'),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 }
 
