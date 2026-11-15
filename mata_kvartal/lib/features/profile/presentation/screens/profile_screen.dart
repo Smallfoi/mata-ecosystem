@@ -676,7 +676,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: MataLoading(radius: 8),
                         )
                       : const Text('Сохранить'),
                 ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../data/api/api_client.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
@@ -71,7 +72,7 @@ class _LegalDocumentsScreenState extends State<LegalDocumentsScreen> {
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: MataLoading(radius: 11));
           }
           if (snap.hasError) {
             return _Message(
@@ -416,15 +417,15 @@ class _ConsentGateScreenState extends State<ConsentGateScreen> {
           future: _future,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             if (snap.hasError) {
               _leave(); // fail-open
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             final pending = snap.data ?? const <_LegalDoc>[];
             if (pending.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             return Column(
               children: [
@@ -524,8 +525,7 @@ class _ConsentGateScreenState extends State<ConsentGateScreen> {
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: AppColors.white),
+                                  child: MataLoading(color: AppColors.white, radius: 8),
                                 )
                               : const Text('ПРИНЯТЬ И ПРОДОЛЖИТЬ'),
                         ),

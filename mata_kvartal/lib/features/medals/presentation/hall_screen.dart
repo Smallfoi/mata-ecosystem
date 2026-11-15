@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../auth/data/auth_provider.dart';
 import '../data/medals_provider.dart';
@@ -66,7 +67,7 @@ class _TrophyHallScreenState extends ConsumerState<TrophyHallScreen>
         child: SafeArea(
           child: medals.when(
             loading: () => const Center(
-              child: CircularProgressIndicator(color: _hallLime),
+              child: MataLoading(color: _hallLime, radius: 11),
             ),
             error: (e, _) => _Offline(
               onRetry: () => ref.invalidate(medalsProvider),

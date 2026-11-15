@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
@@ -86,7 +87,7 @@ class _AccountDataScreenState extends State<AccountDataScreen> {
         title: const RemoteText('app.account.title', 'Конфиденциальность и данные'),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: MataLoading(radius: 11))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -135,8 +136,7 @@ class _AccountDataScreenState extends State<AccountDataScreen> {
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.red),
+                          child: MataLoading(color: AppColors.red, radius: 8),
                         )
                       : const Icon(Icons.delete_outline, size: 20),
                   label: const RemoteText('app.account.deleteAccount', 'Удалить аккаунт',

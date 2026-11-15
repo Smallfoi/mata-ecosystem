@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' show Distance, LatLng, LengthUnit;
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -270,8 +271,7 @@ class _BackupTrackHeroState extends ConsumerState<_BackupTrackHero> {
             child: SizedBox(
               width: 22,
               height: 22,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.textTertiary),
+              child: MataLoading(color: AppColors.textTertiary, radius: 8),
             ),
           );
         }

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../data/api/api_client.dart';
 import '../../theme/app_theme.dart';
@@ -265,7 +266,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
         title: const RemoteText('app.return.title', 'Отмена и возврат'),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: MataLoading(radius: 11))
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
@@ -310,7 +311,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2))
+                  child: MataLoading(radius: 8))
               : const RemoteText('app.return.cancel_order', 'Отменить заказ'),
         ),
         const SizedBox(height: 24),
@@ -391,7 +392,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
             ? const SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2))
+                child: MataLoading(radius: 8))
             : const RemoteText('app.return.submit', 'Оформить заявку'),
       ),
     ];
@@ -455,7 +456,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
                     : const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2)),
+                        child: MataLoading(radius: 8)),
               ),
             ),
           ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/friends_provider.dart';
@@ -439,7 +440,7 @@ class _AddPanel extends ConsumerWidget {
               if (contactsLoading)
                 const SizedBox(
                     width: 16, height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))
+                    child: MataLoading(radius: 8))
               else
                 Icon(CupertinoIcons.chevron_right, size: 16, color: AppColors.muted),
             ]),
