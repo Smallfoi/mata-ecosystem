@@ -148,7 +148,7 @@ PALETTE = [
     ('Сайт — светлая', False, ['#F4F1EA', '#FFFDF8', '#FFFFFF'], [
         ('--ink', '#111317', 'primary'),
         ('--muted', '#595B60', 'secondary'),
-        ('--accent-ink (ссылки)', '#126278', 'secondary'),
+        ('--accent-ink (ссылки и заливка кнопки)', '#115D72', 'secondary'),
     ]),
     ('Сайт — блоки на графите', True, ['#20252B'], [
         ('--on-dark', '#FFFFFF', 'primary'),
