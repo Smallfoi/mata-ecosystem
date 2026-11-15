@@ -149,7 +149,7 @@ class _TrailCard extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: AppColors.muted),
+            Icon(CupertinoIcons.chevron_right, color: AppColors.muted),
           ],
         ),
       ),

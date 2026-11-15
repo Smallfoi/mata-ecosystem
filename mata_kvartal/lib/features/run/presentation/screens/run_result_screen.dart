@@ -17,6 +17,7 @@ import '../../../auth/data/auth_provider.dart';
 import '../../../trails/data/trails_provider.dart';
 import '../../data/completed_runs_provider.dart';
 import '../widgets/run_share.dart';
+import 'package:flutter/cupertino.dart';
 
 /// Итог пробежки для церемонии (Ф1 «Праздник», утверждено 31.08.2026).
 class RunResult {
@@ -601,7 +602,7 @@ class _TrailHitsCard extends ConsumerWidget {
               child: Row(
                 children: [
                   const Icon(
-                    Icons.route_outlined,
+                    CupertinoIcons.arrow_branch,
                     size: 18,
                     color: Color(0xFF20252B),
                   ),
@@ -718,7 +719,7 @@ class _MakeTrailButtonState extends ConsumerState<_MakeTrailButton> {
     }
     return TextButton.icon(
       onPressed: _busy ? null : _create,
-      icon: const Icon(Icons.add_road_outlined, size: 18),
+      icon: const Icon(CupertinoIcons.plus_circle, size: 18),
       label: Text(_busy ? 'Создаём…' : 'Сделать тропой'),
       style: TextButton.styleFrom(foregroundColor: const Color(0xFF20252B)),
     );

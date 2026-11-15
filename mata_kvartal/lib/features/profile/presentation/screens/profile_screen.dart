@@ -999,7 +999,7 @@ String? pendingPointsLine(LoyaltyState l) {
     case 'runnerTerritory':
       return (icon: CupertinoIcons.flag_fill, label: 'Захват территории');
     case 'runnerCompetition':
-      return (icon: Icons.emoji_events, label: 'Соревнование');
+      return (icon: CupertinoIcons.rosette, label: 'Соревнование');
     case 'registration':
       return (icon: CupertinoIcons.gift_fill, label: 'Бонус');
     case 'purchase':

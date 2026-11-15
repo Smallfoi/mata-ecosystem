@@ -1187,7 +1187,7 @@ class _SelfProgress extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  me.improved ? Icons.trending_up : Icons.trending_flat,
+                  me.improved ? CupertinoIcons.arrow_up_right : CupertinoIcons.arrow_right,
                   size: 18,
                   color: me.improved ? AppColors.success : AppColors.muted,
                 ),
