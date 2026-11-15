@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_states.dart';
 import '../../../../shared/widgets/tab_visibility.dart';
 import '../../data/league_provider.dart';
 
@@ -41,10 +43,24 @@ class _LeagueScreenState extends ConsumerState<LeagueScreen> with TabVisibility 
               child: RefreshIndicator(
                 onRefresh: () async => ref.invalidate(leagueBoardDataProvider),
                 child: async.when(
-                  loading: () => const Center(child: CupertinoActivityIndicator()),
-                  error: (_, __) => const _Message(
-                    title: 'Не удалось загрузить зачёт',
-                    text: 'Проверьте подключение и потяните вниз, чтобы обновить.',
+                  loading: () => const MataLoading(),
+                  // Список в ListView, иначе «потянуть, чтобы обновить» не
+                  // работает: RefreshIndicator нужен прокручиваемый потомок.
+                  error: (_, __) => ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      const SizedBox(height: 80),
+                      MataError(
+                        title: 'Не удалось загрузить зачёт',
+                        titleStyle: AppStates.title,
+                        hint: 'Проверьте подключение.',
+                        hintStyle: AppStates.hint,
+                        iconColor: AppStates.icon,
+                        retryLabel: 'Повторить',
+                        onRetry: () => ref.invalidate(leagueBoardDataProvider),
+                        retryBuilder: AppStates.retry,
+                      ),
+                    ],
                   ),
                   data: (data) => _BoardView(board: board, data: data),
                 ),

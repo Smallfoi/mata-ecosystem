@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_states.dart';
 import '../../data/me_stats_provider.dart';
 import 'package:flutter/cupertino.dart';
 
@@ -25,15 +26,15 @@ class StatsScreen extends ConsumerWidget {
       ),
       body: stats.when(
         loading: () => const Center(child: MataLoading(radius: 11)),
-        error: (_, __) => Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'Не удалось загрузить статистику.\nПроверьте подключение и попробуйте позже.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.muted),
-            ),
-          ),
+        error: (_, __) => MataError(
+          title: 'Не удалось загрузить статистику',
+          titleStyle: AppStates.title,
+          hint: 'Проверьте подключение и попробуйте ещё раз.',
+          hintStyle: AppStates.hint,
+          iconColor: AppStates.icon,
+          retryLabel: 'Повторить',
+          onRetry: () => ref.invalidate(meStatsProvider),
+          retryBuilder: AppStates.retry,
         ),
         data: (s) => ListView(
           padding: const EdgeInsets.all(16),
