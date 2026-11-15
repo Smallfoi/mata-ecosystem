@@ -119,6 +119,16 @@ class ProviderTests(TestCase):
         with mock.patch.dict("os.environ", {"OPENAI_BASE_URL": "https://relay.example/v1/"}):
             self.assertEqual(providers.base_url(), "https://relay.example/v1")
 
+    def test_base_url_survives_a_stray_newline(self):
+        """Адрес вставляет человек, и перенос строки в конце не виден глазом.
+        Один такой превратил путь в «…/v1\n/images/edits», и urllib отказался
+        с «URL can't contain control characters» — уже на проде."""
+        import os
+        for value in ("https://relay.example/v1\n", " https://relay.example/v1 ",
+                      "https://relay.example/v1\r\n"):
+            with mock.patch.dict("os.environ", {"OPENAI_BASE_URL": value}):
+                self.assertEqual(providers.base_url(), "https://relay.example/v1")
+
     @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "k"}, clear=False)
     @mock.patch("productmedia.providers.urllib.request.urlopen")
     def test_request_sets_non_bot_user_agent(self, m_open):

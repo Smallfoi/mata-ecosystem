@@ -30,7 +30,11 @@ def openai_enabled() -> bool:
 
 
 def base_url() -> str:
-    return (os.environ.get("OPENAI_BASE_URL") or DEFAULT_BASE).rstrip("/")
+    # Пробелы и перевод строки срезаем до разбора: адрес приходит из Lockbox,
+    # куда его вставляет человек, и один невидимый перенос в конце превращал
+    # путь в «…/v1\n/images/edits» — urllib отказывался с «URL can't contain
+    # control characters», уже после того как всё остальное было настроено.
+    return (os.environ.get("OPENAI_BASE_URL") or DEFAULT_BASE).strip().rstrip("/")
 
 
 def _sniff(data):
