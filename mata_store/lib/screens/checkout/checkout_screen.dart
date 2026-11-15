@@ -527,7 +527,7 @@ class _Header extends StatelessWidget {
                                         fontWeight: FontWeight.w700,
                                         color: current
                                             ? Colors.white
-                                            : Colors.white38,
+                                            : AppColors.lavender,
                                       ),
                                     ),
                             ),
@@ -541,7 +541,7 @@ class _Header extends StatelessWidget {
                                 letterSpacing: 0.5,
                                 color: done || current
                                     ? Colors.white
-                                    : Colors.white38,
+                                    : AppColors.lavender,
                               ),
                             ),
                           ],
