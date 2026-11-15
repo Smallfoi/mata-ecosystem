@@ -219,7 +219,7 @@ class _CartItemTileState extends State<_CartItemTile> {
                 Text(
                   widget.item.product.brand.toUpperCase(),
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: AppColors.grey600,
                     letterSpacing: 1,
@@ -240,7 +240,7 @@ class _CartItemTileState extends State<_CartItemTile> {
                   '${widget.item.size}  ·  ${widget.item.color}',
                   style: const TextStyle(
                     fontSize: 12,
-                    color: AppColors.grey500,
+                    color: AppColors.grey600,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -392,7 +392,7 @@ class _OrderSummary extends StatelessWidget {
               const RemoteText(
                 'app.cart.deliveryNote',
                 'Рассчитывается при оформлении',
-                style: TextStyle(fontSize: 12, color: AppColors.grey500),
+                style: TextStyle(fontSize: 12, color: AppColors.grey600),
               ),
             ],
           ),

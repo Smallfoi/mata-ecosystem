@@ -409,7 +409,7 @@ class _LotTile extends StatelessWidget {
                   partly ? '${lot.dateLine} · из ${lot.amount}' : lot.dateLine,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: AppColors.grey500,
+                    color: AppColors.grey600,
                   ),
                 ),
               ],
@@ -584,7 +584,7 @@ class _TxnTile extends StatelessWidget {
                   _date(tx.createdAt),
                   style: const TextStyle(
                     fontSize: 12,
-                    color: AppColors.grey500,
+                    color: AppColors.grey600,
                   ),
                 ),
               ],

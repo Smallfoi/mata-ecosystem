@@ -157,7 +157,7 @@ class _TopBar extends StatelessWidget {
               const Text(
                 'ЗАЛ СЛАВЫ',
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 3,
                   color: _hallLime,
@@ -330,7 +330,7 @@ class _HeroPage extends StatelessWidget {
               Text(
                 'ПОЛУЧЕНА ${_date(medal.state.earnedAtMs!)}',
                 style: const TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 11,
                   letterSpacing: 1.4,
                   fontWeight: FontWeight.w600,
                   color: _hallMuted,
@@ -467,7 +467,7 @@ class _ShelfSlot extends StatelessWidget {
           Text(
             medal?.def.name ?? 'скоро',
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               color: medal != null ? _hallMuted : _hallFaint,
             ),

@@ -218,7 +218,7 @@ class _SeasonCeremonyState extends State<_SeasonCeremony>
                                   seasonLabel(r.month),
                                   style: const TextStyle(
                                     fontFamily: AppTheme.fontDisplay,
-                                    fontSize: 10.5,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 1.4,
                                     color: _ink,

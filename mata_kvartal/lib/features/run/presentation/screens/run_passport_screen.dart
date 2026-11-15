@@ -301,7 +301,7 @@ class _BackupTrackHeroState extends ConsumerState<_BackupTrackHero> {
               'данные», чтобы новые маршруты переживали переустановку и смену телефона.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 12.5, height: 1.4, color: AppColors.textTertiary),
+                  fontSize: 12.5, height: 1.4, color: AppColors.textSecondary),
             ),
           ),
         );

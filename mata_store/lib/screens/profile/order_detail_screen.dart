@@ -465,9 +465,9 @@ class _ItemRow extends StatelessWidget {
                   Text(
                     item.productBrand.toUpperCase(),
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.grey500,
+                      color: AppColors.grey600,
                       letterSpacing: 1,
                     ),
                   ),

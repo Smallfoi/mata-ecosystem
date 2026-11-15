@@ -181,7 +181,7 @@ class _ToolCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   entry.sub,
-                  style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),

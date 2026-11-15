@@ -1492,7 +1492,7 @@ class _KvartalTopLogo extends StatelessWidget {
                 '\u042f\u043a\u0443\u0442\u0441\u043a',
                 style: TextStyle(
                   color: AppColors.ink,
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
                   height: 1,
                 ),
@@ -1649,7 +1649,7 @@ class _LegendDot extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 5),
-        Text(label, style: TextStyle(color: AppColors.ink, fontSize: 10)),
+        Text(label, style: TextStyle(color: AppColors.ink, fontSize: 11)),
       ],
     );
   }

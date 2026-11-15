@@ -599,7 +599,7 @@ class _SmsForm extends StatelessWidget {
             child: Text(
               _codeHint(context.watch<AuthProvider>().codeInfo),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: AppColors.grey500, fontFeatures: const [FontFeature.tabularFigures()]),
+              style: TextStyle(fontSize: 12, color: AppColors.grey600, fontFeatures: const [FontFeature.tabularFigures()]),
             ),
           ),
         ],
@@ -608,7 +608,7 @@ class _SmsForm extends StatelessWidget {
           'app.auth.consent',
           'Продолжая, вы соглашаетесь с условиями использования и политикой конфиденциальности',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11, color: AppColors.grey500, height: 1.5),
+          style: TextStyle(fontSize: 11, color: AppColors.grey600, height: 1.5),
         ),
         const SizedBox(height: 6),
         Center(

@@ -313,7 +313,7 @@ class _NavItem extends StatelessWidget {
               textAlign: TextAlign.center,
               overflow: TextOverflow.visible,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 height: 1.0,
                 letterSpacing: -0.2,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,

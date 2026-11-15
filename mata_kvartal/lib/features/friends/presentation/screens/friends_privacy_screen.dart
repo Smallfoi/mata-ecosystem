@@ -124,7 +124,7 @@ class FriendsPrivacyScreen extends ConsumerWidget {
 
           Text(
             '🔒 Геопозиция — персональные данные (152-ФЗ). Собираем только пока открыта карта, огрублённо, и делимся лишь со взаимными друзьями. Live-слой — с 16 лет.',
-            style: TextStyle(color: AppColors.faint, fontSize: 11.5, height: 1.5),
+            style: TextStyle(color: AppColors.muted, fontSize: 11.5, height: 1.5),
           ),
         ],
       ),
@@ -272,7 +272,7 @@ class _BeaconCardState extends ConsumerState<_BeaconCard> {
         ])
       else if (friends.isEmpty)
         Text('Сначала добавь друзей — из них выберешь доверенных.',
-            style: TextStyle(color: AppColors.faint, fontSize: 12.5))
+            style: TextStyle(color: AppColors.muted, fontSize: 12.5))
       else ...[
         Wrap(
           spacing: 8,

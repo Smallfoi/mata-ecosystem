@@ -121,7 +121,7 @@ class RaceDetailScreen extends ConsumerWidget {
                   if (race.distances.isNotEmpty) ...[
                     const SizedBox(height: 18),
                     Text('Дистанции',
-                        style: TextStyle(color: AppColors.textTertiary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,

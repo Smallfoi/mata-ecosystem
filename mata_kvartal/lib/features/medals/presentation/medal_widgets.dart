@@ -182,7 +182,7 @@ class _EngravingPainter extends CustomPainter {
       style: TextStyle(
         fontFamily: AppTheme.fontDisplay,
         fontWeight: FontWeight.w700,
-        fontSize: 4.0 * s,
+        fontSize: 11 * s,
         letterSpacing: 1.1 * s,
       ),
       gradient: [hi.withValues(alpha: .8), noble.withValues(alpha: .8)],

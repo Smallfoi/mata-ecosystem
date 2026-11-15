@@ -137,7 +137,7 @@ class _NotificationBell extends StatelessWidget {
                   child: Text(
                     notif.unreadCount > 9 ? '9+' : '${notif.unreadCount}',
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),

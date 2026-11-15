@@ -412,7 +412,7 @@ class _Row extends StatelessWidget {
                     row.club!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
               ],
             ),
