@@ -286,10 +286,8 @@ def payment_webhook(request):
 
 def _refund_webhook(obj):
     """Уведомление ЮKassa о возврате: статус берём из API, не из тела."""
-    import logging
-
     from .payment import fetch_refund
-    from .returns import apply_refund_info
+    from .returns import alert_foreign_refund, apply_refund_info
 
     refund_id = str(obj.get("id") or "").strip()
     if not refund_id:
@@ -301,9 +299,10 @@ def _refund_webhook(obj):
     ret = apply_refund_info(info)
     if ret is None:
         # Возврат сделан не через нас (например, в личном кабинете ЮKassa).
-        # Повтор доставки ничего не изменит — отвечаем 200 и оставляем след в логе.
-        logging.getLogger(__name__).warning(
-            "Уведомление о чужом возврате %s (платёж %s)", refund_id, info.get("paymentId"))
+        # Повтор доставки ничего не изменит — отвечаем 200, а магазину сообщаем:
+        # заказ у нас всё ещё «оплачен», и второй возврат из админки вернул бы
+        # деньги дважды.
+        alert_foreign_refund(info)
         return Response({"ok": False, "detail": "Возврат не найден"})
     return Response({"ok": True, "status": ret.status})
 

@@ -178,6 +178,36 @@ class RefundLifecycleTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertFalse(r.json()["ok"])
 
+    def _foreign(self, status="succeeded"):
+        yk = _Provider(status=status)
+        yk.by_key["cab"] = {"id": "rf_cab", "status": status, "payment_id": "pay_L",
+                            "amount": {"value": "1000.00", "currency": "RUB"}}
+        return yk
+
+    def test_refund_from_yookassa_cabinet_alerts_staff_once(self):
+        """Возврат мимо админки: заказ не трогаем, но магазин узнаёт — иначе он
+        увидит «оплачен» и вернёт деньги второй раз."""
+        yk = self._foreign()
+        with mock.patch.dict(os.environ, {"RETURNS_ALERT_EMAILS": "shop@mata-club.ru"}),                 mock.patch("notifications.email.send_email") as send,                 self.assertLogs("orders.returns", level="ERROR") as logs:
+            r = self._webhook(yk, "rf_cab")
+            self._webhook(yk, "rf_cab")  # повтор уведомления — второго письма нет
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.json()["ok"])
+        self.assertEqual(send.call_count, 1)
+        to, subject, text = send.call_args.args
+        self.assertEqual(to, "shop@mata-club.ru")
+        self.assertIn("SS-L", subject)
+        self.assertIn("НЕ оформляйте возврат", text)
+        self.assertIn("rf_cab", logs.output[0])
+        self.assertEqual(self.order.payment_status, "paid")
+        self.assertEqual(balance_of(UID), self.start)
+
+    def test_pending_cabinet_refund_is_not_alerted_yet(self):
+        yk = self._foreign(status="pending")
+        with mock.patch("notifications.email.send_email") as send:
+            self._webhook(yk, "rf_cab")
+        send.assert_not_called()
+
     # ── таймаут = неизвестный исход ───────────────────────────────────────
 
     def _timeout(self, *args, **kwargs):
