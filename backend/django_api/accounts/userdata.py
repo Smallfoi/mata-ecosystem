@@ -34,6 +34,8 @@ RETURN_WINDOW = timedelta(days=7)
 # (метка в выгрузке, модель, поля пользователя, политика).
 MODELS = (
     ("runs", "runs.Run", ("user_id",), DELETE),
+    # Проверки подлинности приложения к забегам (D-129): вердикт Google по устройству.
+    ("integrityChecks", "attestation.IntegrityCheck", ("user_id",), DELETE),
     ("trailTracks", "trails.PendingTrack", ("user_id",), DELETE),
     ("trailAttempts", "trails.TrailAttempt", ("user_id",), DELETE),
     ("externalWorkouts", "workouts.ExternalWorkout", ("user_id",), DELETE),
