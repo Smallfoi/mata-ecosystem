@@ -693,7 +693,7 @@ class _SectionTitle extends StatelessWidget {
         fontSize: 12,
         fontWeight: FontWeight.w700,
         letterSpacing: 1,
-        color: AppColors.grey600,
+        color: AppColors.black,
       ),
     );
   }
@@ -935,7 +935,7 @@ class _SortSheet extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1,
-                  color: AppColors.grey600,
+                  color: AppColors.black,
                 ),
               ),
             ),

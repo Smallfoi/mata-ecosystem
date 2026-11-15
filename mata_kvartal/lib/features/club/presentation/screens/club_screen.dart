@@ -1318,7 +1318,7 @@ class _InviteCodeCard extends ConsumerWidget {
                     const SizedBox(height: 2),
                     Text(
                       '\u041e\u0442\u0441\u043a\u0430\u043d\u0438\u0440\u0443\u0439\u0442\u0435 QR \u0434\u0440\u0443\u0433\u0430 \u0438\u043b\u0438 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0434',
-                      style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.3),
+                      style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.3),
                     ),
                   ],
                 ),
@@ -1355,7 +1355,7 @@ class _InviteCodeCard extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Text(
                   '\u0438\u043b\u0438 \u043a\u043e\u0434 \u0432\u0440\u0443\u0447\u043d\u0443\u044e',
-                  style: TextStyle(color: AppColors.muted, fontSize: 11),
+                  style: TextStyle(color: AppColors.muted, fontSize: 14),
                 ),
               ),
               Expanded(child: Divider(color: AppColors.line)),
@@ -2464,7 +2464,7 @@ class _DistrictWarCard extends ConsumerWidget {
           const SizedBox(height: 2),
           Text(
             'Чей клуб держит больше земли',
-            style: TextStyle(fontSize: 12, color: AppColors.muted),
+            style: TextStyle(fontSize: 14, color: AppColors.muted),
           ),
           const SizedBox(height: 12),
           async.when(
@@ -2476,13 +2476,13 @@ class _DistrictWarCard extends ConsumerWidget {
             ),
             error: (_, __) => Text(
               'Не удалось загрузить районы — потяни вниз, чтобы обновить.',
-              style: TextStyle(fontSize: 12.5, color: AppColors.muted),
+              style: TextStyle(fontSize: 14, color: AppColors.muted),
             ),
             data: (war) {
               if (war.standings.isEmpty && war.threats.isEmpty) {
                 return Text(
                   'Пока никто не захватил территорию. Замкни первый круг!',
-                  style: TextStyle(fontSize: 12.5, color: AppColors.muted),
+                  style: TextStyle(fontSize: 14, color: AppColors.muted),
                 );
               }
               final maxArea = war.standings
@@ -2518,7 +2518,7 @@ class _DistrictWarCard extends ConsumerWidget {
                               Text(
                                 _fmtArea(d.areaM2),
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   color: d.isMine
                                       ? AppColors.limeDeep

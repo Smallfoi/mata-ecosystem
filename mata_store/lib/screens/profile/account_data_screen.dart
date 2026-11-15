@@ -157,7 +157,7 @@ class _SectionTitle extends StatelessWidget {
         child: Text(
           text.toUpperCase(),
           style: const TextStyle(
-            color: AppColors.grey600,
+            color: AppColors.black,
             fontSize: 12,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.5,

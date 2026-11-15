@@ -312,7 +312,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           'app.editprofile.phoneLogin',
                           'Вход по номеру телефона',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 14,
                             color: AppColors.grey600,
                           ),
                         ),
@@ -477,7 +477,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
-                                        color: AppColors.grey600,
+                                        color: AppColors.black,
                                         letterSpacing: 0.5,
                                       ),
                                     ),
@@ -824,7 +824,7 @@ class _FieldState extends State<_Field> {
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
-            color: AppColors.grey600,
+            color: AppColors.black,
           ),
         ),
         const SizedBox(height: 6),

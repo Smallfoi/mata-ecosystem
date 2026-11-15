@@ -159,7 +159,7 @@ class _StatCard extends StatelessWidget {
             RemoteText(
               stat.contentKey,
               stat.label,
-              style: const TextStyle(fontSize: 12, color: AppColors.grey600),
+              style: const TextStyle(fontSize: 14, color: AppColors.grey600),
             ),
           ],
         ),

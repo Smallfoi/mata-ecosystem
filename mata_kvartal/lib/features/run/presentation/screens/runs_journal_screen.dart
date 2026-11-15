@@ -99,7 +99,7 @@ class _MonthHeader extends StatelessWidget {
               parts.join(' · '),
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
               ),
@@ -182,7 +182,7 @@ class RunTileCard extends StatelessWidget {
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: .5,
-                      color: AppColors.textSecondary,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -264,7 +264,7 @@ class RunTileCard extends StatelessWidget {
                 Text(
                   '${run.paceFormatted} /км',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 14,
                     color: AppColors.textSecondary,
                   ),
                 ),
