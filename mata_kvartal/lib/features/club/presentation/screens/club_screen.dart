@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/config/app_config_provider.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -1025,7 +1026,7 @@ class _ChallengeFormSheetState extends ConsumerState<_ChallengeFormSheet> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: MataLoading(radius: 8),
                     )
                   : const Text('Создать челлендж'),
             ),
@@ -1915,7 +1916,7 @@ class _ClubFormSheetState extends ConsumerState<_ClubFormSheet> {
                     ? const SizedBox(
                         width: 22,
                         height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: MataLoading(radius: 8),
                       )
                     : Text(
                         _isEdit
@@ -2381,7 +2382,7 @@ class _LoadingCard extends StatelessWidget {
   Widget build(BuildContext context) => const Center(
     child: Padding(
       padding: EdgeInsets.all(32),
-      child: CircularProgressIndicator(),
+      child: MataLoading(radius: 11),
     ),
   );
 }

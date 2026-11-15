@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../data/api/api_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
@@ -690,10 +691,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 ? const SizedBox(
                                     width: 22,
                                     height: 22,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
+                                    child: MataLoading(color: Colors.white, radius: 8),
                                   )
                                 : RemoteText(
                                     'app.editprofile.save',

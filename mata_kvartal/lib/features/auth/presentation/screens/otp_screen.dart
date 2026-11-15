@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../profile/data/legal_provider.dart';
 import '../../data/auth_provider.dart';
@@ -214,9 +215,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               const SizedBox(height: 16),
               if (_resending)
                 Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.electricBlue,
-                  ),
+                  child: MataLoading(color: AppColors.electricBlue, radius: 11),
                 )
               else if (_secondsLeft > 0)
                 Center(
@@ -287,10 +286,7 @@ class _WaitingOnPhone extends StatelessWidget {
           SizedBox(
             width: 26,
             height: 26,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.4,
-              color: AppColors.electricBlue,
-            ),
+            child: MataLoading(color: AppColors.electricBlue, radius: 11),
           ),
           const SizedBox(width: 16),
           Expanded(

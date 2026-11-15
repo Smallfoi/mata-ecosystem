@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/data/auth_provider.dart';
@@ -134,8 +135,7 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
                     ? SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.error),
+                        child: MataLoading(color: AppColors.error, radius: 8),
                       )
                     : Icon(CupertinoIcons.trash, color: AppColors.error, size: 20),
                 title: Text('Удалить аккаунт',

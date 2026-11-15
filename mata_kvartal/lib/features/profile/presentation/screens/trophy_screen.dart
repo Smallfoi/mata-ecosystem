@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -29,7 +30,7 @@ class MedalCatalogScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: medals.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: MataLoading(radius: 11)),
           error: (e, _) =>
               _Offline(onRetry: () => ref.invalidate(medalsProvider)),
           data: (list) => _Hall(list: list),

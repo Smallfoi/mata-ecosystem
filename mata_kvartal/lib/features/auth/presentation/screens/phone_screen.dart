@@ -230,7 +230,7 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
                 child: FilledButton(
                   onPressed: canSubmit && !isLoading ? _submit : null,
                   child: isLoading
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(width: 24, height: 24, child: MataLoading(color: Colors.white, radius: 8))
                       : Text(_mode == 'login' ? 'Войти' : 'Получить SMS-код',
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
@@ -30,7 +31,7 @@ class _StatsScreenState extends State<StatsScreen> {
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: MataLoading(radius: 11));
           }
           if (snap.hasError || !snap.hasData) {
             return const Center(

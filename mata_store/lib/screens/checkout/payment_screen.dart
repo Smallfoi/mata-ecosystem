@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../data/repositories/order_repository.dart';
 import '../../providers/order_provider.dart';
@@ -218,7 +219,7 @@ class _Waiting extends StatelessWidget {
         const SizedBox(
           width: 34,
           height: 34,
-          child: CircularProgressIndicator(strokeWidth: 2.4),
+          child: MataLoading(radius: 11),
         ),
         const SizedBox(height: 20),
         const RemoteText(
@@ -343,7 +344,7 @@ class _Awaiting extends StatelessWidget {
             const SizedBox(
               width: 15,
               height: 15,
-              child: CircularProgressIndicator(strokeWidth: 1.8),
+              child: MataLoading(radius: 8),
             ),
             const SizedBox(width: 10),
             Flexible(

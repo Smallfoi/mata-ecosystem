@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/data/auth_provider.dart';
@@ -24,7 +25,7 @@ class LegalDocumentsScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: MataLoading(radius: 11)),
           error: (e, _) => _Message(
             icon: CupertinoIcons.wifi_slash,
             text: 'Не удалось загрузить документы.\nПроверьте соединение.',
@@ -327,16 +328,16 @@ class _ConsentGateScreenState extends ConsumerState<ConsentGateScreen> {
           future: _future,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             final pending = snap.data ?? const <LegalDoc>[];
             if (snap.hasError) {
               // Fail-open: не удалось проверить — не запираем, уводим в приложение.
               _leave();
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             if (pending.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: MataLoading(radius: 11));
             }
             return Column(
               children: [
@@ -471,7 +472,7 @@ class _AcceptBar extends StatelessWidget {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: MataLoading(radius: 8),
                     )
                   : const Text('Принять и продолжить'),
             ),

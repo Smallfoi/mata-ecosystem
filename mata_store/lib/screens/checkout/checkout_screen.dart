@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:mata_ui/mata_ui.dart';
 import '../../data/api/api_client.dart';
 import '../../data/shipping_rates.dart';
 import '../../models/loyalty.dart';
@@ -1501,10 +1502,7 @@ class _NavBar extends StatelessWidget {
                     ? const SizedBox(
                         width: 22,
                         height: 22,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
+                        child: MataLoading(color: Colors.white, radius: 8),
                       )
                     : RemoteText(
                         step < 3 ? 'app.checkout.next' : 'app.checkout.confirm',

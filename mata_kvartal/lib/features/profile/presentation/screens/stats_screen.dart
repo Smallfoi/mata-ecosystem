@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/me_stats_provider.dart';
@@ -22,7 +23,7 @@ class StatsScreen extends ConsumerWidget {
         title: const Text('Моя статистика'),
       ),
       body: stats.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: MataLoading(radius: 11)),
         error: (_, __) => Center(
           child: Padding(
             padding: EdgeInsets.all(24),

@@ -463,7 +463,7 @@ class _PrimaryButton extends StatelessWidget {
         child: busy
             ? const SizedBox(
                 width: 20, height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white),
+                child: MataLoading(color: AppColors.white, radius: 8),
               )
             : Text(label.toUpperCase(),
                 style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1.2, fontSize: 14)),
@@ -813,7 +813,7 @@ class _WaitingOnPhone extends StatelessWidget {
           const SizedBox(
             width: 24,
             height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.black),
+            child: MataLoading(color: AppColors.black, radius: 11),
           ),
           const SizedBox(width: 16),
           Expanded(
