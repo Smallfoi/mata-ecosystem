@@ -181,7 +181,7 @@ class _BoardPicker extends ConsumerWidget {
               child: Text(
                 board.title,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: active ? AppColors.bg : AppColors.muted,
                 ),
@@ -569,7 +569,7 @@ Future<void> showRunnerProfileSheet(BuildContext context, WidgetRef ref) async {
                 const SizedBox(height: 4),
                 Text(
                   'Нужны только для того, чтобы собрать твою группу сравнения.',
-                  style: TextStyle(fontSize: 13, color: AppColors.muted),
+                  style: TextStyle(fontSize: 14, color: AppColors.muted),
                 ),
                 const SizedBox(height: 18),
                 const Text(

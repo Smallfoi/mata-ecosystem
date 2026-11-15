@@ -405,10 +405,10 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
       _needsPhoto
           ? const RemoteText('app.return.photos_need',
               'При браке нужно фото: сам дефект крупно и вещь целиком.',
-              style: TextStyle(fontSize: 13, color: AppColors.grey600))
+              style: TextStyle(fontSize: 14, color: AppColors.grey600))
           : const RemoteText('app.return.photos_hint',
               'Необязательно, но так быстрее разберёмся.',
-              style: TextStyle(fontSize: 13, color: AppColors.grey600)),
+              style: TextStyle(fontSize: 14, color: AppColors.grey600)),
       const SizedBox(height: 8),
       Wrap(
         spacing: 8,
@@ -584,7 +584,7 @@ class _RequestCard extends StatelessWidget {
     final inspection = ((request['inspectionPhotos'] as List?) ?? const [])
         .cast<Map<String, dynamic>>();
     final goodsBack = (request['goodsBack'] ?? '').toString();
-    const muted = TextStyle(fontSize: 13, color: AppColors.grey600);
+    const muted = TextStyle(fontSize: 14, color: AppColors.grey600);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),

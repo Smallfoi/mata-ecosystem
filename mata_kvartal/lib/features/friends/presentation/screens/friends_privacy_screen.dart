@@ -28,7 +28,7 @@ class FriendsPrivacyScreen extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
           Text('Друзья на карте. Меняешь только ты.',
-              style: TextStyle(color: AppColors.muted, fontSize: 13)),
+              style: TextStyle(color: AppColors.muted, fontSize: 14)),
           const SizedBox(height: 16),
 
           _Card(children: [

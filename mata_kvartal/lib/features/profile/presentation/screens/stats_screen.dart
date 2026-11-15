@@ -58,7 +58,7 @@ class StatsScreen extends ConsumerWidget {
             Text(
               'Статистика едина во всех приложениях экосистемы: покупки и заказы '
               'учитываются из МАТА Store.',
-              style: TextStyle(fontSize: 13, height: 1.4, color: AppColors.muted),
+              style: TextStyle(fontSize: 14, height: 1.4, color: AppColors.muted),
             ),
           ],
         ),

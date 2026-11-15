@@ -294,12 +294,12 @@ class _Row extends StatelessWidget {
             child: labelKey == null
                 ? Text(
                     label,
-                    style: const TextStyle(fontSize: 13, color: AppColors.grey600),
+                    style: const TextStyle(fontSize: 14, color: AppColors.grey600),
                   )
                 : RemoteText(
                     labelKey!,
                     label,
-                    style: const TextStyle(fontSize: 13, color: AppColors.grey600),
+                    style: const TextStyle(fontSize: 14, color: AppColors.grey600),
                   ),
           ),
         Expanded(

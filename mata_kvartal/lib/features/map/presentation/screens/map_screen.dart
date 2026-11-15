@@ -1057,7 +1057,7 @@ class _MapErrorNotice extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '\u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u043d\u0442\u0435\u0440\u043d\u0435\u0442 \u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c\u00bb.',
-            style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.25),
+            style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.25),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 14),

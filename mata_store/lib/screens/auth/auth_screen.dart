@@ -516,7 +516,7 @@ class _LoginForm extends StatelessWidget {
         Center(
           child: TextButton(
             onPressed: onForgot,
-            child: const Text('Забыл пароль?', style: TextStyle(color: AppColors.grey600, fontSize: 13)), // staw-static
+            child: const Text('Забыл пароль?', style: TextStyle(color: AppColors.grey600, fontSize: 14)), // staw-static
           ),
         ),
       ],

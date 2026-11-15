@@ -947,7 +947,7 @@ class _EmptyRunsHint extends StatelessWidget {
       ),
       child: Text(
         'Завершённые пробежки появятся здесь после первого старта.',
-        style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
       ),
     );
   }

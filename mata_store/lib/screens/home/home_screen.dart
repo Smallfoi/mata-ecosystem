@@ -333,7 +333,7 @@ class _SectionHeader extends StatelessWidget {
             contentKey,
             title,
             style: const TextStyle(
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: AppColors.grey600,
               letterSpacing: 1.5,

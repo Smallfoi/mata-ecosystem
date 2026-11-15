@@ -54,7 +54,7 @@ class _Hall extends StatelessWidget {
           child: Text(
             'Штамп МАТА · открыто $earned из ${list.length} · '
             'накопленное не отнимается',
-            style: TextStyle(fontSize: 13, color: AppColors.muted),
+            style: TextStyle(fontSize: 14, color: AppColors.muted),
           ),
         ),
         for (final cat in MedalCat.values) ...[
@@ -191,7 +191,7 @@ class _Offline extends StatelessWidget {
         children: [
           Text(
             'Зал наград не открылся — нет связи',
-            style: TextStyle(fontSize: 13.5, color: AppColors.muted),
+            style: TextStyle(fontSize: 14, color: AppColors.muted),
           ),
           const SizedBox(height: 10),
           OutlinedButton(onPressed: onRetry, child: const Text('Повторить')),

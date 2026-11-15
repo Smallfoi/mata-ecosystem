@@ -89,7 +89,7 @@ class ToolsScreen extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
               child: Text(
                 'Офлайн-помощники для бега',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
             ),
             Expanded(

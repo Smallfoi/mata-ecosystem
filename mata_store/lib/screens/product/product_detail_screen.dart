@@ -200,7 +200,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           Text(
                             '(${product.reviewCount} отзывов)',
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 14,
                               color: AppColors.grey600,
                             ),
                           ),
@@ -230,7 +230,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           'app.product.brandLine',
                           'Рядом с тобой в любом состоянии',
                           style: GoogleFonts.robotoSerif(
-                            fontSize: 13,
+                            fontSize: 14,
                             fontStyle: FontStyle.italic,
                             fontWeight: FontWeight.w200,
                             color: AppColors.grey600,
@@ -527,7 +527,7 @@ class _SizeSelector extends StatelessWidget {
                 child: Text(
                   size,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: !available
                         ? AppColors.grey600

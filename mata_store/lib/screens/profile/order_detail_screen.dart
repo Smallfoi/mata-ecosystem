@@ -599,7 +599,7 @@ class _PriceRow extends StatelessWidget {
       children: [
         RemoteText(contentKey, label,
             style: const TextStyle(
-                fontSize: 13, color: AppColors.grey600)),
+                fontSize: 14, color: AppColors.grey600)),
         Text(value,
             style: const TextStyle(
                 fontSize: 13,

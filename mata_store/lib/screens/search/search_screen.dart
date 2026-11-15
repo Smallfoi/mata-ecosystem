@@ -730,7 +730,7 @@ class _ResultsView extends StatelessWidget {
           child: Text(
             '${allResults.length} ${_plural(allResults.length)} по запросу «$query»',
             style: const TextStyle(
-              fontSize: 13,
+              fontSize: 14,
               color: AppColors.grey600,
             ),
           ),

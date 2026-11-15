@@ -138,7 +138,7 @@ class _MedalDetailState extends State<_MedalDetail>
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     letterSpacing: .4,
-                    color: Colors.white38,
+                    color: AppColors.muted,
                   ),
                 )),
                 const SizedBox(height: 16),
@@ -154,7 +154,7 @@ class _MedalDetailState extends State<_MedalDetail>
                   const SizedBox(height: 8),
                   _rise(4, Text(
                     'Нажми на медаль — на обороте личная гравировка',
-                    style: TextStyle(fontSize: 12, color: Colors.white38),
+                    style: TextStyle(fontSize: 12, color: AppColors.muted),
                   )),
                 ] else if (m.def.waitNote != null)
                   _rise(3, Padding(
@@ -165,7 +165,7 @@ class _MedalDetailState extends State<_MedalDetail>
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.4,
-                        color: Colors.white38,
+                        color: AppColors.muted,
                       ),
                     ),
                   ))
@@ -174,7 +174,7 @@ class _MedalDetailState extends State<_MedalDetail>
                 else
                   _rise(3, Text(
                     'Ещё впереди',
-                    style: TextStyle(fontSize: 12.5, color: Colors.white38),
+                    style: TextStyle(fontSize: 12.5, color: AppColors.muted),
                   )),
                 const SizedBox(height: 26),
                 if (earned)

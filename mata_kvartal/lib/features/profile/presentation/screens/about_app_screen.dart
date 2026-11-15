@@ -95,7 +95,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                   Text(
                     'Бег, территории и баллы экосистемы МАТА',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: AppColors.muted),
+                    style: TextStyle(fontSize: 14, color: AppColors.muted),
                   ),
                 ],
               ),
@@ -130,7 +130,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                       : Text(
                           _checkNote!,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 14,
                             color: hasUpdate
                                 ? AppColors.accentInk
                                 : AppColors.muted,
@@ -178,7 +178,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                   ),
                   subtitle: Text(
                     'mata-club.ru/app.html',
-                    style: TextStyle(fontSize: 13, color: AppColors.muted),
+                    style: TextStyle(fontSize: 14, color: AppColors.muted),
                   ),
                   onTap: () => _open(_testersPage),
                 ),
