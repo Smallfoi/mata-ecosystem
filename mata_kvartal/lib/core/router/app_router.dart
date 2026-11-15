@@ -5,6 +5,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../features/auth/data/auth_provider.dart';
 import '../../features/friends/presentation/screens/friends_screen.dart';
 import '../../features/friends/presentation/screens/friends_privacy_screen.dart';
+import '../../features/moderation/presentation/blocked_screen.dart';
 import '../../features/auth/presentation/screens/phone_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/auth/presentation/screens/otp_screen.dart';
@@ -251,6 +252,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/profile/friends/privacy',
                 builder: (_, __) => const FriendsPrivacyScreen(),
+              ),
+              GoRoute(
+                path: '/profile/friends/blocked',
+                builder: (_, __) => const BlockedScreen(),
               ),
               GoRoute(
                 path: '/profile/points',

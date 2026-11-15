@@ -8,6 +8,8 @@ import 'package:mata_ui/mata_ui.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_states.dart';
 import '../../data/friends_provider.dart';
+import '../../../moderation/data/moderation_provider.dart';
+import '../../../moderation/presentation/report_sheet.dart';
 
 /// Друзья (D-82, этап 2a): взаимные друзья, заявки, добавление.
 /// Карта друзей и приватность — этап 2b/2c. Раздел за флагом kFriends.
@@ -218,6 +220,112 @@ Widget _pill(String text, {Color? bg, Color? fg, VoidCallback? onTap, IconData? 
   return onTap == null ? child : GestureDetector(onTap: onTap, child: child);
 }
 
+/// «…» у строки человека: пожаловаться или заблокировать.
+///
+/// Обе кнопки живут рядом с человеком, а не в настройках: защита, до которой
+/// надо дойти через три экрана, не работает в тот момент, когда она нужна.
+Widget _moreButton(BuildContext context, WidgetRef ref, FriendSummary f) {
+  return IconButton(
+    tooltip: 'Ещё',
+    visualDensity: VisualDensity.compact,
+    constraints: const BoxConstraints(),
+    padding: const EdgeInsets.only(left: 6),
+    icon: Icon(CupertinoIcons.ellipsis, size: 18, color: AppColors.muted),
+    onPressed: () => _showPersonMenu(context, ref, f),
+  );
+}
+
+void _showPersonMenu(BuildContext context, WidgetRef ref, FriendSummary f) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (sheetCtx) => Container(
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.line,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 14),
+            ListTile(
+              leading: Icon(CupertinoIcons.exclamationmark_bubble,
+                  color: AppColors.ink),
+              title: Text('Пожаловаться',
+                  style: TextStyle(
+                      color: AppColors.ink, fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                showReportSheet(context,
+                    targetType: 'user', targetId: f.userId, targetName: f.name);
+              },
+            ),
+            ListTile(
+              leading: Icon(CupertinoIcons.nosign, color: AppColors.error),
+              title: Text('Заблокировать',
+                  style: TextStyle(
+                      color: AppColors.error, fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _confirmBlock(context, ref, f);
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> _confirmBlock(
+    BuildContext context, WidgetRef ref, FriendSummary f) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: AppColors.paper,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: Text('Заблокировать ${f.name}?'),
+      content: Text(
+        'Вы перестанете видеть друг друга в поиске, подсказках и на карте, '
+        'а заявки от него не придут. Если вы друзья — дружба прервётся.',
+        style: TextStyle(color: AppColors.muted),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text('Отмена', style: TextStyle(color: AppColors.muted)),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+          child: const Text('Заблокировать'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  final done = await ref.read(moderationActionsProvider).block(f.userId);
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(done
+          ? '${f.name} заблокирован — список в «Друзья → Приватность»'
+          : 'Не удалось — попробуйте позже'),
+    ),
+  );
+}
+
 class _FriendsList extends ConsumerWidget {
   final FriendsData data;
   const _FriendsList({required this.data});
@@ -240,8 +348,11 @@ class _FriendsList extends ConsumerWidget {
         for (final f in data.friends)
           _Row(
             f: f,
-            trailing: _pill('Убрать',
-                fg: AppColors.muted, onTap: () => act.remove(f.userId)),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              _pill('Убрать',
+                  fg: AppColors.muted, onTap: () => act.remove(f.userId)),
+              _moreButton(context, ref, f),
+            ]),
           ),
       ],
     );
@@ -280,6 +391,7 @@ class _Requests extends ConsumerWidget {
                 const SizedBox(width: 8),
                 _pill('Нет',
                     fg: AppColors.muted, onTap: () => act.reject(f.userId)),
+                _moreButton(context, ref, f),
               ]),
             ),
         ],
