@@ -10,6 +10,7 @@ import '../../../profile/data/legal_provider.dart';
 import '../../../profile/presentation/screens/legal_documents_screen.dart';
 import '../../data/auth_provider.dart';
 import 'welcome_screen.dart';
+import 'package:flutter/cupertino.dart';
 
 class PhoneScreen extends ConsumerStatefulWidget {
   const PhoneScreen({super.key});
@@ -209,7 +210,7 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
                   _mode == 'reset' ? 'Новый пароль' : 'Пароль',
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      _obscure ? CupertinoIcons.eye_slash : CupertinoIcons.eye,
                       color: AppColors.muted,
                       size: 22,
                     ),

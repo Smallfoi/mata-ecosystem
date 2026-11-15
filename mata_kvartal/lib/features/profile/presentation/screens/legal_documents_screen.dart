@@ -177,7 +177,7 @@ class _LegalDocView extends StatelessWidget {
             children: [
               Padding(
                 padding: EdgeInsets.only(top: 7, right: 8),
-                child: Icon(Icons.circle, size: 5, color: AppColors.accentBlue),
+                child: Icon(CupertinoIcons.circle, size: 5, color: AppColors.accentBlue),
               ),
               Expanded(
                 child: SelectableText(_stripInline(line.substring(2)),

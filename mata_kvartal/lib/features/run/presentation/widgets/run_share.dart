@@ -15,6 +15,7 @@ import '../../../auth/data/auth_provider.dart';
 import '../../../medals/data/medal_defs.dart';
 import '../../../medals/data/medals_provider.dart';
 import '../../data/completed_runs_provider.dart' show lastRunPointsProvider;
+import 'package:flutter/cupertino.dart';
 import '../../../medals/presentation/medal_share.dart'
     show BrandMark, InstagramButtonLabel, StickerHint, saveShareImageToGallery;
 
@@ -206,7 +207,7 @@ class _RunShareSheetState extends ConsumerState<_RunShareSheet> {
                   minimumSize: const Size(64, 48),
                 ),
                 onPressed: _busy ? null : _saveToGallery,
-                icon: const Icon(Icons.download_rounded, size: 19),
+                icon: const Icon(CupertinoIcons.arrow_down_circle, size: 19),
                 label: const Text('Сохранить в галерею'),
               ),
             ),
@@ -403,7 +404,7 @@ class RunStoryCard extends StatelessWidget {
                       )
                     : Center(
                         child: Icon(
-                          Icons.route,
+                          CupertinoIcons.arrow_branch,
                           size: 64,
                           color: _lime.withValues(alpha: .4),
                         ),

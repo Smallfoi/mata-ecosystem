@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/league_provider.dart';
+import 'package:flutter/cupertino.dart';
 
 /// «Зачем ты бегаешь» — вопрос при первом запуске.
 ///
@@ -110,7 +111,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
                               ),
                             ),
                             if (active)
-                              Icon(Icons.check_circle, color: AppColors.accentInk),
+                              Icon(CupertinoIcons.check_mark_circled, color: AppColors.accentInk),
                           ],
                         ),
                       ),

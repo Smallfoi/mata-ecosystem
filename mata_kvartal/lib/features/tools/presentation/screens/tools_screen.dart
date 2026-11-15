@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
@@ -35,7 +34,7 @@ final _tools = <({
     anim: _ToolAnim.beat,
   ),
   (
-    icon: Icons.straighten,
+    icon: CupertinoIcons.arrow_left_right,
     title: 'Размер обуви',
     sub: 'RU / EU / US',
     route: '/tools/shoe-size',
@@ -43,7 +42,7 @@ final _tools = <({
     anim: _ToolAnim.slide,
   ),
   (
-    icon: Icons.music_note,
+    icon: CupertinoIcons.music_note,
     title: 'Метроном',
     sub: 'ритм шагов (каденс)',
     route: '/tools/metronome',
@@ -51,7 +50,7 @@ final _tools = <({
     anim: _ToolAnim.swing,
   ),
   (
-    icon: Icons.timer,
+    icon: CupertinoIcons.timer,
     title: 'Интервалы',
     sub: 'таймер тренировки',
     route: '/tools/interval',
