@@ -322,6 +322,54 @@ def apply_refund_info(info):
     return settle(ret.pk, info)
 
 
+def alert_foreign_refund(info):
+    """Возврат прошёл в кабинете ЮKassa, мимо нашей админки: сказать магазину.
+
+    Деньги покупателю уже ушли, а у нас заказ по-прежнему «оплачен», баллы не
+    пересчитаны. Сами ничего не проводим: какие позиции вернули, ЮKassa не
+    сообщает, а угадывать по сумме — значит ошибиться в баллах и чеке. Главная
+    опасность — сотрудник увидит «оплачен» и оформит возврат ещё раз, деньги
+    уйдут дважды. Поэтому: ошибка в журнал (её видно в «Мониторинге» → «Ошибки»)
+    и письмо сотрудникам с доступом к заказам. Одно уведомление на возврат.
+    """
+    from django.core.cache import cache
+
+    if info.get("status") != "succeeded":
+        return  # в обработке или отклонён — деньги не ушли, ждём окончательного
+    rid = info.get("refundId") or ""
+    if rid and not cache.add(f"foreign-refund:{rid}", 1, timeout=7 * 24 * 3600):
+        return  # уже сообщили
+    order = Order.objects.filter(payment_id=info.get("paymentId") or "").first()         if info.get("paymentId") else None
+    number = order.order_id if order else "не найден"
+    log.error("Возврат %s на %s ₽ проведён в кабинете ЮKassa, мимо админки "
+              "(платёж %s, заказ %s): статус заказа и баллы не изменены",
+              rid, info.get("amount"), info.get("paymentId"), number)
+    if order is None:
+        return
+    try:
+        from notifications.email import send_email
+
+        from .return_requests import staff_recipients
+
+        subject = f"Заказ {number}: деньги вернули в кабинете ЮKassa"
+        text = (
+            f"По заказу {number} в личном кабинете ЮKassa проведён возврат "
+            f"{info.get('amount')} ₽ (номер возврата {rid}). Через админку МАТА он "
+            f"не оформлялся, поэтому в системе заказ всё ещё «оплачен», а баллы "
+            f"покупателя не пересчитаны.\n\n"
+            f"НЕ оформляйте возврат по этому заказу в админке — деньги уйдут "
+            f"покупателю второй раз.\n\n"
+            f"Что сделать: сверить с покупателем, какие вещи вернули, и поправить "
+            f"заказ и баллы вручную. Дальше возвраты лучше проводить из админки "
+            f"(Заказы → заказ → «Оформить возврат») — тогда баллы и статус меняются сами."
+        )
+        for to in staff_recipients():
+            send_email(to, subject, text)
+    except Exception:
+        # Письмо — подсказка; ошибка уже в журнале.
+        log.exception("Письмо о возврате мимо админки не отправлено")
+
+
 def reconcile_returns(now=None) -> dict:
     """Досверить возвраты «в обработке» с ЮKassa (фоновая задача).
 
