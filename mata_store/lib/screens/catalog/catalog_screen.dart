@@ -338,7 +338,7 @@ class _EmptyResult extends StatelessWidget {
           const RemoteText(
             'app.catalog.empty.subtitle',
             'Попробуйте изменить фильтры',
-            style: TextStyle(fontSize: 13, color: AppColors.grey600),
+            style: TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
           const SizedBox(height: 20),
           GestureDetector(
@@ -520,7 +520,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       'Сбросить',
                       style: TextStyle(
                         color: AppColors.grey600,
-                        fontSize: 13,
+                        fontSize: 14,
                       ),
                     ),
                   ),

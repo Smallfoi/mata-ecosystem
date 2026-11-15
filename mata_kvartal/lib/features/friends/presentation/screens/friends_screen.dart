@@ -236,7 +236,7 @@ class _Empty extends StatelessWidget {
           const SizedBox(height: 6),
           Text(sub,
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)),
+              style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.4)),
         ]),
       ),
     );
@@ -486,6 +486,6 @@ class _AddPanel extends ConsumerWidget {
 
   Widget _muted(String t) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(t, style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)),
+        child: Text(t, style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.4)),
       );
 }

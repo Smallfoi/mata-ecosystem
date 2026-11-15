@@ -740,7 +740,7 @@ class _HubChips extends ConsumerWidget {
               child: Text(
                 tab.title,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: active ? AppColors.bg : AppColors.muted,
                 ),

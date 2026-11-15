@@ -108,7 +108,7 @@ class _RacesScreenState extends ConsumerState<RacesScreen> {
                 children: [
                   Text(
                     'Календарь беговых событий',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                   ),
                   const SizedBox(height: 6),
                   // Кликабельный чип региона — открывает выбор (мой регион / вся Россия /
@@ -464,7 +464,7 @@ class _Segmented extends StatelessWidget {
                     labels[i],
                     style: TextStyle(
                       color: i == index ? AppColors.ink : AppColors.textSecondary,
-                      fontSize: 13.5,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

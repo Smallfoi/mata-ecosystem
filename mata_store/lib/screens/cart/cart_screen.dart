@@ -35,7 +35,7 @@ class CartScreen extends StatelessWidget {
                 child: const RemoteText(
                   'app.cart.clear',
                   'Очистить',
-                  style: TextStyle(color: AppColors.grey600, fontSize: 13),
+                  style: TextStyle(color: AppColors.grey600, fontSize: 14),
                 ),
               );
             },
@@ -387,7 +387,7 @@ class _OrderSummary extends StatelessWidget {
               const RemoteText(
                 'app.cart.delivery',
                 'Доставка',
-                style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                style: TextStyle(fontSize: 14, color: AppColors.grey600),
               ),
               const RemoteText(
                 'app.cart.deliveryNote',

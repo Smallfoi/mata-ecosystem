@@ -441,7 +441,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     const RemoteText(
                       'app.editprofile.noAddresses',
                       'Нет сохранённых адресов',
-                      style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                      style: TextStyle(fontSize: 14, color: AppColors.grey600),
                     ),
 
                   // Address list
@@ -541,7 +541,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 : 'app.editprofile.addAddress',
                             _showAddressForm ? 'Отмена' : 'Добавить адрес',
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppColors.grey600,
                             ),

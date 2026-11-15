@@ -350,7 +350,7 @@ class _Awaiting extends StatelessWidget {
               child: RemoteText(
                 'app.payment.waiting',
                 'Ждём подтверждение оплаты',
-                style: const TextStyle(fontSize: 13.5, color: AppColors.grey600),
+                style: const TextStyle(fontSize: 14, color: AppColors.grey600),
               ),
             ),
           ],
@@ -405,7 +405,7 @@ class _Problem extends StatelessWidget {
             // staw-static — техническая причина от сервера, не редактируемый текст
             detail,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: AppColors.grey600),
+            style: const TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
         ],
         const SizedBox(height: 22),

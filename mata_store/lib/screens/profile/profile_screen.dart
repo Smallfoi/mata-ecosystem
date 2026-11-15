@@ -716,7 +716,7 @@ class _OrdersTab extends StatelessWidget {
                 RemoteText(
                   'app.profile.orders.emptySub',
                   'Ваши заказы появятся здесь',
-                  style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey600),
                 ),
               ],
             ),
@@ -809,7 +809,7 @@ class _OrderCard extends StatelessWidget {
             '${order.items.length} '
             '${_plural(order.items.length)} · '
             '${order.total.toInt()} ₽',
-            style: const TextStyle(fontSize: 13, color: AppColors.grey600),
+            style: const TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
           const SizedBox(height: 4),
           Text(
@@ -853,7 +853,7 @@ class _WishlistTab extends StatelessWidget {
                 RemoteText(
                   'app.profile.wishlist.emptySub',
                   'Добавляйте понравившиеся товары',
-                  style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey600),
                 ),
               ],
             ),

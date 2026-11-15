@@ -223,7 +223,7 @@ class _LegalDocView extends StatelessWidget {
           ),
           child: SelectableText(_stripInline(line.substring(2)),
               style: const TextStyle(
-                  fontSize: 13, color: AppColors.grey600, height: 1.4)),
+                  fontSize: 14, color: AppColors.grey600, height: 1.4)),
         ));
       } else if (RegExp(r'^[-*] ').hasMatch(line)) {
         widgets.add(Padding(

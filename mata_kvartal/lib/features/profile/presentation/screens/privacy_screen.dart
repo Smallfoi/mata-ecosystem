@@ -176,7 +176,7 @@ class _Hint extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
         child: Text(text,
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
       );
 }
 

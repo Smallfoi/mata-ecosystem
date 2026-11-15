@@ -595,7 +595,7 @@ class _ContactStep extends StatelessWidget {
           const RemoteText(
             'app.checkout.contactsSubtitle',
             'Укажите данные для связи по заказу',
-            style: TextStyle(fontSize: 13, color: AppColors.grey600),
+            style: TextStyle(fontSize: 14, color: AppColors.grey600),
           ),
           const SizedBox(height: 24),
           _Field(
@@ -682,7 +682,7 @@ class _DeliveryStep extends StatelessWidget {
             'app.checkout.delivery.note',
             'Доставка по Якутску: свяжемся после заказа и договоримся о времени. '
                 'Стоимость доставки в оплату не входит.',
-            style: TextStyle(fontSize: 13, color: AppColors.grey600, height: 1.4),
+            style: TextStyle(fontSize: 14, color: AppColors.grey600, height: 1.4),
           ),
           if (needAddress) ...[
             const SizedBox(height: 20),
@@ -1202,7 +1202,7 @@ class _ReviewStep extends StatelessWidget {
                 const RemoteText(
                   'app.checkout.pointsLabel',
                   'Баллы',
-                  style: TextStyle(fontSize: 13, color: AppColors.grey600),
+                  style: TextStyle(fontSize: 14, color: AppColors.grey600),
                 ),
                 Text(
                   '−$redeem ₽',
@@ -1240,7 +1240,7 @@ class _ReviewStep extends StatelessWidget {
             Text(
               priceWithBonuses(total.toInt(), redeem),
               textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 13, color: AppColors.grey600),
+              style: const TextStyle(fontSize: 14, color: AppColors.grey600),
             ),
           ],
         ],

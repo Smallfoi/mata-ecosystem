@@ -110,7 +110,7 @@ class _AccountDataScreenState extends State<AccountDataScreen> {
                     'app.account.privacyHint',
                     'Видимость маршрутов и положения в реальном времени настраивается '
                     'в приложении «Квартал» (аккаунт общий).',
-                    style: TextStyle(color: AppColors.grey600, fontSize: 13),
+                    style: TextStyle(color: AppColors.grey600, fontSize: 14),
                   ),
                 ),
                 const SizedBox(height: 28),
@@ -120,7 +120,7 @@ class _AccountDataScreenState extends State<AccountDataScreen> {
                   child: Text(
                     'Удаление аккаунта стирает все ваши данные без возможности '
                     'восстановления (152-ФЗ).',
-                    style: TextStyle(color: AppColors.grey600, fontSize: 13),
+                    style: TextStyle(color: AppColors.grey600, fontSize: 14),
                   ),
                 ),
                 OutlinedButton.icon(
