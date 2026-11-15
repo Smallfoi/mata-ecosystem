@@ -195,13 +195,17 @@ case "${1:-}" in
       echo "СТОП: GlitchTip не отдал ключи (первый пользователь создан? glitchtip.sh admin)"
       exit 1
     fi
-    cp -p "$shop_secrets" "$shop_secrets.bak-$(date +%Y%m%d%H%M%S)"
+    # Свой файл, а не файл секретов магазина: тот переписывается из Lockbox при каждом
+    # обновлении секретов (beget-up.sh SECRETS_ONLY=1) и стирал эти ключи (12.11.2026).
+    # refresh-env.sh и prod-deploy.sh добавляют этот файл в .env последним.
+    keys_file="${MATA_SERVER_KEYS_FILE:-/root/mata-server-keys.env}"
+    [ -s "$keys_file" ] && cp -p "$keys_file" "$keys_file.bak-$(date +%Y%m%d%H%M%S)"
     tmp="$(mktemp)"
     keys="$(printf '%s\n' "$out" | sed -n 's/^ENV:\([A-Z_]*\)=.*/\1/p' | paste -sd'|')"
-    grep -Ev "^(${keys})=" "$shop_secrets" > "$tmp" || true
+    if [ -s "$keys_file" ]; then grep -Ev "^(${keys})=" "$keys_file" > "$tmp" || true; fi
     printf '%s\n' "$out" | sed -n 's/^ENV://p' >> "$tmp"
-    install -m 600 "$tmp" "$shop_secrets"; rm -f "$tmp"
-    echo "Ключи GlitchTip записаны в $shop_secrets (прежняя версия — рядом, .bak-…)."
+    install -m 600 "$tmp" "$keys_file"; rm -f "$tmp"
+    echo "Ключи GlitchTip записаны в $keys_file — их не сотрёт обновление секретов из Lockbox."
     bash deploy/refresh-env.sh
     echo
     echo "Магазин подключён: ошибки бэкенда идут в GlitchTip, страница «Ошибки» в админке живая."

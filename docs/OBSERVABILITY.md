@@ -118,16 +118,22 @@ Valkey. Потолки памяти 700 + 256 МБ, на деле ~240 МБ (з�
 3. `sudo bash /opt/mata/backend/deploy/glitchtip.sh tls` — сертификат и адрес errors.mata-club.ru.
 4. `sudo bash /opt/mata/backend/deploy/glitchtip.sh admin` — ваш вход в GlitchTip: почта и пароль.
 5. `sudo bash /opt/mata/backend/deploy/glitchtip.sh connect` — проекты `backend` и `apps`, ключи,
-   токен только на чтение для страницы «Ошибки» в админке; всё пишет в `/root/mata-secrets.env`
-   (с копией прежней версии) и перезапускает магазин. В конце печатает DSN приложений —
+   токен только на чтение для страницы «Ошибки» в админке; всё пишет в `/root/mata-server-keys.env`
+   (с копией прежней версии) и перезапускает магазин. Это отдельный файл: файл секретов
+   `/root/mata-secrets.env` обновление из Lockbox переписывает целиком. В конце печатает DSN приложений —
    его в секрет GitHub `SENTRY_DSN`, со следующей Android-сборки ошибки телефонов тоже здесь.
 
 Проверено локально 10.11.2026 тем же файлом и образом: миграции, вход, приём настоящей ошибки
 из нашего бэкенда, показ её в `/admin/errors/` («Не решена»), повторный `connect` без дублей,
 nginx с GlitchTip и без него.
 
-**Ключи:** `connect` пишет их в файл секретов сервера, НЕ в Lockbox. При пересоздании сервера из
-Lockbox их надо перенести туда (или повторить `connect`).
+**Ключи:** `connect` пишет их в `/root/mata-server-keys.env`, НЕ в Lockbox. `refresh-env.sh` и
+`prod-deploy.sh` добавляют этот файл в `.env` последним, поэтому обновление секретов
+(`beget-up.sh SECRETS_ONLY=1`) ключи не стирает. До 15.11.2026 стирало — см. PITFALLS.
+При пересоздании сервера повторить `connect`.
+
+**Как понять, что связь пропала:** в `/v1/health` в `configWarnings` снова есть `SENTRY_DSN`.
+Лечится одной командой: `sudo bash /opt/mata/backend/deploy/glitchtip.sh connect`.
 
 ## 8. Ранбук устранения КОРНЯ (петля)
 
