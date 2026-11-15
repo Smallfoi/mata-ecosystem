@@ -20,7 +20,7 @@
 
   /* — Цвет: акцент — */
   --accent: #57bcd8;      /* технический голубой (главный сигнал) */
-  --accent-ink: #126278;  /* затемнённый голубой для текста по светлому */
+  --accent-ink: #115d72;  /* затемнённый голубой для текста по светлому */
   --accent-2: #dff45f;    /* лайм — спортивный сигнал, дозированно */
   --on-dark: #ffffff;     /* текст/иконки на графите */
 
@@ -350,7 +350,7 @@ img {
 
 .eyebrow {
   margin: 0 0 16px;
-  color: #126278;
+  color: #115d72;
   font-size: 12px;
   font-weight: 950;
   letter-spacing: 0.18em;
@@ -444,7 +444,7 @@ h3 {
 }
 
 .btn-primary {
-  background: var(--graphite);
+  background: var(--accent-ink);
   color: var(--on-dark);
   box-shadow: var(--shadow-sm);
 }
