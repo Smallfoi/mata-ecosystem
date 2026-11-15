@@ -4,9 +4,13 @@
 > Все три приложения и backend реализуют ОДНИ и те же сущности, эндпоинты и потоки.
 > Менять контракт — только здесь, синхронно во всех проектах. Связанные документы: `RECOMMENDATION.md`, `ECOSYSTEM.md`.
 >
-> Статус: контракт согласован с уже реализованными в Sport Store моделями (DTO) и репозиториями
-> (`mata_store/lib/data/repositories/*`, `mata_store/lib/models/*`). Backend пока не поднят
-> (`ApiConfig.useMock = true`). При запуске backend все три приложения переключаются на эти эндпоинты.
+> Статус: backend РАБОТАЕТ, все три продукта ходят в него. Прод — `https://api.mata-club.ru/v1`,
+> разработка — `http://127.0.0.1:8000/v1` (Docker; с телефона `adb reverse tcp:8000 tcp:8000`).
+> Прежняя строка «backend пока не поднят, `ApiConfig.useMock = true`» устарела и снята.
+>
+> **Сверено с кодом 15.11.2026** (D05): адреса документа и маршруты Django совпадают в обе
+> стороны. Документ больше не обещает того, чего нет, и описывает все 137 адресов `/v1`.
+> Источник маршрутов — `backend/django_api/config/urls.py` плюс `*/urls.py` приложений.
 
 ---
 
@@ -259,11 +263,14 @@ POST /auth/phone/verify        { phone, code, referralCode? } → { token, user,
                                                            пригласившего; referral { ok, detail } — результат
                                                            (плохой код регистрацию НЕ ломает). То же для
                                                            POST /auth/register { phone, code, …, referralCode? }.
-POST /auth/password/forgot     { email }                 → 200
-POST /auth/password/reset      { password }              → 200
-PUT  /auth/password            { old, new }              → 200
+POST /auth/password/reset      { phone, code, password } → { ok }   (сброс по коду из phone/request,
+                                                           dev — 1234; меняет token_version, то есть
+                                                           разлогинивает ВСЕ устройства)
 GET  /auth/me                                            → user   (incl. privacy)
 ```
+Пароль меняется ТОЛЬКО сбросом по коду на телефон. `PUT /auth/password { old, new }` и
+`POST /auth/password/forgot { email }` в коде НЕ реализованы — в документе они значились
+ошибочно (сверка 15.11.2026).
 
 ### Account (приватность и удаление, LAUNCH_READINESS §2/§13)
 ```
@@ -272,6 +279,16 @@ PATCH /account/privacy   { routePublic, ... }            → privacy   (по у�
 GET   /account/export                                    → JSON-файл со ВСЕМИ ПДн юзера (портируемость, §2)
 POST  /account/delete    { confirm: true }               → { ok, deleted{...} }  (необратимо, Bearer)
 ```
+
+### Profile (общий профиль и аватар)
+```
+PATCH  /profile  { name?, city?, ... }  → user    (общий профиль экосистемы, Bearer)
+POST   /profile/avatar  multipart `image` → user  (аватар единый для всех приложений:
+                                            файл в media, URL в avatar_path)
+DELETE /profile/avatar                    → user  (снять аватар)
+```
+Не путать с `GET|POST /runner/profile` (раздел «League») — там беговые данные для зачётов
+(год рождения, пол, уровень, недельная цель), а не карточка аккаунта.
 
 ### Catalog
 ```
@@ -291,6 +308,11 @@ GET /brands                             → string[]
 GET /sizes                              → string[]
 GET /products/price-range               → { min, max }
 GET /banners                            → Banner[]
+GET /site/content                       → редактируемый контент сайта (тексты и фото шапки,
+                                          hero, секций). Мини-CMS: сайт подставляет по
+                                          data-edit / data-edit-img. Публично, как каталог.
+POST /reviews/photo  multipart `image`  → { url }   (фото к отзыву; только тому, кто вправе
+                                          оставить отзыв на эту модель)
 ```
 
 **Витрина `/models`: размер ответа и страницы (аудит F01).** Замер прода 27.09.2026:
@@ -452,9 +474,13 @@ POST /orders/:id/cancel           → { status: canceled|requested, canCancel, c
                  До передачи курьеру (D-123). 1С заказ ещё не забрала → отмена сразу, деньги целиком; забрала → запрос складу
                  (подтверждает/отклоняет в админке). 409 — уже у курьера / уже возврат / запрос уже есть.
 GET  /orders                                             → Order[] (текущего пользователя)
-GET  /orders/:id                                         → Order
+                 ОДНОГО заказа отдельным адресом НЕТ: клиент берёт нужный из этого списка.
 POST /orders/:id/pay  { returnUrl? }  → { status, paymentId, confirmationUrl, method: "sbp" }  (только СБП, D-72; 409 — время на оплату истекло; 502 — оплата недоступна; dev без провайдера — status=paid без paymentId, на сборку не уходит)
-POST /devices/register { token, platform }               → { ok }   (токен устройства для пушей, D-25)
+GET  /orders/:id/payment                                 → { status, paymentId }
+                 Статус оплаты С ПЕРЕПРОВЕРКОЙ у провайдера, Bearer, только свой заказ.
+                 Нужен по двум причинам: вебхук может не дойти (сеть, наш деплой, 5xx) — тогда
+                 заказ навсегда остался бы «ждёт оплаты» при списанных деньгах; и покупатель,
+                 вернувшись со страницы оплаты, хочет видеть результат сразу.
 ```
 
 ### Loyalty (единый баланс)
@@ -512,6 +538,8 @@ GET  /loyalty/account   + programV1: bool   (false — старые правил
 GET  /loyalty/referral  → { programV1, code, bonus, capMonth, invitedBy, canBind, bindUntil,
                             invited, rewarded }      (code — мой постоянный код приглашения)
 POST /loyalty/referral  { code } → 200 { ok: true, detail, …как GET } | 400 { ok: false, detail, … }
+GET  /loyalty/partners  → партнёры программы на карте (D-81). Публично, без токена: слой
+                          «Карты» в Квартале показывает эти точки всем.
                         ввести код пригласившего (для сборок без поля в регистрации): только в
                         первые 7 дней после регистрации, связь одна и навсегда; самоприглашение
                         (тот же телефон или то же устройство) отклоняется.
@@ -604,7 +632,16 @@ POST /runs  { id, distanceMeters, elapsedSeconds, finishedAtMs, capturedTerritor
             mockDetected: bool (опц.) — клиент сообщает о подделке геолокации (Android mock-GPS)
             → сервер флагает забег (0 очков); накопление флагов помечает аккаунт «на ревью» (S-04).
 ```
-Сырой GPS-маршрут НЕ передаём/не храним (приватность §2). Сервер сам валидирует забег
+```
+GET /runs/:id/track                     → { points: [[lat, lng, ts], ...] }
+```
+Резервная копия своего трека (D-86): маршрут переживает переустановку и смену телефона.
+Только свой; копии нет — пустой список.
+
+Сводка забега едет БЕЗ маршрута, но сам трек приходит отдельно (`POST /runs/track`, раздел
+«Trails») и хранится 30 дней. Прежняя формулировка «сырой GPS-маршрут не храним» в этом
+месте противоречила разделу «Trails» и исправлена сверкой 15.11.2026 (приватность §2 —
+трек не отдаётся никому, кроме владельца, и удаляется по сроку). Сервер сам валидирует забег
 (скорость ≤ 40 км/ч, дистанция/время, суточный лимит) и НАЧИСЛЯЕТ очки за бег
 (`runnerRun` = км×10), идемпотентно по `id`. Неправдоподобный забег → `flagged`, 0 очков.
 Клиент очки за бег больше НЕ присылает.
@@ -625,6 +662,9 @@ POST /territories/capture { points: [[lat,lng],...], captureId, distanceMeters?,
      см. «Программа v1, этап 2»; бонус и тогда, когда новой площади нет, но кварталы перешли
      (blocksGained > 0, скорость проверена).
      дубль captureId → { ok, duplicate: true, areaM2, geojson }
+GET  /territories                       → активные территории пользователя (живой слой, D-14)
+GET  /footprint                         → вечный личный след: вся когда-либо пробежанная площадь
+                                          (не уменьшается; geojson — упрощённый контур под heatmap)
 ```
 Скорость = max(distanceMeters, длина маршрута по points) / elapsedSeconds; > 40 км/ч → 400.
 Без `elapsedSeconds` (нет / не число / ≤ 0) скорость не проверить: зона засчитывается,
@@ -696,11 +736,95 @@ GET  /trails/:id/boards?board=<fastest|mine|frequent|mylane>
 Одна и та же пробежка не даёт две попытки на одной тропе. Невозможная скорость,
 бег в обратную сторону и срезанные углы не засчитываются.
 
+### Clubs (клубы — Квартал)
+```
+GET    /clubs[?search=]                 → Club[]        (витрина клубов; скрытые модерацией не видны)
+POST   /clubs      { name, city, ... }  → Club          (создать клуб)
+GET    /clubs/me                        → Club | null   (мой клуб)
+GET    /clubs/:id                       → Club
+PATCH  /clubs/:id  { ... }              → Club          (правка — владелец)
+POST   /clubs/:id/join                  → { status }    (вступить / подать заявку)
+POST   /clubs/:id/leave                 → { ok }
+GET    /clubs/:id/requests              → заявки на вступление (владелец)
+POST   /clubs/requests/:reqId/approve   → { ok }
+POST   /clubs/requests/:reqId/reject    → { ok }
+POST   /clubs/:id/logo     multipart `image`  → Club    (логотип; владелец)
+POST   /clubs/:id/cover    multipart `image`  → Club    (обложка-баннер; владелец)
+DELETE /clubs/:id/cover                       → Club    (снять обложку)
+POST   /clubs/:id/challenge { title, targetKm, days } → челлендж клуба (владелец)
+DELETE /clubs/:id/challenge                           → отменить челлендж
+GET    /clubs/war                       → «Война района» (Квартал 2.0, Ф6): позиции клубов
+                                          по земле + угрозы недели
+```
+Всё под Bearer.
+
+### Friends (друзья и карта друзей — D-82…D-85)
+```
+GET    /friends                         → { friends, incoming, outgoing }
+POST   /friends/request   { userId }    → заявка (встречную подтверждает автоматически)
+GET    /friends/search?q=               → поиск по имени
+GET    /friends/suggestions             → подсказки (пока — одноклубники)
+POST   /friends/match-contacts          → сопоставление контактов по ХЕШУ телефона
+                                          (сырые номера не шлём — приватность)
+POST   /friends/:id/accept              → подтвердить входящую заявку
+POST   /friends/:id/reject              → отклонить входящую / отменить свою исходящую
+DELETE /friends/:id                     → удалить из друзей
+GET|PATCH /friends/prefs                → приватность карты (по умолчанию меня не видит никто)
+POST   /friends/position                → телефон шлёт позицию, ПОКА открыта карта (батарея);
+                                          для друзей храним огрублённую
+GET    /friends/positions               → позиции взаимных друзей (огрублённые). Взаимность
+                                          «Тени»: я в тени — не вижу никого
+POST   /friends/beacon  { hours, trusted:[id] } → «Маяк» (D-84): точный трек 1–3 доверенным
+                                          друзьям на время (safety-фича)
+```
+Всё под Bearer. Раздел за клиентским флагом `kFriends`.
+
+### Blocks (городские кварталы Якутска — D-74, Ф1–Ф3)
+```
+GET  /blocks[?bbox=]                    → полигоны кварталов с признаком владения
+                                          (rel: mine|club|enemy|free) и флагом дома
+GET  /blocks/nearest?lat=&lon=          → ОДИН ближайший свободный квартал как готовый круг
+                                          («обеги вот этот контур, 1,2 км»)
+POST /blocks/home { blockId }           → назначить домашний квартал (несгораемый, приватный)
+```
+Владение пишет захват (`/territories/capture`) и живёт до конца сезона-месяца; домашний
+квартал не сбрасывается и не перехватывается, чужой дом виден анонимно.
+
+### Races (афиша забегов — вкладка «Старты», D-45; за флагом `showRaces`)
+```
+GET /races[?region=&city=&lat=&lng=&all=1&scope=federal&type=&month=YYYY-MM&when=upcoming|past]
+                                        → { races, cities, region }
+    по умолчанию — СТРОГО регион клиента; all=1 — «Вся Россия»;
+    scope=federal — крупные федеральные старты (для поездок);
+    region принимает слаг (moscow) или название
+GET /races/regions                      → регионы, где есть забеги, + счётчики (для пикера)
+GET /races/:id                          → детали забега
+```
+Публично, токен не нужен.
+
+### Leaderboard (рейтинги)
+```
+GET /leaderboard/users[?period=week&limit=50]      → бегуны
+GET /leaderboard/clubs[?period=week&limit=50]      → клубы
+GET /leaderboard/districts[?limit=50]              → контроль территорий (D-09): клубы по
+                                                     суммарной площади активных территорий
+```
+
 ### Integrations (подключение часов)
 ```
-GET  /integrations/coros/callback   → куда COROS возвращает человека после разрешения доступа
-POST /integrations/coros/push       → сюда COROS присылает завершённые тренировки
-GET  /integrations/coros/status     → проверка «сервис жив», её COROS опрашивает сам
+GET    /integrations/coros/account    → подключены ли часы COROS у этого человека
+GET    /integrations/coros/connect    → начало подключения: ссылка на страницу разрешения доступа
+DELETE /integrations/coros/disconnect → отключить часы (токен удаляем целиком, а не гасим флаг)
+GET    /integrations/coros/callback   → куда COROS возвращает человека после разрешения доступа
+POST   /integrations/coros/push       → сюда COROS присылает завершённые тренировки
+GET    /integrations/coros/status     → проверка «сервис жив», её COROS опрашивает сам
+
+GET    /integrations/suunto/account    → подключены ли часы Suunto (экран «Часы и приложения»)
+GET    /integrations/suunto/connect    → ссылка на страницу разрешения доступа (OAuth)
+DELETE /integrations/suunto/disconnect → отключить часы (токен удаляем целиком)
+GET    /integrations/suunto/callback   → OAuth-redirect: куда Suunto возвращает человека
+POST   /integrations/suunto/push       → уведомление «у человека появилась новая тренировка»
+GET    /integrations/suunto/status     → проверка «сервис жив»
 ```
 Адреса нужны в заявке к COROS ДО выдачи ключей, поэтому существуют заранее.
 Разбор данных появится вместе с Client ID и Secret: пока проверить подпись
@@ -741,14 +865,17 @@ DELETE /workouts/source/:source             → { removed }   (человек о
 ### Shoes (трекер износа)
 ```
 GET  /shoes                             → ShoeAsset[]            (Квартал показывает ресурс)
+GET  /shoes/pending                     → ShoeAsset[]            (купленные пары, ждут решения «в трекер?»)
+POST /shoes/:id/confirm   { add }       → ShoeAsset              (add=true → active, false → declined/скрыта)
 POST /shoes/:id/distance  { km }        → ShoeAsset              (Квартал добавляет км после пробежки)
+DELETE /shoes/:id                       → { ok }                 (убрать пару из трекера)
 ```
 
 ### Notification
 ```
 GET  /notifications                     → Notification[]
 POST /notifications/read  { ids: [] }   → 200
-POST /devices  { fcmToken, platform }   → 200                    (регистрация устройства для пуша)
+POST /devices/register  { token, platform } → { ok }             (регистрация устройства для пуша, D-25)
 ```
 
 ### Legal / Consents (единые документы и согласия)
@@ -760,6 +887,23 @@ POST /legal/consent/revoke  { type }    → { revoked }       (отзыв нео
 ```
 
 ---
+
+### Служебные (здоровье и флаги)
+```
+GET /health                             → { status, service, db, cache, time }
+                                          liveness: процесс жив + доступны БД и кэш
+GET /health/ready                       → 200 готов / 503 не готов (readiness для балансировщика)
+GET /config                             → серверные флаги видимости (D-89), публично, без токена:
+                                          { showTrails, showWatch, showRaces, showLeagueFull,
+                                            showSleepingMedals }
+                                          клиент тянет на старте и на резюме, кэширует ответ
+POST /events                            → приём клиентских событий аналитики (D-30): батч или
+                                          одно. Нужен токен — событие привязывается к uid;
+                                          клиент не может выдать себя за `server`
+POST /payments/webhook                  → уведомление ЮKassa о смене статуса платежа.
+                                          Публичный адрес (прописан в кабинете провайдера),
+                                          проверка — по подписи и перезапросу платежа
+```
 
 ## 4. Потоки обмена между приложениями
 
@@ -809,12 +953,18 @@ Backend меняет статус заказа → создаёт Notification �
 
 ## 6. Пробелы / TODO для полной согласованности
 
-- [ ] Добавить `userId` в Order и Loyalty при подключении backend (сейчас локально не нужен).
-- [ ] Добавить `pointsRedeemed` в модель `Order` Sport Store (сейчас списание считается отдельно в Loyalty).
-- [x] Сервис **Shoes** + модель `ShoeAsset` — **backend готов**: авто-создание при заказе обуви (`POST /orders` → `store_shoes`), `GET /shoes`, `POST /shoes/:id/distance`. Осталось: UI трекера в Квартале (GET /shoes) и начисление км после пробежки.
-- [ ] `runId` в LoyaltyTransaction (для Runner-источников).
-- [ ] Расширить `Product` полями из RECOMMENDATION ч.3 (видео, остатки по вариантам, состав).
-- [ ] Эндпоинт `/auth/me` + хранение `userId` для всех сущностей.
+Список выверен 15.11.2026: почти всё, что тут стояло «не сделано», давно сделано.
+
+- [x] `userId` в Order и Loyalty — есть (`orders.Order.user_id`, `loyalty` пишет по `user_id`).
+- [x] `pointsRedeemed` в модели `Order` МАТА Store — есть (`mata_store/lib/models/order.dart`).
+- [x] Сервис **Shoes** + модель `ShoeAsset` — авто-создание при заказе обуви (`POST /orders` →
+      `store_shoes`), `GET /shoes`, `POST /shoes/:id/distance`; экран трекера в Квартале есть
+      (`features/shoes`), км убавляются после пробежки.
+- [x] `runId` в LoyaltyTransaction — есть (`loyalty.LoyaltyTransaction.run_id`; по нему же
+      отзываются баллы, если анти-чит отклонил забег).
+- [x] Эндпоинт `/auth/me` + хранение `userId` для всех сущностей.
+- [x] Остатки по вариантам — есть (`stockBySize`: разбивка по размерам, общий `stockCount`).
+- [ ] Видео и состав в карточке товара (RECOMMENDATION ч.3) — единственное, что осталось.
 
 ## Квартал 2.0 — дивизионы, сезоны, вехи, война (добавлено 2026-08-31)
 
