@@ -28,6 +28,15 @@
       {% if t.active %}Действует версия #{{ t.active.pk }} от {{ t.active.created_at|date:"d.m.Y H:i" }}{% if t.active.created_by %}, {{ t.active.created_by.get_username }}{% endif %}.
       {% else %}Действует встроенный промт (правок ещё не было).{% endif %}
     </div>
+    {% if t.outdated %}
+      <div class="m-hint">
+        <b>Встроенный промт в коде новее действующей версии.</b> Сохранённая здесь версия
+        перекрывает встроенный текст целиком, и улучшения из кода до генерации не доходят.
+        Если вы правили промт сами и довольны — так и оставьте.
+        {% if can_edit %}Иначе нажмите «Вернуть встроенный» — появится новая версия,
+        прежняя останется в истории.{% endif %}
+      </div>
+    {% endif %}
     <textarea class="m-input m-prompt" data-role="text" {% if not can_edit %}readonly{% endif %}>{{ t.text }}</textarea>
     {% if can_edit %}
       <div class="m-row">
@@ -37,6 +46,25 @@
         <button type="button" class="m-btn quiet" data-prompt-act="reset">Вернуть встроенный</button>
       </div>
     {% endif %}
+    <details class="m-auto-blocks">
+      <summary class="m-small">Что код добавляет к этому тексту сам</summary>
+      <div class="m-small m-muted">
+        Эти блоки приклеиваются к промту выше при каждой генерации — и к встроенному, и к
+        отредактированному здесь. Здесь они только для сведения: какую вещь брать с кадра
+        и как её поставить, код решает по карточке и категории товара из 1С.
+      </div>
+      <div class="m-lead m-small">Какую вещь брать с кадра — пример для лонгслива</div>
+      <pre class="m-prompt-ro">{{ t.auto_which }}</pre>
+      <div class="m-lead m-small">Постановка кадра — выбирается по виду товара</div>
+      {% for st in t.auto_staging %}
+        <div class="m-small"><b>{{ st.label }}</b></div>
+        <pre class="m-prompt-ro">{{ st.text }}</pre>
+      {% endfor %}
+      <div class="m-small m-muted">
+        Если известен буквальный текст принта, добавляется и он; при «Переделать» —
+        замечание проверяющего.
+      </div>
+    </details>
     {% if t.history %}
       <div class="m-wrap">
         <table class="m">

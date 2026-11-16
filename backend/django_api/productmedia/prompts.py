@@ -1,65 +1,118 @@
-"""Универсальные промты «стиль МАТА» для фотопайплайна (v2).
+"""Универсальные промты «стиль МАТА» для фотопайплайна (v3).
 
 УНИВЕРСАЛЬНЫЕ: конкретный принт/цвет/текст НЕ зашиваем — модель берёт их из
-приложенного референса. Стиль (свет/фон/кадр) фиксированный — это и есть единый вид
+приложенного референса. Стиль (свет/фон) фиксированный — это и есть единый вид
 каталога.
 
-Почему v2 на английском и по пунктам: на живых прогонах 27.09 обе модели (gpt-image-1 и
+Почему по-английски и по пунктам: на живых прогонах 27.09 обе модели (gpt-image-1 и
 gpt-image-2.5-flare) при русском промте «сохрани надписи как есть» выдумывали слова
 («Staw Running Member» → «Stow Runbing Member» / «Slaw Running Machine») и меняли ткань.
 Жёсткие пункты на английском модели держат надёжнее, а буквальный текст принта (если
-известен) передаётся отдельно — with_text(); так буквы рисуются куда точнее, чем
-«срисуй с фото». Текст не зашит в промт, поэтому промт остаётся универсальным.
+известен) передаётся отдельно — with_text().
+
+Что нового в v3 (16.11.2026):
+- основной текст говорит «product», а не «garment»: в каталоге 77 кроссовок, 18 ботинок,
+  шиповки, бутылки, очки, рюкзаки — «невидимый манекен» для них бессмыслица;
+- постановка кадра вынесена в STAGING и выбирается по виду товара (одежда / обувь /
+  аксессуар), вид — из категории 1С;
+- какую вещь брать с многопредметного кадра, решает карточка (with_item).
+
+Основной текст можно править на странице «Промты» без выкладки; блоки WHICH ITEM и
+STAGING код добавляет сам — на странице они показаны отдельно, для сведения.
 """
 
-# Правила точности — общие для обоих треков.
+# Правила точности — общие для обоих треков и для любого вида товара.
 _FIDELITY = (
     "PRODUCT FIDELITY (highest priority, never violate):\n"
     "- Use exactly ONE item from the reference: the one named in WHICH ITEM below. "
     "If WHICH ITEM is not given, take the most prominent item. "
     "Ignore everything else in the reference.\n"
-    "- Keep the garment identical to the reference: same colour and shade, same "
-    "fabric and surface texture (knit stays knit, woven stays woven, mesh stays mesh), "
-    "same cut, length, proportions, neckline, seams, panels and trims.\n"
+    "- Keep the item identical to the reference: same colour and shade, same "
+    "material and surface texture (knit stays knit, mesh stays mesh, leather stays "
+    "leather, matte stays matte), same shape, cut, proportions, seams, panels, soles "
+    "and trims.\n"
     "- Text, logos and graphics: reproduce them exactly as in the reference - the same "
     "letters and spelling, font style, size and position. Never invent, rephrase, "
     "translate or 'correct' any text. Do not add text or logos that are not in the "
-    "reference. If the garment has no print, keep it plain.\n"
-    "- Keep the SAME SIDE of the garment as in the reference: if the reference shows "
-    "the back, show the back (back neckline, back panel); if it shows the front, show "
-    "the front. Never move prints, text or graphics to another side of the garment, "
-    "and do not invent what is on the side that is not visible.\n"
+    "reference. If the item has no print, keep it plain.\n"
+    "- Keep the SAME SIDE of the item as in the reference: if the reference shows the "
+    "back, show the back; if it shows the front, show the front. Never move prints, text "
+    "or graphics to another side, and do not invent what is on the side that is not "
+    "visible.\n"
 )
 
 # Трек 1 — каталог: товар без человека, точность важна.
 CATALOG = (
-    "Create a professional e-commerce catalog photo of the garment from the reference "
+    "Create a professional e-commerce catalog photo of the product from the reference "
     "image.\n"
     + _FIDELITY
-    + "- Remove any person, mannequin, hanger and the original background.\n"
+    + "- Remove any person, body part, mannequin, hanger and the original background.\n"
     "STYLE:\n"
-    "- Ghost-mannequin (invisible mannequin), viewed straight on from the same side "
-    "as in the reference: the garment keeps a natural "
-    "worn shape, neatly smoothed, centred with even margins.\n"
-    "- Pure white seamless background, soft natural contact shadow under the garment.\n"
+    "- Pure white seamless background, soft natural contact shadow under the product.\n"
     "- Large softbox key light plus fill, high-key, even exposure, crisp detail edge to "
-    "edge, true-to-life colour, commercial catalog quality."
+    "edge, true-to-life colour, commercial catalog quality.\n"
+    "- How the product is placed in the frame is given in STAGING below."
 )
 
 # Трек 2 — маркетинг: товар на модели (реклама, не карточка).
 MODEL = (
-    "Create a professional studio advertising photo of an athletic model wearing the "
-    "garment from the reference image.\n"
+    "Create a professional studio advertising photo of an athletic model with the "
+    "product from the reference image.\n"
     + _FIDELITY
     + "STYLE:\n"
-    "- Model: athletic build, neutral expression, standing straight, arms relaxed along "
-    "the body, no cap and no glasses; turned to the camera with the same side of the "
-    "garment as in the reference (back to the camera if the reference shows the back). "
-    "Framing from the thighs up.\n"
+    "- Model: athletic build, neutral expression, natural relaxed pose, no extra "
+    "accessories that are not the product.\n"
     "- Light-grey seamless studio background with a subtle gradient, large softbox key "
-    "light and soft rim light, natural skin, sharp focus on the garment, commercial "
-    "quality."
+    "light and soft rim light, natural skin, sharp focus on the product, commercial "
+    "quality.\n"
+    "- How the model wears or uses the product, and the framing, is given in STAGING "
+    "below."
 )
+
+
+# Постановка кадра по виду товара. Вид — из категории 1С (item_kind).
+GARMENT, FOOTWEAR, ACCESSORY = "garment", "footwear", "accessory"
+
+STAGING = {
+    ("catalog", GARMENT): (
+        "STAGING (clothing): ghost-mannequin (invisible mannequin), viewed straight on "
+        "from the same side as in the reference; the garment keeps a natural worn shape, "
+        "neatly smoothed, centred with even margins. Socks and briefs: laid flat, neatly "
+        "shaped, no mannequin."
+    ),
+    ("catalog", FOOTWEAR): (
+        "STAGING (footwear): no foot, leg or mannequin. A single shoe in clean side "
+        "profile, toe pointing left, outer side facing the camera, laces neatly tied, the "
+        "full sole edge visible. If the reference shows only the other side or a top "
+        "view, keep that view instead of inventing the hidden side. Centred with even "
+        "margins."
+    ),
+    ("catalog", ACCESSORY): (
+        "STAGING (accessory): the product alone in its natural resting position - a "
+        "bottle or flask standing upright, a backpack or bag standing with its shape "
+        "filled out, a cap at a three-quarter front view, glasses unfolded facing the "
+        "camera, gloves, buffs, insoles and gel sachets laid flat. Centred with even "
+        "margins."
+    ),
+    ("model", GARMENT): (
+        "STAGING (clothing): the model wears the garment, standing straight, arms relaxed "
+        "along the body, turned to the camera with the same side of the garment as in the "
+        "reference (back to the camera if the reference shows the back). Framing so the "
+        "whole garment is visible: from the thighs up for tops, from the waist down for "
+        "shorts, tights and trousers."
+    ),
+    ("model", FOOTWEAR): (
+        "STAGING (footwear): the model wears the shoes; framing from the knees down, "
+        "both shoes sharp and fully visible, standing or in a calm running stance on the "
+        "studio floor."
+    ),
+    ("model", ACCESSORY): (
+        "STAGING (accessory): the model wears or uses the accessory naturally - a cap or "
+        "beanie on the head, glasses on the face, a backpack on the shoulders, a bottle "
+        "or gel in the hand, gloves on the hands, a buff on the neck. Framing so the "
+        "accessory is prominent and sharp."
+    ),
+}
 
 
 def with_details(prompt: str, count: int = 0) -> str:
@@ -207,6 +260,33 @@ def item_type(name: str = "", category: str = "") -> str:
     return ""
 
 
+# Вид товара — какая постановка кадра ему нужна. Определяется по английскому типу.
+_FOOTWEAR_TYPES = {"running shoes", "track spikes", "boots", "slides"}
+_ACCESSORY_TYPES = {
+    "gloves", "tubular neck gaiter (buff)", "beanie hat", "baseball cap", "sunglasses",
+    "backpack", "bag", "sports water bottle", "thermos flask", "energy gel sachet",
+    "shoe insoles",
+}
+
+
+def item_kind(name: str = "", category: str = "") -> str:
+    """Одежда, обувь или аксессуар. Не узнали — одежда: под неё промт писался
+    изначально, и так ведёт себя всё, что было до v3."""
+    kind = item_type(name, category)
+    if kind in _FOOTWEAR_TYPES:
+        return FOOTWEAR
+    if kind in _ACCESSORY_TYPES:
+        return ACCESSORY
+    return GARMENT
+
+
+def with_staging(prompt: str, track: str = "catalog", name: str = "",
+                 category: str = "") -> str:
+    """Добавить постановку кадра под вид товара. Неизвестный трек — без изменений."""
+    block = STAGING.get((track, item_kind(name, category)))
+    return prompt + "\n" + block if block else prompt
+
+
 def with_item(prompt: str, name: str = "", category: str = "") -> str:
     """Сказать модели, КАКУЮ вещь брать с кадра — по названию карточки.
 
@@ -228,6 +308,7 @@ def with_item(prompt: str, name: str = "", category: str = "") -> str:
         + "\nWHICH ITEM: the reference may show several items worn together (top, "
         "shorts, cap, socks, shoes). This product card is about %s. Its name in the "
         "shop catalogue is \"%s\". Generate ONLY that item and nothing else: no other "
-        "garment, no footwear, no accessory from the reference. This overrides the "
+        "item from the reference - no other clothing, footwear or accessory. This "
+        "overrides the "
         "\"most prominent item\" rule above." % (what, name)
     )

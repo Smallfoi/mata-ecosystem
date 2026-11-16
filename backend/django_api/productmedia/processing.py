@@ -33,6 +33,7 @@ def process(source_bytes: bytes, track: str = "catalog", text: str = "",
     details = [d for d in (details or []) if d]
     prompt = (base or "").strip() or builtin
     prompt = prompts.with_item(prompt, item, category)
+    prompt = prompts.with_staging(prompt, track, item, category)
     prompt = prompts.with_details(prompt, len(details))
     prompt = prompts.with_note(prompts.with_text(prompt, text), note)
     return providers.edit_image(source_bytes, prompt, size=size, high_fidelity=high_fidelity,
