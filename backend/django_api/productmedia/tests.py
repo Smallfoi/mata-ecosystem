@@ -619,6 +619,52 @@ class PipelineScreensTests(TestCase):
         self.assertIn("Эспандер резиновый", out)
         self.assertIn("the item", out)
 
+    def test_shoes_bottles_and_tops_get_their_own_staging(self):
+        """Невидимый манекен для кроссовка — бессмыслица: модель попыталась бы
+        надеть его на невидимую ногу. Постановку выбирает вид товара."""
+        from productmedia import prompts
+        for name, category, kind in (
+            ("BMAI PURE 2.0 CORDURA", "Кроссовки", prompts.FOOTWEAR),
+            ("ANTA PIONEER", "Шиповки", prompts.FOOTWEAR),
+            ("Бутылка SIS", "Бутылки", prompts.ACCESSORY),
+            ("Rockbros SHADOW", "Очки", prompts.ACCESSORY),
+            ("Лонгслив мужской STAW", "Лонгслив", prompts.GARMENT),
+            ("Носки ANTA", "Носки", prompts.GARMENT),
+        ):
+            self.assertEqual(prompts.item_kind(name, category), kind, name)
+        shoe = prompts.with_staging(prompts.CATALOG, "catalog", "BMAI PURE", "Кроссовки")
+        self.assertIn("STAGING (footwear)", shoe)
+        self.assertNotIn("ghost-mannequin", shoe)
+
+    def test_an_unknown_kind_stays_clothing_as_before_v3(self):
+        from productmedia import prompts
+        self.assertEqual(prompts.item_kind("Эспандер резиновый", ""), prompts.GARMENT)
+        self.assertIn("STAGING (clothing)",
+                      prompts.with_staging(prompts.CATALOG, "catalog", "", ""))
+
+    def test_a_shoe_card_is_not_told_to_drop_footwear(self):
+        """Первая редакция WHICH ITEM говорила «no footwear» — прямо против карточки
+        кроссовок."""
+        from productmedia import prompts
+        out = prompts.with_item(prompts.CATALOG, "BMAI PURE 2.0", "Кроссовки")
+        self.assertIn("running shoes", out)
+        self.assertNotIn("no footwear", out)
+
+    def test_the_main_text_no_longer_assumes_clothing(self):
+        from productmedia import prompts
+        for base in (prompts.CATALOG, prompts.MODEL):
+            self.assertNotIn("Ghost-mannequin", base)
+            self.assertIn("STAGING below", base)
+
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False)
+    @mock.patch("productmedia.providers._post_multipart")
+    def test_the_staging_reaches_the_model(self, m_post):
+        m_post.return_value = {"data": [{"b64_json": _png_b64()}]}
+        processing.process(b"raw", track="catalog", item="BMAI PURE 2.0", category="Кроссовки")
+        body = m_post.call_args.args[2]
+        self.assertIn(b"STAGING (footwear)", body)
+        self.assertIn(b"running shoes", body)
+
     def test_no_name_changes_nothing(self):
         from productmedia import prompts
         self.assertEqual(prompts.with_item(prompts.CATALOG, ""), prompts.CATALOG)
@@ -646,6 +692,28 @@ class PipelineScreensTests(TestCase):
 
         self._post(url, action="reset", track="catalog")
         self.assertEqual(PhotoPrompt.active("catalog").text, prompts.CATALOG)
+
+    def test_the_page_says_when_the_code_has_moved_on(self):
+        """Сохранённая версия перекрывает встроенную целиком. С сентября до 16.11
+        на проде так действовал старый текст, и этого никто не видел."""
+        from django.urls import reverse
+        from productmedia import prompts
+        url = reverse("photo_prompts")
+        self.assertNotContains(self.client.get(url), "новее действующей версии")
+        self._post(url, action="save", track="catalog",
+                   text="Old catalog prompt from September, kept by hand.")
+        self.assertContains(self.client.get(url), "новее действующей версии")
+        self._post(url, action="reset", track="catalog")
+        self.assertNotContains(self.client.get(url), "новее действующей версии")
+
+    def test_the_page_shows_what_the_code_adds_by_itself(self):
+        """Блоки WHICH ITEM и STAGING приклеиваются к любому тексту, в том числе
+        к отредактированному, — на странице их видно, хоть править и нельзя."""
+        from django.urls import reverse
+        page = self.client.get(reverse("photo_prompts"))
+        self.assertContains(page, "WHICH ITEM")
+        self.assertContains(page, "STAGING (footwear)")
+        self.assertContains(page, "STAGING (accessory)")
 
 
 def _jpeg_bytes(color=(40, 50, 60), size=(16, 16)):
@@ -783,3 +851,40 @@ class TestRunsHiddenTests(TestCase):
         self.assertTrue(PhotoJob.objects.filter(pk=real_job.pk).exists())
         self.assertTrue(real_job.source.storage.exists(real_job.source.name))
         self.assertEqual(ProductPhoto.objects.filter(model_key="SHOE1").count(), 1)
+
+
+class PromptsV3MigrationTests(TestCase):
+    """Миграция 0008 переводит устаревшую сохранённую версию на встроенный v3.
+
+    Пишет в боевую базу при выкатке, поэтому проверена отдельно: что она трогает,
+    а что оставляет как есть."""
+
+    def _forward(self):
+        import importlib
+        from django.apps import apps
+        migration = importlib.import_module("productmedia.migrations.0008_prompts_v3")
+        migration.forward(apps, None)
+
+    def test_a_stale_saved_version_is_replaced_and_kept_in_history(self):
+        from productmedia import prompts
+        from productmedia.models import PhotoPrompt
+        old = PhotoPrompt.objects.create(track="catalog", text="September prompt, by hand.")
+        self._forward()
+        active = PhotoPrompt.active("catalog")
+        self.assertEqual(active.text, prompts.CATALOG)
+        self.assertNotEqual(active.pk, old.pk)
+        self.assertTrue(PhotoPrompt.objects.filter(pk=old.pk).exists())   # история цела
+
+    def test_no_saved_version_means_nothing_is_written(self):
+        """Без сохранённой версии действует встроенный и обновляется вместе с кодом —
+        замораживать его версией в базе незачем."""
+        from productmedia.models import PhotoPrompt
+        self._forward()
+        self.assertFalse(PhotoPrompt.objects.exists())
+
+    def test_an_up_to_date_version_is_left_alone(self):
+        from productmedia import prompts
+        from productmedia.models import PhotoPrompt
+        PhotoPrompt.objects.create(track="catalog", text=prompts.CATALOG)
+        self._forward()
+        self.assertEqual(PhotoPrompt.objects.filter(track="catalog").count(), 1)
