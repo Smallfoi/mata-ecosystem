@@ -551,6 +551,125 @@ class PipelineScreensTests(TestCase):
         self.assertEqual(PhotoDetail.objects.filter(batch_id=batch, article="TS-7").count(), 1)
         self.assertEqual(PhotoJob.objects.filter(batch_id=batch).count(), 0)
 
+    # ───────────────── какую вещь брать с кадра ─────────────────
+
+    def test_which_item_comes_from_the_card_not_from_the_eye(self):
+        """На маркетинговом кадре лонгслив, шорты, кепка, носки и кроссовки —
+        «самая заметная вещь» угадывается неверно. Выбирает карточка."""
+        from productmedia import prompts
+        out = prompts.with_item(prompts.CATALOG, "Лонгслив мужской STAW")
+        self.assertIn("long-sleeve athletic top", out)
+        self.assertIn("Лонгслив мужской STAW", out)
+        self.assertIn("ONLY that item", out)
+
+    def test_the_card_overrides_the_most_prominent_rule(self):
+        from productmedia import prompts
+        self.assertIn("most prominent", prompts.CATALOG)
+        self.assertIn("overrides", prompts.with_item(prompts.CATALOG, "Шорты STAW"))
+
+    def test_polo_is_not_a_t_shirt(self):
+        """«футболка» входит в «футболка-поло» — порядок поиска решает."""
+        from productmedia import prompts
+        self.assertEqual(prompts.item_type("Футболка-поло мужская ANTA"), "polo shirt")
+        self.assertEqual(prompts.item_type("Футболка женская STAW"), "short-sleeve t-shirt")
+
+    def test_every_kind_in_the_catalogue_is_recognised(self):
+        """Слова взяты из живого каталога; если 1С заведёт новый тип, он просто
+        не распознается — и указание останется общим, без выдумки."""
+        from productmedia import prompts
+        for name, expected in (
+            ("Кроссовки женские BMAI GCARBON-4", "running shoes"),
+            ("Носки ANTA", "socks"),
+            ("Бафф Унисекс. STAW", "tubular neck gaiter (buff)"),
+            ("Ветровка мужская STAW", "lightweight windbreaker jacket"),
+            ("Бутылка для воды SIS", "sports water bottle"),
+        ):
+            self.assertEqual(prompts.item_type(name), expected, name)
+        self.assertEqual(prompts.item_type("Эспандер резиновый"), "")
+
+    def test_the_category_decides_when_the_name_is_brand_and_model(self):
+        """У 216 позиций из 667 в названии только бренд и модель — «BMAI PURE 2.0
+        CORDURA», «ANTA WALK 2.0», «Rockbros SHADOW». Тип там берётся
+        из категории, которую ведёт 1С."""
+        from productmedia import prompts
+        for name, category, expected in (
+            ("BMAI PURE 2.0 CORDURA", "Кроссовки", "running shoes"),
+            ("ANTA WALK 2.0", "Ботинки", "boots"),
+            ("Rockbros SHADOW", "Очки", "sunglasses"),
+            ("SIS GO Isotonic Energy Gel", "Гели", "energy gel sachet"),
+            ("ANTA PIONEER", "Шиповки", "track spikes"),
+        ):
+            self.assertEqual(prompts.item_type(name, category), expected, name)
+
+    def test_the_category_outranks_the_name(self):
+        """Название может врать или устареть; категорию ведёт 1С."""
+        from productmedia import prompts
+        self.assertEqual(prompts.item_type("Футболка ANTA", "Лонгслив"),
+                         "long-sleeve athletic top")
+
+    def test_a_category_that_says_nothing_falls_back_to_the_name(self):
+        from productmedia import prompts
+        for vague in ("Аксессуары", "Все", ""):
+            self.assertEqual(prompts.item_type("Футболка женская STAW", vague),
+                             "short-sleeve t-shirt", vague)
+
+    def test_an_unknown_name_still_names_the_card(self):
+        from productmedia import prompts
+        out = prompts.with_item(prompts.CATALOG, "Эспандер резиновый")
+        self.assertIn("Эспандер резиновый", out)
+        self.assertIn("the item", out)
+
+    def test_shoes_bottles_and_tops_get_their_own_staging(self):
+        """Невидимый манекен для кроссовка — бессмыслица: модель попыталась бы
+        надеть его на невидимую ногу. Постановку выбирает вид товара."""
+        from productmedia import prompts
+        for name, category, kind in (
+            ("BMAI PURE 2.0 CORDURA", "Кроссовки", prompts.FOOTWEAR),
+            ("ANTA PIONEER", "Шиповки", prompts.FOOTWEAR),
+            ("Бутылка SIS", "Бутылки", prompts.ACCESSORY),
+            ("Rockbros SHADOW", "Очки", prompts.ACCESSORY),
+            ("Лонгслив мужской STAW", "Лонгслив", prompts.GARMENT),
+            ("Носки ANTA", "Носки", prompts.GARMENT),
+        ):
+            self.assertEqual(prompts.item_kind(name, category), kind, name)
+        shoe = prompts.with_staging(prompts.CATALOG, "catalog", "BMAI PURE", "Кроссовки")
+        self.assertIn("STAGING (footwear)", shoe)
+        self.assertNotIn("ghost-mannequin", shoe)
+
+    def test_an_unknown_kind_stays_clothing_as_before_v3(self):
+        from productmedia import prompts
+        self.assertEqual(prompts.item_kind("Эспандер резиновый", ""), prompts.GARMENT)
+        self.assertIn("STAGING (clothing)",
+                      prompts.with_staging(prompts.CATALOG, "catalog", "", ""))
+
+    def test_a_shoe_card_is_not_told_to_drop_footwear(self):
+        """Первая редакция WHICH ITEM говорила «no footwear» — прямо против карточки
+        кроссовок."""
+        from productmedia import prompts
+        out = prompts.with_item(prompts.CATALOG, "BMAI PURE 2.0", "Кроссовки")
+        self.assertIn("running shoes", out)
+        self.assertNotIn("no footwear", out)
+
+    def test_the_main_text_no_longer_assumes_clothing(self):
+        from productmedia import prompts
+        for base in (prompts.CATALOG, prompts.MODEL):
+            self.assertNotIn("Ghost-mannequin", base)
+            self.assertIn("STAGING below", base)
+
+    @mock.patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=False)
+    @mock.patch("productmedia.providers._post_multipart")
+    def test_the_staging_reaches_the_model(self, m_post):
+        m_post.return_value = {"data": [{"b64_json": _png_b64()}]}
+        processing.process(b"raw", track="catalog", item="BMAI PURE 2.0", category="Кроссовки")
+        body = m_post.call_args.args[2]
+        self.assertIn(b"STAGING (footwear)", body)
+        self.assertIn(b"running shoes", body)
+
+    def test_no_name_changes_nothing(self):
+        from productmedia import prompts
+        self.assertEqual(prompts.with_item(prompts.CATALOG, ""), prompts.CATALOG)
+        self.assertEqual(prompts.with_item(prompts.CATALOG, "   "), prompts.CATALOG)
+
     def test_prompts_page_save_restore_reset(self):
         from django.urls import reverse
         from productmedia import prompts
@@ -573,6 +692,28 @@ class PipelineScreensTests(TestCase):
 
         self._post(url, action="reset", track="catalog")
         self.assertEqual(PhotoPrompt.active("catalog").text, prompts.CATALOG)
+
+    def test_the_page_says_when_the_code_has_moved_on(self):
+        """Сохранённая версия перекрывает встроенную целиком. С сентября до 16.11
+        на проде так действовал старый текст, и этого никто не видел."""
+        from django.urls import reverse
+        from productmedia import prompts
+        url = reverse("photo_prompts")
+        self.assertNotContains(self.client.get(url), "новее действующей версии")
+        self._post(url, action="save", track="catalog",
+                   text="Old catalog prompt from September, kept by hand.")
+        self.assertContains(self.client.get(url), "новее действующей версии")
+        self._post(url, action="reset", track="catalog")
+        self.assertNotContains(self.client.get(url), "новее действующей версии")
+
+    def test_the_page_shows_what_the_code_adds_by_itself(self):
+        """Блоки WHICH ITEM и STAGING приклеиваются к любому тексту, в том числе
+        к отредактированному, — на странице их видно, хоть править и нельзя."""
+        from django.urls import reverse
+        page = self.client.get(reverse("photo_prompts"))
+        self.assertContains(page, "WHICH ITEM")
+        self.assertContains(page, "STAGING (footwear)")
+        self.assertContains(page, "STAGING (accessory)")
 
 
 def _jpeg_bytes(color=(40, 50, 60), size=(16, 16)):
@@ -710,3 +851,40 @@ class TestRunsHiddenTests(TestCase):
         self.assertTrue(PhotoJob.objects.filter(pk=real_job.pk).exists())
         self.assertTrue(real_job.source.storage.exists(real_job.source.name))
         self.assertEqual(ProductPhoto.objects.filter(model_key="SHOE1").count(), 1)
+
+
+class PromptsV3MigrationTests(TestCase):
+    """Миграция 0008 переводит устаревшую сохранённую версию на встроенный v3.
+
+    Пишет в боевую базу при выкатке, поэтому проверена отдельно: что она трогает,
+    а что оставляет как есть."""
+
+    def _forward(self):
+        import importlib
+        from django.apps import apps
+        migration = importlib.import_module("productmedia.migrations.0008_prompts_v3")
+        migration.forward(apps, None)
+
+    def test_a_stale_saved_version_is_replaced_and_kept_in_history(self):
+        from productmedia import prompts
+        from productmedia.models import PhotoPrompt
+        old = PhotoPrompt.objects.create(track="catalog", text="September prompt, by hand.")
+        self._forward()
+        active = PhotoPrompt.active("catalog")
+        self.assertEqual(active.text, prompts.CATALOG)
+        self.assertNotEqual(active.pk, old.pk)
+        self.assertTrue(PhotoPrompt.objects.filter(pk=old.pk).exists())   # история цела
+
+    def test_no_saved_version_means_nothing_is_written(self):
+        """Без сохранённой версии действует встроенный и обновляется вместе с кодом —
+        замораживать его версией в базе незачем."""
+        from productmedia.models import PhotoPrompt
+        self._forward()
+        self.assertFalse(PhotoPrompt.objects.exists())
+
+    def test_an_up_to_date_version_is_left_alone(self):
+        from productmedia import prompts
+        from productmedia.models import PhotoPrompt
+        PhotoPrompt.objects.create(track="catalog", text=prompts.CATALOG)
+        self._forward()
+        self.assertEqual(PhotoPrompt.objects.filter(track="catalog").count(), 1)

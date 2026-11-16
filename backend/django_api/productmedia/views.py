@@ -23,7 +23,7 @@ from django.urls import reverse
 from catalog import photos as photolib
 from catalog.models import Product, ProductPhoto
 from common.uploads import prepare_image
-from productmedia import processing, service, tasks
+from productmedia import processing, prompts, service, tasks
 from productmedia.matching import _norm, match_folders_to_products
 from productmedia.models import PhotoBatch, PhotoDetail, PhotoJob, PhotoPrompt
 from staff.access import can, tab_required
@@ -330,10 +330,26 @@ def photo_prompts(request):
         active = PhotoPrompt.active(code)
         history = list(PhotoPrompt.objects.filter(track=code)
                        .select_related("created_by")[:10])
+        builtin = processing.TRACKS[code][0]
         tracks.append({
             "code": code, "label": label,
-            "text": active.text if active else processing.TRACKS[code][0],
+            "text": active.text if active else builtin,
             "active": active,
+            # Сохранённая версия перекрывает встроенный промт целиком. Так с сентября
+            # до 16.11.2026 на проде молча действовал старый текст, хотя в коде он
+            # дважды улучшался, — и никто этого не видел. Теперь видно.
+            "outdated": active is not None and active.text.strip() != builtin.strip(),
+            # Эти блоки код добавляет сам к любому тексту выше, в том числе к
+            # отредактированному здесь. Показаны для сведения, править их тут нельзя.
+            "auto_which": prompts.with_item(
+                "", "Лонгслив мужской STAW", "Лонгслив").strip(),
+            "auto_staging": [
+                {"label": label_kind, "text": prompts.STAGING[(code, kind)]}
+                for kind, label_kind in ((prompts.GARMENT, "одежда"),
+                                         (prompts.FOOTWEAR, "обувь"),
+                                         (prompts.ACCESSORY, "аксессуары"))
+                if (code, kind) in prompts.STAGING
+            ],
             "history": [{
                 "id": h.pk, "when": h.created_at, "comment": h.comment,
                 "who": h.created_by.get_username() if h.created_by else "",

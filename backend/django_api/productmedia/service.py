@@ -145,6 +145,20 @@ def _fail(job, text):
     job.save(update_fields=["status", "error", "updated_at"])
 
 
+def _category_name(product) -> str:
+    """Название категории товара — справочник 1С, по нему узнаётся тип вещи.
+
+    Связь у товара строкой (`category_id`), а не ссылкой, поэтому читаем отдельно.
+    Категории нет — вернём пусто, и тип определится по названию карточки.
+    """
+    try:
+        from catalog.models import Category
+        return Category.objects.filter(id=product.category_id).values_list(
+            "name", flat=True).first() or ""
+    except Exception:                        # noqa: BLE001 — тип вещи не повод падать
+        return ""
+
+
 def generate(job, note=None, from_statuses=CLAIM_QUEUED):
     """Исходник → мастер (ИИ) → webp на задании → статус «На проверке». Витрину НЕ трогает.
 
@@ -172,7 +186,9 @@ def generate(job, note=None, from_statuses=CLAIM_QUEUED):
         master = processing.process(source_bytes, track=job.track, text=job.text,
                                     note=job.note if note is None else note,
                                     details=_details(job),
-                                    base=prompt_row.text if prompt_row else "")
+                                    base=prompt_row.text if prompt_row else "",
+                                    item=job.product.name,
+                                    category=_category_name(job.product))
         job.prompt = prompt_row
         job.usage = providers.last_usage()
         webp = images.make_webp(master)
