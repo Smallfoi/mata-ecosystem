@@ -8,9 +8,12 @@ from .models import DeviceToken, Notification
 
 @admin.register(Notification)
 class NotificationAdmin(UserRefMixin, ModelAdmin):
-    list_display = ("user_ref", "title", "type", "read", "order_id", "created_at")
+    list_display = ("user_ref", "title", "type", "promotional", "read", "order_id",
+                    "created_at")
     list_display_links = ("title",)
-    list_filter = ("type", "read")
+    # По «Рекламное» нужен фильтр, а не только колонка: это ответ на вопрос
+    # проверяющего «что вы рассылали как рекламу и кому» (LAUNCH_READINESS §6).
+    list_filter = ("type", "promotional", "read")
     search_fields = ("user_id", "title", "body", "order_id")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)

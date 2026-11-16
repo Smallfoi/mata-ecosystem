@@ -119,6 +119,29 @@ class OldTokensStopWorking(TestCase):
         call_command("revoke_sessions", "--user", self.uid, "--apply", stdout=open(os.devnull, "w"))
         self.assertEqual(_me(self.client, self.token).status_code, 401)
 
+    def test_revoke_sessions_all_logs_everyone_out(self):
+        """Первый шаг при утечке: разлогинить ВСЕХ (docs/BREACH_RESPONSE.md, §2).
+
+        Проверяем и чужой аккаунт: `--user` коснулся бы только одного, а при утечке
+        базы или токенов «один» бессмысленно.
+        """
+        other = Account.objects.create(id="u_other_sess", email="o@t.dev", provider="email")
+        other_token = make_token(other.id, other.token_version)
+        self.assertEqual(_me(self.client, other_token).status_code, 200)
+
+        call_command("revoke_sessions", "--all", "--apply", stdout=open(os.devnull, "w"))
+
+        self.assertEqual(_me(self.client, self.token).status_code, 401)
+        self.assertEqual(_me(self.client, other_token).status_code, 401)
+
+    def test_revoke_sessions_without_target_refuses(self):
+        """Без --user/--without-password/--all команда ничего не делает молча."""
+        from django.core.management.base import CommandError
+
+        with self.assertRaises(CommandError):
+            call_command("revoke_sessions", "--apply", stdout=open(os.devnull, "w"))
+        self.assertEqual(_me(self.client, self.token).status_code, 200)
+
     def test_old_format_token_still_valid_until_revoked(self):
         # Токены, выданные до исправления (без версии), не разлогинивают людей сами.
         self.assertEqual(_me(self.client, make_token(self.uid)).status_code, 200)

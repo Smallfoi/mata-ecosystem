@@ -6,6 +6,7 @@
 
     python manage.py revoke_sessions --user <id>            # один аккаунт
     python manage.py revoke_sessions --without-password     # все без пароля
+    python manage.py revoke_sessions --all                  # ВСЕ аккаунты (утечка)
     ... --apply                                             # выполнить
 
 --without-password — аккаунты, созданные входом по коду: до исправления A01 у них
@@ -26,12 +27,18 @@ class Command(BaseCommand):
         parser.add_argument("--user", action="append", default=[], help="id аккаунта")
         parser.add_argument("--without-password", action="store_true",
                             help="все аккаунты без пароля (вход только по коду)")
+        # Первый шаг при утечке токенов или базы: разлогинить всех. Без этого
+        # порядок действий из docs/BREACH_RESPONSE.md нечем выполнить.
+        parser.add_argument("--all", action="store_true",
+                            help="ВСЕ аккаунты — при утечке токенов/базы")
         parser.add_argument("--apply", action="store_true", help="выполнить, а не показать")
 
     def handle(self, *args, **opts):
-        if not opts["user"] and not opts["without_password"]:
-            raise CommandError("укажите --user <id> или --without-password")
+        if not opts["user"] and not opts["without_password"] and not opts["all"]:
+            raise CommandError("укажите --user <id>, --without-password или --all")
         qs = Account.objects.none()
+        if opts["all"]:
+            qs = Account.objects.all()
         if opts["user"]:
             qs = Account.objects.filter(id__in=opts["user"])
         if opts["without_password"]:
