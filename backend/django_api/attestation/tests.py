@@ -12,7 +12,7 @@ import time
 from unittest import mock
 
 from django.core.cache import cache
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import Account
@@ -153,7 +153,17 @@ class JwtTests(SimpleTestCase):
                 play._service_account()
 
 
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
 class RunUploadTests(ApiTestCase):
+    """Проверка подлинности уходит в Celery (`verify_integrity.delay`).
+
+    EAGER форсим, как в `notifications.PushTaskTests`: без него задача уходит
+    РЕАЛЬНОМУ воркеру всюду, где поднят брокер, — то есть на машине разработчика
+    с dev-стеком, — и `play.decode` в тестовом процессе не вызывается. В CI
+    брокера нет, `CELERY_TASK_ALWAYS_EAGER = not CELERY_BROKER_URL` сам включает
+    inline, и тесты зеленеют. Такой тест зелёный там, где его смотрят реже всего.
+    """
+
     phone = "+79990002901"
 
     def _post(self, rid, integrity=None, body=None):
