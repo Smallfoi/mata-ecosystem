@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../map/data/location_provider.dart';
@@ -120,6 +121,25 @@ class FriendsPrivacyScreen extends ConsumerWidget {
           ]),
           const SizedBox(height: 12),
           const _BeaconCard(),
+          const SizedBox(height: 12),
+
+          // ── Чёрный список ──
+          _Card(children: [
+            Text('ЗАБЛОКИРОВАННЫЕ', style: _labelStyle),
+            const SizedBox(height: 4),
+            Text(
+              'Настройки выше прячут от всех сразу. Блокировка — от конкретного '
+              'человека: вы перестаёте видеть друг друга и он не может прислать заявку.',
+              style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: _Btn('Кого я заблокировал',
+                    onTap: () => context.push('/profile/friends/blocked')),
+              ),
+            ]),
+          ]),
           const SizedBox(height: 16),
 
           Text(

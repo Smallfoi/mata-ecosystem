@@ -23,6 +23,7 @@ from accounts.models import Account
 from clubs.models import ClubMember
 from common.security import user_id_from_request
 from common.throttling import ContactsMatchThrottle, UserJWTRateThrottle
+from moderation.models import hidden_ids
 
 from .models import (
     FriendMapPrefs,
@@ -87,6 +88,10 @@ def friend_request(request):
         return Response({"detail": "Неверный пользователь"}, status=400)
     if not Account.objects.filter(id=other).exists():
         return Response({"detail": "Пользователь не найден"}, status=404)
+    if other in hidden_ids(uid):
+        # Одинаковый ответ в обе стороны: по разнице «заблокирован» и
+        # «заблокировал» человек понял бы, что его заблокировали.
+        return Response({"detail": "Сейчас нельзя добавить этого человека"}, status=403)
     # Встречная заявка (other→uid) — подтверждаем, становимся друзьями.
     rev = Friendship.objects.filter(requester_id=other, addressee_id=uid).first()
     if rev:
@@ -153,7 +158,11 @@ def friend_search(request):
     q = (request.query_params.get("q") or "").strip()
     if len(q) < 2:
         return Response({"results": []})
-    accs = Account.objects.filter(name__icontains=q).exclude(id=uid)[:20]
+    accs = (
+        Account.objects.filter(name__icontains=q)
+        .exclude(id=uid)
+        .exclude(id__in=hidden_ids(uid))[:20]
+    )
     return Response({"results": [_summary(a, relationship(uid, a.id)) for a in accs]})
 
 
@@ -170,6 +179,7 @@ def friend_suggestions(request):
             for m in ClubMember.objects.filter(club_id=mine.club_id).exclude(user_id=uid)
         }
     ids -= friends_ids(uid)
+    ids -= hidden_ids(uid)
     ids.discard(uid)
     accs = _acc_map(ids)
     out = [_summary(a, relationship(uid, a.id)) for a in accs.values()]
@@ -209,6 +219,7 @@ def friend_match_contacts(request):
     accs = list(
         Account.objects.filter(phone_hash__in=hashes)
         .exclude(id=uid)
+        .exclude(id__in=hidden_ids(uid))
         .only("id", "name", "avatar_path")
     )
     rel = relationships(uid, [a.id for a in accs])

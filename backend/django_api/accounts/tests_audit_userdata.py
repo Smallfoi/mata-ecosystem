@@ -17,7 +17,12 @@ from django.utils import timezone
 from accounts import userdata
 from accounts.models import Account
 
-USER_FIELD_NAMES = {"user_id", "owner_id", "requester_id", "addressee_id", "user"}
+# Имена, по которым страж узнаёт «в этой строке есть человек». Список пришлось
+# расширить: жалоба (`reporter_id`) и блокировка (`blocked_id`) проскочили мимо
+# реестра молча — страж их не видел. `target_id` сюда не входит: у жалобы на
+# клуб это id клуба, и страж ловил бы чужие модели.
+USER_FIELD_NAMES = {"user_id", "owner_id", "requester_id", "addressee_id", "user",
+                    "reporter_id", "blocked_id"}
 
 
 def _fill(model, uid, n):
@@ -26,7 +31,8 @@ def _fill(model, uid, n):
     for f in model._meta.concrete_fields:
         if f.auto_created or isinstance(f, (models.AutoField, models.BigAutoField)):
             continue
-        if f.name in ("user_id", "owner_id", "requester_id", "addressee_id"):
+        if f.name in ("user_id", "owner_id", "requester_id", "addressee_id",
+                      "reporter_id", "blocked_id"):
             kwargs[f.name] = uid
             continue
         if f.has_default() or f.null or getattr(f, "auto_now", False) or getattr(f, "auto_now_add", False):
@@ -174,6 +180,24 @@ class EraseEverything(TestCase):
         self.assertEqual(SaleLine.objects.filter(order_pk=self.paid.pk).count(), 1)
         names = {f.name for f in SaleLine._meta.concrete_fields}
         self.assertFalse(names & {"user_id", "phone", "email", "name_customer", "address"})
+
+    def test_delete_removes_reports_about_the_person(self):
+        """Жалоба на человека — тоже данные о нём: уходит вместе с аккаунтом.
+
+        А жалоба на клуб остаётся, даже если её `target_id` совпал строкой:
+        различает только `target_type`.
+        """
+        from moderation.models import Report
+
+        Report.objects.create(reporter_id="u_other", target_type=Report.TARGET_USER,
+                              target_id=self.uid, reason="abuse", comment="угрожает")
+        club = Report.objects.create(reporter_id="u_other", target_type=Report.TARGET_CLUB,
+                                     target_id=self.uid, reason="spam")
+
+        self.assertEqual(self._delete().status_code, 200)
+        self.assertFalse(Report.objects.filter(target_type=Report.TARGET_USER,
+                                               target_id=self.uid).exists())
+        self.assertTrue(Report.objects.filter(pk=club.pk).exists())
 
     def test_not_received_order_blocks_deletion(self):
         from orders.models import Order

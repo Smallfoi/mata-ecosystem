@@ -39,6 +39,7 @@ from clubs import views as clubs_views
 from orders import views as orders_views
 from races import views as races_views
 from friends import views as friends_views
+from moderation import views as moderation_views
 from shoes import views as shoes_views
 from territories import views as territories_views
 from blocks import views as blocks_views
@@ -176,6 +177,12 @@ urlpatterns = [
     path("v1/friends/<str:other_id>/accept", friends_views.friend_accept),
     path("v1/friends/<str:other_id>/reject", friends_views.friend_reject),
     path("v1/friends/<str:other_id>", friends_views.friend_remove),
+    # Защита от другого человека (§9–§10 готовности): чёрный список и жалобы.
+    # Путь /v1/blocks занят кварталами карты, поэтому список — на /v1/me/blocks.
+    path("v1/me/blocks", moderation_views.my_blocks),
+    path("v1/me/blocks/<str:other_id>", moderation_views.unblock),
+    path("v1/reports/reasons", moderation_views.report_reasons),
+    path("v1/reports", moderation_views.create_report),
     # Подключение часов: адреса нужны в заявке к COROS до выдачи ключей.
     path("v1/integrations/", include("integrations.urls")),
     # Выдача Pareta (D-124): итоги дня из 1С и каталог, токен только на чтение.
