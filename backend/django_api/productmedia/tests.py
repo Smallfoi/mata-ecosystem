@@ -587,6 +587,32 @@ class PipelineScreensTests(TestCase):
             self.assertEqual(prompts.item_type(name), expected, name)
         self.assertEqual(prompts.item_type("Эспандер резиновый"), "")
 
+    def test_the_category_decides_when_the_name_is_brand_and_model(self):
+        """У 216 позиций из 667 в названии только бренд и модель — «BMAI PURE 2.0
+        CORDURA», «ANTA WALK 2.0», «Rockbros SHADOW». Тип там берётся
+        из категории, которую ведёт 1С."""
+        from productmedia import prompts
+        for name, category, expected in (
+            ("BMAI PURE 2.0 CORDURA", "Кроссовки", "running shoes"),
+            ("ANTA WALK 2.0", "Ботинки", "boots"),
+            ("Rockbros SHADOW", "Очки", "sunglasses"),
+            ("SIS GO Isotonic Energy Gel", "Гели", "energy gel sachet"),
+            ("ANTA PIONEER", "Шиповки", "track spikes"),
+        ):
+            self.assertEqual(prompts.item_type(name, category), expected, name)
+
+    def test_the_category_outranks_the_name(self):
+        """Название может врать или устареть; категорию ведёт 1С."""
+        from productmedia import prompts
+        self.assertEqual(prompts.item_type("Футболка ANTA", "Лонгслив"),
+                         "long-sleeve athletic top")
+
+    def test_a_category_that_says_nothing_falls_back_to_the_name(self):
+        from productmedia import prompts
+        for vague in ("Аксессуары", "Все", ""):
+            self.assertEqual(prompts.item_type("Футболка женская STAW", vague),
+                             "short-sleeve t-shirt", vague)
+
     def test_an_unknown_name_still_names_the_card(self):
         from productmedia import prompts
         out = prompts.with_item(prompts.CATALOG, "Эспандер резиновый")
