@@ -81,6 +81,13 @@ MODELS = (
     # Фото к возврату (D-123): снимки вещей покупателя. Файл в хранилище удаляется
     # вместе со строкой (сигнал post_delete в orders/models.py).
     ("returnPhotos", "orders.ReturnPhoto", ("user_id",), DELETE),
+    # Чёрный список и жалобы (§9–§10). Блокировку стираем в обе стороны: иначе
+    # в списке того, кто блокировал, остаётся человек, которого больше нет.
+    ("blocks", "moderation.Block", ("user_id", "blocked_id"), DELETE),
+    # Жалобы, поданные человеком, — его текст. Жалобы НА него стирает erase()
+    # отдельно (`_erase_reports_about`): через реестр они попали бы ещё и в
+    # выгрузку, и человек увидел бы, кто и что на него написал.
+    ("reports", "moderation.Report", ("reporter_id",), DELETE),
     ("analyticsEvents", "analytics.Event", ("user_id",), ANON),
 )
 
@@ -166,6 +173,18 @@ def blocking_reason(uid, now=None) -> str:
     return ""
 
 
+def _erase_reports_about(uid: str) -> int:
+    """Жалобы НА этого человека: данные о нём, и разбирать их больше нечего.
+
+    Фильтр по `target_type` обязателен: `target_id` у жалобы на клуб — id клуба,
+    и без него мы стирали бы чужие жалобы при совпадении строк.
+    """
+    model = _model("moderation.Report")
+    if model is None:
+        return 0
+    return model.objects.filter(target_type="user", target_id=uid).delete()[0]
+
+
 def export(uid: str) -> dict:
     """Все данные человека по реестру (для выгрузки 152-ФЗ)."""
     out = {}
@@ -217,6 +236,7 @@ def erase(uid: str) -> dict:
             where = " OR ".join(f"{c}=%s" for c in cols)
             cur.execute(f"DELETE FROM {table} WHERE {where}", [uid] * len(cols))
             report[label] = cur.rowcount
+    report["reportsAboutUser"] = _erase_reports_about(uid)
     return report
 
 
