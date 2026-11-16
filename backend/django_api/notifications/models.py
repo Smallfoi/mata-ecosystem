@@ -20,6 +20,10 @@ class Notification(models.Model):
         max_length=20, default="system", choices=TYPE_CHOICES, verbose_name="Тип"
     )
     order_id = models.CharField(max_length=40, null=True, blank=True, verbose_name="Заказ (ID)")
+    # Рекламное или служебное (LAUNCH_READINESS §6). Канал у нас один — лента и пуши,
+    # поэтому различие держится на этом признаке, а не на канале: по закону рекламу
+    # нельзя мешать с обязательными сервисными сообщениями, и на неё нужно согласие.
+    promotional = models.BooleanField(default=False, db_index=True, verbose_name="Рекламное")
     read = models.BooleanField(default=False, verbose_name="Прочитано")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Создано")
 
@@ -40,6 +44,7 @@ class Notification(models.Model):
             "body": self.body,
             "type": self.type,
             "orderId": self.order_id,
+            "promotional": self.promotional,
             "read": self.read,
             "createdAt": self.created_at.isoformat(),
         }
@@ -113,19 +118,43 @@ class DeviceAccount(models.Model):
         ).delete()
 
 
+def is_promotional(type, promotional=None) -> bool:
+    """Рекламное ли это уведомление.
+
+    Явный флаг главнее. Если его не передали, считаем рекламным тип «Акция»: самая
+    вероятная ошибка — отправить акцию и забыть про флаг, и ошибаться надо в сторону
+    «спросили согласие», а не в сторону «разослали рекламу без согласия».
+    """
+    if promotional is not None:
+        return bool(promotional)
+    return type == "promo"
+
+
 def create_notification(user_id, title, body="", type="system", order_id=None,
-                        email_to=""):
+                        email_to="", promotional=None):
     """Создать уведомление пользователю + (если настроено) отправить пуш.
     Безопасно (без user_id — ничего не делает).
 
     `email_to` — продублировать письмом (D-111): один вызов — все каналы.
     Без EMAIL_PROVIDER или без настоящего адреса письмо не уходит.
+
+    `promotional` — рекламное сообщение (LAUNCH_READINESS §6). Без действующего
+    согласия на рекламу такое уведомление НЕ создаётся и ни в один канал не уходит;
+    функция возвращает None. Служебные уведомления согласия не требуют никогда:
+    статус заказа и ответ модератора человек должен получить независимо от того,
+    отписался он от рекламы или нет.
     """
     if not user_id:
         return None
+    ad = is_promotional(type, promotional)
+    if ad and not _marketing_allowed(user_id):
+        return None
+    # Письмо и пуш — ПОСЛЕ проверки согласия: иначе реклама ушла бы в другой канал,
+    # не оставив следа в ленте.
     _send_email(email_to, title, body)
     n = Notification.objects.create(
         user_id=user_id, title=title, body=body, type=type, order_id=order_id,
+        promotional=ad,
     )
     # Пуш — фоновой задачей (D-07), чтобы не блокировать ответ на провайдере. В EAGER
     # (без брокера) выполнится синхронно. Если брокер задан, но недоступен — не роняем
@@ -139,6 +168,13 @@ def create_notification(user_id, title, body="", type="system", order_id=None,
 
         send_push(user_id, title, body)  # no-op без PUSH_PROVIDER
     return n
+
+
+def _marketing_allowed(user_id) -> bool:
+    """Есть ли согласие на рекламу. Импорт внутри — `legal` зависит от аккаунтов."""
+    from legal.models import has_marketing_consent
+
+    return has_marketing_consent(user_id)
 
 
 def _send_email(to, subject, text):

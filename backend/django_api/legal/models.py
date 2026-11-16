@@ -137,6 +137,23 @@ def record_consent(user_id, document, source=""):
     return consent
 
 
+def has_marketing_consent(user_id) -> bool:
+    """Дал ли человек действующее согласие на рекламные коммуникации.
+
+    Нужно ПЕРЕД отправкой рекламного уведомления (LAUNCH_READINESS §6): канал у нас
+    один — лента и пуши, — поэтому отличие рекламного от служебного держится не на
+    канале, а на этой проверке. Отозванное согласие (`revoked_at`) не считается, и
+    молчание тоже: согласия нет — рекламы нет.
+    """
+    if not user_id:
+        return False
+    return UserConsent.objects.filter(
+        user_id=user_id,
+        document__doc_type=LegalDocument.MARKETING,
+        revoked_at=None,
+    ).exists()
+
+
 class ConsentClient(Account):
     """Клиент глазами юриста: один раз в списке, согласия — внутри (админка «Согласия»).
 
