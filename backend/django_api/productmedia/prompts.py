@@ -15,7 +15,8 @@ gpt-image-2.5-flare) при русском промте «сохрани над�
 # Правила точности — общие для обоих треков.
 _FIDELITY = (
     "PRODUCT FIDELITY (highest priority, never violate):\n"
-    "- Use exactly ONE garment: the most prominent one in the reference image. "
+    "- Use exactly ONE item from the reference: the one named in WHICH ITEM below. "
+    "If WHICH ITEM is not given, take the most prominent item. "
     "Ignore everything else in the reference.\n"
     "- Keep the garment identical to the reference: same colour and shade, same "
     "fabric and surface texture (knit stays knit, woven stays woven, mesh stays mesh), "
@@ -109,4 +110,68 @@ def with_note(prompt: str, note: str = "") -> str:
         prompt
         + "\nREVIEWER FEEDBACK on the previous attempt - it was rejected for this reason, "
         "fix it now (the note may be in Russian): %s" % note
+    )
+
+# Тип вещи по названию карточки. Нужен там, где на кадре несколько вещей сразу:
+# маркетинговый снимок показывает лонгслив, шорты, кепку, носки и кроссовки, а
+# карточка — про одну из них, и «самая заметная» угадывается неверно.
+# Порядок важен: «футболка-поло» ищется раньше «футболки», иначе поло станет
+# футболкой. Слова взяты из живого каталога (ноябрь 2026, 667 позиций), а не
+# придуманы: лонгслив там самый частый товар — 103 карточки.
+ITEM_TYPES = (
+    ("лонгслив", "long-sleeve athletic top"),
+    ("футболка-поло", "polo shirt"),
+    ("футболка", "short-sleeve t-shirt"),
+    ("майка", "sleeveless tank top"),
+    ("шорты", "shorts"),
+    ("леггинсы", "leggings"),
+    ("брюки", "trousers"),
+    ("ветровка", "lightweight windbreaker jacket"),
+    ("куртка", "jacket"),
+    ("жилет", "vest"),
+    ("кроссовки", "running shoes"),
+    ("ботинки", "boots"),
+    ("носки", "socks"),
+    ("перчатки", "gloves"),
+    ("бафф", "tubular neck gaiter (buff)"),
+    ("трусы", "briefs"),
+    ("рюкзак", "backpack"),
+    ("сумка", "bag"),
+    ("очки", "sunglasses"),
+    ("бутылка", "sports water bottle"),
+)
+
+
+def item_type(name: str) -> str:
+    """Английское название типа вещи по названию карточки; «» — не распознали."""
+    low = (name or "").lower()
+    for russian, english in ITEM_TYPES:
+        if russian in low:
+            return english
+    return ""
+
+
+def with_item(prompt: str, name: str = "") -> str:
+    """Сказать модели, КАКУЮ вещь брать с кадра — по названию карточки.
+
+    Исходник часто маркетинговый: на человеке сразу лонгслив, шорты, кепка, носки
+    и кроссовки. Правило «бери самую заметную» тут не работает — заметнее обычно
+    не то, о чём карточка. Название товара и есть ответ, и оно у нас уже есть:
+    задание сопоставлено с карточкой по артикулу.
+
+    Название передаём как есть, по-русски: это истина из 1С, и модель его читает.
+    Тип вещи добавляем по-английски, когда узнали, — так указание однозначнее.
+    """
+    name = (name or "").strip()
+    if not name:
+        return prompt
+    kind = item_type(name)
+    what = ('the %s' % kind) if kind else "the item"
+    return (
+        prompt
+        + "\nWHICH ITEM: the reference may show several items worn together (top, "
+        "shorts, cap, socks, shoes). This product card is about %s. Its name in the "
+        "shop catalogue is \"%s\". Generate ONLY that item and nothing else: no other "
+        "garment, no footwear, no accessory from the reference. This overrides the "
+        "\"most prominent item\" rule above." % (what, name)
     )

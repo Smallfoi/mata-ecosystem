@@ -172,7 +172,8 @@ def generate(job, note=None, from_statuses=CLAIM_QUEUED):
         master = processing.process(source_bytes, track=job.track, text=job.text,
                                     note=job.note if note is None else note,
                                     details=_details(job),
-                                    base=prompt_row.text if prompt_row else "")
+                                    base=prompt_row.text if prompt_row else "",
+                                    item=job.product.name)
         job.prompt = prompt_row
         job.usage = providers.last_usage()
         webp = images.make_webp(master)
