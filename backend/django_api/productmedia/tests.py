@@ -551,6 +551,53 @@ class PipelineScreensTests(TestCase):
         self.assertEqual(PhotoDetail.objects.filter(batch_id=batch, article="TS-7").count(), 1)
         self.assertEqual(PhotoJob.objects.filter(batch_id=batch).count(), 0)
 
+    # ───────────────── какую вещь брать с кадра ─────────────────
+
+    def test_which_item_comes_from_the_card_not_from_the_eye(self):
+        """На маркетинговом кадре лонгслив, шорты, кепка, носки и кроссовки —
+        «самая заметная вещь» угадывается неверно. Выбирает карточка."""
+        from productmedia import prompts
+        out = prompts.with_item(prompts.CATALOG, "Лонгслив мужской STAW")
+        self.assertIn("long-sleeve athletic top", out)
+        self.assertIn("Лонгслив мужской STAW", out)
+        self.assertIn("ONLY that item", out)
+
+    def test_the_card_overrides_the_most_prominent_rule(self):
+        from productmedia import prompts
+        self.assertIn("most prominent", prompts.CATALOG)
+        self.assertIn("overrides", prompts.with_item(prompts.CATALOG, "Шорты STAW"))
+
+    def test_polo_is_not_a_t_shirt(self):
+        """«футболка» входит в «футболка-поло» — порядок поиска решает."""
+        from productmedia import prompts
+        self.assertEqual(prompts.item_type("Футболка-поло мужская ANTA"), "polo shirt")
+        self.assertEqual(prompts.item_type("Футболка женская STAW"), "short-sleeve t-shirt")
+
+    def test_every_kind_in_the_catalogue_is_recognised(self):
+        """Слова взяты из живого каталога; если 1С заведёт новый тип, он просто
+        не распознается — и указание останется общим, без выдумки."""
+        from productmedia import prompts
+        for name, expected in (
+            ("Кроссовки женские BMAI GCARBON-4", "running shoes"),
+            ("Носки ANTA", "socks"),
+            ("Бафф Унисекс. STAW", "tubular neck gaiter (buff)"),
+            ("Ветровка мужская STAW", "lightweight windbreaker jacket"),
+            ("Бутылка для воды SIS", "sports water bottle"),
+        ):
+            self.assertEqual(prompts.item_type(name), expected, name)
+        self.assertEqual(prompts.item_type("Эспандер резиновый"), "")
+
+    def test_an_unknown_name_still_names_the_card(self):
+        from productmedia import prompts
+        out = prompts.with_item(prompts.CATALOG, "Эспандер резиновый")
+        self.assertIn("Эспандер резиновый", out)
+        self.assertIn("the item", out)
+
+    def test_no_name_changes_nothing(self):
+        from productmedia import prompts
+        self.assertEqual(prompts.with_item(prompts.CATALOG, ""), prompts.CATALOG)
+        self.assertEqual(prompts.with_item(prompts.CATALOG, "   "), prompts.CATALOG)
+
     def test_prompts_page_save_restore_reset(self):
         from django.urls import reverse
         from productmedia import prompts
