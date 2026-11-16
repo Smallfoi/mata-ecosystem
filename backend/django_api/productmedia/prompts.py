@@ -112,13 +112,59 @@ def with_note(prompt: str, note: str = "") -> str:
         "fix it now (the note may be in Russian): %s" % note
     )
 
-# Тип вещи по названию карточки. Нужен там, где на кадре несколько вещей сразу:
-# маркетинговый снимок показывает лонгслив, шорты, кепку, носки и кроссовки, а
-# карточка — про одну из них, и «самая заметная» угадывается неверно.
-# Порядок важен: «футболка-поло» ищется раньше «футболки», иначе поло станет
-# футболкой. Слова взяты из живого каталога (ноябрь 2026, 667 позиций), а не
-# придуманы: лонгслив там самый частый товар — 103 карточки.
-ITEM_TYPES = (
+# Тип вещи. Нужен там, где на кадре несколько вещей сразу: маркетинговый снимок
+# показывает лонгслив, шорты, кепку, носки и кроссовки, а карточка — про одну из них.
+#
+# Истина — КАТЕГОРИЯ: её ведёт 1С, и это настоящий справочник магазина. Разбор
+# названия оставлен запасным путём и помогает всё реже: на ноябрь 2026 у 216 позиций
+# из 667 в названии только бренд и модель («BMAI PURE 2.0 CORDURA», «ANTA WALK 2.0»,
+# «Rockbros SHADOW») — там тип из названия не достать в принципе, а категория есть.
+CATEGORY_TYPES = {
+    # одежда
+    "лонгслив": "long-sleeve athletic top",
+    "футболка": "short-sleeve t-shirt",
+    "футболки": "short-sleeve t-shirt",
+    "топ": "sports bra top",
+    "майка": "sleeveless tank top",
+    "худи": "hoodie",
+    "шорты": "shorts",
+    "велосипедка": "cycling shorts",
+    "тайтсы": "running tights",
+    "леггинсы": "leggings",
+    "брюки": "trousers",
+    "ветровка": "lightweight windbreaker jacket",
+    "куртка": "jacket",
+    "куртки": "jacket",
+    "жилет": "vest",
+    "термобелье": "thermal base layer",
+    "трусы": "briefs",
+    "носки": "socks",
+    # обувь
+    "кроссовки": "running shoes",
+    "шиповки": "track spikes",
+    "ботинки": "boots",
+    "тапочки": "slides",
+    "стельки": "shoe insoles",
+    # аксессуары и питание
+    "перчатки": "gloves",
+    "бафф": "tubular neck gaiter (buff)",
+    "шапка": "beanie hat",
+    "бейсболка": "baseball cap",
+    "очки": "sunglasses",
+    "рюкзак": "backpack",
+    "сумка": "bag",
+    "бутылка": "sports water bottle",
+    "бутылки": "sports water bottle",
+    "термос": "thermos flask",
+    "гели": "energy gel sachet",
+}
+
+# Категории, которые ничего не уточняют: берём тип из названия.
+VAGUE_CATEGORIES = {"все", "аксессуары", "all", "accessories"}
+
+# Запасной путь: слово в названии карточки. Порядок важен — «футболка-поло»
+# ищется раньше «футболки», иначе поло станет футболкой.
+NAME_TYPES = (
     ("лонгслив", "long-sleeve athletic top"),
     ("футболка-поло", "polo shirt"),
     ("футболка", "short-sleeve t-shirt"),
@@ -134,6 +180,7 @@ ITEM_TYPES = (
     ("носки", "socks"),
     ("перчатки", "gloves"),
     ("бафф", "tubular neck gaiter (buff)"),
+    ("нижнее белье", "briefs"),
     ("трусы", "briefs"),
     ("рюкзак", "backpack"),
     ("сумка", "bag"),
@@ -142,16 +189,25 @@ ITEM_TYPES = (
 )
 
 
-def item_type(name: str) -> str:
-    """Английское название типа вещи по названию карточки; «» — не распознали."""
+def item_type(name: str = "", category: str = "") -> str:
+    """Английское название типа вещи; «» — не распознали.
+
+    Сначала категория (справочник 1С), затем название. Не распознали — лучше
+    промолчать, чем подставить неверный тип: промт тогда просто назовёт карточку.
+    """
+    key = (category or "").strip().lower()
+    if key and key not in VAGUE_CATEGORIES:
+        english = CATEGORY_TYPES.get(key)
+        if english:
+            return english
     low = (name or "").lower()
-    for russian, english in ITEM_TYPES:
+    for russian, english in NAME_TYPES:
         if russian in low:
             return english
     return ""
 
 
-def with_item(prompt: str, name: str = "") -> str:
+def with_item(prompt: str, name: str = "", category: str = "") -> str:
     """Сказать модели, КАКУЮ вещь брать с кадра — по названию карточки.
 
     Исходник часто маркетинговый: на человеке сразу лонгслив, шорты, кепка, носки
@@ -165,7 +221,7 @@ def with_item(prompt: str, name: str = "") -> str:
     name = (name or "").strip()
     if not name:
         return prompt
-    kind = item_type(name)
+    kind = item_type(name, category)
     what = ('the %s' % kind) if kind else "the item"
     return (
         prompt
