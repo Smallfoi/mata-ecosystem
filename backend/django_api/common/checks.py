@@ -1,6 +1,13 @@
 """Системные проверки окружения (`manage.py check`, `test`, `runserver`).
 
-Пока одна: образ старее `requirements.txt` — см. `common/imagefresh.py`.
+Пока одна: установленные пакеты беднее `requirements.txt` — см. `common/imagefresh.py`.
+
+Про формулировку. Проверка знает только своё окружение, не образ, из которого оно
+выросло. Разница видна на живом примере (16.11.2026): в работающем `backend-web-1`
+сторож назвал только `cryptography`, а в свежем контейнере ИЗ ТОГО ЖЕ ОБРАЗА — ещё и
+`fitparse`. Потому что `fitparse` кто-то поставил в живой контейнер руками: в окружении
+он есть, в образе его нет, и после `recreate` он пропадёт. Поэтому сообщение говорит
+про окружение (что проверено), а про образ — подсказка (что обычно верно в dev).
 """
 from django.core.checks import Warning as CheckWarning
 from django.core.checks import register
@@ -22,9 +29,11 @@ def image_matches_requirements(app_configs, **kwargs):
         return []
     return [
         CheckWarning(
-            f"Образ старее requirements.txt: не установлено — {', '.join(gone)}.",
-            hint="Пакеты ставятся при build, код монтируется томом. "
-                 "Пересоберите: docker compose up -d --build",
+            f"Окружение беднее requirements.txt: не установлено — {', '.join(gone)}.",
+            hint="В dev это почти всегда устаревший образ: пакеты ставятся при build, "
+                 "код монтируется томом. Пересоберите: docker compose up -d --build. "
+                 "`pip install` внутрь живого контейнера уберёт это сообщение, но не "
+                 "починит образ — после recreate вернётся.",
             id=W_STALE_IMAGE,
         )
     ]

@@ -73,6 +73,10 @@ class CheckMessage(SimpleTestCase):
         self.assertEqual(found[0].id, checks.W_STALE_IMAGE)
         self.assertIn("cryptography", found[0].msg)
         self.assertIn("--build", found[0].hint)
+        # Сообщение говорит про ОКРУЖЕНИЕ — это всё, что проверка знает. Про образ —
+        # только подсказка: в живом контейнере пакет мог быть доставлен руками.
+        self.assertIn("Окружение", found[0].msg)
+        self.assertIn("recreate", found[0].hint)
 
     def test_quiet_on_a_fresh_image(self):
         def fresh():
