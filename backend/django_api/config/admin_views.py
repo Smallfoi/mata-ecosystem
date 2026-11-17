@@ -467,7 +467,7 @@ def _video_poster(video_name):
         import imageio_ffmpeg
         ff = imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
-        logging.getLogger(__name__).exception("нет ffmpeg — видео %s не сжато", saved)
+        logging.getLogger(__name__).exception("нет ffmpeg — постер %s не снят", video_name)
         return None
 
     tmpdir = tempfile.mkdtemp(prefix="mata-poster-")
@@ -486,8 +486,7 @@ def _video_poster(video_name):
         with open(out, "rb") as fh:
             return default_storage.save(name, File(fh))
     except Exception:
-        # Не молча: 25.09 тихий None два месяца отдавал на сайт стомегабайтник.
-        logging.getLogger(__name__).exception("сжатие видео %s не удалось", saved)
+        logging.getLogger(__name__).exception("постер-кадр %s не снят", video_name)
         return None
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
