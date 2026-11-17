@@ -38,20 +38,28 @@ def _pairs(qs):
     groups = OrderedDict()
     for product in qs:
         key = product.shop_model_key or product.id
-        entry = groups.setdefault(key, {"key": key, "name": product.shop_title,
-                                        "meta": [], "colors": []})
-        if not entry["meta"]:
-            entry["meta"] = [x for x in (product.brand, product.article) if x]
-        for color in (product.colors or []):
-            color = str(color).strip()
-            if color and color not in entry["colors"]:
+        entry = groups.setdefault(key, {"key": key, "name": product.shop_title, "brand": "",
+                                        "articles": {}, "colors": []})
+        entry["brand"] = entry["brand"] or product.brand
+        colors = [c for c in (str(c).strip() for c in (product.colors or [])) if c]
+        for color in colors:
+            if color not in entry["colors"]:
                 entry["colors"].append(color)
+        # Артикул в 1С — у модели в конкретном цвете (XRPM008-3 жёлтый, -5 мятный).
+        # Раньше плитка брала артикул первой позиции модели, и у всех цветов
+        # стоял артикул жёлтого (16.11.2026).
+        if product.article:
+            for color in colors or [""]:
+                entry["articles"].setdefault(color, product.article)
 
     out = []
     for entry in groups.values():
         for color in (entry["colors"] or [""]):
+            article = entry["articles"].get(color, "" if color else
+                                            next(iter(entry["articles"].values()), ""))
             out.append({"key": entry["key"], "name": entry["name"],
-                        "meta": " · ".join(entry["meta"]), "color": color})
+                        "meta": " · ".join(x for x in (entry["brand"], article) if x),
+                        "color": color})
     return out
 
 
