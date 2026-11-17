@@ -46,6 +46,32 @@ class ModelKeyTests(TestCase):
         self.assertEqual(a, "BMAI EXPEDITION CORDURA")
 
 
+class StawArticleTests(TestCase):
+    """STAW: цвет приклеен к коду модели без дефиса — 26SADT003 + 1850 (D-131)."""
+
+    def test_the_model_is_the_first_nine_characters(self):
+        self.assertEqual(model_base("26SADT0031850"), "26SADT003")
+        self.assertEqual(model_base("26SAJK004QPNK"), "26SAJK004")
+        self.assertEqual(model_base("26SAJK003BRN"), "26SAJK003")
+        self.assertEqual(model_base("27sact0010935"), "27SACT001", "следующий год и строчные — та же схема")
+
+    def test_other_articles_are_untouched(self):
+        self.assertEqual(model_base("XRMM002-4"), "XRMM002")
+        self.assertEqual(model_base("XRPL006"), "XRPL006")
+        self.assertEqual(model_base("26SADT003"), "26SADT003", "код модели без цвета остаётся сам собой")
+
+    def test_colours_of_one_model_become_one_card_and_men_women_stay_apart(self):
+        make("s1", "Футболка женская STAW", article="26SADT0031850", sizes=["S"], colors=["Розовый"],
+             brand="STAW", stock_count=1, stock_by_size={"S": 1})
+        make("s2", "Футболка женская STAW", article="26SADT0031034", sizes=["M"], colors=["Фиолетовый"],
+             brand="STAW", stock_count=1, stock_by_size={"M": 1})
+        make("s3", "Футболка мужская STAW", article="26SADT0021799", sizes=["L"], colors=["Красный"],
+             brand="STAW", stock_count=1, stock_by_size={"L": 1})
+        cards = {c["key"]: c for c in self.client.get("/v1/models").json()}
+        self.assertEqual(set(cards), {"26SADT003", "26SADT002"})
+        self.assertEqual(sorted(c["name"] for c in cards["26SADT003"]["colors"]), ["Розовый", "Фиолетовый"])
+
+
 class ModelCardTests(TestCase):
     def setUp(self):
         # Одна модель обуви: два цвета, по два размера; один размер распродан.

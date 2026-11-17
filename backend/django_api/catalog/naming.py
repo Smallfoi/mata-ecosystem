@@ -215,12 +215,21 @@ def shop_name(name: str, sizes=None, colors=None, article: str = "") -> str:
 # артикул появится.
 
 _COLOR_SUFFIX = re.compile(r"[-_]\d{1,2}$")
+# STAW пишет цвет прямо за кодом модели, без дефиса: 26SADT003 + 1850, 26SAJK004 + QPNK.
+# Модель — первые 9 знаков: год, «SA», группа из двух букв, номер из трёх цифр
+# (D-131; разбор артикула — в правиле номенклатуры 1С от 16.11.2026).
+_STAW = re.compile(r"^(\d{2}SA[A-Z]{2}\d{3})[A-Z0-9]{2,6}$")
 
 
 def model_base(article: str) -> str:
-    """База модели: отрезаем суффикс цвета. «FRWK006-1» → «FRWK006»."""
+    """База модели: отрезаем код цвета. «FRWK006-1» → «FRWK006», «26SADT0031850» → «26SADT003»."""
     article = (article or "").strip()
-    return _COLOR_SUFFIX.sub("", article) if article else ""
+    if not article:
+        return ""
+    staw = _STAW.match(article.upper())
+    if staw:
+        return staw.group(1)
+    return _COLOR_SUFFIX.sub("", article)
 
 
 def model_key(name: str, sizes=None, colors=None, article: str = "",
