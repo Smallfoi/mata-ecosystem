@@ -31,6 +31,9 @@ set -uo pipefail
 export LC_ALL=C.UTF-8
 
 APP_DIR=/opt/mata/backend
+# Свой внешний адрес сервер изнутри не открывает (NAT облака) — к API идём через свой
+# nginx на 127.0.0.1 с настоящим именем: тот же TLS и тот же путь, что у покупателя.
+HEALTH=(curl -fsS -m 10 --resolve api.mata-club.ru:443:127.0.0.1 https://api.mata-club.ru/v1/health)
 COMPOSE=(sudo docker compose -f "$APP_DIR/docker-compose.prod.yml" --env-file "$APP_DIR/.env")
 LOG=/var/log/mata-ops.log
 
@@ -84,7 +87,7 @@ case "$verb" in
     ;;
 
   health)
-    curl -fsS -m 10 https://api.mata-club.ru/v1/health || {
+    "${HEALTH[@]}" || {
       note "health: API не ответил"
       echo "API не ответил на /v1/health" >&2
       exit 1
@@ -187,7 +190,7 @@ YOOKASSA_SECRET_KEY=live_AbCdEf123456 карта 4276380012345678'
     echo "== MTU сетевых интерфейсов (больше 1500 — крупные пакеты теряются, PITFALLS)"
     ip -o link show | awk '$2 !~ /^(lo|veth|br-|docker)/ {print $2, $4, $5}'
     echo "== сторож: /v1/health"
-    curl -fsS -m 10 https://api.mata-club.ru/v1/health || echo "API не ответил"
+    "${HEALTH[@]}" || echo "API не ответил"
     echo
     ;;
 
