@@ -6,7 +6,7 @@ from django.utils import timezone
 
 
 class ShowcaseTab(models.Model):
-    """Вкладка витрины: «Обувь», «Одежда»… (D-132).
+    """Вкладка витрины: «Обувь», «Одежда»… (D-133).
 
     Категории приходят из 1С россыпью — 30+ штук, с дублями и пустыми. Покупателю
     вкладки нужны крупные, как у Nike/adidas/On: тип вещи. Раскладка — наша, в 1С
@@ -65,7 +65,7 @@ class Category(models.Model):
     # просить 1С выгружать справочник заново.
     parent_id = models.CharField(max_length=40, blank=True, default="", db_index=True,
                                  verbose_name="Родительская категория (ID)")
-    # Куда категория попадает на витрине (D-132). Пусто — товары видны только во
+    # Куда категория попадает на витрине (D-133). Пусто — товары видны только во
     # вкладке «Все», а админка напоминает отнести категорию к группе.
     showcase_group = models.ForeignKey(ShowcaseGroup, on_delete=models.SET_NULL, null=True,
                                        blank=True, related_name="categories",

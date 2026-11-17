@@ -48,7 +48,7 @@ def _platform_order(request):
 @throttle_classes(PUBLIC_READ)
 def categories(request):
     """Плоский список для выпущенных сборок Store: без пустых и демо-категорий, в
-    порядке вкладок витрины (D-132). «Все» — первой: из неё приложение рисует кнопку."""
+    порядке вкладок витрины (D-133). «Все» — первой: из неё приложение рисует кнопку."""
     return Response([c.to_json() for c in showcase.visible_categories(_visible_products(request))])
 
 

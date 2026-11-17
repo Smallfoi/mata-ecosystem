@@ -19,7 +19,7 @@ function updateHeader() {
 // Фильтр по категории + текстовый поиск (по названию). Перезапрашиваем DOM,
 // т.к. фильтры/карточки могут перерисовываться из API (catalog.js).
 function applyCatalog() {
-  // Вкладка остаётся подсвеченной, пока внутри выбрана её группа (D-132).
+  // Вкладка остаётся подсвеченной, пока внутри выбрана её группа (D-133).
   document.querySelectorAll("[data-filter]").forEach((button) => {
     const f = button.dataset.filter;
     button.classList.toggle("is-active", f === currentFilter || f === currentTab);
