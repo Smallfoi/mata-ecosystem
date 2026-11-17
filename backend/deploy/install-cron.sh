@@ -30,4 +30,6 @@ KEEP=$(printf '%s\n' "$CURRENT" \
 } | crontab -
 
 echo "Расписание установлено:"
+# Журналы бэкапа читает канал обслуживания (ops-shell backup) без sudo; секретов в них нет.
+touch /var/log/mata-backup.log /var/log/mata-pgbr.log && chmod 644 /var/log/mata-backup.log /var/log/mata-pgbr.log
 crontab -l | grep -E 'prod-autodeploy|tls|backup|pgbr'
