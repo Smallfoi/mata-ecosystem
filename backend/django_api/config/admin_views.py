@@ -286,14 +286,20 @@ def merch_site_image(request):
 
 # Оптимизация загружаемых фото для web: большие камерные снимки (5000×3500, 15+ МБ)
 # грузятся на сайте секундами. Даунскейлим до 2560px по длинной стороне (ретина-качество
-# для героя/секций) и пережимаем: JPEG q85 (без альфы) / PNG (с прозрачностью). Загружать
+# для героя/секций) и пережимаем в WebP q85 — и фото, и картинки с прозрачностью. Загружать
 # можно крупные (лимит 40 МБ) — на сайт уходит лёгкая версия. Ошибка/нет Pillow → оригинал.
+#
+# WebP с 18.11.2026: на фото сайта вдвое легче JPEG q85 при том же виде (замер: 521 → 288 КБ,
+# 230 → 115 КБ). Его читают все браузеры с 2020 г. (Safari — с iOS 14) и Flutter, поэтому
+# отдаём один файл без <picture>: ссылку меняет Конструктор, как и раньше.
 _IMG_MAXDIM = 2560
+_IMG_QUALITY = 85
 
 
 def _webify_image(f):
     try:
         import io
+        import os
 
         from django.core.files.base import ContentFile
         from PIL import Image, ImageOps
@@ -306,21 +312,24 @@ def _webify_image(f):
         has_alpha = img.mode in ("RGBA", "LA") or (
             img.mode == "P" and "transparency" in img.info
         )
+        # До уменьшения: палитровую картинку LANCZOS не масштабирует.
+        img = img.convert("RGBA" if has_alpha else "RGB")
         w, h = img.size
         scale = min(1.0, _IMG_MAXDIM / float(max(w, h)))
         if scale < 1.0:
             img = img.resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.LANCZOS)
         buf = io.BytesIO()
-        base = (getattr(f, "name", None) or "image").rsplit(".", 1)[0]
-        if has_alpha:
-            img.save(buf, format="PNG", optimize=True)
-            name = base + "_web.png"
-        else:
-            img.convert("RGB").save(buf, format="JPEG", quality=85, optimize=True, progressive=True)
-            name = base + "_web.jpg"
+        base = os.path.basename(getattr(f, "name", None) or "image").rsplit(".", 1)[0]
+        if base.endswith("_web"):   # пережимаем уже лёгкую версию — без «_web_web»
+            base = base[:-4]
+        img.save(buf, format="WEBP", quality=_IMG_QUALITY, method=6)
+        name = base + "_web.webp"
         buf.seek(0)
         return ContentFile(buf.read(), name=name)
     except Exception:
+        # Не картинка для Pillow (SVG) или битый файл — уходит оригинал, но не молча.
+        logging.getLogger(__name__).warning(
+            "фото %s не пережато, сохраняем как есть", getattr(f, "name", "?"), exc_info=True)
         try:
             f.seek(0)
         except Exception:

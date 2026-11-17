@@ -28,3 +28,19 @@ def webify_site_videos():
         call_command("webify_site_videos", apply=True)
     finally:
         cache.delete(_LOCK)
+
+
+_IMG_LOCK = "catalog.webify_site_images.lock"
+
+
+@shared_task(name="catalog.webify_site_images", ignore_result=True)
+def webify_site_images():
+    """Фото блоков сайта и баннеров в WebP (18.11.2026). Загрузка уже кладёт WebP;
+    задача доводит то, что лежало раньше, и всё, что когда-то не пережалось."""
+    if not cache.add(_IMG_LOCK, 1, _LOCK_TTL):
+        log.info("webify_site_images: предыдущий запуск ещё идёт")
+        return
+    try:
+        call_command("webify_site_images", apply=True)
+    finally:
+        cache.delete(_IMG_LOCK)

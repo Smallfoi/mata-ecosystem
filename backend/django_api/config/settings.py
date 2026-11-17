@@ -700,6 +700,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "catalog.webify_site_videos",
         "schedule": crontab(minute="*/20"),
     },
+    # Фото блоков сайта и баннеров — в WebP (вдвое легче JPEG). Уже WebP — ничего не делает.
+    "webify-site-images": {
+        "task": "catalog.webify_site_images",
+        "schedule": crontab(minute="10,30,50"),
+    },
 }
 
 # Авто-парсер «Стартов»: URL нормализованного JSON-фида забегов (races/importers/jsonfeed).
