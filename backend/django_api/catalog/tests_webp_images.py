@@ -19,7 +19,10 @@ from config.admin_views import _webify_image
 def _img(fmt, mode="RGB", size=(3000, 2000), **save):
     im = Image.new(mode, size, (200, 30, 30, 128) if mode == "RGBA" else (200, 30, 30))
     if mode == "P":
-        im = Image.new("RGB", size, (200, 30, 30)).convert("P")
+        # Палитра: индекс 0 прозрачный (левая половина), 1 — красный (правая).
+        im = Image.new("P", size, 0)
+        im.putpalette([0, 0, 0, 200, 30, 30] + [0, 0, 0] * 254)
+        im.paste(1, (size[0] // 2, 0, size[0], size[1]))
         save.setdefault("transparency", 0)
     buf = io.BytesIO()
     im.save(buf, fmt, **save)
@@ -44,6 +47,7 @@ class WebifyImageTests(SimpleTestCase):
             im = _open(_webify_image(ContentFile(_img("PNG", mode, size=(400, 300)), name=name)))
             self.assertEqual(im.format, "WEBP")
             self.assertIn("A", im.getbands(), mode)
+            self.assertEqual(im.getpixel((5, 5))[3], 0 if mode == "P" else 128, mode)
 
     def test_already_light_file_gets_no_double_suffix(self):
         out = _webify_image(ContentFile(_img("JPEG", size=(100, 80)), name="SHS_3399_web.jpg"))
