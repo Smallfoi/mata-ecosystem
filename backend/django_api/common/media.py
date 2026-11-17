@@ -16,6 +16,13 @@ graceful degradation, что у SMS/оплаты/пуша: без ключей �
 планы принтов) — их видит только сотрудник на экране проверки. Витринные снимки
 (catalog) остаются в `default` и публичны. Без S3 (dev/CI) — тот же локальный диск.
 """
+import mimetypes
+
+# S3-хранилище берёт Content-Type у `mimetypes`, а в образе сервера `.webp` нет —
+# фото товаров и сайта уходили как application/octet-stream (найдено 18.11.2026).
+# Браузеры картинку угадывают, но тип должен быть честным.
+mimetypes.add_type("image/webp", ".webp")
+mimetypes.add_type("image/avif", ".avif")
 
 PRIVATE_URL_TTL = 3600  # час: хватает на работу с экраном проверки, дальше — перезагрузить
 

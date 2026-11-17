@@ -1,0 +1,67 @@
+# -*- coding: utf-8 -*-
+"""Проставить честный Content-Type уже лежащим в S3 картинкам WebP/AVIF.
+
+До 18.11.2026 сервер не знал тип `.webp`, и хранилище записывало фото товаров и
+сайта как `application/octet-stream`. Новые файлы теперь идут с `image/webp`
+(common/media.py); эта команда правит старые: копирует объект сам в себя с новыми
+метаданными (содержимое не меняется), доступ оставляет публичным.
+
+    python manage.py fix_media_content_types            # показать
+    python manage.py fix_media_content_types --apply    # исправить
+"""
+from django.core.files.storage import default_storage
+from django.core.management.base import BaseCommand
+
+TYPES = {".webp": "image/webp", ".avif": "image/avif"}
+# Только публичные папки витрины. Приватные файлы (photopipeline/, returns/) лежат в
+# том же бакете — копирование с ACL public-read открыло бы их всем.
+PREFIXES = ("uploads/photos/", "uploads/site/", "uploads/banners/",
+            "uploads/categories/", "uploads/products/")
+ALL_USERS = "http://acs.amazonaws.com/groups/global/AllUsers"
+
+
+def _is_public(client, bucket, key) -> bool:
+    acl = client.get_object_acl(Bucket=bucket, Key=key)
+    return any(g.get("Grantee", {}).get("URI") == ALL_USERS and g.get("Permission") == "READ"
+               for g in acl.get("Grants", []))
+
+
+class Command(BaseCommand):
+    help = "Исправить Content-Type у WebP/AVIF в S3 (были application/octet-stream)"
+
+    def add_arguments(self, parser):
+        parser.add_argument("--apply", action="store_true")
+
+    def handle(self, *args, **opts):
+        bucket = getattr(default_storage, "bucket", None)
+        if bucket is None:
+            self.stdout.write("Хранилище не S3 — исправлять нечего.")
+            return
+        client = bucket.meta.client
+        fixed = wrong = 0
+        objects = (o for prefix in PREFIXES for o in bucket.objects.filter(Prefix=prefix))
+        for obj in objects:
+            want = next((t for ext, t in TYPES.items() if obj.key.lower().endswith(ext)), None)
+            if not want:
+                continue
+            head = client.head_object(Bucket=bucket.name, Key=obj.key)
+            if head.get("ContentType") == want:
+                continue
+            if not _is_public(client, bucket.name, obj.key):
+                self.stdout.write(f"  {obj.key}: не публичный — пропуск")
+                continue
+            wrong += 1
+            if not opts["apply"]:
+                continue
+            extra = {"CacheControl": head["CacheControl"]} if head.get("CacheControl") else {}
+            client.copy_object(
+                Bucket=bucket.name, Key=obj.key,
+                CopySource={"Bucket": bucket.name, "Key": obj.key},
+                MetadataDirective="REPLACE", ContentType=want, ACL="public-read",
+                Metadata=head.get("Metadata") or {}, **extra,
+            )
+            fixed += 1
+        if opts["apply"]:
+            self.stdout.write(f"Исправлено: {fixed}.")
+        else:
+            self.stdout.write(f"С неверным типом: {wrong}. Повторите с --apply.")
