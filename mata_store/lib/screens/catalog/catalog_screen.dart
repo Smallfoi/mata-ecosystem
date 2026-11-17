@@ -78,7 +78,13 @@ class CatalogScreen extends StatefulWidget {
 }
 
 class _CatalogScreenState extends State<CatalogScreen> {
-  late String _selectedCategory;
+  // Вкладка витрины ('all' — всё) и группа внутри неё (D-133). Без вкладок от
+  // бэкенда (старый сервер) _selectedTab — это id категории, как раньше.
+  String _selectedTab = 'all';
+  String? _selectedGroup;
+  // Переход в каталог по категории 1С (с главной): раскладываем по вкладке и
+  // группе, когда вкладки загрузятся; до этого фильтруем по самой категории.
+  String? _pendingCategory;
   String _sortBy = 'default';
   CatalogFilters _filters = const CatalogFilters();
 
@@ -88,7 +94,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedCategory = widget.initialCategory ?? 'all';
+    final initial = widget.initialCategory;
+    if (initial != null && initial != 'all') _pendingCategory = initial;
     // Переключение «Просмотр⇄Правка» из конструктора → пересобрать экран
     // (в правке — редактор порядка, в просмотре — обычный каталог).
     consoleEditNotifier.addListener(_onEditToggle);
@@ -105,10 +112,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 
   List<Product> _filtered(CatalogProvider catalog) {
-    var products = catalog
-        .byCategory(_selectedCategory)
-        .where(_filters.matches)
-        .toList();
+    _resolvePendingCategory(catalog);
+    final List<Product> base;
+    if (_pendingCategory != null) {
+      base = catalog.byCategory(_pendingCategory!);
+    } else if (catalog.showcase.isEmpty) {
+      base = catalog.byCategory(_selectedTab);
+    } else {
+      base = catalog.byShowcase(_selectedTab, groupId: _selectedGroup);
+    }
+    var products = base.where(_filters.matches).toList();
     switch (_sortBy) {
       case 'price_asc':
         products.sort((a, b) => a.price.compareTo(b.price));
@@ -122,6 +135,27 @@ class _CatalogScreenState extends State<CatalogScreen> {
     }
     return products;
   }
+
+  void _resolvePendingCategory(CatalogProvider catalog) {
+    final pending = _pendingCategory;
+    if (pending == null || catalog.showcase.isEmpty) return;
+    final (tab, group) = catalog.placeOfCategory(pending);
+    if (tab == null) return;
+    _selectedTab = tab.id;
+    _selectedGroup = tab.groups.length > 1 ? group?.id : null;
+    _pendingCategory = null;
+  }
+
+  void _selectTab(String id) => setState(() {
+        _selectedTab = id;
+        _selectedGroup = null;
+        _pendingCategory = null;
+      });
+
+  void _selectGroup(String id) => setState(() {
+        // Повторное нажатие снимает группу — снова вся вкладка.
+        _selectedGroup = _selectedGroup == id ? null : id;
+      });
 
   Future<void> _openFilters() async {
     final catalog = context.read<CatalogProvider>();
@@ -216,9 +250,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
       ),
       body: Column(
         children: [
-          _CategoryFilter(
-            selected: _selectedCategory,
-            onSelected: (id) => setState(() => _selectedCategory = id),
+          _ShowcaseFilter(
+            selectedTab: _pendingCategory ?? _selectedTab,
+            selectedGroup: _selectedGroup,
+            onTab: _selectTab,
+            onGroup: _selectGroup,
           ),
           const Divider(height: 1),
 
@@ -742,7 +778,7 @@ class _FilterChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppColors.black : AppColors.white,
           border: Border.all(
-            color: selected ? AppColors.black : AppColors.grey200,
+            color: selected ? AppColors.black : AppColors.grey400,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -817,47 +853,174 @@ class _ToggleRow extends StatelessWidget {
 
 // ─── Category filter (unchanged) ──────────────────────────────────────────────
 
-class _CategoryFilter extends StatelessWidget {
-  final String selected;
-  final ValueChanged<String> onSelected;
+/// Ряд вкладок («Все · Обувь · Одежда…») и под ним — группы выбранной вкладки
+/// («Кроссовки · Ботинки»). Без вкладок от бэкенда — прежний ряд категорий 1С.
+class _ShowcaseFilter extends StatelessWidget {
+  final String selectedTab;
+  final String? selectedGroup;
+  final ValueChanged<String> onTab;
+  final ValueChanged<String> onGroup;
 
-  const _CategoryFilter({required this.selected, required this.onSelected});
+  const _ShowcaseFilter({
+    required this.selectedTab,
+    required this.selectedGroup,
+    required this.onTab,
+    required this.onGroup,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final categories = context.watch<CatalogProvider>().categories;
+    final catalog = context.watch<CatalogProvider>();
+    final tabs = catalog.showcase;
+    final List<(String, String)> row;
+    if (tabs.isEmpty) {
+      row = [for (final c in catalog.categories) (c.id, c.name)];
+    } else {
+      final all = catalog.categoryById('all');
+      row = [
+        ('all', all?.name ?? 'Все'),
+        for (final t in tabs) (t.id, t.name),
+      ];
+    }
+    final tab = catalog.tabById(selectedTab);
+    final groups = tab != null && tab.groups.length > 1 ? tab.groups : null;
 
-    return SizedBox(
-      height: 52,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cat = categories[index];
-          final isSelected = cat.id == selected;
-          return GestureDetector(
-            onTap: () => onSelected(cat.id),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.black : AppColors.grey100,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                cat.name,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 52,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemCount: row.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final (id, name) = row[index];
+              return _TabChip(
+                key: ValueKey('tab-$id'),
+                label: name,
+                selected: id == selectedTab,
+                onTap: () => onTab(id),
+              );
+            },
+          ),
+        ),
+        if (groups != null)
+          SizedBox(
+            height: 44,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              itemCount: groups.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final g = groups[index];
+                return _GroupChip(
+                  key: ValueKey('group-${g.id}'),
+                  label: g.name,
+                  count: g.count,
+                  selected: g.id == selectedGroup,
+                  onTap: () => onGroup(g.id),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _TabChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TabChip({super.key, required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.black : AppColors.grey100,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? AppColors.white : AppColors.black,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Группа — мельче и тише вкладки: обводка вместо заливки, рядом число карточек.
+class _GroupChip extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _GroupChip({
+    super.key,
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.grey100 : AppColors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? AppColors.black : AppColors.grey400,
+            ),
+          ),
+          child: Text.rich(
+            TextSpan(children: [
+              TextSpan(
+                text: label,
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? AppColors.white : AppColors.black,
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: AppColors.black,
                 ),
               ),
-            ),
-          );
-        },
+              TextSpan(
+                text: '  $count',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.grey600,
+                ),
+              ),
+            ]),
+          ),
+        ),
       ),
     );
   }

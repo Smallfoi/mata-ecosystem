@@ -1,6 +1,7 @@
 import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../models/review.dart';
+import '../../models/showcase.dart';
 import '../api/api_client.dart';
 import '../api/api_config.dart';
 import '../mock_data.dart';
@@ -19,6 +20,10 @@ class PriceRange {
 /// [ApiProductRepository] (переключается в `ApiConfig.useMock`).
 abstract class ProductRepository {
   Future<List<Category>> getCategories();
+
+  /// Вкладки витрины (D-133). Пусто — бэкенд старый или вкладок нет: экран
+  /// показывает прежний ряд категорий.
+  Future<List<ShowcaseTab>> getShowcase();
   Future<List<Product>> getProducts();
   Future<List<Product>> getByCategory(String categoryId);
   Future<Product?> getById(String id);
@@ -52,6 +57,9 @@ class MockProductRepository implements ProductRepository {
     await Future.delayed(_delay);
     return MockData.categories;
   }
+
+  @override
+  Future<List<ShowcaseTab>> getShowcase() async => const [];
 
   @override
   Future<List<Product>> getProducts() async {
@@ -146,6 +154,19 @@ class ApiProductRepository implements ProductRepository {
   Future<List<Category>> getCategories() async {
     final data = await _client.get('/categories') as List;
     return data.map((j) => Category.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  @override
+  Future<List<ShowcaseTab>> getShowcase() async {
+    try {
+      final data = await _client.get('/showcase', query: _q()) as List;
+      return data
+          .map((j) => ShowcaseTab.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      // Старый бэкенд без /showcase — не повод терять каталог.
+      return const [];
+    }
   }
 
   /// Витрина показывает МОДЕЛИ: один товар — много цветов и размеров (D-94).

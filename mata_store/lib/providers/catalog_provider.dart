@@ -3,6 +3,7 @@ import '../data/repositories/product_repository.dart';
 import '../models/category.dart';
 import '../models/product.dart';
 import '../models/review.dart';
+import '../models/showcase.dart';
 
 /// Кэширует каталог, загруженный из [ProductRepository], и отдаёт его экранам
 /// синхронно. Источник (mock/API) задаётся при создании репозитория в main.dart,
@@ -20,6 +21,7 @@ class CatalogProvider extends ChangeNotifier {
 
   List<Product> _products = const [];
   List<Category> _categories = const [];
+  List<ShowcaseTab> _showcase = const [];
   List<Map<String, String>> _banners = const [];
   List<String> _brands = const [];
   List<String> _sizes = const [];
@@ -29,6 +31,7 @@ class CatalogProvider extends ChangeNotifier {
   // ── Синхронный доступ для экранов ────────────────────────────────────────
   List<Product> get products => _products;
   List<Category> get categories => _categories;
+  List<ShowcaseTab> get showcase => _showcase;
   List<Map<String, String>> get banners => _banners;
   List<String> get brands => _brands;
   List<String> get sizes => _sizes;
@@ -43,6 +46,38 @@ class CatalogProvider extends ChangeNotifier {
   List<Product> byCategory(String categoryId) {
     if (categoryId == 'all') return _products;
     return _products.where((p) => p.categoryId == categoryId).toList();
+  }
+
+  ShowcaseTab? tabById(String id) {
+    for (final t in _showcase) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
+  /// Вкладка и группа, в которые попадает категория 1С (для перехода в каталог
+  /// по категории — например, с главной). Нет во вкладках — (null, null).
+  (ShowcaseTab?, ShowcaseGroup?) placeOfCategory(String categoryId) {
+    for (final t in _showcase) {
+      for (final g in t.groups) {
+        if (g.categoryIds.contains(categoryId)) return (t, g);
+      }
+    }
+    return (null, null);
+  }
+
+  /// Товары вкладки, а внутри неё — группы. `tabId == 'all'` — весь каталог.
+  List<Product> byShowcase(String tabId, {String? groupId}) {
+    if (tabId == 'all') return _products;
+    final tab = tabById(tabId);
+    if (tab == null) return byCategory(tabId);
+    Set<String> ids = tab.categoryIds;
+    if (groupId != null) {
+      for (final g in tab.groups) {
+        if (g.id == groupId) ids = g.categoryIds.toSet();
+      }
+    }
+    return _products.where((p) => ids.contains(p.categoryId)).toList();
   }
 
   Product? getById(String id) {
@@ -103,6 +138,7 @@ class CatalogProvider extends ChangeNotifier {
         _repo.getBrands(),
         _repo.getSizes(),
         _repo.getPriceRange(),
+        _repo.getShowcase(),
       ]);
       _products = results[0] as List<Product>;
       _categories = results[1] as List<Category>;
@@ -112,6 +148,7 @@ class CatalogProvider extends ChangeNotifier {
       final range = results[5] as PriceRange;
       _minPrice = range.min;
       _maxPrice = range.max;
+      _showcase = results[6] as List<ShowcaseTab>;
     } catch (_) {
       // Каталог недоступен — оставляем пустым; экраны покажут пустое состояние.
     }
