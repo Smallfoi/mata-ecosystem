@@ -3,10 +3,10 @@
   <head>
     <!-- Стартует загрузку правок и прячет «старую» вёрстку до их применения.
          Должен идти ПЕРВЫМ: смысл в том, чтобы успеть до отрисовки. -->
-    <script src="boot.js?v=20261115a"></script>
+    <script src="boot.js?v=20261117a"></script>
     <!-- Правки применяются как можно раньше: качается параллельно с
          разметкой, выполняется сразу после её разбора. -->
-    <script defer src="content.js?v=20261115a"></script>
+    <script defer src="content.js?v=20261117a"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>МАТА — интернет-магазин спортивной одежды, обуви и аксессуаров</title>
@@ -48,7 +48,7 @@
       rel="stylesheet"
     />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
-    <link rel="stylesheet" href="styles.css?v=20261115a" />
+    <link rel="stylesheet" href="styles.css?v=20261117a" />
     <script>
       // Прогрессивное улучшение: помечаем, что JS активен (под этим классом hero
       // стартует скрытым и анимируется через motion.js). Страховка: если motion-слой
@@ -282,11 +282,12 @@
         <div class="catalog-bar reveal">
           <div class="filters" role="group" aria-label="Фильтры каталога" data-filters data-sortable="filters">
             <button class="filter is-active" type="button" data-filter="all" data-sid="all" data-edit="filter.all">Все</button>
-            <button class="filter" type="button" data-filter="run" data-sid="run" data-edit="filter.run">Бег</button>
-            <button class="filter" type="button" data-filter="top" data-sid="top" data-edit="filter.top">Верх</button>
-            <button class="filter" type="button" data-filter="bottom" data-sid="bottom" data-edit="filter.bottom">Низ</button>
-            <button class="filter" type="button" data-filter="accessory" data-sid="accessory" data-edit="filter.accessory">Аксессуары</button>
+            <button class="filter" type="button" data-filter="shoes" data-sid="shoes" data-edit="filter.shoes">Обувь</button>
+            <button class="filter" type="button" data-filter="clothing" data-sid="clothing" data-edit="filter.clothing">Одежда</button>
+            <button class="filter" type="button" data-filter="accessories" data-sid="accessories" data-edit="filter.accessories">Аксессуары</button>
+            <button class="filter" type="button" data-filter="nutrition" data-sid="nutrition" data-edit="filter.nutrition">Питание</button>
           </div>
+          <div class="subfilters" data-subfilters hidden role="group" aria-label="Группы вкладки"></div>
           <div class="catalog-tools">
             <input
               class="catalog-search"
@@ -307,7 +308,7 @@
           </div>
         </div>
         <div class="product-grid" data-product-grid>
-          <article class="product-card reveal" data-category="run top"
+          <article class="product-card reveal" data-category="clothing"
             data-name="COOLMAX Race Vest" data-price="1790" data-cat="Бег / верх"
             data-img="media/staw-clean-01.jpg" data-sizes="S,M,L,XL"
             data-colors="#2b2f36,#ece9e1,#57bcd8" data-stock="В наличии"
@@ -327,7 +328,7 @@
             </div>
           </article>
 
-          <article class="product-card reveal" data-category="run bottom"
+          <article class="product-card reveal" data-category="clothing"
             data-name="Run 2.0 Two-in-One Shorts" data-price="2790" data-cat="Бег / низ"
             data-img="media/staw-clean-06.jpg" data-sizes="S,M,L,XL"
             data-colors="#6b5e57,#2b2f36,#8a93a3" data-stock="В наличии"
@@ -347,7 +348,7 @@
             </div>
           </article>
 
-          <article class="product-card reveal" data-category="top"
+          <article class="product-card reveal" data-category="clothing"
             data-name="City Motion Tee" data-price="1490" data-cat="Верх"
             data-img="media/staw-clean-05.jpg" data-sizes="XS,S,M,L,XL"
             data-colors="#7d5d6a,#ece9e1,#20252b" data-stock="В наличии"
@@ -367,7 +368,7 @@
             </div>
           </article>
 
-          <article class="product-card reveal" data-category="run top"
+          <article class="product-card reveal" data-category="clothing"
             data-name="Statement Pace Tee" data-price="1690" data-cat="Бег / верх"
             data-img="media/staw-clean-11.jpg" data-sizes="S,M,L,XL"
             data-colors="#8aa06a,#2b2f36" data-stock="В наличии"
@@ -387,7 +388,7 @@
             </div>
           </article>
 
-          <article class="product-card reveal" data-category="bottom"
+          <article class="product-card reveal" data-category="clothing"
             data-name="Marathon Training Shorts" data-price="2490" data-cat="Низ"
             data-img="media/staw-clean-09.jpg" data-sizes="S,M,L,XL"
             data-colors="#b9b3c7,#2b2f36" data-stock="В наличии"
@@ -407,7 +408,7 @@
             </div>
           </article>
 
-          <article class="product-card reveal" data-category="top"
+          <article class="product-card reveal" data-category="clothing"
             data-name="Everyday Training Layer" data-price="3190" data-cat="Верх"
             data-img="media/staw-clean-17.jpg" data-sizes="S,M,L,XL"
             data-colors="#7a6b86,#20252b,#ece9e1" data-stock="Скоро в продаже"
@@ -807,30 +808,30 @@
 
     <!-- Единый журнал ошибок экосистемы (D-32): JS-ошибки сайта → GlitchTip.
          Подключаем ПЕРВЫМ, чтобы ловить ошибки остальных скриптов. -->
-    <script src="observability.js?v=20261115a"></script>
-    <script src="script.js?v=20261115a"></script>
+    <script src="observability.js?v=20261117a"></script>
+    <script src="script.js?v=20261117a"></script>
     <!-- Динамический каталог из общего backend (наполняет сетку товарами). -->
-    <script src="catalog.js?v=20261115a"></script>
+    <script src="catalog.js?v=20261117a"></script>
     <!-- Промо-баннеры из админки (/banners) → стрип под hero. -->
-    <script src="promo.js?v=20261115a"></script>
+    <script src="promo.js?v=20261117a"></script>
     <!-- Юр-документы из админки (/legal/documents) → модалка по ссылкам. -->
-    <script src="legal.js?v=20261115a"></script>
+    <script src="legal.js?v=20261117a"></script>
     <!-- Экосистема: единый аккаунт + общие баллы (самодостаточный модуль). -->
-    <script src="ecosystem.js?v=20261115a"></script>
+    <script src="ecosystem.js?v=20261117a"></script>
     <!-- Отмена и возврат заказа в окне профиля (D-123). -->
-    <script src="returns.js?v=20261115a"></script>
+    <script src="returns.js?v=20261117a"></script>
     <!-- Мини-CMS: тексты/фото сайта из бэкенда (задаются в «Конструкторе»). -->
     <!-- Режим редактирования для «Конструктора» (активен только при ?edit=1 внутри его окна).
          Редактор (76 КБ) посетителям не нужен — грузим его только в Конструкторе. Условие то
          же, что в самом editor.js; document.write — чтобы файл, как и раньше, выполнился
          синхронно, до DOMContentLoaded (на нём держится часть правок). -->
-    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261115a"><\/script>');</script>
+    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261117a"><\/script>');</script>
 
     <!-- Motion-слой (premium): плавный скролл Lenis + сцены GSAP/ScrollTrigger.
          Загружается с CDN; при недоступности сайт работает без анимаций (фолбэк). -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js"></script>
-    <script src="motion.js?v=20261115a"></script>
+    <script src="motion.js?v=20261117a"></script>
   </body>
 </html>

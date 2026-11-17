@@ -292,7 +292,10 @@ DELETE /profile/avatar                    → user  (снять аватар)
 
 ### Catalog
 ```
-GET /categories                         → Category[]
+GET /categories                         → Category[]   (без пустых; «Все» первой, дальше в порядке вкладок)
+GET /showcase                           → вкладки витрины (D-133): [{ id, name, count, groups: [{ id, name,
+                                          count, categoryIds }] }] — только непустые; count — карточки (модели).
+                                          Карточка во вкладке/группе, если её categoryId в categoryIds.
 GET /products                           → Product[]
 GET /products?category=:id              → Product[]
 GET /products?featured=true             → Product[]

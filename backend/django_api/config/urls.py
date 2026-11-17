@@ -202,6 +202,7 @@ urlpatterns = [
     # Каталог Store (D-13) — контракт как у ApiProductRepository в SportStore.
     # Порядок важен: 'search' и 'price-range' раньше generic '<pid>'.
     path("v1/categories", catalog_views.categories),
+    path("v1/showcase", catalog_views.showcase_tabs),
     path("v1/products/search", catalog_views.product_search),
     path("v1/products/price-range", catalog_views.product_price_range),
     path("v1/products", catalog_views.products),
