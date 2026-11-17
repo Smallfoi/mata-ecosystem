@@ -13,6 +13,8 @@
 #   sudo bash /opt/mata/backend/deploy/glitchtip.sh connect — проекты, ключи и токен; подключить магазин
 #   sudo bash /opt/mata/backend/deploy/glitchtip.sh status  — живы ли контейнеры, сколько едят памяти
 #   sudo bash /opt/mata/backend/deploy/glitchtip.sh stop    — остановить (магазин не затрагивает)
+#   sudo bash /opt/mata/backend/deploy/glitchtip.sh move    — переезд на свою ВМ (D-132): база →
+#                                                            бакет, магазин → внешний адрес
 #
 # Магазин не трогаем: своя база и свои контейнеры, общий только nginx. Блок nginx для
 # errors.mata-club.ru появляется лишь после успешного выпуска сертификата и проверки
@@ -213,6 +215,89 @@ case "${1:-}" in
     printf '%s\n' "$out" | sed -n 's/^APPS_DSN=/  /p'
     ;;
 
+  move)
+    # Переезд на свою ВМ (D-132). Запускать ПОСЛЕ того, как A-запись errors.mata-club.ru
+    # указывает на новую ВМ и та отвечает по HTTPS. Делает за один раз:
+    #   1) дамп базы GlitchTip + его секреты → шифрует ключом переезда (открытая часть —
+    #      deploy/glitchtip-move.crt, закрытая только у Claude) → бакет бэкапов Яндекса;
+    #   2) магазин шлёт ошибки и читает список на внешний адрес (ключи DSN прежние);
+    #   3) убирает блок errors.mata-club.ru из nginx магазина и останавливает GlitchTip здесь.
+    # Тома старого GlitchTip остаются — откат: вернуть A-запись, `glitchtip.sh setup`
+    # (секреты на месте) и файл ключей из копии .bak-*.
+    sync_env
+    cert="deploy/glitchtip-move.crt"
+    [ -s "$cert" ] || { echo "СТОП: нет $cert — переезд уже закрыт или код устарел (git pull)"; exit 1; }
+    code="$(curl -s -o /dev/null -m 20 -w '%{http_code}' "https://$DOMAIN/_health/" || true)"
+    if [ "$code" != 200 ]; then
+      echo "СТОП: https://$DOMAIN/_health/ ответил «${code:-нет связи}», нужно 200."
+      echo "Сначала A-запись на новую ВМ, и подождите, пока она выпустит сертификат."
+      exit 1
+    fi
+    # Если DNS всё ещё указывает сюда, «200» ответил этот же GlitchTip — переезжать некуда.
+    ip="$(dotenv PUBLIC_IP)"
+    got="$(python3 -c "import socket,sys; print(socket.gethostbyname(sys.argv[1]))" "$DOMAIN" 2>/dev/null || true)"
+    if [ -n "$ip" ] && [ "$got" = "$ip" ]; then
+      echo "СТОП: $DOMAIN всё ещё указывает на этот сервер ($ip). Сначала A-запись на новую ВМ."
+      exit 1
+    fi
+    bucket="$(dotenv BACKUP_S3_BUCKET)"
+    s3key="$(dotenv BACKUP_S3_ACCESS_KEY)"; [ -n "$s3key" ] || s3key="$(dotenv MEDIA_S3_ACCESS_KEY)"
+    s3sec="$(dotenv BACKUP_S3_SECRET_KEY)"; [ -n "$s3sec" ] || s3sec="$(dotenv MEDIA_S3_SECRET_KEY)"
+    endpoint="$(dotenv BACKUP_S3_ENDPOINT)"; [ -n "$endpoint" ] || endpoint="https://storage.yandexcloud.net"
+    region="$(dotenv BACKUP_S3_REGION)"; [ -n "$region" ] || region="ru-central1"
+    [ -n "$bucket" ] && [ -n "$s3key" ] && [ -n "$s3sec" ] || {
+      echo "СТОП: в .env нет BACKUP_S3_BUCKET или ключей доступа — некуда выгрузить базу"; exit 1; }
+
+    work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
+    echo "1/3 Дамп базы GlitchTip…"
+    "${GT[@]}" exec -T glitchtip-db pg_dump -U glitchtip -Fc glitchtip > "$work/glitchtip.dump"
+    [ -s "$work/glitchtip.dump" ] || { echo "СТОП: дамп пустой"; exit 1; }
+    install -m 600 "$SECRETS" "$work/mata-glitchtip.env"
+    tar -C "$work" -cf "$work/bundle.tar" glitchtip.dump mata-glitchtip.env
+    openssl cms -encrypt -binary -aes256 -outform DER -in "$work/bundle.tar" \
+      -out "$work/bundle.cms" "$cert"
+    obj="glitchtip-move/$(date -u +%Y%m%dT%H%M%SZ).tar.cms"
+    code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 600 \
+      --aws-sigv4 "aws:amz:${region}:s3" --user "${s3key}:${s3sec}" \
+      --upload-file "$work/bundle.cms" "${endpoint%/}/${bucket}/${obj}" || echo 000)"
+    [ "$code" = 200 ] || { echo "СТОП: выгрузка в бакет не удалась (HTTP $code). Магазин не трогали."; exit 1; }
+    echo "    выгружено: ${bucket}/${obj} ($(du -h "$work/bundle.cms" | cut -f1), зашифровано)"
+
+    echo "2/3 Магазин → https://$DOMAIN …"
+    keys_file="${MATA_SERVER_KEYS_FILE:-/root/mata-server-keys.env}"
+    [ -s "$keys_file" ] || { echo "СТОП: нет $keys_file — ключей GlitchTip у магазина нет"; exit 1; }
+    cp -p "$keys_file" "$keys_file.bak-$(date +%Y%m%d%H%M%S)"
+    sed -i -E \
+      -e "s#^(SENTRY_DSN=)http://([^@]+)@glitchtip-web:8000/#\1https://\2@${DOMAIN}/#" \
+      -e "s#^GLITCHTIP_API_URL=.*#GLITCHTIP_API_URL=https://${DOMAIN}#" \
+      "$keys_file"
+    grep -q "^SENTRY_DSN=https://[^@]*@${DOMAIN}/" "$keys_file" || {
+      echo "СТОП: SENTRY_DSN не переписался — проверьте $keys_file (копия рядом, .bak-*)"; exit 1; }
+    bash deploy/refresh-env.sh
+
+    echo "3/3 Убираю GlitchTip с этого сервера…"
+    if [ -f nginx/extra/glitchtip.conf ]; then
+      mv nginx/extra/glitchtip.conf "$work/glitchtip.conf.off"
+      if "${PROD[@]}" exec -T nginx nginx -t; then
+        "${PROD[@]}" exec -T nginx nginx -s reload
+      else
+        mv "$work/glitchtip.conf.off" nginx/extra/glitchtip.conf
+        echo "ВНИМАНИЕ: nginx -t без блока не прошёл — блок оставлен, разберёмся отдельно."
+      fi
+    fi
+    # Сертификат errors.mata-club.ru здесь больше не продлится (адрес смотрит на новую ВМ),
+    # а неудачное продление в `tls.sh renew` сорвало бы и продление сертификата API.
+    if [ -d /mnt/data/pgdata ]; then le_dir="/mnt/data/letsencrypt"; else le_dir="$PWD/nginx/letsencrypt"; fi
+    if [ -f "$le_dir/renewal/$DOMAIN.conf" ]; then
+      docker run --rm -v "$le_dir:/etc/letsencrypt" certbot/certbot delete         --cert-name "$DOMAIN" --non-interactive         || echo "ВНИМАНИЕ: сертификат $DOMAIN не удалён из certbot — удалить вручную до января"
+    fi
+    rm -rf nginx/certs/errors
+    "${GT[@]}" down
+    echo
+    echo "ГОТОВО. Скажите Claude: «move сделан, объект ${obj}» — он поднимет базу на новой ВМ."
+    echo "До этого новая ВМ отвечает, но старых ключей не знает: события этих минут теряются."
+    ;;
+
   status)
     sync_env
     "${GT[@]}" ps
@@ -227,7 +312,7 @@ case "${1:-}" in
     ;;
 
   *)
-    sed -n '2,17p' "$0"
+    sed -n '2,19p' "$0"
     exit 1
     ;;
 esac

@@ -38,6 +38,19 @@
 
 ---
 
+## 2026-11-17 — Claude — GlitchTip: своя ВМ, код переезда (D-132)
+**Сделано:** владелец согласился на отдельную ВМ и удаление старой `mata-prod` в Яндексе.
+Код: `docker-compose.glitchtip-host.yml` (GlitchTip + PostgreSQL + Caddy), `deploy/glitchtip-host.sh`
+(setup/restore/status), `deploy/cloud-init-glitchtip.yaml`, на проде новая команда
+`glitchtip.sh move` (дамп + секреты → шифр открытым ключом `deploy/glitchtip-move.crt` → бакет;
+магазин → `https://errors.mata-club.ru`; блок nginx, сертификат errors и контейнеры — с прода долой).
+`move` удаляет и сертификат errors из certbot: иначе неудачное продление в `tls.sh renew` сорвало бы
+продление сертификата API.
+**Решения:** D-132. Переезд с базой — ключи DSN у тестеров сохраняются.
+**Состояние:** ВМ ещё не создана (cloud-init берёт код из main — сначала мерж).
+**Дальше:** создать ВМ → A-запись (владелец) → `move` (владелец) → `restore` → удалить `mata-prod`,
+ключ переезда и прод-вариант GlitchTip; добавить errors.mata-club.ru в `uptime.yml`.
+
 ## 2026-11-17 — Claude — ВМ-релей OpenAI в Timeweb удалён владельцем
 **Сделано:** владелец удалил VPS Timeweb `147.45.240.21` (tinyproxy для вызовов OpenAI, см. запись
 о #787). Опись серверов на сегодня: прод МАТА — Cloud.ru `87.242.100.147` (там же GlitchTip, D-122);

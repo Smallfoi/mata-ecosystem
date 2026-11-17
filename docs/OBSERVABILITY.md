@@ -135,6 +135,25 @@ nginx с GlitchTip и без него.
 **Как понять, что связь пропала:** в `/v1/health` в `configWarnings` снова есть `SENTRY_DSN`.
 Лечится одной командой: `sudo bash /opt/mata/backend/deploy/glitchtip.sh connect`.
 
+## 7б. Своя ВМ GlitchTip (D-132) — переезд с прод-ВМ
+
+**Где будет жить:** отдельная ВМ в Yandex Cloud, зона `ru-central1-d`, статический IP (адрес — в
+WORKLOG). Набор `backend/docker-compose.glitchtip-host.yml`: GlitchTip + своя PostgreSQL + Caddy
+(сертификат выпускает и продлевает сам). Вход — `ssh -p 2222 ubuntu@<IP>` по ключу.
+
+**Порядок переезда:**
+1. Claude создаёт ВМ (`cloud-init-glitchtip.yaml` → `glitchtip-host.sh setup`): чистый GlitchTip.
+2. **Владелец, DNS у Beget:** A-запись `errors.mata-club.ru` → IP новой ВМ. Через несколько
+   минут Caddy выпустит сертификат, `https://errors.mata-club.ru/_health/` → 200.
+3. **Владелец, прод** (`ssh user1@87.242.100.147` из Cloud Shell):
+   `sudo bash /opt/mata/backend/deploy/glitchtip.sh move` — сам проверит, что новый адрес
+   отвечает, выгрузит базу зашифрованной в бакет, переключит магазин, остановит старый GlitchTip.
+4. Claude: расшифровывает архив, `glitchtip-host.sh restore` на новой ВМ — ключи, вход,
+   проекты прежние. Окно потери событий — от шага 3 до конца шага 4.
+
+**Откат:** вернуть A-запись на `87.242.100.147`, на проде `glitchtip.sh setup` (секреты и тома
+на месте) и вернуть `/root/mata-server-keys.env` из копии `.bak-*` → `refresh-env.sh`.
+
 ## 8. Ранбук устранения КОРНЯ (петля)
 
 ```

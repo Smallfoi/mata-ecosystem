@@ -1,0 +1,52 @@
+#cloud-config
+# ВМ GlitchTip МАТА (D-132) — Yandex Cloud, Ubuntu 24.04.
+# __SSH_KEYS__ подставляется при создании ВМ (открытые ключи; секретов в этом файле нет).
+# Секреты GlitchTip генерируются на самой ВМ (glitchtip-host.sh setup), настоящие
+# приезжают с базой при переезде (glitchtip-host.sh restore).
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - git
+  - unattended-upgrades
+
+users:
+  - name: ubuntu
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    groups: [docker]
+    ssh_authorized_keys:
+__SSH_KEYS__
+
+write_files:
+  # Только 2222 и только по ключу — как на проде (порт 22 собирал сотни переборов в сутки).
+  - path: /etc/ssh/sshd_config.d/60-mata.conf
+    permissions: "0644"
+    content: |
+      Port 2222
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+  # Обновления безопасности ставятся сами; перезагрузка, если ядро требует, — 18:30 UTC (03:30 Якутск).
+  - path: /etc/apt/apt.conf.d/52mata-unattended
+    permissions: "0644"
+    content: |
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "18:30";
+  # Журналы докера не съедают диск.
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {"log-driver": "json-file", "log-opts": {"max-size": "20m", "max-file": "3"}}
+
+runcmd:
+  - systemctl daemon-reload
+  - systemctl restart ssh.socket || true
+  - systemctl restart ssh || true
+  - systemctl enable --now docker
+  - systemctl restart docker
+  # Из публичного репозитория — только backend (сайт и приложения этой ВМ не нужны).
+  - git clone --depth 1 --filter=blob:none --sparse https://github.com/Smallfoi/mata-ecosystem.git /opt/mata
+  - git -C /opt/mata sparse-checkout set backend
+  - bash /opt/mata/backend/deploy/glitchtip-host.sh setup > /var/log/mata-glitchtip-setup.log 2>&1
