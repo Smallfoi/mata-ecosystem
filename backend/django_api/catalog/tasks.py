@@ -31,6 +31,7 @@ def webify_site_videos():
 
 
 _IMG_LOCK = "catalog.webify_site_images.lock"
+_TYPES_DONE = "catalog.fix_media_content_types.done"
 
 
 @shared_task(name="catalog.webify_site_images", ignore_result=True)
@@ -42,5 +43,10 @@ def webify_site_images():
         return
     try:
         call_command("webify_site_images", apply=True)
+        # Разово: старым WebP в S3 — честный Content-Type (были octet-stream). Отметка
+        # на 30 дней, чтобы не перебирать бакет каждые 20 минут.
+        if not cache.get(_TYPES_DONE):
+            call_command("fix_media_content_types", apply=True)
+            cache.set(_TYPES_DONE, 1, 30 * 24 * 3600)
     finally:
         cache.delete(_IMG_LOCK)
