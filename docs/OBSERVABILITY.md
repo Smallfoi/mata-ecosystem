@@ -137,8 +137,8 @@ nginx с GlitchTip и без него.
 
 ## 7б. Своя ВМ GlitchTip (D-132) — переезд с прод-ВМ
 
-**Где будет жить:** отдельная ВМ в Yandex Cloud, зона `ru-central1-d`, статический IP (адрес — в
-WORKLOG). Набор `backend/docker-compose.glitchtip-host.yml`: GlitchTip + своя PostgreSQL + Caddy
+**Где будет жить:** отдельная ВМ в Yandex Cloud, зона `ru-central1-d`, статический IP `153.51.171.179`
+(ВМ `mata-glitchtip`, создана 17.11.2026). Набор `backend/docker-compose.glitchtip-host.yml`: GlitchTip + своя PostgreSQL + Caddy
 (сертификат выпускает и продлевает сам). Вход — `ssh -p 2222 ubuntu@<IP>` по ключу.
 
 **Порядок переезда:**
