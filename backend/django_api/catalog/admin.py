@@ -4,13 +4,14 @@ from django.db.models import Avg, Count, F, Q
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
-from unfold.admin import ModelAdmin
+from unfold.admin import ModelAdmin, TabularInline
 
 from common.adminutils import ColumnPickerMixin, UserRefMixin
 from config.onec_fill_view import FIELDS as MISSING_FIELDS
 from staff.models import StaffAudit
 
-from .models import Banner, Category, Product, Review
+from . import showcase
+from .models import Banner, Category, Product, Review, ShowcaseGroup, ShowcaseTab
 
 
 @admin.action(description="Опубликовать (на витрину)")
@@ -59,16 +60,64 @@ def delete_products(modeladmin, request, queryset):
     })
 
 
+class ShowcaseGroupInline(TabularInline):
+    model = ShowcaseGroup
+    extra = 0
+    fields = ("id", "name", "sort")
+    ordering = ("sort",)
+
+
+@admin.register(ShowcaseTab)
+class ShowcaseTabAdmin(ModelAdmin):
+    """Вкладки витрины (D-132): какие вкладки есть и какие группы внутри. Подписи
+    кнопок на сайте правятся в Конструкторе."""
+    list_display = ("name", "id", "sort", "groups_list")
+    list_editable = ("sort",)
+    ordering = ("sort",)
+    inlines = [ShowcaseGroupInline]
+
+    @admin.display(description="Группы")
+    def groups_list(self, obj):
+        return ", ".join(g.name for g in obj.groups.all())
+
+
+@admin.register(ShowcaseGroup)
+class ShowcaseGroupAdmin(ModelAdmin):
+    list_display = ("name", "tab", "sort", "categories_list")
+    list_editable = ("sort",)
+    list_filter = ("tab",)
+    ordering = ("tab__sort", "sort")
+
+    @admin.display(description="Категории 1С")
+    def categories_list(self, obj):
+        return ", ".join(c.name for c in obj.categories.all()) or "—"
+
+
 @admin.register(Category)
 class CategoryAdmin(ModelAdmin):
-    list_display = ("preview", "name", "emoji", "sort")
+    list_display = ("preview", "name", "showcase_group", "emoji", "sort")
     list_display_links = ("name",)
-    list_editable = ("sort",)
+    list_editable = ("showcase_group", "sort")
+    list_filter = ("showcase_group__tab", ("showcase_group", admin.EmptyFieldListFilter))
     search_fields = ("id", "name")
     ordering = ("sort",)
     readonly_fields = ("preview_large",)
+
+    def changelist_view(self, request, extra_context=None):
+        """Новая категория из 1С без группы: её товары видны только во «Все»."""
+        if request.method == "GET":
+            lost = showcase.unassigned_with_goods(
+                Product.objects.filter(is_published=True, is_active_1c=True))
+            if lost:
+                self.message_user(request, "Категории с товарами без группы витрины (видны только "
+                                  "во вкладке «Все»): " + ", ".join(c.name for c in lost)
+                                  + ". Выберите им группу в колонке «Группа витрины».",
+                                  messages.WARNING)
+        return super().changelist_view(request, extra_context)
+
     fieldsets = (
-        (None, {"fields": ("id", "name", "emoji", "image", "preview_large", "image_url", "sort")}),
+        (None, {"fields": ("id", "name", "showcase_group", "emoji", "image", "preview_large",
+                           "image_url", "sort")}),
         ("Типовая посылка", {
             "fields": ("default_weight_g", "default_length_cm", "default_width_cm",
                        "default_height_cm"),

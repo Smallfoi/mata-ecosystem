@@ -15,6 +15,7 @@ from common.security import user_id_from_request
 from orders.models import Order
 
 from .models import Banner, Category, Product, Review, SiteContent
+from . import showcase
 from .preview import is_preview
 
 _TRUE = {"1", "true", "True", "yes"}
@@ -46,7 +47,17 @@ def _platform_order(request):
 @api_view(["GET"])
 @throttle_classes(PUBLIC_READ)
 def categories(request):
-    return Response([c.to_json() for c in Category.objects.all()])
+    """Плоский список для выпущенных сборок Store: без пустых и демо-категорий, в
+    порядке вкладок витрины (D-132). «Все» — первой: из неё приложение рисует кнопку."""
+    return Response([c.to_json() for c in showcase.visible_categories(_visible_products(request))])
+
+
+@api_view(["GET"])
+@throttle_classes(PUBLIC_READ)
+def showcase_tabs(request):
+    """Вкладки витрины: `/v1/showcase` → [{id, name, count, groups: [{id, name, count,
+    categoryIds}]}]. Карточка попадает во вкладку по своей категории (categoryId)."""
+    return Response(showcase.tabs(_visible_products(request)))
 
 
 @api_view(["GET"])

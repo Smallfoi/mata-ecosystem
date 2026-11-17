@@ -5,6 +5,47 @@ from django.db import models
 from django.utils import timezone
 
 
+class ShowcaseTab(models.Model):
+    """Вкладка витрины: «Обувь», «Одежда»… (D-132).
+
+    Категории приходят из 1С россыпью — 30+ штук, с дублями и пустыми. Покупателю
+    вкладки нужны крупные, как у Nike/adidas/On: тип вещи. Раскладка — наша, в 1С
+    её нет, и обмен с 1С её не трогает (он обновляет у категории только название,
+    родителя и порядок)."""
+    id = models.SlugField(primary_key=True, max_length=40, verbose_name="ID (латиницей)")
+    name = models.CharField(max_length=60, verbose_name="Название")
+    sort = models.IntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        db_table = "catalog_showcase_tabs"
+        ordering = ["sort", "name"]
+        verbose_name = "Вкладка витрины"
+        verbose_name_plural = "Вкладки витрины"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class ShowcaseGroup(models.Model):
+    """Группа внутри вкладки: «Футболки и майки» = категории 1С «Футболка» + «Майка».
+    Дубли 1С («Тапочки» дважды, «Бутылка»/«Бутылки») попадают в одну группу —
+    на витрине это одна кнопка."""
+    id = models.SlugField(primary_key=True, max_length=40, verbose_name="ID (латиницей)")
+    tab = models.ForeignKey(ShowcaseTab, on_delete=models.CASCADE, related_name="groups",
+                            verbose_name="Вкладка")
+    name = models.CharField(max_length=60, verbose_name="Название")
+    sort = models.IntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        db_table = "catalog_showcase_groups"
+        ordering = ["tab__sort", "sort", "name"]
+        verbose_name = "Группа витрины"
+        verbose_name_plural = "Группы витрины"
+
+    def __str__(self) -> str:
+        return f"{self.tab.name} → {self.name}"
+
+
 class Category(models.Model):
     id = models.CharField(primary_key=True, max_length=40, verbose_name="ID")
     name = models.CharField(max_length=120, verbose_name="Название")
@@ -24,6 +65,11 @@ class Category(models.Model):
     # просить 1С выгружать справочник заново.
     parent_id = models.CharField(max_length=40, blank=True, default="", db_index=True,
                                  verbose_name="Родительская категория (ID)")
+    # Куда категория попадает на витрине (D-132). Пусто — товары видны только во
+    # вкладке «Все», а админка напоминает отнести категорию к группе.
+    showcase_group = models.ForeignKey(ShowcaseGroup, on_delete=models.SET_NULL, null=True,
+                                       blank=True, related_name="categories",
+                                       verbose_name="Группа витрины")
 
     class Meta:
         db_table = "catalog_categories"
