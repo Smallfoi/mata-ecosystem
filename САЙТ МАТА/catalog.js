@@ -201,7 +201,8 @@
       .join("");
     var desc = p.description || "";
     return (
-      '<article class="product-card reveal" data-id="' + esc(p.id) + '" data-category="' + esc(cat) + '"' +
+      '<article class="product-card reveal" data-id="' + esc(p.id) + '" data-cat-id="' + esc(cat) + '"' +
+      ' data-category="' + esc(cardCategories(cat, showcaseIndex(SHOWCASE))) + '"' +
       ' data-name="' + esc(p.name) + '" data-price="' + Number(p.price) + '"' +
       ' data-cat="' + esc(catLabel) + '" data-img="' + esc(img) + '"' +
       (gallery ? ' data-photos="' + esc(gallery) + '"' : "") +
@@ -247,33 +248,104 @@
     if (window.STAW && typeof window.STAW.onCatalogRendered === "function") {
       window.STAW.onCatalogRendered();
     }
-    // Товары пришли из API → подтягиваем категории и перестраиваем фильтры под них.
-    loadCategories();
+    // Товары пришли из API → раскладываем их по вкладкам витрины.
+    loadShowcase();
   }
 
-  // Динамические фильтры из /categories (id товара == categoryId фильтра).
-  function renderFilters(categories) {
-    var wrap = document.querySelector("[data-filters]");
-    if (!wrap || !Array.isArray(categories) || categories.length === 0) return;
-    var html = '<button class="filter is-active" type="button" data-filter="all">Все</button>';
-    categories.forEach(function (c) {
-      if (!c || !c.id || c.id === "all") return;
-      html +=
-        '<button class="filter" type="button" data-filter="' +
-        esc(c.id) +
-        '">' +
-        esc(c.name || c.id) +
-        "</button>";
+  // ── Вкладки витрины (D-132) ────────────────────────────────────────────────
+  // Кнопки вкладок («Обувь», «Одежда»…) стоят в разметке: их подписи и порядок
+  // правят в Конструкторе (data-edit / data-sortable). Раньше здесь кнопки
+  // заменялись списком из /categories — 39 штук с дублями и пустыми. Теперь
+  // /showcase говорит, какие категории 1С в какой вкладке и группе, а мы только
+  // помечаем карточки: data-category = "<категория> <вкладка> g-<группа>".
+  var SHOWCASE = [];
+
+  function showcaseIndex(tabs) {
+    var idx = {};
+    (tabs || []).forEach(function (t) {
+      (t.groups || []).forEach(function (g) {
+        (g.categoryIds || []).forEach(function (cid) { idx[cid] = [t.id, "g-" + g.id]; });
+      });
     });
-    wrap.innerHTML = html;
+    return idx;
   }
 
-  function loadCategories() {
-    fetch(API + "/categories")
+  function cardCategories(categoryId, idx) {
+    var cid = String(categoryId || "");
+    return [cid].concat(idx[cid] || []).filter(Boolean).join(" ");
+  }
+
+  function subfiltersHtml(tab, activeGroup) {
+    if (!tab || !tab.groups || tab.groups.length < 2) return "";
+    return tab.groups.map(function (g) {
+      var key = "g-" + g.id;
+      return '<button class="subfilter' + (key === activeGroup ? " is-active" : "") +
+        '" type="button" data-subfilter="' + esc(key) + '" data-tab="' + esc(tab.id) + '">' +
+        esc(g.name) + ' <span class="subfilter-count">' + esc(String(g.count)) + "</span></button>";
+    }).join("");
+  }
+
+  function tabById(id) {
+    for (var i = 0; i < SHOWCASE.length; i++) if (SHOWCASE[i].id === id) return SHOWCASE[i];
+    return null;
+  }
+
+  function renderSubfilters(tabId, activeGroup) {
+    var box = document.querySelector("[data-subfilters]");
+    if (!box) return;
+    var html = subfiltersHtml(tabById(tabId), activeGroup);
+    box.innerHTML = html;
+    box.hidden = !html;
+  }
+
+  function applyShowcase(tabs) {
+    if (!Array.isArray(tabs) || !tabs.length) return;
+    SHOWCASE = tabs;
+    var idx = showcaseIndex(tabs);
+    document.querySelectorAll(".product-card[data-cat-id]").forEach(function (card) {
+      card.setAttribute("data-category", cardCategories(card.getAttribute("data-cat-id"), idx));
+    });
+    var wrap = document.querySelector("[data-filters]");
+    if (!wrap) return;
+    var live = {};
+    tabs.forEach(function (t) {
+      live[t.id] = true;
+      if (!wrap.querySelector('[data-filter="' + t.id + '"]')) {
+        // Вкладку завели в админке, а в разметке её нет — добавляем с именем из админки.
+        var b = document.createElement("button");
+        b.className = "filter"; b.type = "button";
+        b.setAttribute("data-filter", t.id); b.setAttribute("data-sid", t.id);
+        b.textContent = t.name;
+        wrap.appendChild(b);
+      }
+    });
+    // Пустая вкладка (нет товаров) — прячем, «Все» — всегда.
+    wrap.querySelectorAll("[data-filter]").forEach(function (b) {
+      var id = b.getAttribute("data-filter");
+      if (id !== "all") b.hidden = !live[id];
+    });
+  }
+
+  function loadShowcase() {
+    var tail = PREVIEW ? "?preview=1" + (PREVIEW_TOKEN ? "&preview_token=" + encodeURIComponent(PREVIEW_TOKEN) : "") : "";
+    fetch(API + "/showcase" + tail)
       .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-      .then(renderFilters)
+      .then(applyShowcase)
       .catch(function () {});
   }
+
+  // Вкладка → второй ряд с группами; группа → фильтр по группе, вкладка подсвечена.
+  document.addEventListener("click", function (e) {
+    var tabBtn = e.target.closest && e.target.closest("[data-filters] [data-filter]");
+    if (tabBtn) { renderSubfilters(tabBtn.getAttribute("data-filter"), ""); return; }
+    var sub = e.target.closest && e.target.closest("[data-subfilter]");
+    if (!sub || typeof window.applyFilter !== "function") return;
+    var tab = sub.getAttribute("data-tab");
+    var key = sub.getAttribute("data-subfilter");
+    var off = sub.classList.contains("is-active");   // повторное нажатие снимает группу
+    window.applyFilter(off ? tab : key, tab);
+    renderSubfilters(tab, off ? "" : key);
+  });
 
   function load() {
     var tail = "?platform=site" + (PREVIEW ? "&preview=1" : "") +

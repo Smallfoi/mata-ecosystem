@@ -9,6 +9,7 @@ const cartTotal = document.querySelector("[data-cart-total]");
 
 const cart = [];
 let currentFilter = "all";
+let currentTab = "all";
 let currentSearch = "";
 
 function updateHeader() {
@@ -18,8 +19,10 @@ function updateHeader() {
 // Фильтр по категории + текстовый поиск (по названию). Перезапрашиваем DOM,
 // т.к. фильтры/карточки могут перерисовываться из API (catalog.js).
 function applyCatalog() {
+  // Вкладка остаётся подсвеченной, пока внутри выбрана её группа (D-132).
   document.querySelectorAll("[data-filter]").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.filter === currentFilter);
+    const f = button.dataset.filter;
+    button.classList.toggle("is-active", f === currentFilter || f === currentTab);
   });
   const q = currentSearch.trim().toLowerCase();
   document.querySelectorAll(".product-card").forEach((card) => {
@@ -32,8 +35,9 @@ function applyCatalog() {
   });
 }
 
-function applyFilter(category) {
+function applyFilter(category, tab) {
   currentFilter = category;
+  currentTab = tab || category;
   applyCatalog();
 }
 

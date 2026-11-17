@@ -1,8 +1,9 @@
 """Браузерный smoke сайта (аудит F06): витрина рисуется из API в настоящем Chromium.
 
 Что проверяет: статика сайта (`САЙТ МАТА/`) открывается в headless-браузере, каталог
-берёт товары из API и рисует карточку, фильтры строятся по категориям из API, на
-странице нет необработанных JS-ошибок. Ловит то, что `node --check` не видит:
+берёт товары из API и рисует карточку, вкладки витрины (D-132) раскладывают карточки
+по /v1/showcase: пустые вкладки спрятаны, вторым рядом — группы, фильтр по группе
+работает, вкладка остаётся подсвеченной; на странице нет необработанных JS-ошибок. Ловит то, что `node --check` не видит:
 ошибку во время выполнения, сломанный порядок скриптов, изменившийся контракт
 `/v1/models` на стороне сайта.
 
@@ -48,13 +49,21 @@ MODEL = {
                   {"size": "42", "productId": "smoke-42", "price": 4490, "inStock": True}],
     }],
 }
-CATEGORIES = [{"id": "all", "name": "Все"}, {"id": "smoke-shoes", "name": "Обувь Smoke"}]
+BOOTS = dict(MODEL, key="smoke-boots", name="Ботинки Smoke", categoryId="smoke-boots",
+             colors=[dict(MODEL["colors"][0], sizes=[{"size": "40", "productId": "smoke-b40",
+                                                      "price": 4490, "inStock": True}])])
+CATEGORIES = [{"id": "all", "name": "Все"}, {"id": "smoke-shoes", "name": "Кроссовки"},
+              {"id": "smoke-boots", "name": "Ботинки"}]
+SHOWCASE = [{"id": "shoes", "name": "Обувь", "count": 2, "groups": [
+    {"id": "sneakers", "name": "Кроссовки", "count": 1, "categoryIds": ["smoke-shoes"]},
+    {"id": "boots", "name": "Ботинки", "count": 1, "categoryIds": ["smoke-boots"]},
+]}]
 
 
 def _api(route):
     """Ответы подменённого API. Неизвестное — 404: сайт обязан это переживать."""
     path = route.request.url[len(API_PREFIX):].split("?")[0]
-    body = {"/models": [MODEL], "/categories": CATEGORIES}.get(path)
+    body = {"/models": [MODEL, BOOTS], "/categories": CATEGORIES, "/showcase": SHOWCASE}.get(path)
     if body is None:
         return route.fulfill(status=404, content_type="application/json",
                              body='{"detail": "not mocked"}',
@@ -105,11 +114,36 @@ def main() -> int:
             cards_total = page.locator("[data-product-grid] .product-card").count()
         except PlaywrightTimeout:
             problems.append("карточка из API не появилась в сетке каталога за 15 с")
-        try:
-            page.locator('[data-filters] [data-filter="smoke-shoes"]').wait_for(
-                state="attached", timeout=5000)
-        except PlaywrightTimeout:
-            problems.append("фильтр категории из /v1/categories не появился")
+        tabs_ok = False
+        if not problems:
+            try:
+                page.wait_for_function(
+                    "document.querySelector('[data-id=\"smoke-model\"]')"
+                    "?.dataset.category.split(' ').includes('g-sneakers')", timeout=5000)
+                tabs_ok = True
+            except PlaywrightTimeout:
+                problems.append("карточка не получила вкладку и группу из /v1/showcase")
+        if tabs_ok:
+            hidden = page.evaluate("""() => [...document.querySelectorAll('[data-filters] [data-filter]')]
+                .filter(b => b.hidden).map(b => b.dataset.filter).sort()""")
+            if hidden != ["accessories", "clothing", "nutrition"]:
+                problems.append(f"спрятаны вкладки {hidden}, ждали пустые: accessories, clothing, nutrition")
+            if page.locator('[data-filters] [data-filter="smoke-shoes"]').count():
+                problems.append("кнопки категорий 1С снова рисуются вместо вкладок")
+            page.locator('[data-filters] [data-filter="shoes"]').click()
+            chips = page.locator("[data-subfilters] [data-subfilter]")
+            if chips.count() != 2:
+                problems.append(f"во втором ряду {chips.count()} групп, ждали 2")
+            else:
+                page.locator('[data-subfilter="g-sneakers"]').click()
+                shown = page.evaluate("""() => [...document.querySelectorAll('[data-product-grid] .product-card')]
+                    .filter(c => !c.classList.contains('is-hidden')).map(c => c.dataset.id)""")
+                if shown != ["smoke-model"]:
+                    problems.append(f"после группы «Кроссовки» видны {shown}, ждали только smoke-model")
+                active = page.evaluate("""() => document.querySelector('[data-filter="shoes"]')
+                    .classList.contains('is-active')""")
+                if not active:
+                    problems.append("вкладка «Обувь» погасла, когда выбрали группу внутри неё")
         browser.close()
     server.shutdown()
 
@@ -119,8 +153,8 @@ def main() -> int:
         problems.append(f"название карточки «{name}», ждали «{MODEL['name']}»")
     elif "4" not in price or "490" not in price:
         problems.append(f"цена карточки «{price}», ждали 4 490 ₽")
-    elif cards_total != 1:
-        problems.append(f"карточек в сетке {cards_total}, ждали 1 (из API)")
+    elif cards_total != 2:
+        problems.append(f"карточек в сетке {cards_total}, ждали 2 (из API)")
     if not any(c.startswith("/models") for c in api_calls):
         problems.append("витрина не запросила /v1/models")
     if errors:
@@ -130,7 +164,7 @@ def main() -> int:
     if problems:
         print("SMOKE FAIL:\n  - " + "\n  - ".join(problems))
         return 1
-    print(f"SMOKE OK: карточка «{name}» ({price.strip()}), фильтр категорий из API")
+    print(f"SMOKE OK: карточка «{name}» ({price.strip()}), вкладки и группы из /v1/showcase")
     return 0
 
 
