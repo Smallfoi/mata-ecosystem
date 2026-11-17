@@ -1459,3 +1459,16 @@ mtu=1500»; `curl https://s3.twcstorage.ru/` с сервера висит, из 
 **Решение:** `deploy/net-mtu.sh` (MTU 1500 + `net.ipv4.tcp_mtu_probing=1` + netplan
 `60-mata-mtu.yaml`), вызывается из `prod-deploy.sh`. На текущем проде применено вручную 15.11.
 **Правило:** новый сервер у нового провайдера — сразу проверить `ip link` на MTU больше 1500.
+
+## Прерванное пересоздание оставляет контейнер `<id>_backend-worker-1` — следующее падает, сайт 502
+
+**Симптом (15.11.2026):** `glitchtip.sh connect` → `refresh-env.sh` → `Error response from daemon:
+Conflict. The container name "/3674aa0ab4ca_backend-worker-1" is already in use`. Скрипт вышел до
+`nginx -s reload`; web уже получил новый адрес, nginx стучал в старый — сайт ~5 минут отдавал 502.
+**Причина:** на время пересоздания compose переименовывает старый контейнер в `<12 hex>_<имя>`.
+Прерванное пересоздание оставляет его, и имя занято.
+**Решение:** `deploy/recreate.sh`: `compose_up_app` при конфликте убирает такие контейнеры и
+пробует ещё раз; `nginx_reload` вызывается и при неудаче. Используют `refresh-env.sh` и
+`prod-autodeploy.sh` (копия в `/opt/prod-autodeploy.sh` — после изменения переустановить).
+Руками: `sudo docker ps -a | grep _backend-` → `sudo docker rm -f <id>` → снова `up -d`, затем
+`… exec nginx nginx -s reload`.

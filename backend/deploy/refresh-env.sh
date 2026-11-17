@@ -116,7 +116,15 @@ echo "=== .env пересобран из Lockbox ==="
 
 # пересоздаём контейнеры с новым окружением (env-only, без rm; --force-recreate гарантирует
 # подхват новых переменных в web/worker/beat). db и redis не трогаем.
-docker compose -f docker-compose.prod.yml --env-file .env up -d --force-recreate web worker beat
+C="docker compose -f docker-compose.prod.yml --env-file .env"
+# shellcheck source=recreate.sh
+. ./deploy/recreate.sh
+if ! compose_up_app "$C" --force-recreate web worker beat; then
+  # Что бы ни случилось, nginx перечитываем: web мог уже получить новый адрес.
+  nginx_reload "$C"
+  echo "FATAL: web/worker/beat не пересозданы — .env новый, контейнеры могут быть на старом"
+  exit 1
+fi
 sleep 8
 
 # публикуем юр.документы с актуальными реквизитами (читает LEGAL_* из окружения web)
@@ -125,8 +133,7 @@ docker compose -f docker-compose.prod.yml --env-file .env exec -T web python man
 # ВАЖНО: web пересоздан (--force-recreate) → получил НОВЫЙ внутренний IP. nginx резолвит
 # upstream `web` при загрузке конфига и кэширует IP — без перечитки он будет стучать по старому
 # адресу и отдавать 502. Перечитываем nginx (как в prod-autodeploy.sh).
-docker compose -f docker-compose.prod.yml --env-file .env exec -T nginx nginx -s reload 2>/dev/null \
-  || docker compose -f docker-compose.prod.yml --env-file .env up -d nginx || true
+nginx_reload "$C"
 
 # Ключи хранилищ могли поменяться — пересобрать конфиг непрерывной копии БД (D-117).
 # Контейнер БД при неизменном образе не перезапускается.
