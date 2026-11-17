@@ -286,7 +286,8 @@
   ["pointerover", "touchstart", "focusin"].forEach(function (ev) {
     document.addEventListener(ev, function (e) {
       var t = e.target;
-      if (t && t.closest && t.closest("[data-eco-login]")) {
+      // «Войти» в шапке и «Войти в аккаунт» (мобильное меню, блок лояльности).
+      if (t && t.closest && t.closest("[data-eco-login], [data-eco-login-cta]")) {
         try { window.STAW_preloadAuthVideos(); } catch (err) {}
       }
     }, { passive: true, capture: true });
