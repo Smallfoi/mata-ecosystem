@@ -1,5 +1,9 @@
 """Заполнить каталог Store данными (идемпотентно: upsert по id).
-Запуск: docker compose exec web python manage.py seed_catalog"""
+Запуск: docker compose exec web python manage.py seed_catalog
+
+Только для пустой базы (dev, первый подъём сервера). Как только пришёл каталог
+из 1С, сид ничего не делает: иначе он вернул бы на витрину снятые демо-товары
+(миграция catalog 0025) и стёр бы настоящие баннеры — их он пересоздаёт целиком."""
 from django.core.management.base import BaseCommand
 
 from catalog.models import Banner, Category, Product
@@ -10,6 +14,9 @@ class Command(BaseCommand):
     help = "Сидирует категории/товары/баннеры каталога Store (upsert)."
 
     def handle(self, *args, **options):
+        if Product.objects.filter(external_id__isnull=False).exists():
+            self.stdout.write("catalog seed skipped: каталог уже приходит из 1С")
+            return
         for i, c in enumerate(CATEGORIES):
             Category.objects.update_or_create(
                 id=c["id"],
