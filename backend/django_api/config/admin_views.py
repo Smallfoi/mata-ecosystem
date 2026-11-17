@@ -1,6 +1,7 @@
 """Кастомные страницы админки (вне ModelAdmin): «Конструктор» — live-превью сайта/
 приложения + правка (раздельный порядок по площадкам) + публикация с подтверждением.
 Отдельные страницы «Превью» убраны — конструктор их заменяет."""
+import logging
 import json
 
 from django.conf import settings
@@ -407,6 +408,7 @@ def _webify_video(saved, quality="web"):
         import imageio_ffmpeg
         ff = imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
+        logging.getLogger(__name__).exception("нет ffmpeg — видео %s не сжато", saved)
         return None
 
     tmpdir = tempfile.mkdtemp(prefix="mata-video-")
@@ -430,6 +432,8 @@ def _webify_video(saved, quality="web"):
             web_name = default_storage.save(
                 os.path.splitext(saved)[0] + "_web.mp4", File(fh))
     except Exception:
+        # Не молча: 25.09 тихий None два месяца отдавал на сайт стомегабайтник.
+        logging.getLogger(__name__).exception("сжатие видео %s не удалось", saved)
         return None
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
@@ -463,6 +467,7 @@ def _video_poster(video_name):
         import imageio_ffmpeg
         ff = imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
+        logging.getLogger(__name__).exception("нет ffmpeg — видео %s не сжато", saved)
         return None
 
     tmpdir = tempfile.mkdtemp(prefix="mata-poster-")
@@ -481,6 +486,8 @@ def _video_poster(video_name):
         with open(out, "rb") as fh:
             return default_storage.save(name, File(fh))
     except Exception:
+        # Не молча: 25.09 тихий None два месяца отдавал на сайт стомегабайтник.
+        logging.getLogger(__name__).exception("сжатие видео %s не удалось", saved)
         return None
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)

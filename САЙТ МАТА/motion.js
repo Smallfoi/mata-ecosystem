@@ -58,16 +58,19 @@
       requestAnimationFrame(raf);
     }
 
-    // Плавный переход по якорным ссылкам в той же эстетике.
-    document.querySelectorAll('a[href^="#"]').forEach(function (link) {
+    // Плавный переход по якорным ссылкам в той же эстетике. Один обработчик на
+    // документ: motion.js стоит первым из скриптов (герой не ждёт остальных), и
+    // ссылки, которые другие скрипты добавят позже, тоже должны ехать плавно.
+    document.addEventListener("click", function (e) {
+      var link = e.target && e.target.closest && e.target.closest('a[href^="#"]');
+      if (!link) return;
       var href = link.getAttribute("href");
       if (!href || href === "#") return;
-      link.addEventListener("click", function (e) {
-        var target = document.querySelector(href);
-        if (!target) return;
-        e.preventDefault();
-        lenis.scrollTo(target, { offset: -8 });
-      });
+      var target;
+      try { target = document.querySelector(href); } catch (err) { return; }
+      if (!target) return;
+      e.preventDefault();
+      lenis.scrollTo(target, { offset: -8 });
     });
   }
 
