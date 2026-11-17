@@ -1,0 +1,66 @@
+# GlitchTip МАТА на СВОЕЙ ВМ (D-132) — мониторинг не падает вместе с продом.
+#
+# Отличие от docker-compose.glitchtip.yml (временный вариант на прод-ВМ, D-122): нет сети
+# магазина и его nginx — сертификат и адрес errors.mata-club.ru держит свой Caddy
+# (сам выпускает и продлевает Let's Encrypt). Управление — deploy/glitchtip-host.sh.
+name: mata-glitchtip
+
+services:
+  glitchtip-db:
+    # Точная версия (F05), та же, что на прод-ВМ: база переезжает дампом.
+    image: postgres:16.14-alpine3.23
+    restart: always
+    environment:
+      POSTGRES_DB: glitchtip
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${GLITCHTIP_DB_PASSWORD:?нет GLITCHTIP_DB_PASSWORD — запусти deploy/glitchtip-host.sh setup}
+    command: postgres -c max_locks_per_transaction=512 -c shared_buffers=96MB
+    volumes:
+      - glitchtip-pg:/var/lib/postgresql/data
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glitchtip -d glitchtip"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  glitchtip:
+    # Та же версия, что на прод-ВМ (6.2.6): дамп восстанавливается в ту же схему.
+    image: glitchtip/glitchtip:6.2.6
+    restart: always
+    env_file: glitchtip.env
+    environment:
+      SERVER_ROLE: all_in_one
+      VALKEY_URL: ""
+      PORT: "8000"
+    volumes:
+      - glitchtip-uploads:/code/uploads
+    mem_limit: 900m
+    depends_on:
+      glitchtip-db:
+        condition: service_healthy
+
+  caddy:
+    # Точная версия (F05). Сертификат выпускается сам, как только DNS укажет на эту ВМ;
+    # до того Caddy повторяет попытки с паузами — это не ошибка.
+    image: caddy:2.10.2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      GLITCHTIP_HOST: ${GLITCHTIP_HOST:-errors.mata-club.ru}
+    volumes:
+      - ./deploy/glitchtip-host/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Сертификаты — в томе: пересоздание контейнера не тратит лимит Let's Encrypt.
+      - caddy-data:/data
+      - caddy-config:/config
+    mem_limit: 128m
+    depends_on:
+      - glitchtip
+
+volumes:
+  glitchtip-pg:
+  glitchtip-uploads:
+  caddy-data:
+  caddy-config:

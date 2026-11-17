@@ -1,0 +1,9 @@
+# errors.mata-club.ru → GlitchTip (D-132). Caddy сам выпускает и продлевает сертификат.
+{$GLITCHTIP_HOST} {
+	# Отчёты об ошибках с картами исходников бывают крупными.
+	request_body {
+		max_size 20MB
+	}
+	reverse_proxy glitchtip:8000
+	header X-Content-Type-Options nosniff
+}
