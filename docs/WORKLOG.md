@@ -32,6 +32,19 @@ Air Runner X1» за 12 990 ₽ и т. п.) с фото и ценами; их м
 - Тест `catalog/tests_demo_catalog.py`.
 
 ---
+## 2026-11-17 — Claude — перезапуск без 502 и диагностика бэкапа в канале обслуживания
+
+**Сделано.**
+- `deploy/recreate.sh`: пересоздание web/worker/beat убирает застрявшие контейнеры от прерванного
+  пересоздания и повторяет; nginx перечитывается всегда, даже при сбое (15.11 — 502 на 5 минут).
+  Подключён в `refresh-env.sh` и `prod-autodeploy.sh`. Тесты `test_refresh_env.sh`: конфликт →
+  вторая попытка, рабочие контейнеры не трогаем, при полном сбое nginx перечитан и FATAL.
+- Канал обслуживания (D-103): глагол `backup` — хвост `/var/log/mata-backup.log`, итоги
+  pgBackRest, связь с обоими хранилищами, MTU интерфейсов, `/v1/health`. Только чтение.
+
+**Состояние.** На сервере обёртка и копия автодеплоя обновляются вручную (они вне git-копии):
+`sudo bash /opt/mata/backend/deploy/install-ops-key.sh` и
+`sudo install -m 755 /opt/mata/backend/deploy/prod-autodeploy.sh /opt/prod-autodeploy.sh`.
 
 ## 2026-11-16 — Claude — «Фото товаров»: у каждого цвета свой артикул
 

@@ -18,6 +18,8 @@
 #   flags                       показать флаги направлений (D-89)
 #   manage <команда> [--apply]  безопасные management-команды из списка ниже
 #   selftest                    проверка затирания персональных данных
+#   backup                      журналы бэкапа, связь с хранилищами, MTU, сторож
+#                               (только чтение; журналы — без sudo, они 644)
 #
 # Чего НЕЛЬЗЯ по построению: произвольные shell-команды, чтение `.env` и любых
 # секретов, SQL, доступ к ключам, проброс портов, интерактивная оболочка.
@@ -39,7 +41,7 @@ note() { printf '%s  %s\n' "$(date -Is)" "$*" | sudo tee -a "$LOG" >/dev/null 2>
 deny() {
   note "ОТКАЗ: ${CMD:-<пусто>}${1:+ — $1}"
   echo "Отказано: «${CMD:-<пусто>}» не входит в разрешённый список." >&2
-  echo "Разрешено: status | health | disk | logs | restart | refresh-env | flags | manage | selftest" >&2
+  echo "Разрешено: status | health | disk | logs | restart | refresh-env | flags | manage | selftest | backup" >&2
   exit 42
 }
 
@@ -170,9 +172,28 @@ YOOKASSA_SECRET_KEY=live_AbCdEf123456 карта 4276380012345678'
     exit "$bad"
     ;;
 
+  backup)
+    # 15.11.2026 копия в Timeweb не ложилась трое суток, а увидеть почему агент не мог:
+    # журнал бэкапа пишет cron сервера, а не контейнер. Всё здесь — только чтение.
+    echo "== ночной дамп: /var/log/mata-backup.log"
+    tail -n 30 /var/log/mata-backup.log 2>&1 | redact
+    echo "== непрерывная копия: /var/log/mata-pgbr.log"
+    tail -n 40 /var/log/mata-pgbr.log 2>&1 | grep -E "command end|ERROR|WARN|backup label|backup size" | tail -n 8 | redact
+    echo "== связь с хранилищами (403/200 — доступно, 000 — нет)"
+    for url in https://storage.yandexcloud.net/ https://s3.twcstorage.ru/; do
+      printf '%s → %s
+' "$url" "$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$url")"
+    done
+    echo "== MTU сетевых интерфейсов (больше 1500 — крупные пакеты теряются, PITFALLS)"
+    ip -o link show | awk '$2 !~ /^(lo|veth|br-|docker)/ {print $2, $4, $5}'
+    echo "== сторож: /v1/health"
+    curl -fsS -m 10 https://api.mata-club.ru/v1/health || echo "API не ответил"
+    echo
+    ;;
+
   ""|help|--help)
     echo "Разрешено: status | health | disk | logs <сервис> [строк] | restart <сервис> |"
-    echo "           refresh-env | flags | manage <команда> [--apply] | selftest"
+    echo "           refresh-env | flags | manage <команда> [--apply] | selftest | backup"
     ;;
 
   *)

@@ -26,6 +26,7 @@ ENV
   printf '#!/usr/bin/env bash\necho "DOCKER $*" >> "$STUB_LOG"\n' > "$sb/bin/docker"
   printf '#!/usr/bin/env bash\necho "CURL $*" >> "$STUB_LOG"\necho "{}"\n' > "$sb/bin/curl"
   chmod +x "$sb/backend/deploy/pgbr.sh" "$sb/bin/docker" "$sb/bin/curl"
+  cp "$HERE/../recreate.sh" "$sb/backend/deploy/recreate.sh"
   echo "$sb"
 }
 
@@ -66,6 +67,40 @@ echo "SENTRY_DSN=x" > "$sb/server-keys.env"
 grep -v '^JWT_SECRET=' "$sb/secrets.env" > "$sb/s2" && mv "$sb/s2" "$sb/secrets.env"
 if run "$sb"; then bad "скрипт не остановился без JWT_SECRET"; else ok "остановился"; fi
 [ "$(cat "$sb/backend/.env")" = "PUBLIC_IP=203.0.113.5" ] && ok "старый .env не тронут" || bad ".env испорчен"
+
+echo "== застрявший контейнер от прерванного пересоздания (15.11.2026: 502 на 5 минут)"
+sb="$(make_sandbox)"
+cat > "$sb/bin/docker" <<'STUB'
+#!/usr/bin/env bash
+echo "DOCKER $*" >> "$STUB_LOG"
+case "$*" in
+  *"ps -a"*) echo "3674aa0ab4ca 3674aa0ab4ca_backend-worker-1"; echo "aaaaaaaaaaaa backend-web-1" ;;
+  *"up -d --force-recreate"*)
+    if [ ! -f "$STUB_LOG.retried" ]; then touch "$STUB_LOG.retried"
+      echo 'Error response from daemon: Conflict. The container name "/3674aa0ab4ca_backend-worker-1" is already in use by container "2677c1c6dc88". You have to remove (or rename) that container to be able to reuse that name.' >&2
+      exit 1; fi ;;
+esac
+exit 0
+STUB
+chmod +x "$sb/bin/docker"
+if run "$sb"; then ok "скрипт отработал со второй попытки"; else bad "скрипт упал: $(tail -3 "$sb/out")"; fi
+grep -q "DOCKER rm -f 3674aa0ab4ca$" "$sb/log" && ok "застрявший контейнер убран" || bad "rm -f не вызван: $(grep 'rm' "$sb/log")"
+grep -q "rm -f .*aaaaaaaaaaaa" "$sb/log" && bad "убран рабочий контейнер" || ok "рабочие контейнеры не тронуты"
+[ "$(grep -c 'up -d --force-recreate' "$sb/log")" = 2 ] && ok "вторая попытка была" || bad "попыток: $(grep -c 'up -d --force-recreate' "$sb/log")"
+grep -q "nginx -s reload" "$sb/log" && ok "nginx перечитан" || bad "nginx не перечитан"
+
+echo "== пересоздание не удалось совсем — nginx всё равно перечитан"
+sb="$(make_sandbox)"
+cat > "$sb/bin/docker" <<'STUB'
+#!/usr/bin/env bash
+echo "DOCKER $*" >> "$STUB_LOG"
+case "$*" in *"up -d --force-recreate"*) echo "Error: no space left on device" >&2; exit 1 ;; esac
+exit 0
+STUB
+chmod +x "$sb/bin/docker"
+if run "$sb"; then bad "сбой пересоздания не замечен"; else ok "выход с ошибкой"; fi
+grep -q "nginx -s reload" "$sb/log" && ok "nginx перечитан и при сбое" || bad "nginx не перечитан при сбое"
+grep -q "FATAL" "$sb/out" && ok "в выводе FATAL" || bad "нет FATAL в выводе"
 
 [ "$fails" = 0 ] && echo "ALL OK" || echo "$fails FAILED"
 exit "$fails"

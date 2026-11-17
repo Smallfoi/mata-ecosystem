@@ -83,7 +83,14 @@ sed 's/api\.mata-store\.ru/api.mata-club.ru/g' nginx/mata.conf.example > nginx/m
 
 # Пересобрать код (migrate+collectstatic — в команде web). timeout — чтобы зависание не
 # держало flock вечно; упавшая/зависшая сборка = сбой (ревизия НЕ записывается).
-timeout 900 $COMPOSE up -d --build web worker beat || fail "сборка/запуск web worker beat"
+# Конфликт имён от прерванного пересоздания убираем и пробуем ещё раз (deploy/recreate.sh).
+if [ -f deploy/recreate.sh ]; then
+  # shellcheck source=recreate.sh
+  . deploy/recreate.sh
+  timeout 900 bash -c '. deploy/recreate.sh; compose_up_app "$1" --build web worker beat' _ "$COMPOSE"     || { nginx_reload "$COMPOSE"; fail "сборка/запуск web worker beat"; }
+else
+  timeout 900 $COMPOSE up -d --build web worker beat || fail "сборка/запуск web worker beat"
+fi
 # Юр-документы: идемпотентно; сбой не блокирует релиз (иначе при нехватке LEGAL_* был бы
 # вечный передеплой), но громко пишется в лог.
 timeout 120 $COMPOSE exec -T web python manage.py publish_legal < /dev/null \
