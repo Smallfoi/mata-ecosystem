@@ -71,7 +71,7 @@ class ShowcaseGroupInline(TabularInline):
 class ShowcaseTabAdmin(ModelAdmin):
     """Вкладки витрины (D-132): какие вкладки есть и какие группы внутри. Подписи
     кнопок на сайте правятся в Конструкторе."""
-    list_display = ("name", "id", "sort", "groups_list")
+    list_display = ("name", "sort", "groups_list")
     list_editable = ("sort",)
     ordering = ("sort",)
     inlines = [ShowcaseGroupInline]
