@@ -175,7 +175,7 @@ services:
       - ./nginx/mata.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro         # TLS-сертификаты (deploy/tls.sh)
       - ./nginx/certbot-www:/var/www/certbot:ro   # ACME-проверка при обновлении (без простоя)
-      # Доп. адреса на этом же nginx (сейчас — errors.mata-club.ru для GlitchTip, D-122).
+      # Доп. адреса на этом же nginx (до 17.11.2026 — errors.mata-club.ru, D-122; сейчас пусто).
       # Пусто — ничего не меняется: в mata.conf `include /etc/nginx/extra/*.conf`.
       - ./nginx/extra:/etc/nginx/extra:ro
       - /opt/mata-site:/usr/share/nginx/site:ro   # статика САЙТ МАТА (mata-club.ru)

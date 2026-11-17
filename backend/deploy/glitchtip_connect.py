@@ -1,17 +1,17 @@
 """Подготовить GlitchTip для МАТА (D-122) — выполняется ВНУТРИ контейнера GlitchTip.
 
-Запускает `deploy/glitchtip.sh connect` через `manage.py shell`. Повторный запуск
+Запускает `deploy/glitchtip-host.sh keys` на ВМ GlitchTip (D-132) через `manage.py shell`. Повторный запуск
 безопасен: организацию, команду, проекты и ключи не дублирует, токен для админки
 магазина переиспользует.
 
-Печатает строки KEY=VALUE для .env магазина (их забирает glitchtip.sh) и DSN
-приложений отдельной строкой APPS_DSN=… (его владелец кладёт в секрет GitHub).
+Печатает строки ENV:KEY=VALUE для /root/mata-server-keys.env магазина и DSN приложений
+отдельной строкой APPS_DSN=… (секрет GitHub SENTRY_DSN). Магазин и приложения ходят на
+внешний адрес: GlitchTip живёт на своей ВМ, не в сети магазина.
 """
 from django.apps import apps
 from django.contrib.auth import get_user_model
 
 DOMAIN = "errors.mata-club.ru"
-INTERNAL = "glitchtip-web:8000"   # бэкенд магазина шлёт ошибки внутри сети, без DNS и TLS
 ORG_SLUG = "mata"
 TOKEN_LABEL = "mata-admin-errors"
 READ_SCOPES = ["org:read", "project:read", "team:read", "event:read"]
@@ -62,9 +62,9 @@ if token is None:
         value |= 1 << flags.index(scope)
     token = APIToken.objects.create(user=user, label=TOKEN_LABEL, scopes=value)
 
-print(f"ENV:SENTRY_DSN=http://{backend_key}@{INTERNAL}/{backend.id}")
+print(f"ENV:SENTRY_DSN=https://{backend_key}@{DOMAIN}/{backend.id}")
 print("ENV:SENTRY_ENVIRONMENT=prod")
-print(f"ENV:GLITCHTIP_API_URL=http://{INTERNAL}")
+print(f"ENV:GLITCHTIP_API_URL=https://{DOMAIN}")
 print(f"ENV:GLITCHTIP_WEB_URL=https://{DOMAIN}")
 print(f"ENV:GLITCHTIP_API_TOKEN={token.token}")
 print(f"ENV:GLITCHTIP_ORG={ORG_SLUG}")

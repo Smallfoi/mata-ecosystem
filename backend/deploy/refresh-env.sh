@@ -88,7 +88,7 @@ done
 PULL_SECRET "$ECO_IMAGE_SECRET_ID" >> "$TMP"
 fi
 
-# Ключи, которые выпускает САМ сервер (GlitchTip: glitchtip.sh connect), — в Lockbox их нет.
+# Ключи, которые выпускает САМ сервер (GlitchTip: glitchtip-host.sh keys на его ВМ), — в Lockbox их нет.
 # Живут в отдельном файле: обновление секретов (beget-up.sh SECRETS_ONLY=1) переписывает
 # $SECRETS_FILE целиком и раньше стирало их (12.11.2026 — ошибки перестали доходить до GlitchTip).
 # Добавляем последними, совпадающие ключи из Lockbox заменяются.

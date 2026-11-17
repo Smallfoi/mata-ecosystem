@@ -106,7 +106,7 @@ for k in POSTGRES_PASSWORD DJANGO_SECRET_KEY JWT_SECRET; do
   grep -q "^$k=" .env || { echo "FATAL: $k отсутствует (секреты не пришли) — abort"; exit 1; }
 done
 
-# Ключи, которые выпускает САМ сервер (GlitchTip: glitchtip.sh connect), — в Lockbox их нет.
+# Ключи, которые выпускает САМ сервер (GlitchTip: glitchtip-host.sh keys на его ВМ), — в Lockbox их нет.
 # Живут в отдельном файле: обновление секретов (beget-up.sh SECRETS_ONLY=1) переписывает
 # файл секретов целиком и раньше стирало их (12.11.2026 — ошибки перестали доходить до GlitchTip).
 # Добавляем последними, совпадающие ключи из Lockbox заменяются.
