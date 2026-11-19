@@ -2,7 +2,8 @@
 
 user_id в моделях — обычный CharField (не ForeignKey, контракт с FastAPI), поэтому
 Django не покажет имя автоматически. Миксин подтягивает Account и выводит
-«Имя · телефон». Запрос на строку — для админ-списка (≤100 строк) это норма."""
+«Имя · телефон». В списке аккаунты всей страницы берутся ОДНИМ запросом сразу
+после выборки строк (раньше — запрос на строку: 100 строк «Баллов» = 113 запросов)."""
 import contextvars
 import csv
 
@@ -33,19 +34,54 @@ class ExportCsvMixin:
         return resp
 
 
+# Аккаунты текущей страницы списка: {id: Account}. Переменная контекста по той же
+# причине, что и _hidden_now ниже: ModelAdmin один на все параллельные запросы.
+_accounts_now = contextvars.ContextVar("user_ref_accounts", default=None)
+
+
+def _accounts(ids):
+    from accounts.models import Account
+
+    return {a.id: a for a in Account.objects.filter(id__in=ids).only("name", "phone", "email")}
+
+
 class UserRefMixin:
     """Добавляет метод user_ref (колонка «Пользователь»). Поле с id берётся из
     user_id_field (по умолчанию 'user_id'; для клуба — 'owner_id')."""
     user_id_field = "user_id"
 
+    def get_changelist(self, request, **kwargs):
+        """Список с подкачкой аккаунтов: строки выбраны — берём их владельцев разом."""
+        base = super().get_changelist(request, **kwargs)
+        field = self.user_id_field
+
+        class PrefetchingChangeList(base):
+            def get_results(self, request):
+                super().get_results(request)
+                ids = {getattr(o, field, "") or "" for o in self.result_list} - {""}
+                found = _accounts(ids)
+                # Удалённый аккаунт тоже запоминаем (None) — иначе каждая его строка
+                # снова шла бы в базу.
+                _accounts_now.set({uid: found.get(uid) for uid in ids})
+
+        return PrefetchingChangeList
+
+    def changelist_view(self, request, extra_context=None):
+        # Сбрасываем В НАЧАЛЕ, а не в finally: админка отдаёт ленивый
+        # TemplateResponse, строки рисуются уже после выхода отсюда — сброс в
+        # finally стирал подкачку до отрисовки. Чужую страницу не увидим: каждый
+        # список начинает с пустого словаря и заполняет его своей выборкой.
+        _accounts_now.set(None)
+        return super().changelist_view(request, extra_context)
+
     @admin.display(description="Пользователь")
     def user_ref(self, obj):
-        from accounts.models import Account
-
         uid = getattr(obj, self.user_id_field, "") or ""
         if not uid:
             return "—"
-        acc = Account.objects.filter(id=uid).only("name", "phone", "email").first()
+        page = _accounts_now.get()
+        # Вне списка (карточка, экспорт) или строка не из выборки — точечный запрос.
+        acc = page[uid] if page is not None and uid in page else _accounts({uid}).get(uid)
         if not acc:
             return f"{uid} (удалён)"
         name = acc.name or acc.phone or acc.email or uid
