@@ -40,15 +40,15 @@ run() {  # $1 = песочница
 echo "== ключи сервера переживают обновление секретов"
 sb="$(make_sandbox)"
 cat > "$sb/server-keys.env" <<'ENV'
-SENTRY_DSN='http://key@glitchtip-web:8000/1'
+SENTRY_DSN='https://key@errors.mata-club.ru/1'
 GLITCHTIP_API_TOKEN=tok
 ENV
 # Устаревшая копия ключа в файле секретов (как было до исправления) — побеждает файл сервера.
-echo "SENTRY_DSN=http://old@glitchtip-web:8000/1" >> "$sb/secrets.env"
+echo "SENTRY_DSN=https://old@errors.mata-club.ru/1" >> "$sb/secrets.env"
 if run "$sb"; then ok "скрипт отработал"; else bad "скрипт упал: $(tail -3 "$sb/out")"; fi
 env_file="$sb/backend/.env"
 [ "$(grep -c '^SENTRY_DSN=' "$env_file")" = 1 ] && ok "SENTRY_DSN ровно один" || bad "SENTRY_DSN: $(grep -c '^SENTRY_DSN=' "$env_file") шт."
-grep -q "^SENTRY_DSN='http://key@glitchtip-web:8000/1'$" "$env_file" && ok "SENTRY_DSN из файла сервера" || bad "SENTRY_DSN не тот: $(grep '^SENTRY_DSN=' "$env_file")"
+grep -q "^SENTRY_DSN='https://key@errors.mata-club.ru/1'$" "$env_file" && ok "SENTRY_DSN из файла сервера" || bad "SENTRY_DSN не тот: $(grep '^SENTRY_DSN=' "$env_file")"
 grep -q '^GLITCHTIP_API_TOKEN=tok$' "$env_file" && ok "токен GlitchTip на месте" || bad "нет GLITCHTIP_API_TOKEN"
 grep -q '^PARETA_READ_TOKEN=new-from-lockbox$' "$env_file" && ok "новый ключ из Lockbox тоже на месте" || bad "потерян ключ из Lockbox"
 grep -q '^JWT_SECRET=jwt$' "$env_file" && ok "секреты магазина на месте" || bad "нет JWT_SECRET"

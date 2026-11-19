@@ -9,6 +9,9 @@
 #                                                        расшифрованный: glitchtip.dump +
 #                                                        mata-glitchtip.env)
 #   sudo bash deploy/glitchtip-host.sh status           — контейнеры, память, сертификат
+#   sudo bash deploy/glitchtip-host.sh admin            — создать пользователя (почта + пароль)
+#   sudo bash deploy/glitchtip-host.sh keys             — проекты, ключи, токен для админки
+#                                                        магазина (если их надо выпустить заново)
 #
 # После restore ключи (DSN) и пользователи — прежние: приложения у тестеров продолжают
 # слать ошибки без новой сборки.
@@ -143,8 +146,20 @@ print('Проекты:', ', '.join(P.objects.order_by('id').values_list('slug', 
       | openssl x509 -noout -issuer -enddate 2>/dev/null || echo "  пока нет (DNS ещё не указывает сюда?)"
     ;;
 
+  admin)
+    sync_env
+    "${GT[@]}" exec glitchtip ./manage.py createsuperuser
+    ;;
+
+  keys)
+    # Повторный запуск ничего не дублирует. Строки ENV:… положить в /root/mata-server-keys.env
+    # на проде и выполнить там `bash deploy/refresh-env.sh`; APPS_DSN — в секрет GitHub SENTRY_DSN.
+    sync_env
+    "${GT[@]}" exec -T glitchtip ./manage.py shell -c "$(cat deploy/glitchtip_connect.py)"
+    ;;
+
   *)
-    sed -n '2,15p' "$0"
+    sed -n '2,18p' "$0"
     exit 1
     ;;
 esac
