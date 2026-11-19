@@ -809,16 +809,23 @@ POST   /reports { targetType, targetId, reason, comment? }
 и не плодит очередь модератору; больше 20 жалоб в сутки от одного человека — `429`.
 Разбирает модератор в админке, ответ заявителю хранится в `Report.resolution`.
 
-### Blocks (городские кварталы Якутска — D-74, Ф1–Ф3)
+### Blocks (городские кварталы Якутска — D-74, Ф1–Ф4)
 ```
 GET  /blocks[?bbox=]                    → полигоны кварталов с признаком владения
                                           (rel: mine|club|enemy|free) и флагом дома
 GET  /blocks/nearest?lat=&lon=          → ОДИН ближайший свободный квартал как готовый круг
                                           («обеги вот этот контур, 1,2 км»)
 POST /blocks/home { blockId }           → назначить домашний квартал (несгораемый, приватный)
+GET  /blocks/summary                    → «Мои кварталы» (Ф4): { season{startMs,endMs}, mine, total,
+                                          cityPercent, home|null, districts[{district,total,mine,
+                                          taken,leader|null}], clubs[{clubId,name,blocks,place,
+                                          isMine}], myClubId }
+GET  /blocks/here?lat=&lon=             → квартал под точкой (≤150 м) для «сделать домом здесь»:
+                                          { block: {blockId,district,rel,home,canBeHome,geojson}|null }
 ```
 Владение пишет захват (`/territories/capture`) и живёт до конца сезона-месяца; домашний
-квартал не сбрасывается и не перехватывается, чужой дом виден анонимно.
+квартал не сбрасывается и не перехватывается, чужой дом виден анонимно и в публичные
+цифры сводки (лидеры районов, клубы) не входит.
 
 ### Races (афиша забегов — вкладка «Старты», D-45; за флагом `showRaces`)
 ```

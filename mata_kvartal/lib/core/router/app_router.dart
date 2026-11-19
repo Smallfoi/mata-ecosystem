@@ -20,6 +20,7 @@ import '../../features/league/presentation/screens/focus_screen.dart';
 import '../../features/league/presentation/screens/league_screen.dart';
 import '../../features/trails/data/trails_provider.dart';
 import '../../features/trails/presentation/screens/trails_screen.dart';
+import '../../features/territory/presentation/blocks_screen.dart';
 import '../../features/workouts/presentation/screens/watch_sync_screen.dart';
 import '../../features/league/presentation/screens/division_hub_screen.dart';
 import '../../features/races/data/races_provider.dart';
@@ -212,6 +213,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/trails',
                 builder: (_, __) => const TrailsScreen(),
+              ),
+              // «Мои кварталы» (D-74, Ф3б+Ф4): счёт сезона, дом, районы, клубы.
+              GoRoute(
+                path: '/blocks',
+                builder: (_, __) => const BlocksScreen(),
               ),
               // Тропу передаём объектом: список уже загружен, второй запрос
               // ради названия и длины не нужен.

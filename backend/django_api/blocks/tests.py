@@ -245,3 +245,73 @@ class NearestBlockTests(ApiTestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIsNone(r.json()["block"])
 
+
+
+class BlocksSummaryTests(ApiTestCase):
+    """Ф4 (D-74): «Мои кварталы» — счёт сезона, районы, клубы; приватность дома."""
+
+    phone = "+79990002090"
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("load_blocks")
+
+    def _box(self):
+        bid, lng, lat = _central_block()
+        d = 0.0006
+        return bid, lat, lng, [[lat - d, lng - d], [lat + d, lng - d],
+                               [lat + d, lng + d], [lat - d, lng + d]]
+
+    def test_requires_auth(self):
+        self.assertEqual(self.client.get("/v1/blocks/summary").status_code, 401)
+        self.assertEqual(self.client.get("/v1/blocks/here?lat=1&lon=1").status_code, 401)
+
+    def test_empty_season(self):
+        r = self.api_get("/v1/blocks/summary").json()
+        self.assertEqual(r["mine"], 0)
+        self.assertGreaterEqual(r["total"], 600)
+        self.assertEqual(r["cityPercent"], 0)
+        self.assertIsNone(r["home"])
+        self.assertLess(r["season"]["startMs"], r["season"]["endMs"])
+        self.assertEqual(sum(d["total"] for d in r["districts"]), r["total"])
+
+    def test_capture_counts_and_leads_district(self):
+        club_id = self.api_post("/v1/clubs", {"name": "Северный ветер"}).json()["id"]
+        bid, _lat, _lng, box = self._box()
+        self.api_post("/v1/territories/capture", {"points": box, "captureId": "sum1"})
+        r = self.api_get("/v1/blocks/summary").json()
+        self.assertGreaterEqual(r["mine"], 1)
+        self.assertGreater(r["cityPercent"], 0)
+        led = [d for d in r["districts"] if d["leader"] and d["leader"]["isMe"]]
+        self.assertTrue(led)
+        self.assertEqual(r["myClubId"], club_id)
+        self.assertEqual(r["clubs"][0]["clubId"], club_id)
+        self.assertTrue(r["clubs"][0]["isMine"])
+        self.assertEqual(r["clubs"][0]["blocks"], r["mine"])
+
+    def test_someone_elses_home_stays_out_of_public_numbers(self):
+        bid, _lat, _lng, _box = self._box()
+        other = self.new_user("+79990002091")
+        self.api_post("/v1/blocks/home", {"blockId": bid}, token=other)
+        mine_view = self.api_get("/v1/blocks/summary").json()
+        self.assertFalse(any(d["leader"] for d in mine_view["districts"]))
+        theirs = self.api_get("/v1/blocks/summary", token=other).json()
+        self.assertEqual(theirs["mine"], 1)          # свой дом в своём счёте есть
+        self.assertEqual(theirs["home"]["blockId"], bid)
+
+    def test_here_finds_the_block_and_whether_it_can_be_home(self):
+        bid, lat, lng, _box = self._box()
+        r = self.api_get(f"/v1/blocks/here?lat={lat}&lon={lng}").json()["block"]
+        self.assertEqual(r["blockId"], bid)
+        self.assertEqual(r["rel"], "free")
+        self.assertTrue(r["canBeHome"])
+        other = self.new_user("+79990002092")
+        self.api_post("/v1/blocks/home", {"blockId": bid}, token=other)
+        r = self.api_get(f"/v1/blocks/here?lat={lat}&lon={lng}").json()["block"]
+        self.assertEqual(r["rel"], "enemy")
+        self.assertFalse(r["canBeHome"])
+
+    def test_here_far_away_and_bad_input(self):
+        self.assertIsNone(self.api_get("/v1/blocks/here?lat=55.75&lon=37.61").json()["block"])
+        self.assertEqual(self.api_get("/v1/blocks/here?lat=x&lon=1").status_code, 400)
+        self.assertEqual(self.api_get("/v1/blocks/here?lat=91&lon=1").status_code, 400)
