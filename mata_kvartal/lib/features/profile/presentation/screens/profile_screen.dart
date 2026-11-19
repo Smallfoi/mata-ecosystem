@@ -795,6 +795,11 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/profile/privacy'),
             ),
             _SettingsTile(
+              icon: CupertinoIcons.shield_lefthalf_fill,
+              label: 'Модерация',
+              onTap: () => context.push('/profile/moderation'),
+            ),
+            _SettingsTile(
               icon: CupertinoIcons.doc_text_fill,
               label: '\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b',
               onTap: () => context.push('/profile/legal'),

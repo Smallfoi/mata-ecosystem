@@ -6,6 +6,7 @@ import '../../features/auth/data/auth_provider.dart';
 import '../../features/friends/presentation/screens/friends_screen.dart';
 import '../../features/friends/presentation/screens/friends_privacy_screen.dart';
 import '../../features/moderation/presentation/blocked_screen.dart';
+import '../../features/moderation/presentation/appeals_screen.dart';
 import '../../features/auth/presentation/screens/phone_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/auth/presentation/screens/otp_screen.dart';
@@ -262,6 +263,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/profile/friends/blocked',
                 builder: (_, __) => const BlockedScreen(),
+              ),
+              // «Модерация» (§10): меры ко мне с возражением и итоги моих жалоб.
+              GoRoute(
+                path: '/profile/moderation',
+                builder: (_, __) => const AppealsScreen(),
               ),
               GoRoute(
                 path: '/profile/points',

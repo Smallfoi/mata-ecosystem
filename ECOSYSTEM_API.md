@@ -797,6 +797,13 @@ POST   /me/blocks        { userId }     → заблокировать: рвёт
 DELETE /me/blocks/:id                   → разблокировать (дружбу НЕ возвращает)
 GET    /reports/reasons                 → причины жалобы списком (общие для клиентов)
 POST   /reports { targetType, targetId, reason, comment? }
+GET    /me/reports                      → мои жалобы: [{id, targetType, targetName, reason,
+                                          reasonTitle, comment, status, statusTitle, createdAt}]
+                                          (текст решения модератора заявителю не отдаётся)
+GET    /me/measures                     → меры ко мне и к моим клубам: [{id, kind, kindTitle,
+                                          summary, targetType, active, createdAt, canAppeal,
+                                          appealStatus, appealText, appealReply}]
+POST   /me/measures/:id/appeal { text } → возразить один раз (201; повтор 409; чужая/нет — 404)
                                         → пожаловаться на человека или клуб;
                                           targetType: user|club
 ```

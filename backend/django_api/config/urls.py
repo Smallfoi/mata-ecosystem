@@ -183,6 +183,11 @@ urlpatterns = [
     path("v1/me/blocks/<str:other_id>", moderation_views.unblock),
     path("v1/reports/reasons", moderation_views.report_reasons),
     path("v1/reports", moderation_views.create_report),
+    # Апелляция (§10): человек видит, чем кончилась его жалоба, и может
+    # возразить на меру, применённую к нему.
+    path("v1/me/reports", moderation_views.my_reports),
+    path("v1/me/measures", moderation_views.my_measures),
+    path("v1/me/measures/<str:measure_id>/appeal", moderation_views.appeal_measure),
     # Подключение часов: адреса нужны в заявке к COROS до выдачи ключей.
     path("v1/integrations/", include("integrations.urls")),
     # Выдача Pareta (D-124): итоги дня из 1С и каталог, токен только на чтение.

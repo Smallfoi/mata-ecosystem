@@ -1483,3 +1483,13 @@ Conflict. The container name "/3674aa0ab4ca_backend-worker-1" is already in use`
 `prod-autodeploy.sh` (копия в `/opt/prod-autodeploy.sh` — после изменения переустановить).
 Руками: `sudo docker ps -a | grep _backend-` → `sudo docker rm -f <id>` → снова `up -d`, затем
 `… exec nginx nginx -s reload`.
+
+## Python на Windows пишет CRLF — дифф «на весь файл» и конфликт при rebase (19.11.2026)
+`open(p,'w').write(s)` в текстовом режиме на Windows превращает каждый `
+` в `
+`.
+Репозиторий хранит LF, `core.autocrlf=false` — в коммит уходит переписанный целиком файл:
+PR показывает тысячи строк, а rebase даёт конфликт на весь WORKLOG/DECISIONS. Так вышло с
+#949 (поймано до вливания). **Правильно:** читать и писать с `newline=''`
+(`open(p, encoding='utf-8', newline='')`) или в двоичном режиме; перед коммитом смотреть
+`git diff --stat` — правка в три строки не может давать 600.
