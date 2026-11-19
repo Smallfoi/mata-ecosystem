@@ -562,6 +562,12 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                         onTap: () => _showLoop(loop),
                       ),
                     ),
+                  // «Мои кварталы»: счёт сезона, дом, районы (D-74, Ф4).
+                  if (mode == RunMode.capture)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 14, top: 2, bottom: 4),
+                      child: _BlocksChip(onTap: () => context.push('/blocks')),
+                    ),
                   // Слой троп: показать/скрыть линии троп в любом режиме.
                   if (trailsFeatureOn)
                     Padding(
@@ -1356,6 +1362,38 @@ class _LoopChip extends StatelessWidget {
             Text(
               loop.distanceLabel,
               style: TextStyle(color: AppColors.muted, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Вход в «Мои кварталы» из режима «Захват»: там видно, сколько города уже твоё.
+class _BlocksChip extends StatelessWidget {
+  final VoidCallback onTap;
+  const _BlocksChip({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: _Glass(
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.square_grid_2x2, size: 13, color: AppColors.lime),
+            const SizedBox(width: 6),
+            Text(
+              'Мои кварталы',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),

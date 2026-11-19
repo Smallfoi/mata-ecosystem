@@ -17,7 +17,7 @@ from django.db import connection
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from clubs.models import ClubMember
+from clubs.models import Club, ClubMember
 from common.people import names_of
 from common.security import user_id_from_request
 
@@ -216,3 +216,169 @@ def set_home(request):
             [block_id, uid, club_id],
         )
     return Response({"ok": True, "blockId": block_id})
+
+
+def _season_bounds():
+    """Начало текущего сезона-месяца и начало следующего (конец сезона), UTC."""
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT date_trunc('month', now()), date_trunc('month', now()) + interval '1 month'"
+        )
+        return cur.fetchone()
+
+
+@api_view(["GET"])
+def blocks_summary(request):
+    """Сводка «Мои кварталы» (D-74, Ф4): счёт сезона, дом, районы, войны клубов.
+
+    Публичные цифры (лидеры районов, клубы) считают только сезонные захваты:
+    чужой домашний квартал в них не входит — иначе по «у Ивана один квартал в
+    Строительном» можно было бы угадать, где он живёт. Свой дом в своём счёте есть.
+    """
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    my_club = _club_of(uid)
+    start, end = _season_bounds()
+    base = (
+        "FROM city_blocks b "
+        "LEFT JOIN block_ownership o ON o.block_id = b.block_id "
+        "LEFT JOIN home_block h ON h.block_id = b.block_id"
+    )
+    season = "o.captured_at >= date_trunc('month', now()) AND h.owner_id IS NULL"
+    with connection.cursor() as cur:
+        cur.execute(
+            f"SELECT COALESCE(b.district, ''), COUNT(*), "
+            f"COUNT(*) FILTER (WHERE {_EFF_OWNER_SQL} = %s), "
+            f"COUNT(*) FILTER (WHERE {_EFF_OWNER_SQL} IS NOT NULL) "
+            f"{base} GROUP BY 1 ORDER BY 1",
+            [uid],
+        )
+        district_rows = cur.fetchall()
+        # Лидер района: больше всех сезонных кварталов; при равенстве — кто взял раньше.
+        cur.execute(
+            "SELECT district, owner_id, n FROM ("
+            "  SELECT COALESCE(b.district, '') AS district, o.owner_id, COUNT(*) AS n, "
+            "         ROW_NUMBER() OVER (PARTITION BY COALESCE(b.district, '') "
+            "                            ORDER BY COUNT(*) DESC, MIN(o.captured_at)) AS rk "
+            f"  {base} WHERE {season} GROUP BY 1, 2"
+            ") t WHERE rk = 1"
+        )
+        leaders = {d: (owner, n) for d, owner, n in cur.fetchall()}
+        cur.execute(
+            f"SELECT o.club_id, COUNT(*) {base} WHERE {season} AND o.club_id IS NOT NULL "
+            "GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20"
+        )
+        club_rows = cur.fetchall()
+        cur.execute(
+            "SELECT b.block_id, b.district, b.area_m2 FROM home_block h "
+            "JOIN city_blocks b ON b.block_id = h.block_id WHERE h.owner_id = %s",
+            [uid],
+        )
+        home = cur.fetchone()
+
+    club_ids = [c for c, _ in club_rows]
+    if my_club and my_club not in club_ids:
+        club_ids.append(my_club)
+    clubs_by_id = {
+        c.id: c for c in Club.objects.filter(id__in=club_ids, is_hidden=False)
+    }
+    names = names_of([owner for owner, _ in leaders.values()])
+
+    total = sum(r[1] for r in district_rows)
+    mine = sum(r[2] for r in district_rows)
+    districts = []
+    for district, count, my_count, taken in district_rows:
+        leader = leaders.get(district)
+        districts.append({
+            "district": district or "Без района",
+            "total": count,
+            "mine": my_count,
+            "taken": taken,
+            "leader": None if not leader else {
+                "name": names.get(leader[0]) or "Бегун",
+                "blocks": leader[1],
+                "isMe": leader[0] == uid,
+            },
+        })
+    clubs = [
+        {
+            "clubId": club_id,
+            "name": clubs_by_id[club_id].name,
+            "blocks": n,
+            "place": i + 1,
+            "isMine": club_id == my_club,
+        }
+        for i, (club_id, n) in enumerate(
+            (c, n) for c, n in club_rows if c in clubs_by_id
+        )
+    ]
+    return Response({
+        "season": {
+            "startMs": int(start.timestamp() * 1000),
+            "endMs": int(end.timestamp() * 1000),
+        },
+        "mine": mine,
+        "total": total,
+        "cityPercent": round(mine * 100 / total, 1) if total else 0,
+        "home": None if not home else {
+            "blockId": home[0], "district": home[1], "areaM2": home[2],
+        },
+        "districts": districts,
+        "clubs": clubs,
+        "myClubId": my_club,
+    })
+
+
+# «Сделать домом здесь»: квартал под точкой или ближайший в пределах двора.
+HERE_RADIUS_M = 150
+
+
+@api_view(["GET"])
+def block_here(request):
+    """Квартал под точкой (D-74, Ф3б) — для выбора дома «там, где я стою».
+
+    Точка не уходит в хранилище и не логируется: ответ — только квартал.
+    Если точка на улице между кварталами — берём ближайший в радиусе двора.
+    """
+    uid = user_id_from_request(request)
+    if not uid:
+        return Response({"detail": "Нет токена"}, status=401)
+    try:
+        lat = float(request.query_params.get("lat", ""))
+        lon = float(request.query_params.get("lon", ""))
+    except (TypeError, ValueError):
+        return Response({"detail": "Нужны lat и lon"}, status=400)
+    if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+        return Response({"detail": "Координаты вне диапазона"}, status=400)
+
+    point = "ST_SetSRID(ST_MakePoint(%s,%s),4326)"
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT b.block_id, b.district, b.area_m2, "
+            f"ST_AsGeoJSON(ST_SimplifyPreserveTopology(b.geom, {SIMPLIFY_TOLERANCE})), "
+            f"{_EFF_OWNER_SQL}, h.owner_id "
+            "FROM city_blocks b "
+            "LEFT JOIN block_ownership o ON o.block_id = b.block_id "
+            "LEFT JOIN home_block h ON h.block_id = b.block_id "
+            f"WHERE ST_DWithin(b.geom::geography, {point}::geography, %s) "
+            f"ORDER BY b.geom <-> {point} LIMIT 1",
+            [lon, lat, HERE_RADIUS_M, lon, lat],
+        )
+        row = cur.fetchone()
+    if not row:
+        return Response({"block": None})
+    block_id, district, area_m2, gj, eff_owner, home_owner = row
+    rel = "free" if eff_owner is None else "mine" if eff_owner == uid else "enemy"
+    return Response({
+        "block": {
+            "blockId": block_id,
+            "district": district,
+            "areaM2": area_m2,
+            "rel": rel,
+            "home": home_owner == uid,
+            # Можно ли сделать домом: свободен или уже мой (как в set_home).
+            "canBeHome": rel in ("free", "mine"),
+            "geojson": json.loads(gj),
+        }
+    })

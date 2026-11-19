@@ -752,6 +752,11 @@ class SettingsScreen extends ConsumerWidget {
               label: '\u041c\u043e\u044f \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430',
               onTap: () => context.push('/profile/stats'),
             ),
+            _SettingsTile(
+              icon: CupertinoIcons.square_grid_2x2,
+              label: 'Мои кварталы',
+              onTap: () => context.push('/blocks'),
+            ),
             // Друзья (D-82, этап 2a) — за флагом kFriends.
             if (kFriends)
               _SettingsTile(

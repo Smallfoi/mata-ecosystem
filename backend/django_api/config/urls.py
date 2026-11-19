@@ -197,6 +197,8 @@ urlpatterns = [
     path("v1/blocks", blocks_views.list_blocks),
     path("v1/blocks/nearest", blocks_views.nearest_block),
     path("v1/blocks/home", blocks_views.set_home),
+    path("v1/blocks/summary", blocks_views.blocks_summary),
+    path("v1/blocks/here", blocks_views.block_here),
     # Вечный личный след (для профиля «исследовано км²»)
     path("v1/footprint", territories_views.footprint),
     # Каталог Store (D-13) — контракт как у ApiProductRepository в SportStore.
