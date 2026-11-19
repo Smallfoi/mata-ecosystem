@@ -1,8 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/account_scope.dart';
 import '../../auth/data/auth_provider.dart';
+import '../../run/data/completed_runs_provider.dart' show completedRunsKeyFor;
+import '../../run/data/run_provider.dart' show activeRunStorageKey;
 
 /// Настройки приватности (LAUNCH_READINESS §2) и удаление аккаунта (§13).
 /// Бэкенд: GET/PATCH /v1/account/privacy, POST /v1/account/delete.
@@ -107,18 +111,29 @@ class AccountNotifier extends StateNotifier<AccountState> {
   }
 
   /// Необратимо удалить аккаунт и все персональные данные. true — успех.
+  ///
+  /// После ответа сервера стираем и то, что лежит на телефоне (D-104): историю
+  /// пробежек с точками маршрута и офлайн-очереди этого аккаунта. Выход из
+  /// аккаунта их бережёт (офлайн-забег ждёт следующего входа), удаление — нет.
   Future<bool> deleteAccount() async {
     if (_auth() == null) return false;
+    final accountId = ref.read(authProvider).user?.id ?? '';
     try {
       await _dio.post<dynamic>(
         '/account/delete',
         data: const {'confirm': true},
         options: _auth(),
       );
-      return true;
     } catch (_) {
       return false;
     }
+    await wipeAccountData(
+      await SharedPreferences.getInstance(),
+      accountId,
+      completedRunsKey: completedRunsKeyFor(accountId),
+      activeRunKey: activeRunStorageKey,
+    );
+    return true;
   }
 }
 
