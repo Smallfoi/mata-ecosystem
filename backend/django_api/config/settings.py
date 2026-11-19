@@ -693,6 +693,18 @@ CELERY_BEAT_SCHEDULE = {
         "task": "loyalty.daily",
         "schedule": crontab(hour=0, minute=20),
     },
+    # Фоновые видео сайта (окно входа и др.): исходник с камеры → web-версия. Всё
+    # уже лёгкое — задача ничего не делает; после загрузки тяжёлого ролика сожмёт его
+    # в ближайшие 20 минут (17.11.2026: 190 МБ видео грузились на каждом заходе).
+    "webify-site-videos": {
+        "task": "catalog.webify_site_videos",
+        "schedule": crontab(minute="*/20"),
+    },
+    # Фото блоков сайта и баннеров — в WebP (вдвое легче JPEG). Уже WebP — ничего не делает.
+    "webify-site-images": {
+        "task": "catalog.webify_site_images",
+        "schedule": crontab(minute="10,30,50"),
+    },
 }
 
 # Авто-парсер «Стартов»: URL нормализованного JSON-фида забегов (races/importers/jsonfeed).

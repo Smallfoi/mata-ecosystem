@@ -281,6 +281,18 @@
     (document.body || document.documentElement).appendChild(pv);
     try { pv.load(); } catch (e) {}
   }
+  // Прогрев по намерению: курсор навели, палец коснулся или фокус пришёл на «Войти» —
+  // за доли секунды до клика начинаем качать ролик; до старта виден постер-кадр.
+  ["pointerover", "touchstart", "focusin"].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      var t = e.target;
+      // «Войти» в шапке и «Войти в аккаунт» (мобильное меню, блок лояльности).
+      if (t && t.closest && t.closest("[data-eco-login], [data-eco-login-cta]")) {
+        try { window.STAW_preloadAuthVideos(); } catch (err) {}
+      }
+    }, { passive: true, capture: true });
+  });
+
   window.STAW_preloadAuthVideos = function () {
     var C = window.STAW_CONTENT; if (!C) return;
     ["bgvid.auth.panelReg", "bgvid.auth.panelLogin"].forEach(function (k) {
@@ -657,7 +669,8 @@
     // Публикуем контент глобально: модалки/элементы, которые строятся из JS позже
     // (напр. экран входа в ecosystem.js), читают переопределения отсюда.
     try { window.STAW_CONTENT = content; } catch (e) {}
-    try { window.STAW_preloadAuthVideos(); } catch (e) {} // прогрев видео экрана входа
+    // Видео окна входа НЕ грузим при открытии страницы (17.11.2026: каждый заход тянул
+    // два ролика ещё до того, как кто-то нажмёт «Войти»). Прогрев — по намерению.
     injectAnimCss();
     // 1) сначала материализуем добавленные блоки — чтобы их ключи было куда применять
     Object.keys(content).forEach(function (k) {
