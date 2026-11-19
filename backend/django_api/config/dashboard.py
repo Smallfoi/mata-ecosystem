@@ -34,6 +34,50 @@ def _errors_tile():
         return {"title": "Ошибки", "value": "—", "icon": "bug_report"}
 
 
+# Воронка и удержание считаются десятками запросов (когорта × неделя) — не на
+# каждое открытие главной: кэш на 10 минут (Redis, D-29). Свежесть в минуты
+# для этих цифр не важна, важна скорость главной страницы.
+ANALYTICS_CACHE_KEY = "dashboard:analytics:v1"
+ANALYTICS_CACHE_SECONDS = 600
+RETENTION_WEEKS = 6
+
+
+def _analytics_block():
+    """Воронка активации за 30 дней и удержание недельных когорт для главной.
+
+    Сбой расчёта не роняет главную: блок просто не показывается.
+    """
+    from django.core.cache import cache
+
+    cached = cache.get(ANALYTICS_CACHE_KEY)
+    if cached is not None:
+        return cached
+    try:
+        from analytics.funnel import funnel
+        from analytics.retention import weekly_cohorts
+
+        steps = funnel(days=30)
+        cohorts = weekly_cohorts(RETENTION_WEEKS)
+    except Exception:
+        return None
+    rows = []
+    for c in cohorts:
+        cells = {r["week"]: r["pct"] for r in c["retention"]}
+        rows.append({
+            "week": c["cohortWeek"][8:10] + "." + c["cohortWeek"][5:7],
+            "size": c["size"],
+            # Пустая клетка — неделя ещё не наступила (у свежих когорт).
+            "cells": [cells.get(w) for w in range(RETENTION_WEEKS)],
+        })
+    block = {
+        "funnel": steps,
+        "retention": rows,
+        "retention_weeks": list(range(RETENTION_WEEKS)),
+    }
+    cache.set(ANALYTICS_CACHE_KEY, block, ANALYTICS_CACHE_SECONDS)
+    return block
+
+
 def dashboard_callback(request, context):
     from accounts.models import Account
     from catalog.models import Product
@@ -152,5 +196,6 @@ def dashboard_callback(request, context):
             {"title": "Товаров", "value": products, "icon": "inventory_2"},
         ],
         "orders_daily": daily,
+        "analytics": _analytics_block(),
     })
     return context

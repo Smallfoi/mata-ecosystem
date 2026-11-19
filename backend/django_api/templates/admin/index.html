@@ -52,5 +52,50 @@ Unfold содержит — их оставляем.
       {% endfor %}
     </div>
   </div>
+
+  {% if analytics %}
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div class="m-card pad">
+      <div class="mb-1 text-sm font-medium m-muted">Воронка активации · 30 дней</div>
+      <div class="mb-4 text-xs m-muted">Сколько людей дошли до шага — из зарегистрированных за период</div>
+      <div class="m-vstack">
+        {% for st in analytics.funnel %}
+        <div>
+          <div class="flex items-center justify-between text-sm">
+            <span>{{ st.label }}</span>
+            <span class="font-semibold">{{ st.users }}{% if not forloop.first %} · {{ st.pctOfFirst }}%{% endif %}</span>
+          </div>
+          <div class="mt-1 h-2 w-full rounded m-track">
+            <div class="h-2 rounded m-bar" style="width: {{ st.pctOfFirst }}%; min-width: 2px;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="m-card pad lg:col-span-2" style="overflow-x: auto;">
+      <div class="mb-1 text-sm font-medium m-muted">Удержание по неделям</div>
+      <div class="mb-4 text-xs m-muted">Доля когорты (неделя регистрации) с активностью в баллах на N-й неделе</div>
+      <table class="w-full text-sm" style="font-variant-numeric: tabular-nums;">
+        <thead>
+          <tr class="m-muted text-xs">
+            <th class="py-1 pr-3 text-left font-medium">Когорта</th>
+            <th class="py-1 pr-3 text-right font-medium">Людей</th>
+            {% for w in analytics.retention_weeks %}<th class="py-1 px-2 text-right font-medium">Н{{ w }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in analytics.retention %}
+          <tr>
+            <td class="py-1 pr-3">{{ r.week }}</td>
+            <td class="py-1 pr-3 text-right">{{ r.size }}</td>
+            {% for c in r.cells %}<td class="py-1 px-2 text-right">{% if c is None %}<span class="m-muted">·</span>{% else %}{{ c|floatformat:0 }}%{% endif %}</td>{% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

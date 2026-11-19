@@ -87,6 +87,11 @@ class ShowcaseGroupAdmin(ModelAdmin):
     list_editable = ("sort",)
     list_filter = ("tab",)
     ordering = ("tab__sort", "sort")
+    list_select_related = ("tab",)
+
+    def get_queryset(self, request):
+        # Категории группы — одним запросом на страницу, а не на строку.
+        return super().get_queryset(request).prefetch_related("categories")
 
     @admin.display(description="Категории 1С")
     def categories_list(self, obj):
@@ -102,6 +107,23 @@ class CategoryAdmin(ModelAdmin):
     search_fields = ("id", "name")
     ordering = ("sort",)
     readonly_fields = ("preview_large",)
+    list_select_related = ("showcase_group__tab",)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        # Подпись группы — «Вкладка → Группа»: без select_related каждый пункт
+        # выпадающего списка в КАЖДОЙ строке списка тянул свою вкладку
+        # (2 категории = 51 запрос).
+        if db_field.name == "showcase_group":
+            kwargs["queryset"] = ShowcaseGroup.objects.select_related("tab")
+        field = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == "showcase_group" and field is not None and request is not None:
+            # Колонка правится прямо в списке: форма КАЖДОЙ строки иначе заново
+            # выбирает группы. Варианты — один раз на запрос, общие для всех строк.
+            cached = getattr(request, "_showcase_group_choices", None)
+            if cached is None:
+                cached = request._showcase_group_choices = list(field.choices)
+            field.choices = cached
+        return field
 
     def changelist_view(self, request, extra_context=None):
         """Новая категория из 1С без группы: её товары видны только во «Все»."""
