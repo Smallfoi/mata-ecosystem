@@ -91,6 +91,93 @@ class Report(models.Model):
         return f"{self.get_reason_display()} → {self.target_type}:{self.target_id}"
 
 
+class ModerationMeasure(models.Model):
+    """Мера, применённая к человеку или клубу, и его возражение на неё.
+
+    Жалоба и мера намеренно разделены. Жалоба — это чужой текст о человеке:
+    показать её тому, на кого жаловались, значит выдать заявителя, а для жалобы
+    на угрозы это опасно. Мера — наше собственное решение, и о нём человек
+    обязан узнать: без этого «обжаловать» не значит ничего (§10 готовности).
+
+    Поэтому `summary` пишет модератор своими словами — что именно нарушено, без
+    цитат из жалобы и без того, кто её подал. Связь с жалобой (`report`) живёт
+    только внутри админки и наружу не отдаётся.
+    """
+
+    KIND_WARNING = "warning"
+    KIND_CONTENT = "content"
+    KIND_BLOCK = "block"
+    KINDS = [
+        (KIND_WARNING, "Предупреждение"),
+        (KIND_CONTENT, "Контент скрыт"),
+        (KIND_BLOCK, "Доступ ограничен"),
+    ]
+
+    APPEAL_NONE = "none"
+    APPEAL_NEW = "new"
+    APPEAL_ACCEPTED = "accepted"
+    APPEAL_REJECTED = "rejected"
+    APPEALS = [
+        (APPEAL_NONE, "Не оспорена"),
+        (APPEAL_NEW, "Возражение на разборе"),
+        (APPEAL_ACCEPTED, "Возражение принято, мера снята"),
+        (APPEAL_REJECTED, "Возражение отклонено"),
+    ]
+
+    target_type = models.CharField(
+        max_length=10, choices=Report.TARGETS, default=Report.TARGET_USER,
+        verbose_name="К кому",
+    )
+    target_id = models.CharField(max_length=40, db_index=True, verbose_name="ID цели")
+    kind = models.CharField(max_length=12, choices=KINDS, default=KIND_WARNING,
+                            verbose_name="Мера")
+    summary = models.TextField(verbose_name="Что нарушено (текст человеку)")
+    # Связь с жалобой — для модератора. Наружу не отдаём ни при каких условиях.
+    report = models.ForeignKey(Report, null=True, blank=True, on_delete=models.SET_NULL,
+                               verbose_name="По жалобе")
+    active = models.BooleanField(default=True, verbose_name="Действует")
+    created_at = models.DateTimeField(default=timezone.now, db_index=True,
+                                      verbose_name="Применена")
+
+    appeal_text = models.TextField(blank=True, default="", verbose_name="Возражение")
+    appeal_at = models.DateTimeField(null=True, blank=True, verbose_name="Возражение подано")
+    appeal_status = models.CharField(max_length=12, choices=APPEALS, default=APPEAL_NONE,
+                                     db_index=True, verbose_name="Статус возражения")
+    appeal_reply = models.TextField(blank=True, default="", verbose_name="Ответ на возражение")
+    appeal_resolved_at = models.DateTimeField(null=True, blank=True,
+                                              verbose_name="Возражение разобрано")
+
+    class Meta:
+        db_table = "moderation_measures"
+        ordering = ["-created_at"]
+        verbose_name = "Мера модерации"
+        verbose_name_plural = "Меры модерации"
+
+    def __str__(self):
+        return f"{self.get_kind_display()} → {self.target_type}:{self.target_id}"
+
+    @property
+    def can_appeal(self) -> bool:
+        """Оспорить можно один раз: второе возражение по тому же поводу — не
+        новый довод, а повтор, и разбирать его нечего."""
+        return self.appeal_status == self.APPEAL_NONE
+
+    def to_json(self) -> dict:
+        return {
+            "id": str(self.pk),
+            "kind": self.kind,
+            "kindTitle": self.get_kind_display(),
+            "summary": self.summary,
+            "targetType": self.target_type,
+            "active": self.active,
+            "createdAt": self.created_at.isoformat(),
+            "canAppeal": self.can_appeal,
+            "appealStatus": self.appeal_status,
+            "appealText": self.appeal_text,
+            "appealReply": self.appeal_reply,
+        }
+
+
 def blocked_ids(uid: str) -> set:
     """Кого заблокировал я."""
     return set(

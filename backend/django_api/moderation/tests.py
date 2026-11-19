@@ -132,3 +132,174 @@ class ReportTests(TestCase):
         r = self.client.get("/v1/reports/reasons", **self._auth())
         codes = [x["code"] for x in r.json()]
         self.assertIn("abuse", codes)
+
+
+class AppealTests(TestCase):
+    """§10: человек видит, чем кончилась его жалоба, и может возразить на меру."""
+
+    def setUp(self):
+        from common.security import make_token
+        self.a = _acc("a3", "Алекс")   # заявитель
+        self.b = _acc("b3", "Борис")   # тот, к кому применили меру
+        self.ta = make_token("a3")
+        self.tb = make_token("b3")
+
+    def _auth(self, token):
+        return {"HTTP_AUTHORIZATION": f"Bearer {token}"}
+
+    def _report(self, resolution=""):
+        return Report.objects.create(
+            reporter_id="a3", target_type=Report.TARGET_USER, target_id="b3",
+            reason="abuse", comment="угрожает", resolution=resolution,
+        )
+
+    def _measure(self, **over):
+        from moderation.models import ModerationMeasure
+        kw = dict(target_type=Report.TARGET_USER, target_id="b3",
+                  kind=ModerationMeasure.KIND_WARNING, summary="Оскорбления в чате клуба")
+        kw.update(over)
+        return ModerationMeasure.objects.create(**kw)
+
+    def test_reporter_sees_status_and_answer(self):
+        self._report(resolution="Предупредили")
+        Report.objects.update(status=Report.ACCEPTED)
+
+        r = self.client.get("/v1/me/reports", **self._auth(self.ta))
+        row = r.json()[0]
+        self.assertEqual(row["targetName"], "Борис")
+        self.assertEqual(row["status"], "accepted")
+        self.assertNotIn("resolution", row)  # решение — о другом человеке
+
+    def test_reporter_sees_only_own_reports(self):
+        self._report()
+        r = self.client.get("/v1/me/reports", **self._auth(self.tb))
+        self.assertEqual(r.json(), [])
+
+    def test_measure_visible_to_its_target(self):
+        self._measure()
+        r = self.client.get("/v1/me/measures", **self._auth(self.tb))
+        rows = r.json()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["summary"], "Оскорбления в чате клуба")
+        self.assertTrue(rows[0]["canAppeal"])
+        # Жалоба, из которой выросла мера, наружу не уходит: в ней чужое имя.
+        self.assertNotIn("report", rows[0])
+        self.assertNotIn("reporterId", rows[0])
+
+    def test_measure_invisible_to_others(self):
+        self._measure()
+        r = self.client.get("/v1/me/measures", **self._auth(self.ta))
+        self.assertEqual(r.json(), [])
+
+    def test_appeal_once(self):
+        from moderation.models import ModerationMeasure
+        m = self._measure()
+        ok = self.client.post(f"/v1/me/measures/{m.pk}/appeal", {"text": "Это был не я"},
+                              content_type="application/json", **self._auth(self.tb))
+        self.assertEqual(ok.status_code, 201)
+        m.refresh_from_db()
+        self.assertEqual(m.appeal_status, ModerationMeasure.APPEAL_NEW)
+        self.assertEqual(m.appeal_text, "Это был не я")
+
+        again = self.client.post(f"/v1/me/measures/{m.pk}/appeal", {"text": "ещё раз"},
+                                 content_type="application/json", **self._auth(self.tb))
+        self.assertEqual(again.status_code, 409)
+
+    def test_appeal_needs_text(self):
+        m = self._measure()
+        r = self.client.post(f"/v1/me/measures/{m.pk}/appeal", {"text": "   "},
+                             content_type="application/json", **self._auth(self.tb))
+        self.assertEqual(r.status_code, 400)
+
+    def test_cannot_appeal_someone_elses_measure(self):
+        """Чужая мера и несуществующая отвечают одинаково: перебором id нельзя
+        узнать, что к кому применили."""
+        m = self._measure()
+        mine = self.client.post(f"/v1/me/measures/{m.pk}/appeal", {"text": "не я"},
+                                content_type="application/json", **self._auth(self.ta))
+        ghost = self.client.post("/v1/me/measures/999999/appeal", {"text": "не я"},
+                                 content_type="application/json", **self._auth(self.ta))
+        self.assertEqual(mine.status_code, 404)
+        self.assertEqual(ghost.status_code, 404)
+
+    def test_club_owner_sees_and_appeals_club_measure(self):
+        Club.objects.create(id="c3", name="Клуб", owner_id="b3")
+        m = self._measure(target_type=Report.TARGET_CLUB, target_id="c3",
+                          summary="Название клуба нарушает правила")
+
+        seen = self.client.get("/v1/me/measures", **self._auth(self.tb))
+        self.assertEqual(len(seen.json()), 1)
+        r = self.client.post(f"/v1/me/measures/{m.pk}/appeal", {"text": "переименуем"},
+                             content_type="application/json", **self._auth(self.tb))
+        self.assertEqual(r.status_code, 201)
+
+    def test_admin_action_requires_answer_and_notifies(self):
+        """Мера без объяснения — мера, которую нельзя обжаловать: такую не даём."""
+        from django.contrib.admin.sites import AdminSite
+        from notifications.models import Notification
+        from moderation.admin import ReportAdmin
+        from moderation.models import ModerationMeasure
+
+        silent = self._report()                       # без resolution
+        spoken = self._report(resolution="Предупреждение за оскорбления")
+        admin_obj = ReportAdmin(Report, AdminSite())
+
+        request = type("R", (), {})()
+        messages_seen = []
+        admin_obj.message_user = lambda req, msg, level=None: messages_seen.append(msg)
+        admin_obj.mark_accepted(request, Report.objects.filter(
+            pk__in=[silent.pk, spoken.pk]))
+
+        self.assertEqual(ModerationMeasure.objects.count(), 1)
+        measure = ModerationMeasure.objects.get()
+        self.assertEqual(measure.summary, "Предупреждение за оскорбления")
+        silent.refresh_from_db()
+        self.assertEqual(silent.status, Report.NEW)   # без ответа — не закрыта
+
+        note = Notification.objects.get(user_id="b3")
+        self.assertIn("Применена мера", note.body)
+        # В уведомлении не должно быть ни заявителя, ни его слов.
+        self.assertNotIn("Алекс", note.body)
+        self.assertNotIn("угрожает", note.body)
+
+    def test_reporter_is_told_the_outcome_without_details(self):
+        from django.contrib.admin.sites import AdminSite
+        from notifications.models import Notification
+        from moderation.admin import ReportAdmin
+
+        accepted = self._report(resolution="Предупреждение за оскорбления")
+        admin_obj = ReportAdmin(Report, AdminSite())
+        admin_obj.message_user = lambda *a, **k: None
+        admin_obj.mark_accepted(None, Report.objects.filter(pk=accepted.pk))
+        note = Notification.objects.get(user_id="a3")
+        self.assertIn("приняли меры", note.body)
+        # Что именно применили к другому человеку — заявителю не пересказываем.
+        self.assertNotIn("оскорбления", note.body)
+
+        rejected = self._report()
+        admin_obj.mark_rejected(None, Report.objects.filter(pk=rejected.pk))
+        self.assertTrue(Notification.objects.filter(
+            user_id="a3", body__contains="нарушения правил не нашли").exists())
+
+    def test_appeal_answer_reaches_the_person_and_lifts_the_measure(self):
+        from django.contrib.admin.sites import AdminSite
+        from notifications.models import Notification
+        from moderation.admin import ModerationMeasureAdmin
+        from moderation.models import ModerationMeasure
+
+        m = self._measure()
+        self.client.post(f"/v1/me/measures/{m.pk}/appeal", {"text": "Это был не я"},
+                         content_type="application/json", **self._auth(self.tb))
+        admin_obj = ModerationMeasureAdmin(ModerationMeasure, AdminSite())
+        admin_obj.message_user = lambda *a, **k: None
+        admin_obj.appeal_accept(None, ModerationMeasure.objects.filter(pk=m.pk))
+        m.refresh_from_db()
+        self.assertFalse(m.active)
+        self.assertEqual(m.appeal_status, ModerationMeasure.APPEAL_ACCEPTED)
+        self.assertTrue(Notification.objects.filter(
+            user_id="b3", title="Ответ на возражение", body__contains="мера снята").exists())
+
+    def test_bad_measure_id_is_a_plain_not_found(self):
+        r = self.client.post("/v1/me/measures/abc/appeal", {"text": "не я"},
+                             content_type="application/json", **self._auth(self.tb))
+        self.assertEqual(r.status_code, 404)
