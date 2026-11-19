@@ -98,3 +98,56 @@ Future<void> migrateOwnerlessQueues(SharedPreferences prefs) async {
 
   await prefs.setBool(_queuesMigratedKey, true);
 }
+
+/// Стереть с телефона всё, что принадлежит удалённому аккаунту (D-104).
+///
+/// Выход аккаунта данные НЕ стирает — офлайн-забег дождётся следующего входа.
+/// Удаление — другое: человек попросил стереть всё, и его треки (история
+/// пробежек с точками маршрута, очередь захватов с контуром петли) не должны
+/// остаться на устройстве. Чужие аккаунты на этом телефоне не трогаем.
+///
+/// [completedRunsKey] — ключ истории пробежек этого аккаунта
+/// (`completedRunsKeyFor(accountId)`; передаём снаружи, чтобы хранилище не
+/// зависело от экрана забегов). [activeRunKey] — забег, идущий прямо сейчас:
+/// он принадлежит вошедшему, то есть удаляемому аккаунту.
+Future<void> wipeAccountData(
+  SharedPreferences prefs,
+  String accountId, {
+  required String completedRunsKey,
+  required String activeRunKey,
+}) async {
+  if (accountId.isEmpty || accountId == unknownOwner) return;
+  await prefs.remove(completedRunsKey);
+  await prefs.remove(activeRunKey);
+
+  for (final key in ownerScopedJsonListQueues) {
+    final raw = prefs.getString(key);
+    if (raw == null || raw.isEmpty) continue;
+    try {
+      final rest = (jsonDecode(raw) as List)
+          .whereType<Map>()
+          .where((m) => !isOwnedBy(m, accountId))
+          .toList();
+      await prefs.setString(key, jsonEncode(rest));
+    } catch (_) {
+      // битая очередь: прочитать владельцев нельзя — стираем целиком, лучше
+      // потерять чужой хвост, чем оставить треки удалённого.
+      await prefs.remove(key);
+    }
+  }
+
+  for (final key in ownerScopedStringListQueues) {
+    final list = prefs.getStringList(key);
+    if (list == null || list.isEmpty) continue;
+    final rest = <String>[];
+    for (final raw in list) {
+      try {
+        final m = jsonDecode(raw);
+        if (m is Map && !isOwnedBy(m, accountId)) rest.add(raw);
+      } catch (_) {
+        // битая запись — выбрасываем
+      }
+    }
+    await prefs.setStringList(key, rest);
+  }
+}

@@ -87,7 +87,24 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
     return Scaffold(
       extendBody: true,
-      body: widget.navigationShell,
+      // Тело уходит под бар (extendBody), и Scaffold сообщает экранам высоту бара
+      // нижним отступом. Плиту «Бег» он не учитывает, а она наполовину торчит над
+      // баром — последняя кнопка экрана (например, «Удалить аккаунт») оказывалась
+      // под плитой, и тап уходил в «Бег». Добавляем выступ плиты к отступу один
+      // раз здесь: его получат все экраны с SafeArea/MediaQuery.
+      body: Builder(
+        builder: (context) {
+          final mq = MediaQuery.of(context);
+          return MediaQuery(
+            data: mq.copyWith(
+              padding: mq.padding.copyWith(
+                bottom: mq.padding.bottom + _runPlateOverhang,
+              ),
+            ),
+            child: widget.navigationShell,
+          );
+        },
+      ),
       // Центральная кнопка «Бег» — приподнятая плита знака (мотив эмблемы
       // дивизиона и медалей): док по центру, наполовину над баром.
       floatingActionButton: _RunPlate(
@@ -104,6 +121,10 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 }
 
 // ── Плита «Бег» над баром ────────────────────────────────────────────────────
+
+/// Насколько плита «Бег» выступает над баром: половина плиты (62/2) плюс
+/// свечение по контуру.
+const _runPlateOverhang = 36.0;
 
 class _RunPlate extends StatelessWidget {
   final bool isActive;
