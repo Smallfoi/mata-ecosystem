@@ -150,7 +150,7 @@ class BlockHere {
 }
 
 final _dio = ApiClient.create(
-  headers: const {'Content-Type': 'application/json', 'Connection': 'close'},
+  headers: const {'Content-Type': 'application/json'},
 );
 
 Options _auth(String token) =>
@@ -158,7 +158,7 @@ Options _auth(String token) =>
 
 final blocksSummaryProvider =
     FutureProvider.autoDispose<BlocksSummary?>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return null;
   final res = await _dio.get<Map<String, dynamic>>(
     '/blocks/summary',

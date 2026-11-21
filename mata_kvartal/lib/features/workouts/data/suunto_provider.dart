@@ -54,7 +54,7 @@ class SuuntoController extends StateNotifier<SuuntoState> {
 
   final Ref ref;
   final Dio _dio = ApiClient.create(
-    headers: const {'Content-Type': 'application/json', 'Connection': 'close'},
+    headers: const {'Content-Type': 'application/json'},
   );
 
   Options get _auth => Options(

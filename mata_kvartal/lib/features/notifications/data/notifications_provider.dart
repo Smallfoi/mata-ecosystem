@@ -74,7 +74,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 
   NotificationsNotifier(this.ref) : super(const NotificationsState());
 
-  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
   Future<void> refresh() async {
     if (state.isLoading) return;

@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'api_config.dart';
+import 'shared_adapter_web.dart'
+    if (dart.library.io) 'shared_adapter_io.dart';
 
 /// Единая точка создания Dio (D-32).
 ///
@@ -10,7 +12,15 @@ import 'api_config.dart';
 /// поведение (перехватчик, заголовок, таймаут) пришлось бы дописывать двадцать
 /// раз и один раз забыть.
 ///
-/// Сейчас общее поведение ровно одно: **хлебные крошки для трекера ошибок**.
+/// Общее поведение:
+/// - **один пул соединений** (21.11.2026, этап 2 оптимизации). Раньше у каждого
+///   из ~30 Dio был свой пул, а заголовок `Connection: close` запрещал повторно
+///   использовать соединение вовсе: каждый запрос платил новое TCP+TLS-рукопожатие
+///   до сервера в Москве — 200–400 мс из Якутска. Теперь все Dio делят один
+///   адаптер, соединение живёт и переиспользуется;
+/// - **повтор GET при обрыве** соединения (один раз): страховка, ради которой когда-то
+///   и ставили `Connection: close` (PITFALLS «Dio + keep-alive поверх adb reverse»);
+/// - **хлебные крошки для трекера ошибок**.
 /// Без них падение в приложении выглядит как «упало где-то»; с ними в карточке
 /// ошибки видно последние запросы — куда ходили, что ответили, сколько ждали.
 /// Это половина работы по поиску причины.
@@ -21,18 +31,30 @@ import 'api_config.dart';
 class ApiClient {
   ApiClient._();
 
+  /// Общий адаптер (пул соединений) для всех Dio приложения.
+  static final HttpClientAdapter _adapter = createSharedAdapter();
+
   /// Dio с общими настройками и крошками. Заменяет ручной `Dio(BaseOptions(...))`.
-  static Dio create({Map<String, String>? headers}) {
+  ///
+  /// [baseUrl] — для сторонних сервисов (погода); по умолчанию — наш API.
+  static Dio create({Map<String, String>? headers, String? baseUrl}) {
+    // `Connection` из переданных заголовков выкидываем: закрывать соединение после
+    // каждого запроса — ровно то, от чего мы ушли (см. выше).
+    final clean = Map<String, String>.of(
+      headers ?? const {'Content-Type': 'application/json'},
+    )..removeWhere((k, _) => k.toLowerCase() == 'connection');
     final dio = Dio(
       BaseOptions(
-        baseUrl: ApiConfig.baseUrl,
+        baseUrl: baseUrl ?? ApiConfig.baseUrl,
         connectTimeout: ApiConfig.connectTimeout,
         receiveTimeout: ApiConfig.receiveTimeout,
-        headers: headers ??
-            const {'Content-Type': 'application/json', 'Connection': 'close'},
+        headers: clean,
       ),
     );
-    dio.interceptors.add(_BreadcrumbInterceptor());
+    dio.httpClientAdapter = _adapter;
+    dio.interceptors
+      ..add(_BreadcrumbInterceptor())
+      ..add(_RetryOnDroppedConnection(dio));
     return dio;
   }
 }
@@ -53,6 +75,42 @@ String _routeOf(String path) {
         return looksLikeId ? '…' : seg;
       })
       .join('/');
+}
+
+/// Один повтор GET/HEAD, если соединение оборвалось до ответа.
+///
+/// Живое соединение сервер может закрыть ровно в момент нашего запроса — тогда
+/// Dio видит «Connection closed before full header». GET безопасно повторить: он
+/// ничего не меняет. POST/PUT/DELETE не повторяем — запрос мог дойти до сервера.
+class _RetryOnDroppedConnection extends Interceptor {
+  _RetryOnDroppedConnection(this._dio);
+  final Dio _dio;
+  static const _flag = 'retriedDroppedConnection';
+
+  static bool isDropped(DioException e) {
+    if (e.type == DioExceptionType.connectionError) return true;
+    if (e.type != DioExceptionType.unknown) return false;
+    final text = '${e.error ?? ''} ${e.message ?? ''}'.toLowerCase();
+    return text.contains('connection closed') ||
+        text.contains('connection reset') ||
+        text.contains('broken pipe');
+  }
+
+  @override
+  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+    final o = err.requestOptions;
+    final safe = o.method == 'GET' || o.method == 'HEAD';
+    if (!safe || o.extra[_flag] == true || !isDropped(err)) {
+      handler.next(err);
+      return;
+    }
+    o.extra[_flag] = true;
+    try {
+      handler.resolve(await _dio.fetch<dynamic>(o));
+    } on DioException catch (e) {
+      handler.next(e);
+    }
+  }
 }
 
 class _BreadcrumbInterceptor extends Interceptor {

@@ -36,7 +36,7 @@ class LegalDoc {
       );
 }
 
-final _legalDio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+final _legalDio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
 /// Загрузить опубликованные документы. С токеном — у каждого проставлен
 /// `accepted` (принят ли пользователем); без токена — `accepted == null`.

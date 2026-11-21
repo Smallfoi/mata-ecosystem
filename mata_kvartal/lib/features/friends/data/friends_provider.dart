@@ -74,7 +74,7 @@ String _normPhone(String raw) {
 
 /// Мои друзья + входящие/исходящие заявки.
 final friendsProvider = FutureProvider.autoDispose<FriendsData>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return const FriendsData();
   final res = await _friendsDio.get<Map<String, dynamic>>(
     '/friends',
@@ -91,7 +91,7 @@ final friendsProvider = FutureProvider.autoDispose<FriendsData>((ref) async {
 /// Поиск людей по имени (для «по нику/ссылке»). Пусто при запросе < 2 символов.
 final friendSearchProvider =
     FutureProvider.autoDispose.family<List<FriendSummary>, String>((ref, q) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || q.trim().length < 2) return const [];
   final res = await _friendsDio.get<Map<String, dynamic>>(
     '/friends/search',
@@ -104,7 +104,7 @@ final friendSearchProvider =
 /// Подсказки: пока одноклубники, ещё не в друзьях.
 final friendSuggestionsProvider =
     FutureProvider.autoDispose<List<FriendSummary>>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null) return const [];
   final res = await _friendsDio.get<Map<String, dynamic>>(
     '/friends/suggestions',
@@ -308,7 +308,7 @@ class FriendPosition {
 
 /// Мои настройки приватности карты друзей.
 final friendPrefsProvider = FutureProvider.autoDispose<FriendMapPrefs>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null) return const FriendMapPrefs();
   final res = await _friendsDio.get<Map<String, dynamic>>(
     '/friends/prefs', options: _auth(token));
@@ -319,7 +319,7 @@ final friendPrefsProvider = FutureProvider.autoDispose<FriendMapPrefs>((ref) asy
 final friendPositionsProvider =
     FutureProvider.autoDispose<List<FriendPosition>>((ref) async {
   if (!kFriends) return const [];
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null) return const [];
   final res = await _friendsDio.get<Map<String, dynamic>>(
     '/friends/positions', options: _auth(token));

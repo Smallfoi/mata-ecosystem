@@ -221,7 +221,7 @@ class ClubNotifier extends StateNotifier<ClubState> {
   final Ref ref;
   ClubNotifier(this.ref) : super(const ClubState());
 
-  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
   Future<void> refresh({String? search}) async {
     final token = ref.read(authProvider).token;
@@ -238,21 +238,27 @@ class ClubNotifier extends StateNotifier<ClubState> {
     );
     try {
       final options = Options(headers: {'Authorization': 'Bearer $token'});
-      final my = await _dio.get<Map<String, dynamic>>(
+      // Мой клуб и список клубов друг от друга не зависят — параллельно, а не
+      // по очереди (аудит 21.11.2026: экран клуба ждал сумму двух запросов).
+      final myFuture = _dio.get<Map<String, dynamic>>(
         '/clubs/me',
         options: options,
       );
-      final rawClub = my.data?['club'];
-      final myClub = rawClub is Map<String, dynamic>
-          ? Club.fromJson(rawClub)
-          : null;
-      final list = await _dio.get<List<dynamic>>(
+      final listFuture = _dio.get<List<dynamic>>(
         '/clubs',
         queryParameters: nextSearch.trim().isEmpty
             ? null
             : {'search': nextSearch.trim()},
         options: options,
       );
+      // Future.wait: упадёт один — ошибка второго не останется необработанной.
+      await Future.wait<Object?>([myFuture, listFuture]);
+      final my = await myFuture;
+      final list = await listFuture;
+      final rawClub = my.data?['club'];
+      final myClub = rawClub is Map<String, dynamic>
+          ? Club.fromJson(rawClub)
+          : null;
       final clubs = (list.data ?? [])
           .whereType<Map<String, dynamic>>()
           .map(Club.fromJson)
@@ -620,11 +626,11 @@ class WarData {
   const WarData({this.standings = const [], this.threats = const []});
 }
 
-final _warDio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+final _warDio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
 /// Позиции клубов по земле + лента угроз моего клуба за 7 дней.
 final clubWarProvider = FutureProvider.autoDispose<WarData>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return const WarData();
   final res = await _warDio.get<Map<String, dynamic>>(
     '/clubs/war',

@@ -1,6 +1,8 @@
 import 'dart:math' show pow;
 
 import 'package:dio/dio.dart';
+
+import '../../../core/api/api_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -59,9 +61,12 @@ class WeatherData {
 const _metNoUrl =
     'https://api.met.no/weatherapi/locationforecast/2.0/compact';
 
+/// Общий клиент: пул соединений и таймауты (раньше — новый Dio без connectTimeout
+/// на каждый запрос: при плохой сети запрос мог висеть бесконечно).
+final _weatherDio = ApiClient.create(headers: const {});
+
 Future<WeatherData> _fetchWeather(LatLng at) async {
-  final dio = Dio();
-  final res = await dio.get<Map<String, dynamic>>(
+  final res = await _weatherDio.get<Map<String, dynamic>>(
     _metNoUrl,
     queryParameters: {
       'lat': at.latitude.toStringAsFixed(4),

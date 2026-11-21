@@ -44,8 +44,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
 
+  // Вернулись на вкладку — тянем свежее, но не чаще раза в минуту: раньше каждое
+  // переключение вкладки запускало ~8 запросов разом (аудит 21.11.2026).
+  // «Потянуть, чтобы обновить» обновляет всегда.
+  static const _staleAfter = Duration(seconds: 60);
+  DateTime? _lastRefresh;
+
   @override
-  void onTabShown() => _refresh();   // вернулись на вкладку — тянем свежее
+  void onTabShown() {
+    final last = _lastRefresh;
+    if (last == null || DateTime.now().difference(last) > _staleAfter) _refresh();
+  }
 
   @override
   void dispose() {
@@ -67,7 +76,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   /// Pull-to-refresh: тянем баланс/профиль/статистику с бэка прямо на экране.
   /// (обновление между переходами экранов остаётся — это в дополнение к нему).
   Future<void> _refresh() async {
-    ref.invalidate(footprintAreaProvider);
+    _lastRefresh = DateTime.now();
+    ref.invalidate(footprintDataProvider);
     await Future.wait([
       ref.read(loyaltyProvider.notifier).refresh(),
       ref.read(shoesProvider.notifier).refresh(),

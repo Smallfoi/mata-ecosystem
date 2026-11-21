@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/storage/account_scope.dart';
 import '../../auth/data/auth_provider.dart';
 import 'loyalty_v1.dart';
@@ -125,17 +125,7 @@ class LoyaltyNotifier extends StateNotifier<LoyaltyState> {
 
   LoyaltyNotifier(this.ref) : super(const LoyaltyState());
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-      // 'Connection: close' — каждый запрос на свежем соединении. Иначе Dio
-      // переиспользует keep-alive, который uvicorn закрывает по таймауту, и
-      // поверх adb reverse это даёт "Connection closed before full header".
-      headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-    ),
-  );
+  final Dio _dio = ApiClient.create();
 
   static const _pendingKey = 'kvartal.loyalty.pending.v1';
 

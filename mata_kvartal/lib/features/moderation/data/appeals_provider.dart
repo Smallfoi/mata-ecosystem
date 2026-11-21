@@ -82,7 +82,7 @@ Options _auth(String token) =>
     Options(headers: {'Authorization': 'Bearer $token'});
 
 final myReportsProvider = FutureProvider.autoDispose<List<MyReport>>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return const [];
   final res = await _dio.get<List<dynamic>>('/me/reports', options: _auth(token));
   return (res.data ?? const [])
@@ -92,7 +92,7 @@ final myReportsProvider = FutureProvider.autoDispose<List<MyReport>>((ref) async
 });
 
 final myMeasuresProvider = FutureProvider.autoDispose<List<MyMeasure>>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return const [];
   final res = await _dio.get<List<dynamic>>('/me/measures', options: _auth(token));
   return (res.data ?? const [])

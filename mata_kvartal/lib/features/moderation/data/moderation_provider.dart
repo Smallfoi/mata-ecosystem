@@ -43,7 +43,7 @@ Options _auth(String token) => Options(headers: {'Authorization': 'Bearer $token
 
 /// Кого я заблокировал.
 final blockedProvider = FutureProvider.autoDispose<List<BlockedUser>>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return const [];
   final res = await _dio.get<List<dynamic>>('/me/blocks', options: _auth(token));
   return (res.data ?? const [])
@@ -56,7 +56,7 @@ final blockedProvider = FutureProvider.autoDispose<List<BlockedUser>>((ref) asyn
 /// в формулировках: модератор разбирает по тем же словам, что видел человек.
 final reportReasonsProvider =
     FutureProvider.autoDispose<List<ReportReason>>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return const [];
   final res = await _dio.get<List<dynamic>>('/reports/reasons', options: _auth(token));
   return (res.data ?? const [])

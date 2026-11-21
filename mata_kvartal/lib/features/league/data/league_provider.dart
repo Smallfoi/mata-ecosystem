@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
 
 /// Зачёты лиги и профиль бегуна (docs/LEAGUE_PLAN.md, Э1).
@@ -174,16 +174,7 @@ class RunnerProfile {
   );
 }
 
-final _leagueDio = Dio(
-  BaseOptions(
-    baseUrl: ApiConfig.baseUrl,
-    connectTimeout: ApiConfig.connectTimeout,
-    receiveTimeout: ApiConfig.receiveTimeout,
-    // 'Connection: close' — как и в рейтинге: keep-alive поверх adb reverse
-    // даёт «Connection closed before full header» (см. PITFALLS).
-    headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-  ),
-);
+final _leagueDio = ApiClient.create();
 
 /// Выбранный зачёт и период. Держим в состоянии, чтобы переключение вкладок
 /// не сбрасывало выбор.
@@ -200,7 +191,7 @@ final leaguePeriodProvider = StateProvider<String>((_) => 'week');
 final leagueBoardDataProvider = FutureProvider.autoDispose<LeagueBoardData>((ref) async {
   final board = ref.watch(leagueBoardProvider);
   final period = ref.watch(leaguePeriodProvider);
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) {
     return LeagueBoardData(
       board: board,
@@ -232,7 +223,7 @@ final leagueBoardDataProvider = FutureProvider.autoDispose<LeagueBoardData>((ref
 });
 
 final runnerProfileProvider = FutureProvider.autoDispose<RunnerProfile>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return const RunnerProfile();
   final res = await _leagueDio.get<Map<String, dynamic>>(
     '/runner/profile',

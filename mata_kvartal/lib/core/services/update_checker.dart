@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+
+import '../api/api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,12 +32,13 @@ class UpdateChecker {
       'https://storage.yandexcloud.net/mata-media/app/kvartal/version.json';
   static const _prefsDismissedCode = 'update_dismissed_code';
   static bool _checkedThisSession = false;
+  static final Dio _dio = ApiClient.create(headers: const {});
 
   /// Читает version.json с раздачи. null — нет связи/ответ не разобран.
   /// Используют и баннер обновления, и экран «О приложении».
   static Future<UpdateInfo?> fetchLatest() async {
     try {
-      final resp = await Dio().get<Map<String, dynamic>>(
+      final resp = await _dio.get<Map<String, dynamic>>(
         _versionUrl,
         queryParameters: {'t': DateTime.now().millisecondsSinceEpoch},
         options: Options(
