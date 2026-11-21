@@ -733,8 +733,19 @@
         }
         if (c.imageUrl && safeId(key)) {
           var url = mediaUrl(c.imageUrl);
+          // Уменьшенные копии под экран (сервер делает 640/1280 px): телефон берёт
+          // подходящую, а не исходник 2560 px. Нет копий — исходник, как раньше.
+          var sset = c.imageSrcset && !EDIT ? c.imageSrcset : "";
           document.querySelectorAll('[data-edit-img="' + key + '"]').forEach(function (el) {
-            if (el.tagName === "IMG") el.src = url; else el.style.backgroundImage = "url('" + url + "')";
+            if (el.tagName === "IMG") {
+              if (sset) {
+                el.setAttribute("sizes", el.getAttribute("sizes") || "100vw");
+                el.setAttribute("srcset", sset);
+              } else {
+                el.removeAttribute("srcset");
+              }
+              el.src = url;
+            } else el.style.backgroundImage = "url('" + url + "')";
           });
         }
       } catch (e) { /* один плохой ключ не ломает остальные */ }

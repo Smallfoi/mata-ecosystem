@@ -30,12 +30,22 @@
   }
 
   var gsap = window.gsap;
-  if (window.ScrollTrigger) gsap.registerPlugin(window.ScrollTrigger);
-  var ScrollTrigger = window.ScrollTrigger;
+
+  // Телефоны и планшеты (сенсор): лёгкий режим (этап 6 оптимизации, 21.11.2026).
+  // Палец и так прокручивает нативно и плавно — Lenis на сенсоре ничего не даёт,
+  // но крутит тикер GSAP на каждом кадре. Параллакс, привязанный к прокрутке,
+  // пересчитывает стили на каждом кадре прокрутки — на телефоне это и было
+  // подтормаживание (Lighthouse: ~5 с главного потока на GSAP). Появление героя
+  // при загрузке оставляем — оно короткое. На компьютере всё как было.
+  var touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+  var ScrollTrigger = touch ? null : window.ScrollTrigger;
+  // Регистрируем только там, где используем: зарегистрированный плагин сам вешает
+  // слушатели прокрутки и пересчёты, даже если сцен нет.
+  if (ScrollTrigger) gsap.registerPlugin(ScrollTrigger);
 
   // ── Плавный скролл (Lenis) ────────────────────────────────────────────────
   var lenis = null;
-  if (hasLenis) {
+  if (hasLenis && !touch) {
     lenis = new window.Lenis({
       duration: 1.1,
       easing: function (t) {
