@@ -5,7 +5,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- profile-сборка без --dart-define ходит на локальный http://127.0.0.1:8000
+    <!-- profile-сборка без dart-define ходит на локальный http://127.0.0.1:8000
          (kReleaseMode=false) — cleartext только здесь и в debug, не в release. -->
     <application
         android:usesCleartextTraffic="true"
