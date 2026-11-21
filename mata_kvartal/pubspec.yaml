@@ -24,8 +24,6 @@ dependencies:
   flutter_map: ^7.0.2
   flutter_cache_manager: ^3.4.1
   latlong2: ^0.9.1
-  # Векторные тайлы OpenFreeMap (стиль Bright), D-19 — коммерч.-безопасная подложка.
-  vector_map_tiles: ^8.0.0
 
   # GPS
   geolocator: ^13.0.2
@@ -34,9 +32,6 @@ dependencies:
   # Поиск друзей по контактам телефона (D-85): читаем контакты, хешируем номера.
   flutter_contacts: ^1.1.9+2
   crypto: ^3.0.6
-
-  # Charts
-  fl_chart: ^0.70.2
 
   # Animations
   flutter_animate: ^4.5.2

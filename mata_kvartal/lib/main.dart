@@ -17,7 +17,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _clearMapAndRunDataOnStartup();
   await _scopeLocalDataToAccount();
-  await RaceReminders.init(); // локальные напоминания о «Моих стартах»
+  // Напоминания о «Моих стартах» — после первого кадра, а не перед ним: разбор
+  // базы часовых поясов занимал время запуска, а нужен лишь при планировании
+  // напоминания (каждый метод RaceReminders сам вызывает init). Этап 7, 21.11.2026.
+  WidgetsBinding.instance.addPostFrameCallback((_) => RaceReminders.init());
   await _runWithSentry(const ProviderScope(child: KvartalApp()));
 }
 

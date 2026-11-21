@@ -31,6 +31,12 @@ def webify_site_videos():
 
 
 _IMG_LOCK = "catalog.webify_site_images.lock"
+# Замок фото-задачи — короче интервала запуска (20 мин). Автодеплой перезапускает
+# воркер посреди прогона, `finally` не успевает снять замок, и с часовым замком
+# задача пропускала прогоны весь день частых выкладок (21.11.2026: «предыдущий
+# запуск ещё идёт» при пустом воркере). Задача идемпотентна — сделанное пропускает,
+# поэтому редкое наложение двух прогонов безвредно.
+_IMG_LOCK_TTL = 15 * 60
 # v2 (21.11.2026): команда теперь ставит и Cache-Control — один раз пройти бакет заново.
 _TYPES_DONE = "catalog.fix_media_content_types.done.v2"
 
@@ -39,7 +45,7 @@ _TYPES_DONE = "catalog.fix_media_content_types.done.v2"
 def webify_site_images():
     """Фото блоков сайта и баннеров в WebP (18.11.2026). Загрузка уже кладёт WebP;
     задача доводит то, что лежало раньше, и всё, что когда-то не пережалось."""
-    if not cache.add(_IMG_LOCK, 1, _LOCK_TTL):
+    if not cache.add(_IMG_LOCK, 1, _IMG_LOCK_TTL):
         log.info("webify_site_images: предыдущий запуск ещё идёт")
         return
     try:
