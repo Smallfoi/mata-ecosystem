@@ -40,6 +40,8 @@ class Command(BaseCommand):
         todo = list(_rows())
         if not todo:
             self.stdout.write("Нечего пережимать: все фото сайта уже WebP.")
+            if opts["apply"]:
+                self._variants()
             return
         for obj in todo:
             self.stdout.write(f"  {obj._meta.model_name} {obj.pk}: {obj.image.name}")
@@ -75,3 +77,13 @@ class Command(BaseCommand):
                               f"{len(data) // 1024} → {new_size // 1024} КБ")
         if total_old:
             self.stdout.write(f"Готово: {total_old // 1024} → {total_new // 1024} КБ.")
+        self._variants()
+
+    def _variants(self):
+        # Уменьшенные копии под экраны телефонов (этап 6 оптимизации) — после
+        # пережатия, чтобы копии делались уже с WebP-исходника.
+        from catalog.site_variants import make_all
+
+        n = make_all(self.stdout)
+        if n:
+            self.stdout.write(f"Сделаны копии под экраны: {n}.")

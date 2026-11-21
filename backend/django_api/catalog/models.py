@@ -337,6 +337,9 @@ class SiteContent(models.Model):
     key = models.CharField(primary_key=True, max_length=80, verbose_name="Ключ")
     value = models.TextField(blank=True, default="", verbose_name="Текст")
     image = models.ImageField(upload_to="uploads/site/", null=True, blank=True, verbose_name="Фото")
+    # Уменьшенные копии фото под экраны (catalog/site_variants.py): {"src": имя
+    # исходника, "width": его ширина, "640": имя копии, "1280": имя копии}.
+    image_variants = models.JSONField(default=dict, blank=True, verbose_name="Копии фото")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
 
     class Meta:
@@ -351,7 +354,13 @@ class SiteContent(models.Model):
         return self.image.url if self.image else ""
 
     def to_json(self) -> dict:
-        return {"value": self.value, "imageUrl": self.image_url()}
+        from catalog.site_variants import srcset
+
+        data = {"value": self.value, "imageUrl": self.image_url()}
+        sset = srcset(self)
+        if sset:
+            data["imageSrcset"] = sset
+        return data
 
 
 class CheckDismissal(models.Model):
