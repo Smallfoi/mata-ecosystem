@@ -1910,7 +1910,8 @@ class _TodayRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final weather = ref.watch(weatherProvider).valueOrNull;
     final win = bestRunWindow(weather?.hourly ?? const []);
-    final level = ref.watch(runnerLevelProvider).valueOrNull;
+    final levelAsync = ref.watch(runnerLevelProvider);
+    final level = levelAsync.valueOrNull;
     final me = ref.watch(leagueBoardDataProvider).valueOrNull?.me;
     final form = ref.watch(weekFormProvider);
     final days = form.where((d) => d).length;
@@ -1939,7 +1940,9 @@ class _TodayRow extends ConsumerWidget {
               if (level != null) level.title,
               if (me?.place != null) '#${me!.place}',
             ].join(' · ').isEmpty
-                ? 'загрузка…'
+                // «загрузка…» — только пока правда грузится; ошибка — прочерк,
+                // а не вечная загрузка.
+                ? (levelAsync.isLoading ? 'загрузка…' : '—')
                 : [
                     if (level != null) level.title,
                     if (me?.place != null) '#${me!.place}',

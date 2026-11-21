@@ -95,7 +95,12 @@ class MeStats {
 
 /// Тянет статистику при открытии экрана; autoDispose — перезапрашивается заново.
 final meStatsProvider = FutureProvider.autoDispose<MeStats>((ref) async {
-  final token = ref.read(authProvider).token;
+  // watch, а не read: при холодном запуске карта строится раньше, чем
+  // восстановлена сессия. С read провайдер один раз падал «Не авторизован» и
+  // оставался в ошибке, пока карта на экране, — чип «Дивизион» навсегда
+  // показывал «загрузка…» (телефон владельца, 21.11.2026). С watch он
+  // перезапросится, как только появится токен.
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) {
     throw Exception('Не авторизован');
   }
