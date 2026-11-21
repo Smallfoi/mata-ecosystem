@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../data/cached_tile_provider.dart';
 import '../../data/location_provider.dart';
 import '../../data/zone_provider.dart';
 import '../../data/loop_suggestion_provider.dart';
@@ -193,9 +194,15 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
   @override
   Widget build(BuildContext context) {
     final zones = ref.watch(zoneProvider).valueOrNull ?? const <BlockZone>[];
-    final territories = ref.watch(territoryProvider).territories;
-    final posAsync = ref.watch(positionStreamProvider);
-    final runState = ref.watch(runProvider);
+    // Только список: опрос раз в 12 с переключает isLoading — карте это не важно.
+    final territories = ref.watch(territoryProvider.select((s) => s.territories));
+    // Карта следит только за статусом и маршрутом забега. Раньше — за всем
+    // состоянием: таймер забега тикает раз в секунду, и вся карта со всеми
+    // слоями перестраивалась каждую секунду (аудит 21.11.2026). Таймер и
+    // дистанцию показывает нижняя панель — у неё свой Consumer.
+    final runState = ref.watch(
+      runProvider.select((s) => (status: s.status, route: s.route)),
+    );
     final closureStatus = ref
         .read(zoneProvider.notifier)
         .inspectLoopClosure(runState.route);
@@ -304,6 +311,8 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                     : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 subdomains: _hasCarto ? const ['a', 'b', 'c', 'd'] : const [],
                 userAgentPackageName: 'ru.mata.kvartal',
+                // Кэш тайлов на диске: после перезапуска карта не качается заново.
+                tileProvider: CachedTileProvider(),
                 maxNativeZoom: 19,
                 errorTileCallback: (_, __, ___) => _handleTileError(),
               ),
@@ -497,13 +506,17 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
               // сглаженного (Калман) трека — метка и линия совпадают. Метка
               // плавно «скользит» между фиксами (анимация), а не прыгает.
               // Вне бега — текущая позиция из потока.
-              _AnimatedUserMarker(
-                target:
-                    runState.status != RunStatus.idle &&
-                        runState.route.isNotEmpty
-                    ? runState.route.last
-                    : posAsync.valueOrNull?.toLatLng,
-                isRunning: runState.status == RunStatus.active,
+              // Позицию вне забега слушает только метка: движение человека не
+              // перестраивает остальную карту.
+              Consumer(
+                builder: (context, ref, _) => _AnimatedUserMarker(
+                  target:
+                      runState.status != RunStatus.idle &&
+                          runState.route.isNotEmpty
+                      ? runState.route.last
+                      : ref.watch(positionStreamProvider).valueOrNull?.toLatLng,
+                  isRunning: runState.status == RunStatus.active,
+                ),
               ),
             ],
           ),
@@ -652,7 +665,10 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                               runState.status != RunStatus.idle &&
                                   runState.route.isNotEmpty
                               ? runState.route.last
-                              : posAsync.valueOrNull?.toLatLng;
+                              : ref
+                                    .read(positionStreamProvider)
+                                    .valueOrNull
+                                    ?.toLatLng;
                           if (point == null) return;
                           _mapController.move(
                             point,
@@ -664,11 +680,15 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
                   Padding(
                     // Плита «Бег» приподнята над баром — панели нужен воздух.
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: _BottomPanel(
-                      mode: mode,
-                      runState: runState,
-                      territories: territories,
-                      closureStatus: closureStatus,
+                    // Своя подписка на забег: таймер и дистанция обновляются
+                    // каждую секунду, не трогая карту.
+                    child: Consumer(
+                      builder: (context, ref, _) => _BottomPanel(
+                        mode: mode,
+                        runState: ref.watch(runProvider),
+                        territories: territories,
+                        closureStatus: closureStatus,
+                      ),
                     ),
                   ),
                 ],
@@ -679,7 +699,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with TabVisibility {
           if (_selectedPartner != null)
             _PartnerCard(
               partner: _selectedPartner!,
-              userPoint: posAsync.valueOrNull?.toLatLng,
+              userPoint: ref.read(positionStreamProvider).valueOrNull?.toLatLng,
               onClose: () => setState(() => _selectedPartner = null),
             ),
           if (_selectedFriend != null)
@@ -1252,13 +1272,14 @@ class _UserMarkerState extends State<_UserMarker>
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Пульсирующее кольцо
-        AnimatedBuilder(
-          animation: _ctrl,
-          builder: (_, __) => Opacity(
-            opacity: _opacity.value,
-            child: Transform.scale(
-              scale: _scale.value,
+        // Пульсирующее кольцо. Переходы вместо AnimatedBuilder+Opacity: кадр
+        // анимации меняет только слой, виджеты не перестраиваются; отдельный
+        // слой (RepaintBoundary) — кольцо не тянет за собой перерисовку соседей.
+        RepaintBoundary(
+          child: FadeTransition(
+            opacity: _opacity,
+            child: ScaleTransition(
+              scale: _scale,
               child: Container(
                 width: 26,
                 height: 26,

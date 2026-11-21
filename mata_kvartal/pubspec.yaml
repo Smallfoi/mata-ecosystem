@@ -22,6 +22,7 @@ dependencies:
 
   # Maps
   flutter_map: ^7.0.2
+  flutter_cache_manager: ^3.4.1
   latlong2: ^0.9.1
   # Векторные тайлы OpenFreeMap (стиль Bright), D-19 — коммерч.-безопасная подложка.
   vector_map_tiles: ^8.0.0
