@@ -120,7 +120,7 @@ final weekFormProvider = Provider.autoDispose<List<bool>>((ref) {
 
 // ── Серверный дивизион недели (Квартал 2.0, бэкенд 09.2026) ─────────────────
 
-final _divDio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+final _divDio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
 class DivisionMemberRow {
   final String userId;
@@ -175,7 +175,7 @@ class DivisionData {
 
 /// Дивизион недели с бэка: группа до 30 бегунов твоего уровня.
 final divisionProvider = FutureProvider.autoDispose<DivisionData?>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return null;
   final res = await _divDio.get<Map<String, dynamic>>(
     '/league/division',
@@ -218,7 +218,7 @@ class SeasonResultData {
 
 final seasonLatestProvider =
     FutureProvider.autoDispose<SeasonResultData?>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return null;
   final res = await _divDio.get<Map<String, dynamic>>(
     '/league/season/latest',

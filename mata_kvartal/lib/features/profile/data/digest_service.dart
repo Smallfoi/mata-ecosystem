@@ -27,10 +27,10 @@ class WeekDigest {
   });
 }
 
-final _digestDio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+final _digestDio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
 final weekDigestProvider = FutureProvider.autoDispose<WeekDigest?>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return null;
   final res = await _digestDio.get<Map<String, dynamic>>(
     '/me/digest',

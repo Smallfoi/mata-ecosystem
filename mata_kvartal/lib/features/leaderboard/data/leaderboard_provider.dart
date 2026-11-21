@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_config.dart';
+import '../../../core/api/api_client.dart';
 import '../../auth/data/auth_provider.dart';
 
 /// Рейтинг — по пробежанным КМ (источник правды — backend, D-11).
@@ -122,23 +122,14 @@ class DistrictsBoard {
   const DistrictsBoard({required this.top, this.myRank});
 }
 
-final _leaderboardDio = Dio(
-  BaseOptions(
-    baseUrl: ApiConfig.baseUrl,
-    connectTimeout: ApiConfig.connectTimeout,
-    receiveTimeout: ApiConfig.receiveTimeout,
-    // 'Connection: close' — свежее соединение на запрос (см. PITFALLS: Dio keep-alive
-    // поверх adb reverse даёт "Connection closed before full header").
-    headers: {'Content-Type': 'application/json', 'Connection': 'close'},
-  ),
-);
+final _leaderboardDio = ApiClient.create();
 
 /// Выбранный период рейтинга: 'week' | 'month'.
 final leaderboardPeriodProvider = StateProvider<String>((_) => 'week');
 
 final leaderboardUsersProvider = FutureProvider.autoDispose<UsersBoard>((ref) async {
   final period = ref.watch(leaderboardPeriodProvider);
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) {
     return const UsersBoard(top: [], myKm: 0);
   }
@@ -162,7 +153,7 @@ final leaderboardUsersProvider = FutureProvider.autoDispose<UsersBoard>((ref) as
 
 final leaderboardClubsProvider = FutureProvider.autoDispose<ClubsBoard>((ref) async {
   final period = ref.watch(leaderboardPeriodProvider);
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) {
     return const ClubsBoard(top: []);
   }
@@ -182,7 +173,7 @@ final leaderboardClubsProvider = FutureProvider.autoDispose<ClubsBoard>((ref) as
 /// Рейтинг контроля территорий (D-09). Не зависит от периода — это снимок «сейчас».
 final leaderboardDistrictsProvider =
     FutureProvider.autoDispose<DistrictsBoard>((ref) async {
-      final token = ref.watch(authProvider).token;
+      final token = ref.watch(authProvider.select((s) => s.token));
       if (token == null || token.isEmpty) {
         return const DistrictsBoard(top: []);
       }

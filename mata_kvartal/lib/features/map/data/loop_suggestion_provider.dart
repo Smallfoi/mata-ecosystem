@@ -65,7 +65,7 @@ class LoopSuggestion {
 }
 
 final _dio = ApiClient.create(
-  headers: const {'Content-Type': 'application/json', 'Connection': 'close'},
+  headers: const {'Content-Type': 'application/json'},
 );
 
 /// Ближайший свободный квартал к текущей позиции. Пусто — значит рядом свободных
@@ -75,12 +75,20 @@ final _dio = ApiClient.create(
 /// улице связи может не быть вовсе (D-77: бег не должен зависеть от сети).
 final loopSuggestionProvider =
     FutureProvider.autoDispose<LoopSuggestion?>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   if (token == null || token.isEmpty) return null;
-  final pos = ref.watch(positionStreamProvider).valueOrNull;
-  if (pos == null) return null;
-  final lat = (pos.latitude * 1000).round() / 1000;
-  final lon = (pos.longitude * 1000).round() / 1000;
+  // Огрубляем ВНУТРИ select: провайдер пересчитывается, только когда сменилась
+  // клетка ~100 м. Раньше округляли после watch всей позиции — запрос к серверу
+  // уходил на каждый GPS-фикс, примерно раз в секунду (аудит 21.11.2026).
+  final cell = ref.watch(positionStreamProvider.select((a) {
+    final p = a.valueOrNull;
+    return p == null
+        ? null
+        : ((p.latitude * 1000).round(), (p.longitude * 1000).round());
+  }));
+  if (cell == null) return null;
+  final lat = cell.$1 / 1000;
+  final lon = cell.$2 / 1000;
   try {
     final res = await _dio.get<Map<String, dynamic>>(
       '/blocks/nearest',

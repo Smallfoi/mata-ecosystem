@@ -145,7 +145,7 @@ class TerritoryNotifier extends StateNotifier<TerritoryState> {
   final Ref ref;
   TerritoryNotifier(this.ref) : super(const TerritoryState());
 
-  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
   String? get _token {
     final token = ref.read(authProvider).token;
@@ -405,21 +405,33 @@ final territoryProvider =
       return notifier;
     });
 
-/// Вечный личный след: суммарная исследованная площадь (м²), не уменьшается.
-/// Для профиля «исследовано N км²» (живой слой территорий — отдельно, распадается).
-final footprintAreaProvider = FutureProvider.autoDispose<double>((ref) async {
-  final token = ref.watch(authProvider).token;
-  if (token == null || token.isEmpty) return 0;
-  final dio = ApiClient.create(headers: const {'Content-Type': 'application/json', 'Connection': 'close'});
+final _territoryDio = ApiClient.create();
+
+/// Ответ GET /footprint одним запросом: площадь и кольца вечного следа.
+///
+/// Раньше площадь и кольца были двумя провайдерами с двумя одинаковыми запросами
+/// к одному и тому же адресу (аудит 21.11.2026) — теперь запрос один, а
+/// [footprintAreaProvider] и [footprintRingsProvider] берут из него своё.
+final footprintDataProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  final token = ref.watch(authProvider.select((s) => s.token));
+  if (token == null || token.isEmpty) return const {};
   try {
-    final res = await dio.get<Map<String, dynamic>>(
+    final res = await _territoryDio.get<Map<String, dynamic>>(
       '/footprint',
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
-    return (res.data?['areaM2'] as num?)?.toDouble() ?? 0;
+    return res.data ?? const {};
   } catch (_) {
-    return 0;
+    return const {};
   }
+});
+
+/// Вечный личный след: суммарная исследованная площадь (м²), не уменьшается.
+/// Для профиля «исследовано N км²» (живой слой территорий — отдельно, распадается).
+final footprintAreaProvider = FutureProvider.autoDispose<double>((ref) async {
+  final data = await ref.watch(footprintDataProvider.future);
+  return (data['areaM2'] as num?)?.toDouble() ?? 0;
 });
 
 /// Кольца вечного следа (footprints) для карты режима «Исследование».
@@ -427,21 +439,7 @@ final footprintAreaProvider = FutureProvider.autoDispose<double>((ref) async {
 /// Тот же разбор колец, что и у территорий (ringsFromGeoJson) — один источник.
 final footprintRingsProvider =
     FutureProvider.autoDispose<List<List<LatLng>>>((ref) async {
-  final token = ref.watch(authProvider).token;
-  if (token == null || token.isEmpty) return const [];
-  final dio = ApiClient.create(
-    headers: const {'Content-Type': 'application/json', 'Connection': 'close'},
-  );
-  try {
-    final res = await dio.get<Map<String, dynamic>>(
-      '/footprint',
-      options: Options(headers: {'Authorization': 'Bearer $token'}),
-    );
-    final geojson = res.data?['geojson'];
-    return geojson is Map<String, dynamic>
-        ? ringsFromGeoJson(geojson)
-        : const [];
-  } catch (_) {
-    return const [];
-  }
+  final data = await ref.watch(footprintDataProvider.future);
+  final geojson = data['geojson'];
+  return geojson is Map<String, dynamic> ? ringsFromGeoJson(geojson) : const [];
 });

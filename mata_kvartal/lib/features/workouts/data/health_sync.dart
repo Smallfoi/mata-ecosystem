@@ -101,7 +101,7 @@ class HealthSyncNotifier extends StateNotifier<HealthSyncState> {
   final Health _health = Health();
   bool _configured = false;
 
-  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
   Future<void> _configure() async {
     if (_configured) return;

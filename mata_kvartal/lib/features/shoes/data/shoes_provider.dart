@@ -120,7 +120,7 @@ class ShoesNotifier extends StateNotifier<ShoesState> {
 
   ShoesNotifier(this.ref) : super(const ShoesState());
 
-  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
   static const _pendingKey = 'kvartal.shoes.pending.v1';
 

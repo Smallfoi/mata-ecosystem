@@ -65,10 +65,10 @@ class MedalFull {
   bool get earned => state.earned;
 }
 
-final _medalsDio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+final _medalsDio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
 final medalsProvider = FutureProvider.autoDispose<List<MedalFull>>((ref) async {
-  final token = ref.watch(authProvider).token;
+  final token = ref.watch(authProvider.select((s) => s.token));
   // «Спящие» медали (без критерия на сервере) скрыты до готовности (D-89,
   // showSleepingMedals). Уже заработанную не прячем — так не отберём достижение.
   final showSleeping =

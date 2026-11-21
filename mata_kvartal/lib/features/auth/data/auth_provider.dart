@@ -206,13 +206,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
       avatarPath: prefs.getString(_userAvatarPrefsKey),
     );
 
-    state = state.copyWith(
-      status: AuthStatus.authenticated,
-      phone: phone,
-      token: token,
-      user: cachedUser,
-      clearError: true,
-    );
+    // Сессия уже восстановлена тем же токеном (возврат на вкладку, возврат в
+    // приложение) — не перезаписываем состояние копией из кэша: каждая запись
+    // будила всех, кто следит за входом (аудит 21.11.2026).
+    final alreadyIn =
+        state.status == AuthStatus.authenticated && state.token == token;
+    if (!alreadyIn) {
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        phone: phone,
+        token: token,
+        user: cachedUser,
+        clearError: true,
+      );
+    }
 
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -225,7 +232,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
         freshUser,
         phone.isEmpty ? freshUser.phone ?? '' : phone,
       );
-      state = state.copyWith(user: freshUser, phone: freshUser.phone ?? phone);
+      final now = state.user;
+      final same = now != null &&
+          now.id == freshUser.id &&
+          now.name == freshUser.name &&
+          now.email == freshUser.email &&
+          now.phone == freshUser.phone &&
+          now.city == freshUser.city &&
+          now.avatarPath == freshUser.avatarPath;
+      if (!same) {
+        state = state.copyWith(user: freshUser, phone: freshUser.phone ?? phone);
+      }
     } catch (_) {
       // Если сервер временно недоступен, оставляем локальную сессию для dev-теста карты/GPS.
     }

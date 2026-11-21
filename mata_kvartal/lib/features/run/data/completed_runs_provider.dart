@@ -28,7 +28,7 @@ const _maxStoredRuns = 50;
 /// Dio для отправки забегов. Отдельный провайдер — чтобы тесты подменяли сеть.
 final completedRunsDioProvider = Provider<Dio>(
   (_) => ApiClient.create(
-    headers: {'Content-Type': 'application/json', 'Connection': 'close'},
+    headers: {'Content-Type': 'application/json'},
   ),
 );
 

@@ -99,7 +99,7 @@ final meStatsProvider = FutureProvider.autoDispose<MeStats>((ref) async {
   if (token == null || token.isEmpty) {
     throw Exception('Не авторизован');
   }
-  final dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+  final dio = ApiClient.create(headers: {'Content-Type': 'application/json'});
   final r = await dio.get<Map<String, dynamic>>(
     '/me/stats',
     options: Options(headers: {'Authorization': 'Bearer $token'}),

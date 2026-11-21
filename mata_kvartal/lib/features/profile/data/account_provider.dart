@@ -52,7 +52,7 @@ class AccountNotifier extends StateNotifier<AccountState> {
   final Ref ref;
   AccountNotifier(this.ref) : super(const AccountState());
 
-  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json', 'Connection': 'close'});
+  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json'});
 
   Options? _auth() {
     final t = ref.read(authProvider).token;
