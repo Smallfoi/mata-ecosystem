@@ -31,7 +31,8 @@ def webify_site_videos():
 
 
 _IMG_LOCK = "catalog.webify_site_images.lock"
-_TYPES_DONE = "catalog.fix_media_content_types.done"
+# v2 (21.11.2026): команда теперь ставит и Cache-Control — один раз пройти бакет заново.
+_TYPES_DONE = "catalog.fix_media_content_types.done.v2"
 
 
 @shared_task(name="catalog.webify_site_images", ignore_result=True)
