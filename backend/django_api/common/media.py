@@ -24,6 +24,13 @@ import mimetypes
 mimetypes.add_type("image/webp", ".webp")
 mimetypes.add_type("image/avif", ".avif")
 
+# Кэш публичных медиа в браузере и приложениях (этап 1 оптимизации, 21.11.2026).
+# До этого S3 отдавал фото без Cache-Control — браузер качал фото сайта (1,6 МБ на
+# главной) заново при каждом визите. Неделя, а не год: имена файлов уникальны
+# (file_overwrite=False), но удалённый файл может освободить имя для нового — через
+# неделю браузер всё равно перепроверит по ETag.
+MEDIA_CACHE_CONTROL = "public, max-age=604800"
+
 PRIVATE_URL_TTL = 3600  # час: хватает на работу с экраном проверки, дальше — перезагрузить
 
 _STATIC = {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}
@@ -61,14 +68,16 @@ def media_storages(env):
         "default_acl": "public-read",   # фото публичны (витрина/аватары)
         "querystring_auth": False,      # публичные URL без подписи
         "file_overwrite": False,        # не перезатирать по совпадению имени
+        "object_parameters": {"CacheControl": MEDIA_CACHE_CONTROL},
     }
     custom = (env.get("MEDIA_S3_CUSTOM_DOMAIN") or "").strip()
     if custom:
         options["custom_domain"] = custom  # CDN-домен для отдачи медиа
     # Приватные объекты: ACL private + подписанные ссылки. CDN-домен не ставим —
     # по нему подпись S3 не работает, ссылка идёт прямо на хранилище.
+    # Приватным файлам кэш в браузере не нужен: ссылка подписана и живёт час.
     private = dict(options, default_acl="private", querystring_auth=True,
-                   querystring_expire=PRIVATE_URL_TTL)
+                   querystring_expire=PRIVATE_URL_TTL, object_parameters={})
     private.pop("custom_domain", None)
     return {
         "default": {"BACKEND": "storages.backends.s3.S3Storage", "OPTIONS": options},

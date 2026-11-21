@@ -6,6 +6,29 @@
 # Пустой каталог nginx не смущает.
 include /etc/nginx/extra/*.conf;
 
+# ── Сжатие (этап 1 оптимизации, 21.11.2026) ───────────────────────────────────
+# До этого nginx отдавал всё как есть: главная сайта 56 КБ HTML, CSS/JS ~300 КБ,
+# список товаров API 239 КБ JSON. gzip ужимает текст в 4–8 раз — на мобильной сети
+# это самый крупный выигрыш. Уже сжатое Django (/v1/models) nginx повторно не жмёт.
+# Картинки/видео не жмём: WebP/JPEG/MP4 уже сжаты, только трата процессора.
+# BREACH: ответы входа (/v1/auth/) несут токен рядом с данными из запроса — для них
+# сжатие выключено отдельным location ниже.
+gzip on;
+gzip_comp_level 5;
+gzip_min_length 1024;
+gzip_proxied any;
+gzip_vary on;
+gzip_types text/plain text/css text/xml application/json application/javascript
+           application/xml application/manifest+json image/svg+xml;
+
+# Кэш файлов сайта. Ссылки на CSS/JS в странице несут метку версии `?v=…` (страж
+# tools/check_site_cache_bust.py): поменялся файл — поменялся адрес, поэтому файл
+# с меткой можно держать год. Без метки — перепроверять у сервера каждый раз.
+map $arg_v $site_asset_cache {
+    ""      "no-cache";
+    default "public, max-age=31536000, immutable";
+}
+
 # HTTP → HTTPS
 server {
     listen 80;
@@ -70,6 +93,17 @@ server {
         proxy_read_timeout 300s;        # оптимизация видео может занять время
     }
 
+    # Вход и токены — без сжатия (BREACH: секрет рядом с отражёнными данными запроса).
+    location /v1/auth/ {
+        gzip off;
+        proxy_pass http://web:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
     location / {
         proxy_pass http://web:8000;
         proxy_set_header Host $host;
@@ -110,6 +144,20 @@ server {
 
     root /usr/share/nginx/site;
     index index.html;
+
+    # CSS/JS: с меткой версии — год, без метки — перепроверка (см. map выше).
+    location ~* \.(?:css|js)$ {
+        try_files $uri =404;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Cache-Control $site_asset_cache always;
+    }
+    # Картинки, шрифты, видео сайта: метки версии у них нет — неделя, потом браузер
+    # перепроверит по ETag (304 без тела).
+    location ~* \.(?:jpg|jpeg|png|webp|avif|gif|svg|ico|woff2?|mp4|webm)$ {
+        try_files $uri =404;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Cache-Control "public, max-age=604800" always;
+    }
 
     location / {
         try_files $uri $uri/ /index.html;
