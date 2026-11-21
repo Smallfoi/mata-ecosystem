@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show compute;
+
 import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../models/review.dart';
@@ -12,6 +14,35 @@ class PriceRange {
   final double max;
   const PriceRange(this.min, this.max);
 }
+
+/// Каталог из последнего сохранённого ответа сервера — для мгновенного показа
+/// при запуске (этап 5 оптимизации, 21.11.2026). Поля, которых нет в кэше, — null.
+class CatalogSnapshot {
+  final List<Product>? products;
+  final List<Category>? categories;
+  final List<Map<String, String>>? banners;
+  final List<ShowcaseTab>? showcase;
+  const CatalogSnapshot({this.products, this.categories, this.banners, this.showcase});
+
+  bool get isEmpty => products == null && categories == null && banners == null;
+}
+
+/// Репозиторий, умеющий отдать каталог из кэша на диске.
+abstract class CatalogCache {
+  Future<CatalogSnapshot?> cachedSnapshot();
+}
+
+List<Product> _parseModelCards(List<dynamic> data) =>
+    data.map((j) => Product.fromModelCard(j as Map<String, dynamic>)).toList();
+
+List<Category> _parseCategories(List<dynamic> data) =>
+    data.map((j) => Category.fromJson(j as Map<String, dynamic>)).toList();
+
+List<ShowcaseTab> _parseShowcase(List<dynamic> data) =>
+    data.map((j) => ShowcaseTab.fromJson(j as Map<String, dynamic>)).toList();
+
+List<Map<String, String>> _parseBanners(List<dynamic> data) =>
+    data.map((j) => (j as Map).map((k, v) => MapEntry('$k', '$v'))).toList();
 
 /// Контракт доступа к товарам и категориям.
 ///
@@ -133,7 +164,7 @@ class MockProductRepository implements ProductRepository {
 // метода уже реализовано через ApiClient — останется поднять API и переключить
 // ApiConfig.useMock = false.
 
-class ApiProductRepository implements ProductRepository {
+class ApiProductRepository implements ProductRepository, CatalogCache {
   final ApiClient _client;
   ApiProductRepository(this._client);
 
@@ -150,19 +181,41 @@ class ApiProductRepository implements ProductRepository {
     return q;
   }
 
+  /// Каталог из последних ответов на диске (см. [CatalogCache]). Ничего нет или
+  /// не разобралось — null: тогда экраны ждут сеть, как раньше.
+  @override
+  Future<CatalogSnapshot?> cachedSnapshot() async {
+    try {
+      final results = await Future.wait([
+        _client.cached('/models', query: _q()),
+        _client.cached('/categories'),
+        _client.cached('/banners', query: _q()),
+        _client.cached('/showcase', query: _q()),
+      ]);
+      final models = results[0];
+      final snap = CatalogSnapshot(
+        products: models is List ? await compute(_parseModelCards, models) : null,
+        categories: results[1] is List ? _parseCategories(results[1] as List) : null,
+        banners: results[2] is List ? _parseBanners(results[2] as List) : null,
+        showcase: results[3] is List ? _parseShowcase(results[3] as List) : null,
+      );
+      return snap.isEmpty ? null : snap;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Future<List<Category>> getCategories() async {
-    final data = await _client.get('/categories') as List;
-    return data.map((j) => Category.fromJson(j as Map<String, dynamic>)).toList();
+    final data = await _client.get('/categories', cache: true) as List;
+    return _parseCategories(data);
   }
 
   @override
   Future<List<ShowcaseTab>> getShowcase() async {
     try {
-      final data = await _client.get('/showcase', query: _q()) as List;
-      return data
-          .map((j) => ShowcaseTab.fromJson(j as Map<String, dynamic>))
-          .toList();
+      final data = await _client.get('/showcase', query: _q(), cache: true) as List;
+      return _parseShowcase(data);
     } catch (_) {
       // Старый бэкенд без /showcase — не повод терять каталог.
       return const [];
@@ -177,10 +230,13 @@ class ApiProductRepository implements ProductRepository {
     String fallback = '/products',
   }) async {
     try {
-      final data = await _client.get('/models', query: _q(extra)) as List;
-      return data
-          .map((j) => Product.fromModelCard(j as Map<String, dynamic>))
-          .toList();
+      // Полный каталог (без фильтров) сохраняем — для мгновенного запуска.
+      final data = await _client.get('/models',
+          query: _q(extra), cache: extra == null) as List;
+      // Сотни карточек разбираем в фоне: на главном потоке это провал кадров.
+      return data.length > 50
+          ? await compute(_parseModelCards, data)
+          : _parseModelCards(data);
     } catch (_) {
       final data = await _client.get(fallback, query: _q(extra)) as List;
       return data.map((j) => Product.fromJson(j as Map<String, dynamic>)).toList();
@@ -246,10 +302,8 @@ class ApiProductRepository implements ProductRepository {
 
   @override
   Future<List<Map<String, String>>> getBanners() async {
-    final data = await _client.get('/banners', query: _q()) as List;
-    return data
-        .map((j) => (j as Map).map((k, v) => MapEntry('$k', '$v')))
-        .toList();
+    final data = await _client.get('/banners', query: _q(), cache: true) as List;
+    return _parseBanners(data);
   }
 
   @override

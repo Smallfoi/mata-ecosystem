@@ -78,7 +78,7 @@ class LoyaltyScreen extends StatelessWidget {
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, i) => _TxnTile(
                     tx: loyalty.transactions[i],
-                  ).animate(delay: (i * 30).ms).fadeIn(duration: 250.ms),
+                  ).animate(delay: ((i < 6 ? i : 6) * 30).ms).fadeIn(duration: 250.ms),
                 ),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],

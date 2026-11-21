@@ -424,7 +424,7 @@ class _CategoryCards extends StatelessWidget {
                 contentKey: cat.key,
                 imageUrl: cat.img,
               )
-              .animate(delay: (i * 70).ms)
+              .animate(delay: ((i < 6 ? i : 6) * 70).ms)
               .fadeIn(duration: 350.ms)
               .slideX(begin: 0.15, duration: 350.ms, curve: Curves.easeOut);
         },
@@ -532,7 +532,7 @@ class _HorizontalProductList extends StatelessWidget {
                 width: 165,
                 heroTag: 'featured-${products[i].id}',
               )
-              .animate(delay: (i * 80).ms)
+              .animate(delay: ((i < 6 ? i : 6) * 80).ms)
               .fadeIn(duration: 400.ms)
               .slideX(begin: 0.1, duration: 400.ms, curve: Curves.easeOut);
         },
@@ -547,6 +547,8 @@ class _NewProductsGrid extends StatelessWidget {
   final List products;
   const _NewProductsGrid({required this.products});
 
+  static const _maxOnHome = 10;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -560,13 +562,17 @@ class _NewProductsGrid extends StatelessWidget {
           mainAxisSpacing: 16,
           childAspectRatio: 0.6,
         ),
-        itemCount: products.length,
+        // Сетка строится целиком (shrinkWrap внутри прокрутки), поэтому на
+        // главной — первые 10 новинок; остальные — по «Все» в каталоге.
+        // Раньше строились ВСЕ новинки разом, каждая со своей загрузкой фото
+        // и анимацией (аудит 21.11.2026).
+        itemCount: products.length > _maxOnHome ? _maxOnHome : products.length,
         itemBuilder: (context, i) {
           return ProductCard(
                 product: products[i],
                 heroTag: 'new-${products[i].id}',
               )
-              .animate(delay: (i * 90).ms)
+              .animate(delay: ((i < 6 ? i : 6) * 90).ms)
               .fadeIn(duration: 450.ms)
               .slideY(begin: 0.15, duration: 450.ms, curve: Curves.easeOut);
         },

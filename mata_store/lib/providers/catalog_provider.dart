@@ -127,31 +127,52 @@ class CatalogProvider extends ChangeNotifier {
   }
 
   // ── Загрузка ─────────────────────────────────────────────────────────────
+  /// Сначала — каталог с прошлого запуска (с диска, мгновенно), затем свежий с
+  /// сервера: каждая часть показывается, как только пришла (этап 5 оптимизации,
+  /// 21.11.2026). Раньше главная ждала все семь запросов разом и ничего не
+  /// показывала до самого медленного.
   Future<void> load() async {
     _loading = true;
     notifyListeners();
-    try {
-      final results = await Future.wait([
-        _repo.getProducts(),
-        _repo.getCategories(),
-        _repo.getBanners(),
-        _repo.getBrands(),
-        _repo.getSizes(),
-        _repo.getPriceRange(),
-        _repo.getShowcase(),
-      ]);
-      _products = results[0] as List<Product>;
-      _categories = results[1] as List<Category>;
-      _banners = results[2] as List<Map<String, String>>;
-      _brands = results[3] as List<String>;
-      _sizes = results[4] as List<String>;
-      final range = results[5] as PriceRange;
-      _minPrice = range.min;
-      _maxPrice = range.max;
-      _showcase = results[6] as List<ShowcaseTab>;
-    } catch (_) {
-      // Каталог недоступен — оставляем пустым; экраны покажут пустое состояние.
+
+    final repo = _repo;
+    if (repo is CatalogCache && _products.isEmpty) {
+      final snap = await (repo as CatalogCache).cachedSnapshot();
+      if (snap != null) {
+        _products = snap.products ?? _products;
+        _categories = snap.categories ?? _categories;
+        _banners = snap.banners ?? _banners;
+        _showcase = snap.showcase ?? _showcase;
+        if (_products.isNotEmpty) _loading = false;
+        notifyListeners();
+      }
     }
+
+    Future<void> part<T>(Future<T> f, void Function(T v) apply) async {
+      try {
+        apply(await f);
+        notifyListeners();
+      } catch (_) {
+        // Часть каталога недоступна — остальное показываем; пустое место
+        // экраны обработают сами.
+      }
+    }
+
+    await Future.wait([
+      part(_repo.getProducts(), (v) {
+        _products = v;
+        _loading = false;
+      }),
+      part(_repo.getCategories(), (v) => _categories = v),
+      part(_repo.getBanners(), (v) => _banners = v),
+      part(_repo.getBrands(), (v) => _brands = v),
+      part(_repo.getSizes(), (v) => _sizes = v),
+      part(_repo.getPriceRange(), (v) {
+        _minPrice = v.min;
+        _maxPrice = v.max;
+      }),
+      part(_repo.getShowcase(), (v) => _showcase = v),
+    ]);
     _loading = false;
     notifyListeners();
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mata_ui/mata_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../models/product.dart';
 import '../../providers/catalog_provider.dart';
 import '../../theme/app_states.dart';
@@ -267,7 +268,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
             ),
 
           Expanded(
-            child: products.isEmpty
+            // Каталог ещё грузится — сетка-заглушка, а не «Ничего не найдено»:
+            // человек принимал загрузку за сломанный каталог (аудит 21.11.2026).
+            child: products.isEmpty && catalog.isLoading
+                ? const _GridSkeleton()
+                : products.isEmpty
                 ? _EmptyResult(
                     onReset: () =>
                         setState(() => _filters = const CatalogFilters()),
@@ -282,6 +287,36 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Заглушка сетки на время загрузки ────────────────────────────────────────
+
+class _GridSkeleton extends StatelessWidget {
+  const _GridSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: AppColors.grey100,
+      highlightColor: AppColors.white,
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        gridDelegate: _catalogGrid,
+        itemCount: 6,
+        itemBuilder: (_, __) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: Container(color: AppColors.grey100)),
+            const SizedBox(height: 10),
+            Container(height: 12, width: 110, color: AppColors.grey100),
+            const SizedBox(height: 6),
+            Container(height: 12, width: 70, color: AppColors.grey100),
+          ],
+        ),
       ),
     );
   }

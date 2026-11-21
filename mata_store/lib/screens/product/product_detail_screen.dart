@@ -790,7 +790,7 @@ class _AddedToCartSheet extends StatelessWidget {
             children: [
               SizedBox(
                 width: 72, height: 88,
-                child: ProductImage(path: product.firstImage),
+                child: ProductImage(path: product.coverThumb),
               ).animate(delay: 100.ms).fadeIn(duration: 300.ms).slideX(begin: -0.1),
               const SizedBox(width: 14),
               Expanded(

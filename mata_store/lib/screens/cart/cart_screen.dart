@@ -60,7 +60,7 @@ class CartScreen extends StatelessWidget {
                           itemBuilder: (context, index) {
                             final item = cart.items[index];
                             return _CartItemTile(item: item, index: index)
-                                .animate(delay: (index * 80).ms)
+                                .animate(delay: ((index < 6 ? index : 6) * 80).ms)
                                 .fadeIn(duration: 380.ms, curve: Curves.easeOut)
                                 .slideX(
                                   begin: 0.12,
@@ -206,7 +206,7 @@ class _CartItemTileState extends State<_CartItemTile> {
           SizedBox(
             width: 88,
             height: 108,
-            child: ProductImage(path: widget.item.product.firstImage),
+            child: ProductImage(path: widget.item.product.coverThumb),
           ),
 
           const SizedBox(width: 14),
