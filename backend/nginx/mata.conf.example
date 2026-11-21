@@ -93,6 +93,20 @@ server {
         proxy_read_timeout 300s;        # оптимизация видео может занять время
     }
 
+    # «Фото товаров» (staff-only): снимки с фотоаппарата весят 11–14 МБ. Общие 8m
+    # резали их ответом 413, а страница писала «сеть не ответила» (21.11.2026).
+    # Лимит Django — MAX_BYTES в config/product_photos_view.py (25 МБ); здесь с запасом
+    # на обёртку multipart. Держать nginx >= Django, иначе человек не видит причину.
+    location = /admin/photos/ {
+        client_max_body_size 30m;
+        proxy_pass http://web:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;        # три webp из 50-Мп снимка
+    }
+
     # Вход и токены — без сжатия (BREACH: секрет рядом с отражёнными данными запроса).
     location /v1/auth/ {
         gzip off;

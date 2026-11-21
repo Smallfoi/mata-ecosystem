@@ -31,7 +31,7 @@
 {% csrf_token %}
 
 {% if items %}
-  <div class="m-gals" id="photo-grid">
+  <div class="m-gals" id="photo-grid" data-max-mb="{{ max_mb }}">
     {% for it in items %}
       <div class="m-gal" data-key="{{ it.key }}" data-color="{{ it.color }}">
         <div class="m-gal-head">
