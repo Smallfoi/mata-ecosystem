@@ -28,6 +28,14 @@ void main() async {
   // к fonts.gstatic.com (офлайн + приватность §2: не шлём IP в Google). Файлы байт-в-байт
   // те же, что google_fonts скачал бы по сети, поэтому вид не меняется (D-01).
   GoogleFonts.config.allowRuntimeFetching = false;
+  // Настройки и токен читаем ПАРАЛЛЕЛЬНО (этап 7 оптимизации, 21.11.2026):
+  // защищённое хранилище Android при первом обращении поднимает ключ Keystore —
+  // это заметное время, и раньше оно шло строго после чтения настроек.
+  const secure = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+  final tokenFuture =
+      ApiConfig.anyApi ? secure.read(key: 'jwt') : Future<String?>.value(null);
   final prefs = await SharedPreferences.getInstance();
 
   // Per-service источник данных (walking skeleton): часть сервисов на реальном
@@ -37,9 +45,6 @@ void main() async {
     // JWT — в защищённом хранилище (Android Keystore / iOS Keychain), не в
     // открытых SharedPreferences (S-08). Сохраняем при смене токена, восстанавливаем
     // при старте; одноразовая миграция со старого открытого ключа prefs['jwt'].
-    const secure = FlutterSecureStorage(
-      aOptions: AndroidOptions(encryptedSharedPreferences: true),
-    );
     api.onTokenChanged = (t) {
       if (t == null) {
         secure.delete(key: 'jwt');
@@ -47,7 +52,7 @@ void main() async {
         secure.write(key: 'jwt', value: t);
       }
     };
-    var token = await secure.read(key: 'jwt');
+    var token = await tokenFuture;
     if (token == null) {
       final legacy = prefs.getString('jwt');
       if (legacy != null && legacy.isNotEmpty) {
