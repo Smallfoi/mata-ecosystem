@@ -25,7 +25,9 @@ from staff.access import tab_required
 from staff.models import StaffAudit
 
 PER_PAGE = 24
-MAX_BYTES = 12 * 1024 * 1024          # 12 МБ — фотоаппарат влезает, «архив» нет
+# 25 МБ: снимки STAW с фотоаппарата — 11–14 МБ (21.11.2026), оригинал не храним,
+# пережимаем в webp. В nginx у /admin/photos/ лимит 30m — держать его больше этого.
+MAX_BYTES = 25 * 1024 * 1024
 ALLOWED = {"image/jpeg", "image/png", "image/webp"}
 
 

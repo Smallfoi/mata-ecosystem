@@ -106,8 +106,24 @@
     return fetch(window.location.pathname, {
       method: "POST", body: body, credentials: "same-origin",
       headers: token ? { "X-CSRFToken": token.value } : {}
-    }).then(function (r) { return r.json(); });
+    }).then(function (r) {
+      // Не-JSON ответ — это не обрыв связи, а отказ по дороге: nginx (413 «большое
+      // тело», 502 на время выкладки) или Django (истёкший вход уводит на страницу
+      // входа). Раньше всё это превращалось в «сеть не ответила» (21.11.2026).
+      return r.json().catch(function () {
+        return { ok: false, error: whyFailed(r) };
+      });
+    });
   }
+
+  function whyFailed(r) {
+    if (r.status === 413) return "файл слишком большой для сервера — уменьшите снимок";
+    if (r.status === 403 || r.redirected) return "вход истёк — обновите страницу и войдите снова";
+    if (r.status >= 500) return "сервер перезапускается — повторите через минуту";
+    return "сервер ответил ошибкой " + r.status;
+  }
+
+  var MAX_MB = parseInt(grid.dataset.maxMb, 10) || 0;
 
   function count(gal) {
     return gal.querySelectorAll(".m-slot.is-filled").length;
@@ -167,6 +183,11 @@
     if (count(gal) >= MAX) {
       gal.classList.remove("is-busy");
       fail(gal, "мест больше нет — удалите лишнее");
+      return;
+    }
+    if (MAX_MB && files[i].size > MAX_MB * 1024 * 1024) {
+      fail(gal, files[i].name + ": больше " + MAX_MB + " МБ — уменьшите снимок");
+      upload(gal, files, i + 1);             // остальные файлы пачки льём дальше
       return;
     }
     gal.classList.add("is-busy");
