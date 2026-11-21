@@ -31,19 +31,31 @@ class ProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (_isNetwork) {
-      return CachedNetworkImage(
-        imageUrl: _url,
+    // Распаковываем фото под реальный размер плитки, а не исходные 900+ px:
+    // каждая плитка каталога занимала несколько МБ памяти, кэш картинок
+    // переполнялся и при прокрутке назад фото распаковывались заново — рывки
+    // (аудит 21.11.2026). Ширина неизвестна (бесконечна) — как раньше, целиком.
+    return LayoutBuilder(builder: (context, c) {
+      final dpr = MediaQuery.devicePixelRatioOf(context);
+      final px = c.maxWidth.isFinite && c.maxWidth > 0
+          ? (c.maxWidth * dpr).round()
+          : null;
+      if (_isNetwork) {
+        return CachedNetworkImage(
+          imageUrl: _url,
+          fit: fit,
+          memCacheWidth: px,
+          placeholder: (_, __) => Container(color: AppColors.grey100),
+          errorWidget: (_, __, ___) => _error(),
+        );
+      }
+      return Image.asset(
+        path,
         fit: fit,
-        placeholder: (_, __) => Container(color: AppColors.grey100),
-        errorWidget: (_, __, ___) => _error(),
+        cacheWidth: px,
+        errorBuilder: (_, __, ___) => _error(),
       );
-    }
-    return Image.asset(
-      path,
-      fit: fit,
-      errorBuilder: (_, __, ___) => _error(),
-    );
+    });
   }
 
   Widget _error() => Container(

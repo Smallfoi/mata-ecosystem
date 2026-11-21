@@ -750,7 +750,7 @@ class _OrdersTab extends StatelessWidget {
                 ),
               ),
               child: _OrderCard(order: order)
-                  .animate(delay: (i * 60).ms)
+                  .animate(delay: ((i < 6 ? i : 6) * 60).ms)
                   .fadeIn(duration: 350.ms)
                   .slideY(begin: 0.08),
             );

@@ -1,8 +1,18 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'api_config.dart';
+import 'response_cache_web.dart'
+    if (dart.library.io) 'response_cache_io.dart';
+
+/// Ответ больше этого разбираем в фоновом изоляте: полный каталог (~300 КБ JSON)
+/// на главном потоке давал провал кадров ровно во время появления главной
+/// (аудит 21.11.2026).
+const _isolateDecodeBytes = 64 * 1024;
+
+dynamic _decodeJsonBytes(List<int> bytes) => jsonDecode(utf8.decode(bytes));
 
 /// Тонкая обёртка над HTTP для общения с backend.
 ///
@@ -75,10 +85,50 @@ class ApiClient {
     );
   }
 
-  Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
-    final res = await _client
-        .get(_uri(path, query), headers: _headers)
-        .timeout(ApiConfig.timeout);
+  /// [cache] — сохранить успешный ответ на диск: при следующем запуске экран
+  /// покажет его сразу, не дожидаясь сети ([cached]).
+  Future<dynamic> get(String path,
+      {Map<String, dynamic>? query, bool cache = false}) async {
+    final uri = _uri(path, query);
+    final res = await _client.get(uri, headers: _headers).timeout(ApiConfig.timeout);
+    final ok = res.statusCode >= 200 && res.statusCode < 300;
+    final data = await _decodeAsync(res);
+    if (cache && ok && res.bodyBytes.isNotEmpty) {
+      unawaitedWrite(_cacheKey(uri), utf8.decode(res.bodyBytes));
+    }
+    return data;
+  }
+
+  /// Последний сохранённый ответ [get] с `cache: true`, или null.
+  Future<dynamic> cached(String path, {Map<String, dynamic>? query}) async {
+    final body = await ResponseCache.read(_cacheKey(_uri(path, query)));
+    if (body == null || body.isEmpty) return null;
+    try {
+      return body.length > _isolateDecodeBytes
+          ? await compute(_decodeJsonBytes, utf8.encode(body))
+          : jsonDecode(body);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _cacheKey(Uri uri) {
+    // Имя файла из адреса без токена превью: короткое и стабильное.
+    final q = Map.of(uri.queryParameters)..remove('preview_token');
+    final raw = '${uri.path}?${(q.keys.toList()..sort()).map((k) => '$k=${q[k]}').join('&')}';
+    return base64Url.encode(utf8.encode(raw)).replaceAll('=', '');
+  }
+
+  static void unawaitedWrite(String key, String body) {
+    ResponseCache.write(key, body);
+  }
+
+  Future<dynamic> _decodeAsync(http.Response res) async {
+    final ok = res.statusCode >= 200 && res.statusCode < 300;
+    if (ok && res.bodyBytes.length > _isolateDecodeBytes) {
+      _breadcrumb(res);
+      return compute(_decodeJsonBytes, res.bodyBytes);
+    }
     return _decode(res);
   }
 

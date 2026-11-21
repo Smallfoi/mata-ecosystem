@@ -109,7 +109,10 @@ class _LoyaltyCard3DState extends State<LoyaltyCard3D>
           : 'Карта лояльности, ${widget.balance} баллов. Нажми — QR для кассы',
       child: GestureDetector(
         onTap: _flip,
-        child: AnimatedBuilder(
+        // Свой слой: «живая» карта перерисовывается каждый кадр, и без границы
+        // вместе с ней перерисовывался весь экран вокруг (аудит 21.11.2026).
+        child: RepaintBoundary(
+          child: AnimatedBuilder(
           animation: Listenable.merge([_ctrl, _clock]),
           builder: (context, _) {
             final t = _flipCurve.transform(_ctrl.value);
@@ -167,6 +170,7 @@ class _LoyaltyCard3DState extends State<LoyaltyCard3D>
               ),
             );
           },
+          ),
         ),
       ),
     );

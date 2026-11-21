@@ -507,7 +507,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ),
                           ],
                         ),
-                      ).animate(delay: (i * 50).ms).fadeIn(duration: 250.ms),
+                      ).animate(delay: ((i < 6 ? i : 6) * 50).ms).fadeIn(duration: 250.ms),
                     );
                   }),
 

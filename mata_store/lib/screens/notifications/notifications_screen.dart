@@ -72,7 +72,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             itemBuilder: (context, i) {
               final n = notif.items[i];
               return _NotificationTile(notification: n)
-                  .animate(delay: (i * 40).ms)
+                  .animate(delay: ((i < 6 ? i : 6) * 40).ms)
                   .fadeIn(duration: 300.ms)
                   .slideX(begin: 0.05, curve: Curves.easeOut);
             },
