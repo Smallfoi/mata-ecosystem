@@ -358,8 +358,17 @@ class RunNotifier extends StateNotifier<RunState> {
       routeTimes: routeTimes,
       distanceMeters: distanceMeters,
     );
-    await _persistRun();
+    // Сохраняем не на каждую точку: запись перечитывает и перекодирует ВЕСЬ
+    // маршрут, и на длинном забеге каждая точка дорожала (аудит 21.11.2026).
+    // Таймер всё равно сохраняет раз в 5 с; пауза и финиш — сразу.
+    final last = _lastPersistAt;
+    if (last == null || now.difference(last) >= _persistEvery) {
+      await _persistRun();
+    }
   }
+
+  static const _persistEvery = Duration(seconds: 5);
+  DateTime? _lastPersistAt;
 
   void _startTimer() {
     _timer?.cancel();
@@ -542,6 +551,7 @@ class RunNotifier extends StateNotifier<RunState> {
   }
 
   Future<void> _persistRun() async {
+    _lastPersistAt = DateTime.now();
     final prefs = await SharedPreferences.getInstance();
     await prefs.reload();
 

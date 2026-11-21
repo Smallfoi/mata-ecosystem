@@ -27,26 +27,30 @@ class MedalImage extends StatelessWidget {
     required this.size,
   });
 
-  static const _desaturate = ColorFilter.matrix(<double>[
+  // Неполученная медаль: серая и полупрозрачная (0.42) ОДНИМ фильтром. Раньше —
+  // Opacity поверх ColorFiltered: два отдельных слоя на каждую ячейку сетки
+  // (аудит 21.11.2026). Картинка та же.
+  static const _locked = ColorFilter.matrix(<double>[
     0.2126, 0.7152, 0.0722, 0, 0,
     0.2126, 0.7152, 0.0722, 0, 0,
     0.2126, 0.7152, 0.0722, 0, 0,
-    0, 0, 0, 1, 0,
+    0, 0, 0, 0.42, 0,
   ]);
 
   @override
   Widget build(BuildContext context) {
+    // Распаковываем под размер ячейки, а не исходные 768 px: в сетке медалей
+    // каждая занимала ~2,3 МБ памяти.
+    final px = (size * MediaQuery.devicePixelRatioOf(context)).round();
     Widget img = Image.asset(
       def.asset,
       width: size,
       height: size,
+      cacheWidth: px,
       filterQuality: FilterQuality.medium,
     );
     if (!earned) {
-      img = Opacity(
-        opacity: 0.42,
-        child: ColorFiltered(colorFilter: _desaturate, child: img),
-      );
+      img = ColorFiltered(colorFilter: _locked, child: img);
     }
     if (earned && isNew) {
       img = CustomPaint(

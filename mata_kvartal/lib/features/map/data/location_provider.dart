@@ -44,7 +44,10 @@ final positionStreamProvider = StreamProvider<Position?>((ref) async* {
   yield* Geolocator.getPositionStream(
     locationSettings: const LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0,
+      // Поток нужен только метке на карте (трек забега пишет свой поток в
+      // run_provider). Раньше distanceFilter: 0 — событие на каждый фикс даже
+      // стоя на месте, и карта перестраивалась ~раз в секунду (аудит 21.11.2026).
+      distanceFilter: 3,
     ),
   );
 });
