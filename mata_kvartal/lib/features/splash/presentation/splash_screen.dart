@@ -41,9 +41,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   static const _chipMarkCenter = Offset(33.5, 97);
   static const _chipMarkSize = 24.0;
 
+  // Длина всей сцены. Было 3050 мс + ожидание перехода — каждый запуск держал
+  // человека почти 3 секунды (аудит 21.11.2026). Владелец согласовал короткую
+  // заставку: та же хореография (все фазы — доли шкалы), сжатая до 1,3 с,
+  // плюс пропуск по тапу.
+  static const _total = Duration(milliseconds: 1300);
+  // Решение о финале — в той же точке шкалы, что и раньше (2050 из 3050).
+  static final _decideAt = _total * (2050 / 3050);
+  static final _finaleTail = _total * (790 / 3050);
+  static final _guestTail = _total * (450 / 3050);
+
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 3050),
+    duration: _total,
   );
 
   // Бегун срывается с места и добегает последний метр — петля замыкается.
@@ -85,6 +95,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   // Финал играем только авторизованным (знаку есть куда лететь — чип карты).
   bool _withFinale = false;
+  bool _left = false;
+
+  bool get _authed => ref.read(authProvider).status == AuthStatus.authenticated;
+
+  /// Уйти с заставки ровно один раз (по таймеру или по тапу).
+  void _leave() {
+    if (_left || !mounted) return;
+    _left = true;
+    context.go(_authed ? '/map?from=splash' : '/auth/phone');
+  }
 
   @override
   void initState() {
@@ -93,22 +113,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     // Flutter = чистый графит (как системный сплэш), всё идёт на глазах.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // «Уменьшить движение» в системе — заставку не играем вовсе.
+      if (MediaQuery.of(context).disableAnimations) {
+        _leave();
+        return;
+      }
       _c.forward();
       // Решение о финале — перед его началом (auth к этому моменту готов).
-      Future.delayed(const Duration(milliseconds: 2050), () {
-        if (!mounted) return;
-        final authed =
-            ref.read(authProvider).status == AuthStatus.authenticated;
-        if (authed) {
+      Future.delayed(_decideAt, () {
+        if (!mounted || _left) return;
+        if (_authed) {
           setState(() => _withFinale = true);
-          // Знак долетает к ~2800мс; карта стартует следом и накрывает сцену.
-          Future.delayed(const Duration(milliseconds: 790), () {
-            if (mounted) context.go('/map?from=splash');
-          });
+          // Знак долетает к концу шкалы; карта стартует следом и накрывает сцену.
+          Future.delayed(_finaleTail, _leave);
         } else {
-          Future.delayed(const Duration(milliseconds: 450), () {
-            if (mounted) context.go('/auth/phone');
-          });
+          Future.delayed(_guestTail, _leave);
         }
       });
     });
@@ -130,7 +149,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     return Scaffold(
       backgroundColor: _bg,
-      body: AnimatedBuilder(
+      // Тап по заставке — сразу в приложение.
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _leave,
+        child: AnimatedBuilder(
         animation: _c,
         builder: (context, _) {
           final close = reduceMotion ? 1.0 : _close.value;
@@ -246,6 +269,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             ],
           );
         },
+        ),
       ),
     );
   }

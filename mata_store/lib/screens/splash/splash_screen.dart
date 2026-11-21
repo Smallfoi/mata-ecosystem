@@ -47,9 +47,13 @@ class _SplashScreenState extends State<SplashScreen>
       statusBarIconBrightness: Brightness.light,
     ));
 
+    // Было 2600 мс, и каталог начинал грузиться только после заставки (аудит
+    // 21.11.2026). Владелец согласовал короткую заставку: та же хореография (все
+    // фазы — доли шкалы, подписи ниже — в миллисекундах старой шкалы), сжатая
+    // до 1,2 с, и пропуск по тапу.
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2600),
+      duration: const Duration(milliseconds: 1200),
     );
 
     // ─ Линия: 0–480ms ─────────────────────────────────────────────────────
@@ -105,12 +109,27 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _ctrl.addStatusListener((status) {
-      if (status == AnimationStatus.completed && mounted) {
-        widget.onComplete();
-      }
+      if (status == AnimationStatus.completed) _finish();
     });
 
-    _ctrl.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // «Уменьшить движение» в системе — заставку не играем.
+      if (MediaQuery.of(context).disableAnimations) {
+        _finish();
+      } else {
+        _ctrl.forward();
+      }
+    });
+  }
+
+  bool _done = false;
+
+  /// Уйти с заставки ровно один раз (конец анимации или тап).
+  void _finish() {
+    if (_done || !mounted) return;
+    _done = true;
+    widget.onComplete();
   }
 
   @override
@@ -125,7 +144,11 @@ class _SplashScreenState extends State<SplashScreen>
 
     return Scaffold(
       backgroundColor: AppColors.black,
-      body: RepaintBoundary(
+      // Тап по заставке — сразу в магазин.
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _finish,
+        child: RepaintBoundary(
         child: AnimatedBuilder(
           animation: _ctrl,
           builder: (context, _) => Stack(
@@ -257,6 +280,7 @@ class _SplashScreenState extends State<SplashScreen>
             ],
           ),
         ),
+      ),
       ),
     );
   }

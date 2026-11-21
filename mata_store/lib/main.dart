@@ -107,7 +107,11 @@ void main() async {
             return loyalty;
           },
         ),
-        ChangeNotifierProvider(create: (_) => CatalogProvider(productRepo)),
+        // lazy: false — каталог начинает грузиться при запуске, параллельно с
+        // заставкой. Раньше провайдер создавался, только когда его читала
+        // главная — то есть ПОСЛЕ заставки (аудит 21.11.2026).
+        ChangeNotifierProvider(
+            lazy: false, create: (_) => CatalogProvider(productRepo)),
         ChangeNotifierProxyProvider2<AuthProvider, NotificationsProvider,
             OrderProvider>(
           create: (_) => OrderProvider(prefs, orderRepo,
