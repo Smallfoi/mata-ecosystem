@@ -47,6 +47,29 @@ def make_token(user_id: str, version: int = 0) -> str:
     return f"{header}.{payload}.{sig}"
 
 
+# Скользящее продление (22.11.2026): токену осталось меньше половины срока —
+# `/auth/me` выдаёт новый. Кто открывает приложение хоть раз в две недели, на
+# экран входа больше не вылетает; брошенный на 30+ дней токен по-прежнему умирает.
+RENEW_BEFORE = JWT_TTL // 2
+
+
+def renewed_token(request, version: int = 0) -> str | None:
+    """Новый токен, если предъявленный действует, но близок к концу срока.
+
+    Вызывать только после `user_id_from_request` (подпись, срок и версия уже
+    проверены). Версию берём текущую — смена пароля продление не обходит.
+    """
+    try:
+        token = request.headers.get("Authorization", "").split(" ", 1)[1]
+        payload = token.split(".")[1]
+        data = json.loads(base64.urlsafe_b64decode(payload + "=="))
+        if data["exp"] - time.time() >= RENEW_BEFORE:
+            return None
+        return make_token(data["sub"], version)
+    except Exception:
+        return None
+
+
 def user_id_from_request(request) -> str | None:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):

@@ -267,6 +267,9 @@ POST /auth/password/reset      { phone, code, password } → { ok }   (сбро�
                                                            dev — 1234; меняет token_version, то есть
                                                            разлогинивает ВСЕ устройства)
 GET  /auth/me                                            → user   (incl. privacy)
+                                                           + renewedToken? — когда токену (30 дней)
+                                                           осталось < 15: клиент сохраняет его вместо
+                                                           старого (скользящее продление, D-134)
 ```
 Пароль меняется ТОЛЬКО сбросом по коду на телефон. `PUT /auth/password { old, new }` и
 `POST /auth/password/forgot { email }` в коде НЕ реализованы — в документе они значились

@@ -10,9 +10,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Квартал оставался «вошедшим» — экраны падали с ошибкой («Не удалось
 /// загрузить клубы»), на вход не уводило. Store в той же ситуации выходил.
 class _Reply implements HttpClientAdapter {
-  _Reply(this.status, {this.dropConnection = false});
+  _Reply(this.status, {this.dropConnection = false, this.renewed});
   final int status;
   final bool dropConnection;
+  final String? renewed;
 
   @override
   Future<ResponseBody> fetch(RequestOptions options,
@@ -23,7 +24,12 @@ class _Reply implements HttpClientAdapter {
     }
     return ResponseBody.fromString(
       jsonEncode(status == 200
-          ? {'id': 'u1', 'name': 'Бегун', 'email': ''}
+          ? {
+              'id': 'u1',
+              'name': 'Бегун',
+              'email': '',
+              if (renewed != null) 'renewedToken': renewed,
+            }
           : {'detail': 'Не авторизован'}),
       status,
       headers: {
@@ -72,5 +78,12 @@ void main() {
     final auth = await _start(_Reply(200));
     expect(auth.state.status, AuthStatus.authenticated);
     expect(auth.state.user?.id, 'u1');
+    expect(auth.state.token, 'dead-token');
+  });
+
+  test('сервер продлил вход — берём новый токен', () async {
+    final auth = await _start(_Reply(200, renewed: 'fresh-token'));
+    expect(auth.state.status, AuthStatus.authenticated);
+    expect(auth.state.token, 'fresh-token');
   });
 }
