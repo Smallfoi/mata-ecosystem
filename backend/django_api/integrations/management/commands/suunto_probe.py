@@ -18,10 +18,9 @@ from integrations import suunto
 from integrations.models import WatchAccount
 from integrations.tasks import _fresh_token
 
-LIST_CANDIDATES = ["/v2/workouts", "/v3/workouts", "/v2/workout", "/v1/workouts"]
-ONE_CANDIDATES = ["/v2/workout/{id}", "/v3/workout/{id}", "/v2/workouts/{id}"]
-FIT_CANDIDATES = ["/v2/workout/exportFit/{id}", "/v3/workout/exportFit/{id}",
-                  "/v2/workouts/{id}/fit"]
+LIST_CANDIDATES = suunto.LIST_CANDIDATES
+ONE_CANDIDATES = suunto.ONE_CANDIDATES
+FIT_CANDIDATES = suunto.FIT_CANDIDATES
 
 
 class Command(BaseCommand):

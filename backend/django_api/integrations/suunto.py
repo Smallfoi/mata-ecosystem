@@ -13,6 +13,7 @@ Suunto приняли нас в партнёрскую программу 05.10.
 Ключи живут в окружении (Lockbox): репозиторий публичный, здесь их нет и не будет.
 """
 import json
+import logging
 import os
 import urllib.parse
 import urllib.request
@@ -20,6 +21,8 @@ from datetime import datetime, timedelta
 from datetime import timezone as dt_tz
 
 from django.utils import timezone
+
+log = logging.getLogger(__name__)
 
 AUTHORIZE_URL = "https://cloudapi-oauth.suunto.com/oauth/authorize"
 TOKEN_URL = "https://cloudapi-oauth.suunto.com/oauth/token"
@@ -31,16 +34,24 @@ REFRESH_MARGIN = timedelta(minutes=5)
 TIMEOUT_S = 20
 
 # Пути их API. Портал отдаёт их только скриптом, в открытой документации версия
-# указана по-разному (v2 и v3), поэтому держим в настройках: первый живой прогон
-# покажет верный, и менять придётся переменную окружения, а не код.
-# Проверить, какой отвечает, можно командой `manage.py suunto_probe`.
-WORKOUT_PATH = os.environ.get("SUUNTO_WORKOUT_PATH") or "/v2/workout/{id}"
-WORKOUTS_PATH = os.environ.get("SUUNTO_WORKOUTS_PATH") or "/v2/workouts"
-FIT_PATH = os.environ.get("SUUNTO_FIT_PATH") or "/v2/workout/exportFit/{id}"
+# указана по-разному (v2 и v3). С 22.11.2026 путь подбирается сам: заданный в
+# окружении (SUUNTO_*_PATH) — главный; иначе первый кандидат, который ответил не
+# 404/405, запоминается в кэше навсегда. Лишние запросы — только один раз (у
+# Developer API лимит 200 в неделю). Вручную посмотреть — `manage.py suunto_probe`.
+LIST_CANDIDATES = ["/v2/workouts", "/v3/workouts", "/v2/workout", "/v1/workouts"]
+ONE_CANDIDATES = ["/v2/workout/{id}", "/v3/workout/{id}", "/v2/workouts/{id}"]
+FIT_CANDIDATES = ["/v2/workout/exportFit/{id}", "/v3/workout/exportFit/{id}",
+                  "/v2/workouts/{id}/fit"]
+_WRONG_PATH = {404, 405}
+_PATH_KEY = "suunto.path.{}"
 
 
 class SuuntoError(RuntimeError):
-    """Suunto ответила отказом или не ответила вовсе."""
+    """Suunto ответила отказом или не ответила вовсе. `status` — HTTP-код, если был."""
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 def client_id() -> str:
@@ -87,7 +98,7 @@ def _post_form(url: str, data: dict) -> dict:
             return json.loads(resp.read().decode() or "{}")
     except urllib.error.HTTPError as e:                      # отказ с телом ответа
         detail = (e.read() or b"")[:300].decode(errors="replace")
-        raise SuuntoError(f"Suunto {e.code}: {detail}") from e
+        raise SuuntoError(f"Suunto {e.code}: {detail}", status=e.code) from e
     except Exception as e:                                   # сеть, таймаут, мусор
         raise SuuntoError(f"Suunto недоступна: {e}") from e
 
@@ -133,14 +144,48 @@ def api_get(path: str, access_token: str, params: dict | None = None):
             return raw
     except urllib.error.HTTPError as e:
         detail = (e.read() or b"")[:300].decode(errors="replace")
-        raise SuuntoError(f"Suunto {e.code}: {detail}") from e
+        raise SuuntoError(f"Suunto {e.code}: {detail}", status=e.code) from e
     except Exception as e:
         raise SuuntoError(f"Suunto недоступна: {e}") from e
 
 
+def known_path(kind: str) -> str:
+    """Путь, который уже ответил (или задан в окружении); пусто — ещё не знаем."""
+    from django.core.cache import cache
+
+    pinned = (os.environ.get(f"SUUNTO_{kind.upper()}_PATH") or "").strip()
+    return pinned or (cache.get(_PATH_KEY.format(kind)) or "")
+
+
+def _discover(kind: str, candidates: list[str], workout_id: str, access_token: str):
+    """Запрос по известному пути, а пока он неизвестен — по кандидатам по очереди."""
+    from django.core.cache import cache
+
+    pinned = (os.environ.get(f"SUUNTO_{kind.upper()}_PATH") or "").strip()
+    wid = urllib.parse.quote(str(workout_id))
+    if pinned:
+        return api_get(pinned.format(id=wid), access_token)
+    known = cache.get(_PATH_KEY.format(kind))
+    order = ([known] if known else []) + [c for c in candidates if c != known]
+    last = None
+    for tmpl in order:
+        try:
+            result = api_get(tmpl.format(id=wid), access_token)
+        except SuuntoError as e:
+            if e.status in _WRONG_PATH:
+                last = e
+                continue
+            raise
+        if tmpl != known:
+            cache.set(_PATH_KEY.format(kind), tmpl, None)
+            log.info("Suunto: путь %s найден — %s", kind, tmpl)
+        return result
+    raise last or SuuntoError("Suunto: ни один путь не ответил")
+
+
 def fetch_workout(access_token: str, workout_id: str) -> dict:
     """Сводка одной тренировки: дистанция, время, пульс, вид спорта."""
-    data = api_get(WORKOUT_PATH.format(id=urllib.parse.quote(str(workout_id))), access_token)
+    data = _discover("workout", ONE_CANDIDATES, workout_id, access_token)
     if isinstance(data, dict):
         # У них ответ встречается и «как есть», и завёрнутым в payload.
         return data.get("payload") if isinstance(data.get("payload"), dict) else data
@@ -149,7 +194,7 @@ def fetch_workout(access_token: str, workout_id: str) -> dict:
 
 def download_fit(access_token: str, workout_id: str) -> bytes:
     """FIT-файл тренировки: в нём лежит полный трек с координатами."""
-    raw = api_get(FIT_PATH.format(id=urllib.parse.quote(str(workout_id))), access_token)
+    raw = _discover("fit", FIT_CANDIDATES, workout_id, access_token)
     return raw if isinstance(raw, (bytes, bytearray)) else b""
 
 

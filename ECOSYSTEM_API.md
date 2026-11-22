@@ -864,14 +864,16 @@ GET    /integrations/coros/connect    → начало подключения: �
 DELETE /integrations/coros/disconnect → отключить часы (токен удаляем целиком, а не гасим флаг)
 GET    /integrations/coros/callback   → куда COROS возвращает человека после разрешения доступа
 POST   /integrations/coros/push       → сюда COROS присылает завершённые тренировки
-GET    /integrations/coros/status     → проверка «сервис жив», её COROS опрашивает сам
+GET    /integrations/coros/status     → проверка «сервис жив», её COROS опрашивает сам;
+                                         registered — наш сервер уже зарегистрирован у COROS
 
 GET    /integrations/suunto/account    → подключены ли часы Suunto (экран «Часы и приложения»)
 GET    /integrations/suunto/connect    → ссылка на страницу разрешения доступа (OAuth)
 DELETE /integrations/suunto/disconnect → отключить часы (токен удаляем целиком)
 GET    /integrations/suunto/callback   → OAuth-redirect: куда Suunto возвращает человека
 POST   /integrations/suunto/push       → уведомление «у человека появилась новая тренировка»
-GET    /integrations/suunto/status     → проверка «сервис жив»
+GET    /integrations/suunto/status     → проверка «сервис жив»; configured — ключи на сервере
+                                         (да/нет, без значений); paths — найденные пути API
 ```
 Адреса нужны в заявке к COROS ДО выдачи ключей, поэтому существуют заранее.
 Разбор данных появится вместе с Client ID и Secret: пока проверить подпись

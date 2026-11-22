@@ -5,7 +5,7 @@ import 'package:mata_ui/mata_ui.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/health_sync.dart';
-import '../../data/suunto_provider.dart';
+import '../../data/watch_brand_provider.dart';
 
 /// «Часы и приложения» — подключение Health Connect.
 ///
@@ -114,10 +114,13 @@ class _WatchSyncScreenState extends ConsumerState<WatchSyncScreen> {
                 onDisconnect: _confirmDisconnect,
               ),
             },
-            // Suunto — прямое подключение, без Health Connect: партнёрский
-            // доступ даёт трек и присылает тренировку сама (D-108).
+            // Прямые подключения, без Health Connect: трек с часов приходит к нам
+            // с сервера марки (D-108). Suunto присылает тренировку сама, COROS
+            // наш сервер опрашивает раз в полчаса.
             const SizedBox(height: 12),
-            const _SuuntoCard(),
+            const WatchBrandCard(WatchBrand.suunto),
+            const SizedBox(height: 12),
+            const WatchBrandCard(WatchBrand.coros),
             if (state.error != null) ...[
               const SizedBox(height: 12),
               Text(
@@ -335,15 +338,18 @@ class _ConnectedCard extends StatelessWidget {
   }
 }
 
-/// Прямое подключение часов Suunto: без Health Connect и без телефона на бегу.
-class _SuuntoCard extends ConsumerStatefulWidget {
-  const _SuuntoCard();
+/// Прямое подключение часов марки (Suunto, COROS): без Health Connect и без
+/// телефона на бегу.
+class WatchBrandCard extends ConsumerStatefulWidget {
+  const WatchBrandCard(this.brand, {super.key});
+
+  final WatchBrand brand;
 
   @override
-  ConsumerState<_SuuntoCard> createState() => _SuuntoCardState();
+  ConsumerState<WatchBrandCard> createState() => _WatchBrandCardState();
 }
 
-class _SuuntoCardState extends ConsumerState<_SuuntoCard>
+class _WatchBrandCardState extends ConsumerState<WatchBrandCard>
     with WidgetsBindingObserver {
   @override
   void initState() {
@@ -362,7 +368,7 @@ class _SuuntoCardState extends ConsumerState<_SuuntoCard>
     // Разрешение выдают во внешнем браузере — узнать о нём можно только когда
     // человек вернулся в приложение. Поэтому перечитываем состояние на возврате.
     if (lifecycle == AppLifecycleState.resumed) {
-      ref.read(suuntoProvider.notifier).refresh();
+      ref.read(watchBrandProvider(widget.brand).notifier).refresh();
     }
   }
 
@@ -376,28 +382,37 @@ class _SuuntoCardState extends ConsumerState<_SuuntoCard>
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(suuntoProvider);
-    // Ключей на сервере нет — кнопка привела бы в тупик, карточку не показываем.
+    final brand = widget.brand;
+    final state = ref.watch(watchBrandProvider(brand));
+    final notifier = ref.read(watchBrandProvider(brand).notifier);
+    // Сервер не готов к этой марке — кнопка привела бы в тупик, карточку не показываем.
     if (!state.available) return const SizedBox.shrink();
 
-    if (!state.connected) {
-      return _Card(
-        icon: CupertinoIcons.link,
-        title: 'Подключить Suunto',
-        text: 'Тренировки с часов придут сами, с маршрутом и пульсом — '
-            'даже если телефон остался дома.',
-        action: 'Подключить',
-        busy: state.busy,
-        onAction: () => ref.read(suuntoProvider.notifier).connect(),
-      );
-    }
-    return _Card(
-      icon: CupertinoIcons.check_mark_circled_solid,
-      title: 'Suunto подключена',
-      text: _lastSync(state.lastSyncAt),
-      action: 'Отключить',
-      busy: state.busy,
-      onAction: () => ref.read(suuntoProvider.notifier).disconnect(),
+    final card = state.connected
+        ? _Card(
+            icon: CupertinoIcons.check_mark_circled_solid,
+            title: 'Часы ${brand.label} подключены',
+            text: _lastSync(state.lastSyncAt),
+            action: 'Отключить',
+            busy: state.busy,
+            onAction: notifier.disconnect,
+          )
+        : _Card(
+            icon: CupertinoIcons.link,
+            title: 'Подключить ${brand.label}',
+            text: brand.pitch,
+            action: 'Подключить',
+            busy: state.busy,
+            onAction: notifier.connect,
+          );
+    if (state.error == null) return card;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        card,
+        const SizedBox(height: 8),
+        Text(state.error!, style: TextStyle(color: AppColors.error, fontSize: 13)),
+      ],
     );
   }
 }
