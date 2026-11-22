@@ -146,6 +146,8 @@ class _KvartalLogoMarkState extends State<KvartalLogoMark>
 /// [fillScale] — масштаб лаймовой территории. Без пунктиров — как иконка.
 /// [runner] — рисовать ли точку-бегуна. Подложке под прогрессом бегун не нужен:
 /// иначе под настоящей точкой проступает вторая, «теневая» (баг 22.11.2026).
+/// [trail] 0..1 — режим прогресса: бегун стоит там же, где на логотипе, а за ним
+/// тянется след длиной trail × периметр (1 — петля замкнута). null — обычный знак.
 class KvartalMarkPainter extends CustomPainter {
   final Color outline;
   final Color fill;
@@ -153,6 +155,7 @@ class KvartalMarkPainter extends CustomPainter {
   final double draw; // 0..1 — сколько маршрута уже нарисовано (сплэш)
   final double fillScale; // 0..1 — масштаб заливки территории (сплэш)
   final bool runner; // точка-бегун на конце линии
+  final double? trail; // 0..1 — длина следа за бегуном (прогресс уровня)
 
   KvartalMarkPainter({
     required this.outline,
@@ -161,6 +164,7 @@ class KvartalMarkPainter extends CustomPainter {
     this.draw = 1,
     this.fillScale = 1,
     this.runner = true,
+    this.trail,
   });
 
   @override
@@ -200,8 +204,10 @@ class KvartalMarkPainter extends CustomPainter {
 
     final gapFull = len * 0.14;
     final gap = gapFull * (1 - close);
-    final dotT = 5 + gapFull * close; // бегун закрывает петлю
-    final solidLen = len - gap;
+    // Прогресс: бегун на месте логотипа (t = 5, левая сторона), след — позади него.
+    final dotT = trail != null ? 5.0 : 5 + gapFull * close; // бегун закрывает петлю
+    final solidLen =
+        trail != null ? len * trail!.clamp(0.0, 1.0) : len - gap;
     final start = dotT - solidLen;
 
     final stroke = Paint()
@@ -210,7 +216,9 @@ class KvartalMarkPainter extends CustomPainter {
       ..strokeWidth = 4.6
       ..strokeCap = StrokeCap.round;
 
-    if (start < 0) {
+    if (solidLen <= 0.01) {
+      // Следа ещё нет — только бегун.
+    } else if (start < 0) {
       canvas.drawPath(metric.extractPath(start + len, len), stroke);
       canvas.drawPath(metric.extractPath(0, dotT), stroke);
     } else {
@@ -267,7 +275,8 @@ class KvartalMarkPainter extends CustomPainter {
       old.close != close ||
       old.draw != draw ||
       old.fillScale != fillScale ||
-      old.runner != runner;
+      old.runner != runner ||
+      old.trail != trail;
 }
 
 class KvartalLogoBadge extends StatelessWidget {
