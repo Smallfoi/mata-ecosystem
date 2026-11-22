@@ -250,10 +250,12 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
                       opacity: title.clamp(0, 1),
                       child: Column(
                         children: [
-                          const Text(
-                            'Забег завершён',
+                          Text(
+                            // Несостоявшаяся пробежка — не «забег» (владелец,
+                            // 22.11.2026): честнее «запись остановлена».
+                            r.recorded ? 'Забег завершён' : 'Запись остановлена',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontFamily: AppTheme.fontDisplay,
                               fontSize: 21,
                               fontWeight: FontWeight.w800,

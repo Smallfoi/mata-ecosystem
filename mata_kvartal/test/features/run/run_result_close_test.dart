@@ -84,6 +84,8 @@ void main() {
     await tester.pump(const Duration(seconds: 6)); // церемония до конца
 
     expect(find.text('Пробежки не было'), findsOneWidget);
+    expect(find.text('Запись остановлена'), findsOneWidget);
+    expect(find.text('Забег завершён'), findsNothing);
     expect(find.text('Пробежка засчитана'), findsNothing);
     expect(find.text('Поделиться'), findsNothing);
     expect(find.text('Подробнее о пробежке'), findsNothing,
@@ -98,6 +100,7 @@ void main() {
 
     expect(find.text('Пробежка засчитана'), findsOneWidget);
     expect(find.text('Поделиться'), findsOneWidget);
+    expect(find.text('Забег завершён'), findsOneWidget);
     expect(find.text('Подробнее о пробежке'), findsNothing);
   });
 }
