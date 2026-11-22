@@ -144,12 +144,15 @@ class _KvartalLogoMarkState extends State<KvartalLogoMark>
 /// Painter знака: [close] 0 — разрыв «последнего метра» (состояние иконки),
 /// 1 — петля замкнута; [draw] < 1 — режим заставки, маршрут растёт с нуля;
 /// [fillScale] — масштаб лаймовой территории. Без пунктиров — как иконка.
+/// [runner] — рисовать ли точку-бегуна. Подложке под прогрессом бегун не нужен:
+/// иначе под настоящей точкой проступает вторая, «теневая» (баг 22.11.2026).
 class KvartalMarkPainter extends CustomPainter {
   final Color outline;
   final Color fill;
   final double close; // 0 — разрыв полный, 1 — петля замкнута
   final double draw; // 0..1 — сколько маршрута уже нарисовано (сплэш)
   final double fillScale; // 0..1 — масштаб заливки территории (сплэш)
+  final bool runner; // точка-бегун на конце линии
 
   KvartalMarkPainter({
     required this.outline,
@@ -157,6 +160,7 @@ class KvartalMarkPainter extends CustomPainter {
     this.close = 0,
     this.draw = 1,
     this.fillScale = 1,
+    this.runner = true,
   });
 
   @override
@@ -214,6 +218,7 @@ class KvartalMarkPainter extends CustomPainter {
     }
 
     // «Бегун» на конце сплошной линии.
+    if (!runner) return;
     final pos = metric.getTangentForOffset(dotT % len)!.position;
     canvas.drawCircle(pos, 5, Paint()..color = outline);
     canvas.drawCircle(pos, 2.2, Paint()..color = fill);
@@ -249,6 +254,7 @@ class KvartalMarkPainter extends CustomPainter {
     }
 
     // Бегун.
+    if (!runner) return;
     final pos = metric.getTangentForOffset(dotT % len)!.position;
     canvas.drawCircle(pos, 5, Paint()..color = outline);
     canvas.drawCircle(pos, 2.2, Paint()..color = fill);
@@ -260,7 +266,8 @@ class KvartalMarkPainter extends CustomPainter {
       old.fill != fill ||
       old.close != close ||
       old.draw != draw ||
-      old.fillScale != fillScale;
+      old.fillScale != fillScale ||
+      old.runner != runner;
 }
 
 class KvartalLogoBadge extends StatelessWidget {

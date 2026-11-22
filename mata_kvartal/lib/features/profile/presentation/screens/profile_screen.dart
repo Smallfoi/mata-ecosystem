@@ -1930,7 +1930,8 @@ class _LevelHeader extends ConsumerWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Подложка: полный контур слабым тоном.
+                // Подложка: полный контур слабым тоном, БЕЗ бегуна — точка одна,
+                // на конце прогресса (иначе проступала вторая, «теневая»).
                 Opacity(
                   opacity: .30,
                   child: CustomPaint(
@@ -1938,6 +1939,7 @@ class _LevelHeader extends ConsumerWidget {
                       outline: onLevel,
                       fill: Colors.transparent,
                       close: 1,
+                      runner: false,
                     ),
                   ),
                 ),
