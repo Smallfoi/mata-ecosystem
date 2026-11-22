@@ -510,110 +510,106 @@ class _PositionLadder extends StatelessWidget {
         : of! <= 1
         ? 1.0
         : ((of! - place!) / (of! - 1)).clamp(0.0, 1.0);
-    return SizedBox(
-      height: 40,
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final w = box.maxWidth - 8;
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: 4,
-                top: 4,
-                child: Text(
-                  'ВЫЛЕТ',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: .5,
-                    color: AppColors.warm.withValues(alpha: .9),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 4,
-                top: 4,
-                child: const Text(
-                  'ВЫШЕ',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: .5,
-                    color: AppColors.lime,
-                  ),
-                ),
-              ),
-              // Дорожка с зонами.
-              Positioned(
-                left: 4,
-                right: 4,
-                top: 21,
-                child: Container(
-                  height: 5,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(3),
-                    color: const Color(0xFF4A5248),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: w * .18,
-                        color: AppColors.warm.withValues(alpha: .75),
-                      ),
-                      const Spacer(),
-                      Container(width: w * .18, color: AppColors.lime),
-                    ],
-                  ),
-                ),
-              ),
-              if (fraction != null)
-                Positioned(
-                  left: 4 + w * fraction - 11,
-                  top: 13,
-                  child: Container(
-                    width: 22,
-                    height: 22,
-                    alignment: Alignment.center,
+    // Метка места стоит НА полосе, подписи — под ней: раньше метка сидела выше
+    // полосы и в зоне «ВЫШЕ» закрывала подпись, а у края вылезала за полосу
+    // (баг 22.11.2026). Align держит метку целиком внутри полосы при любом месте.
+    const labelStyle = TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      letterSpacing: .5,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: SizedBox(
+            height: 24,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Дорожка с зонами.
+                LayoutBuilder(
+                  builder: (context, box) => Container(
+                    height: 5,
                     decoration: BoxDecoration(
-                      color: AppColors.lime,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: const Color(0xFF171C19),
-                        width: 2,
-                      ),
+                      borderRadius: BorderRadius.circular(3),
+                      color: const Color(0xFF4A5248),
                     ),
-                    child: Text(
-                      '#$place',
-                      style: const TextStyle(
-                        fontFamily: AppTheme.fontDisplay,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF171C19),
-                      ),
-                    ),
-                  ),
-                )
-              else
-                const Positioned(
-                  left: 0,
-                  right: 0,
-                  top: 30,
-                  child: Text(
-                    'пробеги в этом периоде — займёшь место',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFFB9C1BB),
+                    clipBehavior: Clip.antiAlias,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: box.maxWidth * .18,
+                          color: AppColors.warm.withValues(alpha: .75),
+                        ),
+                        const Spacer(),
+                        Container(width: box.maxWidth * .18, color: AppColors.lime),
+                      ],
                     ),
                   ),
                 ),
+                if (fraction != null)
+                  Align(
+                    alignment: Alignment(fraction * 2 - 1, 0),
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 24, minHeight: 22),
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.lime,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFF171C19),
+                          width: 2,
+                        ),
+                      ),
+                      child: Text(
+                        '#$place',
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.fontDisplay,
+                          fontSize: 11,
+                          height: 1,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF171C19),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              Text(
+                'ВЫЛЕТ',
+                style: labelStyle.copyWith(
+                  color: AppColors.warm.withValues(alpha: .9),
+                ),
+              ),
+              const Spacer(),
+              Text('ВЫШЕ', style: labelStyle.copyWith(color: AppColors.lime)),
             ],
-          );
-        },
-      ),
+          ),
+        ),
+        if (fraction == null) ...[
+          const SizedBox(height: 6),
+          const Text(
+            'пробеги в этом периоде — займёшь место',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFB9C1BB),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
