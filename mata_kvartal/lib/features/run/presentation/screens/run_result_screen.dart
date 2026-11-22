@@ -400,6 +400,25 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
                       child: _StatsPanel(result: r),
                     ),
                   ),
+                  // Закрыть — сразу, без ожидания церемонии (владелец,
+                  // 22.11.2026: случайно нажал «старт» и тут же «стоп» —
+                  // смотреть нечего, нужен выход на главный экран). Своя
+                  // кнопка ловит касание, поэтому «пропуск» анимации по тапу
+                  // в любом месте экрана её не задевает.
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 8,
+                    right: 8,
+                    child: IconButton(
+                      onPressed: () => context.go('/map'),
+                      tooltip: 'Закрыть',
+                      iconSize: 26,
+                      color: _light,
+                      icon: const Icon(Icons.close_rounded),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                      ),
+                    ),
+                  ),
                 ],
               );
             },
