@@ -115,7 +115,11 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier() : super(const AuthState()) {
+  /// [dio] — только для тестов: подменить сеть, не трогая боевую сборку.
+  AuthNotifier({Dio? dio})
+    : _dio =
+          dio ?? ApiClient.create(headers: {'Content-Type': 'application/json'}),
+      super(const AuthState()) {
     restoreSession();
   }
 
@@ -149,7 +153,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   static const _userCityPrefsKey = 'kvartal.auth.user_city.v1';
   static const _userAvatarPrefsKey = 'kvartal.auth.user_avatar.v1';
 
-  final Dio _dio = ApiClient.create(headers: {'Content-Type': 'application/json'});
+  final Dio _dio;
 
   // Токен входа — в защищённом хранилище (Android Keystore / iOS Keychain),
   // а не в открытых SharedPreferences (S-08, launch-gate §13).
@@ -243,8 +247,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (!same) {
         state = state.copyWith(user: freshUser, phone: freshUser.phone ?? phone);
       }
+    } on DioException catch (e) {
+      // 401 — сервер больше не принимает этот токен: истёк (30 дней), сменили
+      // пароль, сессии отозваны. Раньше ошибку глотали, и приложение оставалось
+      // «вошедшим» с мёртвым токеном: каждый экран падал с ошибкой («Не удалось
+      // загрузить клубы», 22.11.2026). Выходим — роутер уведёт на вход, как в
+      // Store. Офлайн-очередь выход не стирает (D-104).
+      if (e.response?.statusCode == 401 && state.token == token) {
+        await logout();
+      }
+      // Остальное (нет сети, 5xx) — оставляем локальную сессию.
     } catch (_) {
-      // Если сервер временно недоступен, оставляем локальную сессию для dev-теста карты/GPS.
+      // Ответ не разобрался — сессию не трогаем.
     }
   }
 
