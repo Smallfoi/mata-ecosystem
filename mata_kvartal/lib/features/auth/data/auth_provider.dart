@@ -166,7 +166,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final secure = await _secure.read(key: _tokenSecureKey);
       if (secure != null && secure.isNotEmpty) return secure;
-    } catch (_) {}
+    } catch (_) {
+      // Хранилище не расшифровалось (перенос на новый телефон, восстановление
+      // из резервной копии — ключа Keystore нет). Сбрасываем, иначе и новый
+      // токен после входа не запишется — вылет на вход при каждом запуске.
+      try {
+        await _secure.deleteAll();
+      } catch (_) {}
+    }
     // Миграция со старого открытого ключа (одноразово после обновления).
     final legacy = prefs.getString(_tokenPrefsKey);
     if (legacy != null && legacy.isNotEmpty) {
@@ -231,11 +238,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       final freshUser = AuthUser.fromJson(response.data ?? {});
+      // Продление входа (22.11.2026): токену осталось меньше половины срока —
+      // сервер прислал новый. Без этого раз в 30 дней выкидывало на вход.
+      final renewed = response.data?['renewedToken'];
+      final liveToken =
+          renewed is String && renewed.isNotEmpty ? renewed : token;
       await _saveSession(
-        token,
+        liveToken,
         freshUser,
         phone.isEmpty ? freshUser.phone ?? '' : phone,
       );
+      if (liveToken != token && state.token == token) {
+        state = state.copyWith(token: liveToken);
+      }
       final now = state.user;
       final same = now != null &&
           now.id == freshUser.id &&

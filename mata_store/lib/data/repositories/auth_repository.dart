@@ -277,8 +277,12 @@ class ApiAuthRepository implements AuthRepository {
 
   @override
   Future<AuthUser> fetchMe() async {
-    final data = await _client.get('/auth/me');
-    return AuthUser.fromJson(data as Map<String, dynamic>);
+    final data = await _client.get('/auth/me') as Map<String, dynamic>;
+    // Продление входа (22.11.2026): токену осталось меньше половины срока —
+    // сервер прислал новый; сеттер сам сохранит его в защищённое хранилище.
+    final renewed = data['renewedToken'];
+    if (renewed is String && renewed.isNotEmpty) _client.authToken = renewed;
+    return AuthUser.fromJson(data);
   }
 
   @override

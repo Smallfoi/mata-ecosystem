@@ -34,8 +34,18 @@ void main() async {
   const secure = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
-  final tokenFuture =
-      ApiConfig.anyApi ? secure.read(key: 'jwt') : Future<String?>.value(null);
+  // Хранилище может не расшифроваться (перенос на новый телефон, восстановление
+  // из резервной копии Android — ключа Keystore там нет). Без catchError main()
+  // падал до runApp и приложение висело на заставке (22.11.2026). Нет токена —
+  // просто экран входа.
+  final tokenFuture = ApiConfig.anyApi
+      ? secure.read(key: 'jwt').catchError((Object _) async {
+          try {
+            await secure.deleteAll(); // битое хранилище не чинится — с нуля
+          } catch (_) {}
+          return null;
+        })
+      : Future<String?>.value(null);
   final prefs = await SharedPreferences.getInstance();
 
   // Per-service источник данных (walking skeleton): часть сервисов на реальном
@@ -46,11 +56,11 @@ void main() async {
     // открытых SharedPreferences (S-08). Сохраняем при смене токена, восстанавливаем
     // при старте; одноразовая миграция со старого открытого ключа prefs['jwt'].
     api.onTokenChanged = (t) {
-      if (t == null) {
-        secure.delete(key: 'jwt');
-      } else {
-        secure.write(key: 'jwt', value: t);
-      }
+      // Ошибка записи не должна всплывать необработанной (вход уже в памяти).
+      final op = t == null
+          ? secure.delete(key: 'jwt')
+          : secure.write(key: 'jwt', value: t);
+      op.catchError((Object _) {});
     };
     var token = await tokenFuture;
     if (token == null) {
@@ -62,6 +72,10 @@ void main() async {
       }
     }
     api.authToken = token;
+    // Токена нет, а карточка пользователя в кэше осталась — приложение считало
+    // бы себя «вошедшим» без права на запросы (401 не ловится: токена-то нет).
+    // Чистим кэш — человек увидит экран входа, а не сломанный профиль.
+    if (token == null && ApiConfig.useApiAuth) await prefs.remove('auth_user');
   }
 
   final ProductRepository productRepo = ApiConfig.useApiCatalog

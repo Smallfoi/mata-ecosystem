@@ -11,6 +11,7 @@ from common.security import (
     make_token,
     new_user_id,
     normalize_phone,
+    renewed_token,
     synthetic_email_for_phone,
     user_id_from_request,
     verify_password,
@@ -263,7 +264,12 @@ def me(request):
     acc = Account.objects.filter(id=uid).first()
     if not acc:
         return Response({"detail": "Пользователь не найден"}, status=404)
-    return Response(acc.to_json())
+    body = acc.to_json()
+    # Продление входа (22.11.2026): поле добавочное — старые клиенты его не видят.
+    fresh = renewed_token(request, acc.token_version or 0)
+    if fresh:
+        body["renewedToken"] = fresh
+    return Response(body)
 
 
 @api_view(["PATCH"])
