@@ -461,6 +461,26 @@ SSH к новой ВМ с ПК изредка рвётся («Connection closed�
 **Дальше:** A-запись → `153.51.171.179` (владелец, Beget) → `glitchtip.sh move` на проде (владелец)
 → Claude: `restore` → удалить `mata-prod` (диски, IP `mata-static-…`, `mata-sg`) → чистка прод-варианта.
 
+## 2026-11-22 — Claude — часы: готовность без SSH, COROS в Квартале
+
+**Зачем.** Владелец: «сделай 1–4» по сводке часов (ключи Suunto на проде, пути API, кнопка COROS,
+Garmin). С MacBook канала `mata_prod_ops` нет, поэтому проверки перенесены туда, где SSH не нужен.
+
+**Сделано.**
+- `GET /v1/integrations/suunto/status` → `configured` (все три ключа на сервере, только да/нет) и
+  `paths` (какие пути API уже ответили); `coros/status` → `registered` (саморегистрация прошла).
+- Пути Suunto подбираются сами: `SUUNTO_*_PATH` из окружения главнее; иначе запомненный, потом
+  кандидаты по очереди; неверным путём считаются только 404/405, первый ответивший — в кэш навсегда
+  (лимит Developer API 200/нед — перебор один раз). `suunto_probe` берёт кандидатов оттуда же.
+- Квартал: `suunto_provider` → `watch_brand_provider` (один контроллер на марку, `WatchBrand.suunto/
+  coros`), карточка `WatchBrandCard` — «Подключить COROS» рядом с Suunto; причина ошибки теперь видна.
+- Тесты: `integrations/tests_suunto_paths.py`, `mata_kvartal/test/features/workouts/watch_brand_card_test.dart`.
+
+**Не сделано здесь:** установка на телефон (на MacBook нет Flutter), живая проверка на часах,
+флаг `showWatch` — после проверки. Garmin — письмо-напоминание владельцу на отправку.
+
+---
+
 ## 2026-11-18 — Claude — фото сайта в WebP
 
 **Зачем.** Замер на фото главной: JPEG q85 521 → WebP q85 288 КБ, 230 → 115 КБ; при увеличении

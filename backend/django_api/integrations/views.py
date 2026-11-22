@@ -168,8 +168,14 @@ def coros_push(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def coros_status(request):
-    """Проверка «сервис жив» — её COROS опрашивает сам."""
-    return Response({"status": "ok", "service": "MATA integrations", "time": timezone.now().isoformat()})
+    """Проверка «сервис жив» — её COROS опрашивает сам.
+
+    `registered` — наш сервер уже завёл себе приложение у COROS (саморегистрация
+    проходит при первом подключении часов). Без значений ключей."""
+    from .models import McpClient
+
+    return Response({"status": "ok", "service": "MATA integrations", "time": timezone.now().isoformat(),
+                     "registered": McpClient.objects.filter(source="coros").exists()})
 
 
 # ─────────────────────────── Часы Suunto ─────────────────────────────────
@@ -322,8 +328,16 @@ def suunto_push(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def suunto_status(request):
-    """Проверка «сервис жив»."""
-    return Response({"status": "ok", "service": "MATA integrations", "time": timezone.now().isoformat()})
+    """Проверка «сервис жив» и готовности подключения (22.11.2026).
+
+    `configured` — все три ключа доехали до сервера (значения не раскрываем: только да/нет);
+    `paths` — какие пути API уже ответили на живой тренировке (пусто — ещё не было ни одной).
+    Раньше это узнавали только командой на сервере (`suunto_check`), а SSH есть не всегда."""
+    from . import suunto
+
+    return Response({"status": "ok", "service": "MATA integrations", "time": timezone.now().isoformat(),
+                     "configured": suunto.configured(),
+                     "paths": {k: suunto.known_path(k) for k in ("workout", "fit")}})
 
 
 # ─────────────────────────── Обмен с 1С (D-62) ───────────────────────────
