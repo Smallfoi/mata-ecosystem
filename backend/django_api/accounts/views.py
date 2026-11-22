@@ -112,7 +112,10 @@ def login(request):
         email = (d.get("email") or "").strip().lower()
         acc = Account.objects.filter(email=email).first()
     if not acc or not verify_password(d.get("password") or "", acc.password_hash or ""):
-        return Response({"detail": "Неверный телефон/email или пароль"}, status=401)
+        # Говорим тем языком, каким человек входил: во всех приложениях вход по
+        # номеру — «email» в ошибке путал (владелец, 22.11.2026).
+        what = "номер телефона" if phone else "email"
+        return Response({"detail": f"Неверный {what} или пароль"}, status=401)
     if acc.is_blocked:
         return Response({"detail": "Аккаунт заблокирован"}, status=403)
     return Response({"token": make_token(acc.id, acc.token_version), "user": acc.to_json()})
