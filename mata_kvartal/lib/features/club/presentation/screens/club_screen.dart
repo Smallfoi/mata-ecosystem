@@ -363,7 +363,7 @@ class _ClubSliverHeader extends ConsumerWidget {
                                 const SizedBox(height: 2),
                                 _FitText(
                                   hasClub
-                                      ? '${club!.memberCount} \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u043e\u0432'
+                                      ? '${club!.memberCount} ${membersWord(club!.memberCount)}'
                                       : '\u0421\u043e\u0437\u0434\u0430\u0439 \u043a\u043b\u0443\u0431 \u0438\u043b\u0438 \u043a\u043e\u043c\u0430\u043d\u0434\u0443',
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(color: onHeaderSoft),
@@ -2601,4 +2601,15 @@ class _DistrictWarCard extends ConsumerWidget {
     if (m2 >= 10000) return '${(m2 / 10000).toStringAsFixed(1)} га';
     return '${m2.round()} м²';
   }
+}
+
+/// «1 участник», «3 участника», «5 участников» — было всегда «участников»
+/// (владелец увидел «1 участников», 22.11.2026).
+String membersWord(int n) {
+  final mod100 = n % 100;
+  final mod10 = n % 10;
+  if (mod100 >= 11 && mod100 <= 14) return 'участников';
+  if (mod10 == 1) return 'участник';
+  if (mod10 >= 2 && mod10 <= 4) return 'участника';
+  return 'участников';
 }
