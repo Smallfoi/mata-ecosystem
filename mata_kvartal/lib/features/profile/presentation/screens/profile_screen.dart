@@ -1948,7 +1948,7 @@ class _LevelHeader extends ConsumerWidget {
                     outline: onLevel,
                     fill: Colors.transparent,
                     close: 1,
-                    // Бегун там же, где на логотипе; пройденное — след за ним.
+                    // Старт — верхний левый угол, по часовой; бегун ведёт линию.
                     trail: progress,
                   ),
                 ),

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -146,8 +148,8 @@ class _KvartalLogoMarkState extends State<KvartalLogoMark>
 /// [fillScale] — масштаб лаймовой территории. Без пунктиров — как иконка.
 /// [runner] — рисовать ли точку-бегуна. Подложке под прогрессом бегун не нужен:
 /// иначе под настоящей точкой проступает вторая, «теневая» (баг 22.11.2026).
-/// [trail] 0..1 — режим прогресса: бегун стоит там же, где на логотипе, а за ним
-/// тянется след длиной trail × периметр (1 — петля замкнута). null — обычный знак.
+/// [trail] 0..1 — режим прогресса: линия стартует в верхнем левом углу и идёт по
+/// часовой стрелке, бегун — на её конце; 1 — петля замкнута. null — обычный знак.
 class KvartalMarkPainter extends CustomPainter {
   final Color outline;
   final Color fill;
@@ -155,7 +157,7 @@ class KvartalMarkPainter extends CustomPainter {
   final double draw; // 0..1 — сколько маршрута уже нарисовано (сплэш)
   final double fillScale; // 0..1 — масштаб заливки территории (сплэш)
   final bool runner; // точка-бегун на конце линии
-  final double? trail; // 0..1 — длина следа за бегуном (прогресс уровня)
+  final double? trail; // 0..1 — пройденная доля петли (прогресс уровня)
 
   KvartalMarkPainter({
     required this.outline,
@@ -188,6 +190,10 @@ class KvartalMarkPainter extends CustomPainter {
       canvas.restore();
     }
 
+    if (trail != null) {
+      _paintProgress(canvas, trail!.clamp(0.0, 1.0));
+      return;
+    }
     if (draw < 1) {
       _paintDrawing(canvas);
       return;
@@ -204,10 +210,8 @@ class KvartalMarkPainter extends CustomPainter {
 
     final gapFull = len * 0.14;
     final gap = gapFull * (1 - close);
-    // Прогресс: бегун на месте логотипа (t = 5, левая сторона), след — позади него.
-    final dotT = trail != null ? 5.0 : 5 + gapFull * close; // бегун закрывает петлю
-    final solidLen =
-        trail != null ? len * trail!.clamp(0.0, 1.0) : len - gap;
+    final dotT = 5 + gapFull * close; // бегун закрывает петлю
+    final solidLen = len - gap;
     final start = dotT - solidLen;
 
     final stroke = Paint()
@@ -216,9 +220,7 @@ class KvartalMarkPainter extends CustomPainter {
       ..strokeWidth = 4.6
       ..strokeCap = StrokeCap.round;
 
-    if (solidLen <= 0.01) {
-      // Следа ещё нет — только бегун.
-    } else if (start < 0) {
+    if (start < 0) {
       canvas.drawPath(metric.extractPath(start + len, len), stroke);
       canvas.drawPath(metric.extractPath(0, dotT), stroke);
     } else {
@@ -228,6 +230,43 @@ class KvartalMarkPainter extends CustomPainter {
     // «Бегун» на конце сплошной линии.
     if (!runner) return;
     final pos = metric.getTangentForOffset(dotT % len)!.position;
+    canvas.drawCircle(pos, 5, Paint()..color = outline);
+    canvas.drawCircle(pos, 2.2, Paint()..color = fill);
+  }
+
+  /// Прогресс уровня: старт — середина верхнего левого угла, линия идёт по часовой
+  /// стрелке, бегун ведёт её (замечание владельца 22.11.2026). Путь RRect начинается
+  /// внизу левой стороны и идёт вверх: левая прямая 12, затем дуга угла π·9/2.
+  void _paintProgress(Canvas canvas, double p) {
+    final ring = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        const Rect.fromLTWH(9, 9, 30, 30),
+        const Radius.circular(9),
+      ));
+    final metric = ring.computeMetrics().first;
+    final len = metric.length;
+    const tStart = 12 + math.pi * 9 / 4; // середина верхнего левого угла
+    final solid = len * p;
+    final head = tStart + solid;
+
+    if (solid > 0.5) {
+      final stroke = Paint()
+        ..color = outline
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.6
+        ..strokeCap = StrokeCap.round;
+      if (p >= .999) {
+        canvas.drawPath(ring, stroke);
+      } else if (head <= len) {
+        canvas.drawPath(metric.extractPath(tStart, head), stroke);
+      } else {
+        canvas.drawPath(metric.extractPath(tStart, len), stroke);
+        canvas.drawPath(metric.extractPath(0, head - len), stroke);
+      }
+    }
+
+    if (!runner) return;
+    final pos = metric.getTangentForOffset(head % len)!.position;
     canvas.drawCircle(pos, 5, Paint()..color = outline);
     canvas.drawCircle(pos, 2.2, Paint()..color = fill);
   }
