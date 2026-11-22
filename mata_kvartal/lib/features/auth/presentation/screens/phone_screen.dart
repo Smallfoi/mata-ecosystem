@@ -89,6 +89,8 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
     String hint, {
     Widget? prefixIcon,
     Widget? suffixIcon,
+    String? prefixText,
+    TextStyle? prefixStyle,
   }) {
     OutlineInputBorder b(Color c, double w) => OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -101,6 +103,13 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
       fillColor: AppColors.panel,
       prefixIcon: prefixIcon,
       prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+      prefixText: prefixText,
+      prefixStyle: prefixStyle,
+      // Префикс («+7») Flutter прячет у пустого поля без фокуса — нам он нужен
+      // всегда: образец номера виден сразу. Подписи у полей нет, поэтому
+      // «always» больше ни на что не влияет.
+      floatingLabelBehavior:
+          prefixText != null ? FloatingLabelBehavior.always : null,
       suffixIcon: suffixIcon,
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
@@ -123,6 +132,11 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
         .textTheme
         .titleMedium
         ?.copyWith(color: AppColors.ink);
+    // Номер целиком (код страны + цифры) — один стиль, цифры одинаковой ширины.
+    final phoneStyle = inputStyle?.copyWith(
+      letterSpacing: 1.5,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -191,13 +205,15 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
                 inputFormatters: const [PhoneMaskFormatter()],
-                style: inputStyle?.copyWith(letterSpacing: 1.5),
+                style: phoneStyle,
                 decoration: _dec(
                   '', // подсказку-маску рисует сам PhoneMaskController
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 10, 0),
-                    child: Text('+7', style: inputStyle?.copyWith(fontWeight: FontWeight.w600)),
-                  ),
+                  // «+7» — встроенный префикс поля: та же строка, тот же стиль и
+                  // базовая линия, что у цифр (владелец, 22.11.2026: код страны был
+                  // отдельной подписью другой насыщенности, выше цифр и с двойным
+                  // отступом). Зазор после «+7» — ровно пробел между группами номера.
+                  prefixText: '+7 ',
+                  prefixStyle: phoneStyle,
                 ),
                 onChanged: (_) => setState(() {}),
               ),
