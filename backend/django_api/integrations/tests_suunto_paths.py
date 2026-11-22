@@ -30,7 +30,8 @@ class PathDiscoveryTests(TestCase):
             cache.delete(suunto._PATH_KEY.format(k))
 
     def test_first_answering_path_is_found_and_remembered(self):
-        fake, calls = _api({"/v3/workout/7": {"payload": {"totalDistance": 5000}}})
+        fake, calls = _api({"/v3/workout/7": {"payload": {"totalDistance": 5000}},
+                            "/v3/workout/8": {"totalDistance": 3000}})
         with mock.patch.object(suunto, "api_get", side_effect=fake):
             self.assertEqual(suunto.fetch_workout("t", "7"), {"totalDistance": 5000})
             self.assertEqual(calls, ["/v2/workout/7", "/v3/workout/7"])
