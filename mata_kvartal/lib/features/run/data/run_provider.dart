@@ -14,6 +14,10 @@ import 'completed_runs_provider.dart';
 import 'gps_kalman.dart';
 import 'route_cleaner.dart';
 
+/// Меньше — не пробежка, а случайное нажатие: не сохраняем и не засчитываем
+/// (экран итога честно пишет «Пробежки не было»). 22.11.2026.
+const double kMinRecordedRunMeters = 50;
+
 enum RunStatus { idle, active, paused }
 
 const activeRunStorageKey = 'kvartal.active_run.v1';
@@ -409,7 +413,11 @@ class RunNotifier extends StateNotifier<RunState> {
     unawaited(_foregroundPositionSub?.cancel());
     unawaited(_stopNativeLocationService());
     _foregroundPositionSub = null;
-    if (completed.route.length > 1 || completed.distanceMeters > 0) {
+    // Случайный старт-стоп (пара GPS-точек за секунды) — не пробежка: в историю
+    // и на сервер не уходит (владелец, 22.11.2026). Захват всегда сохраняем.
+    if (completed.distanceMeters >= kMinRecordedRunMeters ||
+        capturedZones > 0 ||
+        capturedTerritory) {
       unawaited(
         _saveCompletedRun(
           completed,

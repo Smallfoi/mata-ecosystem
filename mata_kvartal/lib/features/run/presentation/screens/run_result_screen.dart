@@ -16,6 +16,7 @@ import '../../../../core/config/app_config_provider.dart';
 import '../../../auth/data/auth_provider.dart';
 import '../../../trails/data/trails_provider.dart';
 import '../../data/completed_runs_provider.dart';
+import '../../data/run_provider.dart' show kMinRecordedRunMeters;
 import '../widgets/run_share.dart';
 import 'package:flutter/cupertino.dart';
 
@@ -42,6 +43,10 @@ class RunResult {
   double get distanceKm => distanceMeters / 1000;
 
   bool get hasCapture => capturedTerritory || capturedZones > 0;
+
+  /// Записана ли пробежка вообще. Нет — это случайный старт-стоп: в историю
+  /// не попала, баллов и зачётов нет (см. [kMinRecordedRunMeters]).
+  bool get recorded => hasCapture || distanceMeters >= kMinRecordedRunMeters;
 
   int get quarters => math.max(capturedZones, capturedTerritory ? 1 : 0);
 
@@ -285,7 +290,9 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
                             Text(
                               r.hasCapture
                                   ? '+${r.quarters} ${_qWord(r.quarters)}'
-                                  : 'Пробежка засчитана',
+                                  : r.recorded
+                                      ? 'Пробежка засчитана'
+                                      : 'Пробежки не было',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontFamily: AppTheme.fontDisplay,
@@ -321,6 +328,22 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
                                 ),
                               ],
                             ),
+                            if (!r.recorded)
+                              Opacity(
+                                opacity: s3,
+                                child: const Padding(
+                                  padding: EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    'Слишком коротко — в историю не попала',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFFB9C1BB),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             // «+N баллов» — как только сервер подтвердил
                             // начисление (офлайн — долетит и покажется позже).
                             Consumer(
@@ -398,6 +421,25 @@ class _RunResultScreenState extends ConsumerState<RunResultScreen>
                     child: FractionalTranslation(
                       translation: Offset(0, 1.1 - panel * 1.1),
                       child: _StatsPanel(result: r),
+                    ),
+                  ),
+                  // Закрыть — сразу, без ожидания церемонии (владелец,
+                  // 22.11.2026: случайно нажал «старт» и тут же «стоп» —
+                  // смотреть нечего, нужен выход на главный экран). Своя
+                  // кнопка ловит касание, поэтому «пропуск» анимации по тапу
+                  // в любом месте экрана её не задевает.
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 8,
+                    right: 8,
+                    child: IconButton(
+                      onPressed: () => context.go('/map'),
+                      tooltip: 'Закрыть',
+                      iconSize: 26,
+                      color: _light,
+                      icon: const Icon(Icons.close_rounded),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                      ),
                     ),
                   ),
                 ],
@@ -499,6 +541,8 @@ class _StatsPanel extends ConsumerWidget {
           const SizedBox(height: 14),
           Row(
             children: [
+              // Нечем делиться — пробежки не было: остаётся только выход.
+              if (result.recorded) ...[
               Expanded(
                 child: FilledButton(
                   style: FilledButton.styleFrom(
@@ -528,6 +572,7 @@ class _StatsPanel extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 10),
+              ],
               Expanded(
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
@@ -547,14 +592,22 @@ class _StatsPanel extends ConsumerWidget {
           _TrailHitsCard(since: result.finishedAt),
           // Сделать тропой: пробежал круг — сохрани его как тропу для всех.
           _MakeTrailButton(result: result),
-          // Паспорт пробежки: свежая пробежка уже сохранена — первая в истории.
+          // Паспорт ИМЕННО этой пробежки. Раньше брали первую в истории — а у
+          // несохранённой (случайный старт-стоп) это была прошлая пробежка
+          // (владелец, 22.11.2026). Ищем по времени финиша; нет — нет кнопки.
+          if (result.recorded)
           Consumer(
             builder: (context, ref, _) {
               final runs = ref.watch(completedRunsProvider);
-              if (runs.isEmpty) return const SizedBox.shrink();
+              final mine = runs.where(
+                (run) =>
+                    run.finishedAt.difference(result.finishedAt).abs() <
+                    const Duration(minutes: 2),
+              );
+              if (mine.isEmpty) return const SizedBox.shrink();
               return TextButton(
                 onPressed: () =>
-                    context.push('/runs/passport', extra: runs.first),
+                    context.push('/runs/passport', extra: mine.first),
                 child: const Text(
                   'Подробнее о пробежке',
                   style: TextStyle(
