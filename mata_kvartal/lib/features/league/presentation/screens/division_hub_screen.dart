@@ -555,7 +555,6 @@ class _PositionLadder extends StatelessWidget {
                     child: Container(
                       constraints: const BoxConstraints(minWidth: 24, minHeight: 22),
                       padding: const EdgeInsets.symmetric(horizontal: 5),
-                      alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: AppColors.lime,
                         borderRadius: BorderRadius.circular(8),
@@ -564,15 +563,21 @@ class _PositionLadder extends StatelessWidget {
                           width: 2,
                         ),
                       ),
-                      child: Text(
-                        '#$place',
-                        maxLines: 1,
-                        style: const TextStyle(
-                          fontFamily: AppTheme.fontDisplay,
-                          fontSize: 11,
-                          height: 1,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF171C19),
+                      // Center с коэффициентами 1 — метка по размеру текста (alignment у
+                      // Container растягивал её на всю полосу, 22.11.2026).
+                      child: Center(
+                        widthFactor: 1,
+                        heightFactor: 1,
+                        child: Text(
+                          '#$place',
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontFamily: AppTheme.fontDisplay,
+                            fontSize: 11,
+                            height: 1,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF171C19),
+                          ),
                         ),
                       ),
                     ),
