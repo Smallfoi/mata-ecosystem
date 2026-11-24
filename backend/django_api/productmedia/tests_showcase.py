@@ -39,16 +39,23 @@ class ShowcaseTests(SimpleTestCase):
         self.assertAlmostEqual(left, 512 - right, delta=2)
         self.assertAlmostEqual(top, 512 - bottom, delta=2)
 
-    def test_background_taken_from_the_photo(self):
-        """Светло-серый студийный фон не превращается в белый."""
-        grey = (236, 236, 236)
-        im = _open(images.showcase(_photo(bg=grey), size=400, sharpen=False))
-        self.assertEqual(im.getpixel((5, 5)), grey)
-
-    def test_background_can_be_set_explicitly(self):
-        im = _open(images.showcase(_photo(bg=(230, 230, 230)), size=400,
-                                   bg=(255, 255, 255), sharpen=False))
+    def test_grey_studio_background_becomes_white(self):
+        """Решение владельца 25.11: витрина белая, какой бы ни была подложка."""
+        im = _open(images.showcase(_photo(bg=(236, 236, 236)), size=400, sharpen=False))
         self.assertEqual(im.getpixel((5, 5)), (255, 255, 255))
+
+    def test_white_is_everywhere_not_only_in_the_margins(self):
+        """Серый фон СНИМКА тоже белеет — иначе он лёг бы рамкой вокруг товара.
+
+        Смотрим точку впритык к товару: она внутри обрезанного кадра, то есть
+        там, где раньше оставалась подложка исходника.
+        """
+        data = images.showcase(_photo(bg=(236, 236, 236), box=(300, 250, 420, 330)),
+                               size=400, sharpen=False)
+        im = _open(data)
+        box = images._content_box(im, (255, 255, 255), images.BG_TOLERANCE)
+        just_outside = (max(0, box[0] - 3), (box[1] + box[3]) // 2)
+        self.assertEqual(im.getpixel(just_outside), (255, 255, 255))
 
     def test_product_colour_survives(self):
         """Цвет товара не «улучшается»: как сняли, так и осталось."""
@@ -79,3 +86,29 @@ class ShowcaseTests(SimpleTestCase):
         master = images.showcase(_photo(), size=images.SHOWCASE_PX)
         webp = images.make_webp(master)
         self.assertEqual(_open(webp).size, (images.WEBP_MAX_PX, images.WEBP_MAX_PX))
+
+
+class ShowcaseTrackTests(SimpleTestCase):
+    """Витринный трек не должен ходить к провайдеру — ни запроса, ни токенов."""
+
+    def test_track_goes_around_the_provider(self):
+        from unittest import mock
+
+        from productmedia import processing
+
+        with mock.patch.object(processing.providers, "edit_image") as ai:
+            out = processing.process(_photo(), track="showcase")
+
+        ai.assert_not_called()
+        self.assertEqual(_open(out).size, (2048, 2048))
+
+    def test_ai_tracks_still_call_the_provider(self):
+        from unittest import mock
+
+        from productmedia import processing
+
+        with mock.patch.object(processing.providers, "edit_image",
+                               return_value=_photo()) as ai:
+            processing.process(_photo(), track="catalog", item="Кроссовки")
+
+        ai.assert_called_once()

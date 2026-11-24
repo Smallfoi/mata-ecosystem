@@ -214,6 +214,16 @@ def _decide(request):
         if job.status not in (PhotoJob.STATUS_REVIEW, PhotoJob.STATUS_FAILED,
                               PhotoJob.STATUS_REJECTED):
             return _err("снимок уже в работе")
+        # Повтор может сменить способ: «улучшить снимок» (без ИИ) или
+        # «сгенерировать заново». Иначе ради другого способа пришлось бы
+        # перезагружать партию.
+        track = request.POST.get("track") or ""
+        if track:
+            if track not in dict(PhotoBatch.TRACK_CHOICES):
+                return _err("неизвестный трек")
+            if track != job.track:
+                job.track = track
+                job.save(update_fields=["track", "updated_at"])
         service.redo(job, note or (job.note if action == "retry" else ""), request.user)
         tasks.regenerate_job.delay(job.pk)
         StaffAudit.write(request, "фотопайплайн: переделать %s (%s)" % (label, note[:80]))
@@ -268,6 +278,11 @@ def photo_review(request):
             "master": _url(j.master),
             "details": [u for u in details.get((j.batch_id, _norm(j.article)), []) if u],
             "prompt": ("версия #%s" % j.prompt_id) if j.prompt_id else "встроенный",
+            "track": j.track,
+            # Какой ИИ-трек предложить кнопкой «сгенерировать»: тот, которым
+            # грузили партию, а для витринных партий — каталожный.
+            "ai_track": (j.batch.track if j.batch and j.batch.track in processing.TRACKS
+                         else PhotoBatch.TRACK_CATALOG),
             "tokens": usage.get("total_tokens"),
             "batch": j.batch_id,
         })
@@ -326,7 +341,11 @@ def photo_prompts(request):
         return _prompt_action(request)
 
     tracks = []
+    # Витринная обработка идёт без ИИ, промта у неё нет — на этой странице ей
+    # нечего показывать. Перебираем треки провайдера, а не все подряд.
     for code, label in PhotoBatch.TRACK_CHOICES:
+        if code not in processing.TRACKS:
+            continue
         active = PhotoPrompt.active(code)
         history = list(PhotoPrompt.objects.filter(track=code)
                        .select_related("created_by")[:10])

@@ -71,12 +71,21 @@
                       title="Снимок останется у нас для рекламы, но на витрину не пойдёт"
                       >В маркетинг</button>
               <button type="button" class="m-btn" data-act="redo">Переделать</button>
+              <button type="button" class="m-btn" data-act="retry" data-track="showcase"
+                      title="Обработать исходник без ИИ: белый фон, единый кадр, резкость"
+                      >Улучшить снимок</button>
               <button type="button" class="m-btn bad" data-act="reject">Отклонить</button>
             </div>
           {% elif it.status == "failed" or it.status == "rejected" %}
             <textarea class="m-input" rows="2" data-role="note" placeholder="Замечание к новой попытке (необязательно)"></textarea>
             <div class="m-acts">
-              <button type="button" class="m-btn" data-act="retry">Сгенерировать заново</button>
+              {# Сначала дешёвое и точное, потом дорогое и творческое. #}
+              <button type="button" class="m-btn ok" data-act="retry" data-track="showcase"
+                      title="Белый фон, единый кадр, резкость. Ракурс и поза остаются как на съёмке"
+                      >Улучшить снимок</button>
+              <button type="button" class="m-btn" data-act="retry" data-track="{{ it.ai_track }}"
+                      title="Нарисовать картинку заново по этому снимку — ракурс и детали могут измениться"
+                      >Сгенерировать заново</button>
             </div>
           {% endif %}
         {% endif %}
