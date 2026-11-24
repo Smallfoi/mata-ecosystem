@@ -1,0 +1,123 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+{# «Импорт контента»: фото и описания с сайтов брендов — проверить и загрузить. Стиль общий, m-*. #}
+
+<form method="get" class="m-card ci-pick">
+  <div class="m-head">Пакет</div>
+  {% if batches %}
+    <div class="ci-batches">
+      {% for b in batches %}
+        <a class="m-btn{% if b.name == batch %} ci-on{% endif %}" href="?batch={{ b.name|urlencode }}">{{ b.title|default:b.name }}</a>
+      {% endfor %}
+    </div>
+  {% endif %}
+  <label>Имя пакета <input name="batch" value="{{ batch }}" placeholder="например, bmai-2026-11"></label>
+  <button class="m-btn" type="submit">Открыть</button>
+</form>
+
+{% if error %}<div class="m-hint ci-err">{{ error }}</div>{% endif %}
+
+{% if rows %}
+<div class="m-sum">
+  <div class="m-tile"><b>{{ total }}</b><span>моделей в пакете</span></div>
+  <div class="m-tile"><b>{{ photo_colors }}</b><span>цветов получат фото</span></div>
+  <div class="m-tile"><b>{{ desc_count }}</b><span>моделей получат описание</span></div>
+  <div class="m-tile"><b>{{ not_found }}</b><span>не нашлись у нас</span></div>
+</div>
+
+<div class="m-card">
+  <div class="m-head">{{ manifest_title }}</div>
+  <p>
+    Проверьте, что фото и описание подходят модели. Снимите галочку с ошибочных и нажмите
+    «Загрузить отмеченные». Фото ложатся только в пустые цвета, описание — только в пустое
+    поле: то, что уже сделали сотрудники, не перезаписывается.
+  </p>
+  <div class="ci-bar">{% csrf_token %}
+    <label><input type="checkbox" id="ci-all" checked> отметить всё</label>
+    <button class="m-btn" id="ci-go" type="button">Загрузить отмеченные</button>
+    <span id="ci-progress" class="m-muted"></span>
+  </div>
+  <div class="m-wrap">
+    <table class="m ci">
+      <thead>
+        <tr><th></th><th>Наша модель</th><th>Фото по цветам</th><th>Описание</th><th>Не хватает</th><th>Итог</th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-item="{{ r.index }}">
+          <td>{% if r.ready %}<input type="checkbox" class="ci-pick-row" checked>{% endif %}</td>
+          <td>
+            <b class="m-mono">{{ r.article }}</b><br>
+            {% for m in r.models %}{{ m.name }}<br>{% empty %}<span class="m-tag bad">нет у нас</span>{% endfor %}
+            {% if r.source %}<a href="{{ r.source }}" target="_blank" rel="noopener" class="m-muted">источник</a>{% endif %}
+          </td>
+          <td>
+            {% for c in r.colors %}
+              <div class="ci-color">
+                <span class="m-mono">{{ c.code }}</span>
+                {% if c.state == "fill" %}<span class="m-tag ok">{{ c.color|default:"без цвета" }}</span>
+                {% elif c.state == "has" %}<span class="m-tag info">{{ c.color|default:"без цвета" }}: уже есть фото</span>
+                {% else %}<span class="m-tag warn">цвета нет у нас</span>{% endif %}
+                <div class="ci-shots">{% for u in c.urls %}<img src="{{ u }}" alt="" loading="lazy">{% endfor %}</div>
+              </div>
+            {% empty %}<span class="m-muted">фото нет</span>{% endfor %}
+          </td>
+          <td>
+            {% if r.description %}
+              <details><summary>
+                {% if r.desc_state == "fill" %}<span class="m-tag ok">добавится</span>
+                {% elif r.desc_state == "has" %}<span class="m-tag info">уже есть</span>
+                {% else %}<span class="m-tag warn">некуда</span>{% endif %}
+                показать</summary>
+                <pre class="ci-text">{{ r.description }}</pre>
+              </details>
+            {% else %}<span class="m-muted">нет</span>{% endif %}
+          </td>
+          <td class="m-muted">{{ r.missing|join:", " }}</td>
+          <td class="ci-result"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+
+<script>
+(function () {
+  var go = document.getElementById("ci-go");
+  if (!go) return;
+  var all = document.getElementById("ci-all");
+  var boxes = function () { return Array.prototype.slice.call(document.querySelectorAll(".ci-pick-row")); };
+  all.addEventListener("change", function () { boxes().forEach(function (b) { b.checked = all.checked; }); });
+  var tok = document.querySelector("input[name=csrfmiddlewaretoken]");
+  var csrf = tok ? tok.value : "";
+  var batch = "{{ batch|escapejs }}";
+  go.addEventListener("click", async function () {
+    var rows = boxes().filter(function (b) { return b.checked; }).map(function (b) { return b.closest("tr"); });
+    if (!rows.length) return;
+    go.disabled = true;
+    var done = 0, progress = document.getElementById("ci-progress");
+    for (var i = 0; i < rows.length; i++) {
+      var tr = rows[i], cell = tr.querySelector(".ci-result");
+      cell.textContent = "загружаю…";
+      var body = new URLSearchParams({ batch: batch, item: tr.dataset.item });
+      try {
+        var r = await fetch(location.pathname, { method: "POST", body: body,
+          headers: { "X-CSRFToken": csrf }, credentials: "same-origin" });
+        var j = await r.json().catch(function () { return { ok: false, error: "ответ " + r.status }; });
+        cell.textContent = j.error ? j.error :
+          ("фото +" + j.photos + ", описаний +" + j.described + (j.errors && j.errors.length ? "; ошибки: " + j.errors.join("; ") : ""));
+        tr.querySelector(".ci-pick-row").checked = false;
+      } catch (e) {
+        cell.textContent = "сеть не ответила — повторите";
+      }
+      done++; progress.textContent = done + " из " + rows.length;
+    }
+    go.disabled = false;
+  });
+})();
+</script>
+{% endblock %}

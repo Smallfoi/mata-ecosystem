@@ -526,6 +526,10 @@ UNFOLD = {
                     {"title": "Фото товаров", "icon": "add_photo_alternate",
                      "link": reverse_lazy("product_photos"),
                      "permission": _tab("product_photos")},
+                    # Фото и описания с сайтов брендов — после проверки (24.11.2026).
+                    {"title": "Импорт контента", "icon": "cloud_download",
+                     "link": reverse_lazy("content_import"),
+                     "permission": _tab("content_import")},
                     # Фотопайплайн: партии исходников по артикулу → ИИ → проверка.
                     {"title": "Фотопайплайн", "icon": "auto_awesome",
                      "link": reverse_lazy("photo_pipeline"),
