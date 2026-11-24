@@ -50,3 +50,26 @@ class PhotoRouteTests(SimpleTestCase):
         with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "", "OPENAI_BASE_URL": RELAY}):
             text = _run()
         self.assertIn("OPENAI_API_KEY пуст", text)
+
+
+class FailLoggingTests(SimpleTestCase):
+    """Сбой генерации обязан попадать в журнал сервера, а не только в карточку.
+
+    24.11.2026: ответ релея «OpenAI HTTP 404: not found» был виден лишь владельцу
+    на экране — в логах стояло только `status: failed`, и расследовать удалённо
+    было нечем.
+    """
+
+    def test_failure_goes_to_the_log(self):
+        from productmedia import service
+        from productmedia.models import PhotoJob
+
+        job = PhotoJob(pk=42, article="XRPL006-5", status=PhotoJob.STATUS_PROCESSING)
+        with mock.patch.object(PhotoJob, "save"), \
+                self.assertLogs("productmedia.service", level="WARNING") as logs:
+            service._fail(job, "OpenAI HTTP 404: not found")
+
+        line = "\n".join(logs.output)
+        self.assertIn("XRPL006-5", line)
+        self.assertIn("OpenAI HTTP 404", line)
+        self.assertEqual(job.status, PhotoJob.STATUS_FAILED)
