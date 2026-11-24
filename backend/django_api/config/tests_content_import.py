@@ -36,6 +36,10 @@ MANIFEST = {
          "photos": {"XRMM002-4": [PREFIX + "t/a.jpg"], "XRMM002-2": [PREFIX + "t/b.jpg"],
                     "XRMM002-9": [PREFIX + "t/c.jpg"]}},
         {"article": "NOPE01", "description": "чужое", "photos": {}},
+        # STAW: код цвета в артикуле без дефиса — модель по началу артикула, цвет по названию.
+        {"article": "26SADT003", "prefix": True, "description": "STAW футболка",
+         "photos": {"26SADT003|Горчичный": [PREFIX + "t/s.jpg"],
+                    "26SADT003|Фиолетовый": [PREFIX + "t/v.jpg"]}},
     ],
 }
 
@@ -57,6 +61,8 @@ class ContentImportTests(TestCase):
                                    brand="BMAI", article=art, price=100, colors=[color],
                                    model_key_override="XRMM002")
         Product.objects.filter(pk="p3").update(description="уже написано сотрудником")
+        Product.objects.create(id="s1", name="Футболка женская STAW", brand="STAW",
+                               article="26SADT0031850", price=100, colors=["Горчичный"])
         ProductPhoto.objects.create(model_key="XRMM002", color="Оранжевый",
                                     image="uploads/photos/old.webp")
 
@@ -93,6 +99,16 @@ class ContentImportTests(TestCase):
         self.assertEqual(p1.description, "BMAI GCARBON 4 — тест")
         self.assertTrue(p1.is_overridden("description"))  # 1С не сотрёт
         self.assertEqual(Product.objects.get(pk="p3").description, "уже написано сотрудником")
+
+    def test_staw_prefix_and_color_name(self):
+        r = self.client.get(URL, {"batch": "bmai-test"})
+        staw = r.context["rows"][2]
+        states = {c["code"]: c["state"] for c in staw["colors"]}
+        self.assertEqual(states, {"26SADT003|Горчичный": "fill", "26SADT003|Фиолетовый": "none"})
+        with mock.patch.object(ci, "_fetch", return_value=_png()):
+            j = self.client.post(URL, {"batch": "bmai-test", "item": "2"}).json()
+        self.assertEqual((j["photos"], j["described"]), (1, 1))
+        self.assertEqual(Product.objects.get(pk="s1").description, "STAW футболка")
 
     def test_apply_twice_is_noop(self):
         with mock.patch.object(ci, "_fetch", return_value=_png()):

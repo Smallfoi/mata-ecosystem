@@ -19,6 +19,9 @@
     {"title": "...", "items": [{"article": "XRMM002", "description": "...",
       "source": "https://...", "missing": ["нет веса"],
       "photos": {"XRMM002-4": ["https://storage.yandexcloud.net/mata-media/content-import/..."]}}]}
+
+    STAW: «"prefix": true» (позиции модели — по началу артикула) и ключи фото вида
+    «26SADT003|Горчичный» (артикул модели + цвет из 1С).
 """
 import json
 import re
@@ -81,6 +84,27 @@ def _positions(code: str):
     return Product.objects.filter(Q(article__iexact=code) | Q(article__istartswith=code + "-"))
 
 
+def _model_positions(item: dict):
+    """Позиции модели пункта. У STAW код цвета вписан в артикул без дефиса
+    (26SADT0031850), поэтому пункт может попросить искать по началу артикула."""
+    article = (item.get("article") or "").strip()
+    if item.get("prefix") and article:
+        return Product.objects.filter(article__istartswith=article)
+    return _positions(article)
+
+
+def _color_positions(item: dict, code: str):
+    """Позиции цвета: «XRMM002-4» — по артикулу цвета; «26SADT003|Горчичный» — по
+    артикулу модели и названию цвета из 1С (когда код цвета в артикуле нам неизвестен)."""
+    if "|" not in code:
+        return list(_positions(code))
+    article, color = (part.strip() for part in code.split("|", 1))
+    want = photolib.norm_color(color)
+    rows = Product.objects.filter(article__istartswith=article) if article else []
+    return [p for p in rows
+            if any(photolib.norm_color(str(c)) == want for c in (p.colors or []))]
+
+
 def _first_color(products) -> str:
     for p in products:
         for c in p.colors or []:
@@ -92,7 +116,7 @@ def _first_color(products) -> str:
 def resolve(item: dict) -> dict:
     """Куда ляжет пункт пакета: модели, цвета, что уже есть. Ничего не меняет."""
     article = (item.get("article") or "").strip()
-    base = list(_positions(article))
+    base = list(_model_positions(item))
     models = {}
     for p in base:
         key = p.shop_model_key or p.id
@@ -109,7 +133,7 @@ def resolve(item: dict) -> dict:
 
     colors = []
     for code, urls in (item.get("photos") or {}).items():
-        rows = list(_positions(code))
+        rows = _color_positions(item, code)
         entry = {"code": code, "urls": list(urls or []), "color": "", "model": "",
                  "state": "none"}
         if not rows:
@@ -123,6 +147,7 @@ def resolve(item: dict) -> dict:
 
     return {
         "article": article,
+        "prefix": bool(item.get("prefix")),
         "description": item.get("description") or "",
         "source": item.get("source") or "",
         "missing": list(item.get("missing") or []),
@@ -154,7 +179,7 @@ def apply_item(request, item: dict) -> dict:
     described = 0
     text = plan["description"].strip()
     if text:
-        for p in _positions(plan["article"]):
+        for p in _model_positions(item):
             if (p.description or "").strip():
                 continue
             p.description = text
