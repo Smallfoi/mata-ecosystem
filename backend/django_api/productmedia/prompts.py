@@ -80,12 +80,20 @@ STAGING = {
         "neatly smoothed, centred with even margins. Socks and briefs: laid flat, neatly "
         "shaped, no mannequin."
     ),
+    # Разворот кроссовка БЕРЁТСЯ С ИСХОДНИКА (решение владельца 24.11.2026).
+    # Прежняя редакция требовала «строго в профиль, носком влево» и спорила с
+    # правилом FIDELITY «покажи ту же сторону, что на референсе»: снимок задника
+    # модель разворачивала вбок, а замечание проверяющего не помогало — пожелание
+    # против правила проигрывает. Единый вид каталога держат свет, фон и
+    # кадрирование, а не одинаковый поворот: покупателю нужны и задник, и подошва.
     ("catalog", FOOTWEAR): (
-        "STAGING (footwear): no foot, leg or mannequin. A single shoe in clean side "
-        "profile, toe pointing left, outer side facing the camera, laces neatly tied, the "
-        "full sole edge visible. If the reference shows only the other side or a top "
-        "view, keep that view instead of inventing the hidden side. Centred with even "
-        "margins."
+        "STAGING (footwear): no foot, leg or mannequin. A single shoe, laces neatly "
+        "tied, centred with even margins. KEEP THE VIEWPOINT OF THE REFERENCE: a side "
+        "profile stays a side profile with the toe pointing the same way, a heel/back "
+        "view stays heel/back, a three-quarter stays three-quarter, a top view stays "
+        "top view, a sole shot stays a sole shot. Never rotate the shoe to another "
+        "angle and never invent a side the reference does not show. For a side "
+        "profile, keep the full sole edge visible."
     ),
     ("catalog", ACCESSORY): (
         "STAGING (accessory): the product alone in its natural resting position - a "
@@ -161,8 +169,11 @@ def with_note(prompt: str, note: str = "") -> str:
         return prompt
     return (
         prompt
-        + "\nREVIEWER FEEDBACK on the previous attempt - it was rejected for this reason, "
-        "fix it now (the note may be in Russian): %s" % note
+        + "\nREVIEWER FEEDBACK (overrides STAGING and STYLE where they conflict; never "
+        "overrides PRODUCT FIDELITY). A human looked at the previous attempt and "
+        "rejected it. The note often describes what went wrong rather than what to "
+        "do - work out the required change and apply it (the note may be in "
+        "Russian): %s" % note
     )
 
 # Тип вещи. Нужен там, где на кадре несколько вещей сразу: маркетинговый снимок

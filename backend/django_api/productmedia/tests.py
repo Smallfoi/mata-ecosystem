@@ -888,3 +888,51 @@ class PromptsV3MigrationTests(TestCase):
         PhotoPrompt.objects.create(track="catalog", text=prompts.CATALOG)
         self._forward()
         self.assertEqual(PhotoPrompt.objects.filter(track="catalog").count(), 1)
+
+
+class ShoeViewFromReferenceTests(TestCase):
+    """Разворот обуви берётся с исходника (решение владельца 24.11.2026).
+
+    До этого STAGING требовал «строго в профиль, носком влево» и спорил с правилом
+    FIDELITY «та же сторона, что на референсе»: снимок задника выходил сбоку, и
+    замечание проверяющего не спасало — пожелание против правила проигрывает.
+    """
+
+    def _shoe(self):
+        from productmedia import prompts
+        return prompts.with_staging(prompts.CATALOG, "catalog", "BMAI PURE", "Кроссовки")
+
+    @staticmethod
+    def _note(text, note):
+        from productmedia import prompts
+        return prompts.with_note(text, note)
+
+    def test_viewpoint_comes_from_the_reference(self):
+        text = self._shoe()
+        self.assertIn("KEEP THE VIEWPOINT OF THE REFERENCE", text)
+        self.assertIn("heel/back", text)
+
+    def test_no_fixed_rotation_anymore(self):
+        """Команды «носком влево» быть не должно: она и ломала задники."""
+        text = self._shoe()
+        self.assertNotIn("toe pointing left", text)
+        self.assertIn("same way", text)   # направление носка — как на исходнике
+
+    def test_studio_rules_stay(self):
+        """Единый вид держится светом и кадром, а не поворотом — это не трогаем."""
+        text = self._shoe()
+        self.assertIn("no foot, leg or mannequin", text)
+        self.assertIn("centred with even margins", text)
+
+    def test_reviewer_note_outranks_staging(self):
+        """Смысл кнопки «Переделать» — человек может переспорить автоматику."""
+        text = self._note(self._shoe(), "нужен вид сзади")
+        self.assertIn("overrides STAGING", text)
+        self.assertIn("never ", text.split("REVIEWER FEEDBACK")[1][:120])
+        self.assertIn("нужен вид сзади", text)
+
+    def test_note_still_cannot_break_fidelity(self):
+        """А вот точность товара замечанием не отменяется — иначе дорисуют принт."""
+        text = self._note(self._shoe(), "добавь логотип покрупнее")
+        self.assertIn("never ", text.lower())
+        self.assertIn("overrides PRODUCT FIDELITY", text)
