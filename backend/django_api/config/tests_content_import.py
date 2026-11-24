@@ -4,6 +4,8 @@
 сотрудников не перетираются; пакеты берутся только из нашего хранилища.
 """
 import io
+import shutil
+import tempfile
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -15,6 +17,7 @@ from catalog.models import Product, ProductPhoto
 from common.testutils import login_admin
 from config import content_import_view as ci
 
+_MEDIA = tempfile.mkdtemp(prefix="mata-content-import-")
 URL = "/admin/content-import/"
 PREFIX = "https://storage.yandexcloud.net/mata-media/content-import/"
 
@@ -37,8 +40,13 @@ MANIFEST = {
 }
 
 
-@override_settings(CONTENT_IMPORT_PREFIX=PREFIX)
+@override_settings(CONTENT_IMPORT_PREFIX=PREFIX, MEDIA_ROOT=_MEDIA)
 class ContentImportTests(TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(_MEDIA, ignore_errors=True)
+
     @classmethod
     def setUpTestData(cls):
         # Две позиции цвета -4 (два размера), одна позиция цвета -2 — у неё уже есть фото.
@@ -76,7 +84,7 @@ class ContentImportTests(TestCase):
     def test_apply_fills_only_empty(self):
         with mock.patch.object(ci, "_fetch", return_value=_png()):
             j = self.client.post(URL, {"batch": "bmai-test", "item": "0"}).json()
-        self.assertEqual(j["photos"], 1)                 # только цвет -4
+        self.assertEqual(j["photos"], 1, j)              # только цвет -4
         self.assertEqual(j["described"], 2)              # p1, p2; p3 уже с описанием
         self.assertEqual(ProductPhoto.objects.filter(model_key="XRMM002",
                                                      color="Белый/Красный").count(), 1)
