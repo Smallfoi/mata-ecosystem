@@ -11,6 +11,7 @@
 повторы идут через Celery (tasks). Любой сбой ИИ/сети фиксируется в самом задании
 (status=failed, текст в error) и НЕ роняет воркер.
 """
+import logging
 import re
 from datetime import timedelta
 
@@ -139,10 +140,23 @@ def recover_stuck(max_age=STALE_PROCESSING):
     ).update(status=PhotoJob.STATUS_FAILED, error=STUCK_ERROR, updated_at=now)
 
 
+log = logging.getLogger(__name__)
+
+
 def _fail(job, text):
+    """Записать сбой задания — и в карточку, и в журнал сервера.
+
+    Раньше текст уходил ТОЛЬКО в `job.error`, и причину видел один человек —
+    тот, кто открыл эту карточку в админке. 24.11.2026 из-за этого полдня
+    ушло на «почему не генерируется»: в логах было лишь `status: failed`,
+    а ответ («OpenAI HTTP 404: not found» — отказ релея) лежал на экране
+    владельца. Сбой, который не виден в логах, нельзя расследовать удалённо.
+    """
     job.status = PhotoJob.STATUS_FAILED
     job.error = str(text)[:2000]
     job.save(update_fields=["status", "error", "updated_at"])
+    log.warning("Фотопайплайн: задание %s (%s) не удалось — %s",
+                job.pk, job.article or "без артикула", job.error)
 
 
 def _category_name(product) -> str:
