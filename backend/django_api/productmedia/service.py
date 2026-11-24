@@ -22,7 +22,7 @@ from django.utils import timezone
 from catalog.models import Product
 from productmedia import images, processing, providers
 from productmedia.matching import _norm
-from productmedia.models import PhotoDetail, PhotoJob, PhotoPrompt
+from productmedia.models import PhotoBatch, PhotoDetail, PhotoJob, PhotoPrompt
 
 
 def add_detail(batch, article, content, filename="detail.jpg"):
@@ -204,7 +204,13 @@ def generate(job, note=None, from_statuses=CLAIM_QUEUED):
                                     item=job.product.name,
                                     category=_category_name(job.product))
         job.prompt = prompt_row
-        job.usage = providers.last_usage()
+        # У витринной обработки нет ни промта, ни токенов. Без этой оговорки в
+        # карточку попал бы расход от ЧУЖОЙ генерации: счётчик провайдера живёт
+        # в процессе и обнуляется только при обращении к нему.
+        if job.track == PhotoBatch.TRACK_SHOWCASE:
+            job.prompt, job.usage = None, {}
+        else:
+            job.usage = providers.last_usage()
         webp = images.make_webp(master)
 
         base = _safe_base(job)

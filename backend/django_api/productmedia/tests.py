@@ -936,3 +936,51 @@ class ShoeViewFromReferenceTests(TestCase):
         text = self._note(self._shoe(), "добавь логотип покрупнее")
         self.assertIn("never ", text.lower())
         self.assertIn("overrides PRODUCT FIDELITY", text)
+
+
+class RetrySwitchesModeTests(TestCase):
+    """Повтор может сменить способ: улучшить снимок или сгенерировать заново.
+
+    Иначе ради другого способа пришлось бы заново загружать всю партию — а у
+    владельца на экране «Ошибки» уже лежат десятки готовых заданий.
+    """
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from common.testutils import login_admin
+        get_user_model().objects.create_superuser("owner_rt", "rt@t.dev", "OwnerPass!2026")
+        login_admin(self.client, "owner_rt", "OwnerPass!2026")
+
+    def _job(self):
+        from productmedia.models import PhotoBatch, PhotoJob
+        Product.objects.create(id="rt1", name="Кроссовки", category_id="c", price=9000,
+                               article="RT-1", colors=["Белый"], model_key="RT")
+        batch = PhotoBatch.objects.create(track=PhotoBatch.TRACK_CATALOG)
+        return PhotoJob.objects.create(batch=batch, article="RT-1", product_id="rt1",
+                                       track=PhotoBatch.TRACK_CATALOG,
+                                       status=PhotoJob.STATUS_FAILED,
+                                       error="OpenAI HTTP 404: not found")
+
+    def test_retry_can_switch_to_showcase(self):
+        from unittest import mock
+        from django.urls import reverse
+        from productmedia.models import PhotoBatch, PhotoJob
+
+        job = self._job()
+        with mock.patch("productmedia.tasks.regenerate_job.delay"):
+            r = self.client.post(reverse("photo_review"),
+                                 {"action": "retry", "job": job.pk, "track": "showcase"})
+        self.assertTrue(r.json()["ok"])
+        job.refresh_from_db()
+        self.assertEqual(job.track, PhotoBatch.TRACK_SHOWCASE)
+        self.assertEqual(job.status, PhotoJob.STATUS_PENDING)
+
+    def test_unknown_mode_refused(self):
+        from django.urls import reverse
+
+        job = self._job()
+        r = self.client.post(reverse("photo_review"),
+                             {"action": "retry", "job": job.pk, "track": "магия"})
+        self.assertFalse(r.json()["ok"])
+        job.refresh_from_db()
+        self.assertEqual(job.track, "catalog")

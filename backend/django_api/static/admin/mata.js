@@ -641,6 +641,8 @@
       body.append("action", act);
       body.append("job", card.dataset.job);
       body.append("note", note);
+      // Кнопка может сменить способ: улучшение снимка или генерация заново.
+      if (btn.dataset.track) body.append("track", btn.dataset.track);
       card.classList.add("is-busy");
       post(body).then(function (data) {
         card.classList.remove("is-busy");
