@@ -47,6 +47,7 @@ from analytics import views as analytics_views
 from integrations import pareta as pareta_views
 from config.errors_view import error_detail, errors_console
 from config.data_check_view import data_check, data_check_closed, data_check_item
+from config.content_import_view import content_import
 from config.onec_fill_view import onec_fill
 from config.product_photos_view import product_photos
 from productmedia.views import photo_guide, photo_pipeline, photo_prompts, photo_review
@@ -82,6 +83,7 @@ urlpatterns = [
     path("admin/data-check/item/", data_check_item, name="data_check_item"),
     path("admin/data-check/closed/", data_check_closed, name="data_check_closed"),
     path("admin/photos/", product_photos, name="product_photos"),
+    path("admin/content-import/", content_import, name="content_import"),
     # Фотопайплайн: загрузка партии по артикулам → ИИ → проверка → витрина. ДО admin/.
     path("admin/photo-pipeline/", photo_pipeline, name="photo_pipeline"),
     path("admin/photo-pipeline/review/", photo_review, name="photo_review"),

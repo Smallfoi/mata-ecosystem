@@ -1217,6 +1217,8 @@ html.js.motion-off .hero .brand-wordmark span {
 }
 
 .pv-desc {
+  /* Описание по паспорту товара — абзацы и пункты «•» (24.11.2026). */
+  white-space: pre-line;
   margin: 14px 0 18px;
   color: var(--muted);
   font-size: var(--fs-body);
