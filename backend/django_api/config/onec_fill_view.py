@@ -5,14 +5,17 @@
 товар без категории не попадёт ни в один раздел, товар без цены нельзя
 продать, а без веса доставка считается по типовой коробке.
 
-Строки «Фото» здесь НЕТ намеренно: в 1С фото не будет, снимки ведём в своей
-системе (Фото товаров / Фотопайплайн). Но в «готовы к витрине» фото входит —
-товар без снимка продавать нельзя; проверяем его так же, как витрина.
+Строка «Фото» есть с 24.11.2026 (просьба владельца — видеть фото рядом с ценой и
+описанием), но без метки «1С»: в 1С фото не будет, снимки ведём в своей системе
+(Фото товаров / Фотопайплайн). Проверяем фото так же, как витрина; ниже — блок
+«Фото по брендам» со ссылками на загрузку.
 
 Страница отвечает на один вопрос: что именно просить заполнить в 1С в первую
 очередь. По каждому полю — сколько заполнено, сколько пусто и чем пустота
 грозит; «показать» открывает список именно незаполненных карточек.
 """
+from urllib.parse import quote
+
 from django.contrib import admin
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Q
@@ -70,6 +73,62 @@ def _percent(part: int, whole: int) -> int:
     return round(part * 100 / whole) if whole else 0
 
 
+def without_photo_ids(products=None) -> set:
+    """Позиции без снимка на витрине — для строки «Фото» и фильтра «Не заполнено».
+
+    Условие нельзя выразить одним Q: снимки лежат у модели и цвета, а не у позиции.
+    Поэтому считаем в Python — тем же `_has_photo`, что и «готовы к витрине», чтобы
+    цифра в сводке и список по «Показать» не разошлись.
+    """
+    products = list(Product.objects.all() if products is None else products)
+    shots = photolib.by_model({p.shop_model_key or p.id for p in products})
+    return {p.pk for p in products
+            if not _has_photo(p, shots.get(p.shop_model_key or p.id))}
+
+
+def _photo_by_brand(products, missing: set) -> list:
+    """Фото по брендам в моделях: сколько моделей совсем без снимков и сколько в наличии.
+
+    Модель «без фото», если ни у одной её позиции нет снимка; «частично» — снимки
+    есть не у всех цветов. Сотрудник снимает модель целиком, поэтому считаем модели.
+    """
+    models = {}
+    for p in products:
+        key = p.shop_model_key or p.id
+        m = models.setdefault(key, {"brand": (p.brand or "").strip(), "has": False,
+                                    "miss": False, "stock": False})
+        m["brand"] = m["brand"] or (p.brand or "").strip()
+        if p.pk in missing:
+            m["miss"] = True
+        else:
+            m["has"] = True
+        if p.in_stock:
+            m["stock"] = True
+
+    brands = {}
+    for m in models.values():
+        b = brands.setdefault(m["brand"], {"brand": m["brand"], "models": 0, "full": 0,
+                                          "partial": 0, "empty": 0, "empty_in_stock": 0})
+        b["models"] += 1
+        if not m["has"]:
+            b["empty"] += 1
+            if m["stock"]:
+                b["empty_in_stock"] += 1
+        elif m["miss"]:
+            b["partial"] += 1
+        else:
+            b["full"] += 1
+
+    rows = sorted(brands.values(), key=lambda b: (-b["empty"], -b["models"], b["brand"]))
+    photos = reverse("product_photos")
+    changelist = reverse("admin:catalog_product_changelist")
+    for b in rows:
+        b["percent"] = _percent(b["full"], b["models"])
+        b["upload_link"] = f"{photos}?q={quote(b['brand'])}" if b["brand"] else photos
+        b["list_link"] = (f"{changelist}?missing=photo&brand__exact={quote(b['brand'])}")
+    return rows
+
+
 @staff_member_required
 @tab_required("onec_fill")
 def onec_fill(request):
@@ -92,6 +151,21 @@ def onec_fill(request):
             "from_1c": key in FROM_1C,
             "link": f"{reverse('admin:catalog_product_changelist')}?missing={key}",
         })
+
+    # Фото — не поле 1С (снимки ведём сами), но владелец хочет видеть его в той же
+    # таблице, рядом с ценой и описанием (24.11.2026).
+    products = list(Product.objects.all())
+    missing_photo = without_photo_ids(products)
+    rows.append({
+        "key": "photo",
+        "title": "Фото",
+        "filled": total - len(missing_photo),
+        "blank": len(missing_photo),
+        "percent": _percent(total - len(missing_photo), total),
+        "risk": "покупатель видит пустую карточку",
+        "from_1c": False,
+        "link": f"{reverse('admin:catalog_product_changelist')}?missing=photo",
+    })
     rows.sort(key=lambda r: (-r["blank"], r["title"]))
 
     # Категория указана, но такой категории у нас нет — товар потеряется так же,
@@ -107,9 +181,8 @@ def onec_fill(request):
     # «Готов к витрине» = есть цена, фото и категория, КОТОРАЯ У НАС ЕСТЬ. Чужая
     # категория не считается: на витрине такой товар теряется ровно так же, как без неё.
     # Цена и категория — из 1С, фото — из нашей системы (в 1С их не будет).
-    sellable = list(Product.objects.filter(category_id__in=known).exclude(price__lte=0))
-    shots = photolib.by_model({p.shop_model_key or p.id for p in sellable})
-    ready = sum(1 for p in sellable if _has_photo(p, shots.get(p.shop_model_key or p.id)))
+    ready = sum(1 for p in products
+                if p.category_id in known and p.price > 0 and p.pk not in missing_photo)
 
     return TemplateResponse(request, "admin/onec_fill.html", {
         **admin.site.each_context(request),
@@ -124,4 +197,6 @@ def onec_fill(request):
         "last_at": timezone.localtime(last.created_at).strftime("%d.%m.%Y %H:%M")
         if last else "",
         "log_link": reverse("onec_log"),
+        "photo_brands": _photo_by_brand(products, missing_photo),
+        "photos_link": reverse("product_photos"),
     })
