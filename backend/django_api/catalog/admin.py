@@ -194,9 +194,14 @@ class MissingFilter(admin.SimpleListFilter):
     parameter_name = "missing"
 
     def lookups(self, request, model_admin):
-        return [(key, title) for key, title, _c, _r in MISSING_FIELDS]
+        return [(key, title) for key, title, _c, _r in MISSING_FIELDS] + [("photo", "Фото")]
 
     def queryset(self, request, queryset):
+        if self.value() == "photo":
+            # Снимки лежат у модели и цвета — одним Q не выразить; правило то же,
+            # что у строки «Фото» на странице заполненности.
+            from config.onec_fill_view import without_photo_ids
+            return queryset.filter(pk__in=without_photo_ids())
         for key, _title, cond, _risk in MISSING_FIELDS:
             if self.value() == key:
                 return queryset.filter(cond)

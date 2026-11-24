@@ -57,10 +57,30 @@ class OnecFillTests(TestCase):
             self.assertEqual(page.context["cl"].result_count, row["blank"],
                              f"расходится по полю «{row['title']}»")
 
-    def test_no_photo_row(self):
-        """Фото в 1С не ведём — их заполненность живёт в «Фото товаров», не здесь."""
-        keys = {r["key"] for r in self.client.get(FILL).context["rows"]}
-        self.assertNotIn("photo", keys)
+    def test_photo_row(self):
+        """Фото — в той же таблице (24.11.2026), но без метки «1С»: снимки ведём сами."""
+        row = self._row("photo")
+        self.assertEqual(row["blank"], 1)                         # только p_empty
+        self.assertFalse(row["from_1c"])
+        page = self.client.get(f"{LIST}?missing=photo")
+        self.assertEqual(page.context["cl"].result_count, 1)
+        self.assertEqual(page.context["cl"].result_list[0].pk, "p_empty")
+
+    def test_photo_from_our_system_counts(self):
+        """Снимок из «Фото товаров» (модель+цвет) закрывает пустоту и в строке, и в списке."""
+        ProductPhoto.objects.create(model_key=Product.objects.get(pk="p_empty").shop_model_key
+                                    or "p_empty", color="", image="uploads/photos/e.webp")
+        self.assertEqual(self._row("photo")["blank"], 0)
+        page = self.client.get(f"{LIST}?missing=photo")
+        self.assertEqual(page.context["cl"].result_count, 0)
+
+    def test_photo_by_brand(self):
+        """Блок по брендам считает модели: BMAI с фото, у «без бренда» одна пустая."""
+        brands = {b["brand"]: b for b in self.client.get(FILL).context["photo_brands"]}
+        self.assertEqual((brands["BMAI"]["full"], brands["BMAI"]["empty"]), (1, 0))
+        self.assertEqual((brands[""]["models"], brands[""]["empty"]), (2, 1))
+        bmai_list = self.client.get(brands["BMAI"]["list_link"])
+        self.assertEqual(bmai_list.context["cl"].result_count, 0)
 
     def test_foreign_category_is_visible(self):
         r = self.client.get(FILL)
