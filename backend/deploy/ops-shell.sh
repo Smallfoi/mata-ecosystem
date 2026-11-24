@@ -75,7 +75,7 @@ svc_restart() { case "$1" in web|worker|beat) return 0 ;; *) return 1 ;; esac; }
 # Management-команды: только те, что ничего не ломают необратимо и разобраны в PR.
 manage_allowed() {
   case "$1" in
-    check_launch_readiness|showmigrations|webify_site_videos|seed_trails|clean_seed_trails)
+    check_launch_readiness|showmigrations|webify_site_videos|seed_trails|clean_seed_trails|photo_route)
       return 0 ;;
     *) return 1 ;;
   esac
