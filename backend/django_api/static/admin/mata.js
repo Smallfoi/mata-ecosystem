@@ -628,6 +628,23 @@
       card.appendChild(note);
     }
 
+    var clear = document.querySelector("[data-role=clear]");
+    if (clear) clear.addEventListener("click", function () {
+      if (!window.confirm("Удалить ВСЕ снимки этой вкладки вместе с файлами?")) return;
+      var body = new FormData();
+      body.append("action", "delete_all");
+      body.append("status", clear.dataset.status);
+      clear.disabled = true;
+      post(body).then(function (data) {
+        if (data.ok) { window.location.reload(); return; }
+        clear.disabled = false;
+        window.alert(data.error || "не вышло");
+      }).catch(function () {
+        clear.disabled = false;
+        window.alert("сеть не ответила");
+      });
+    });
+
     grid.addEventListener("click", function (e) {
       var btn = e.target.closest("[data-act]");
       if (!btn) return;
@@ -636,6 +653,9 @@
       var field = card.querySelector("[data-role=note]");
       var note = field ? field.value.trim() : "";
       if (act === "redo" && !note) { fail(card, "Напишите, что исправить"); return; }
+      // Удаление необратимо и уносит файлы из хранилища — спрашиваем.
+      if (act === "delete" &&
+          !window.confirm("Удалить снимок совсем? Файлы тоже будут стёрты.")) return;
 
       var body = new FormData();
       body.append("action", act);
@@ -647,6 +667,7 @@
       post(body).then(function (data) {
         card.classList.remove("is-busy");
         if (!data.ok) { fail(card, data.error || "не вышло"); return; }
+        if (act === "delete") { card.remove(); return; }
         var state = card.querySelector("[data-role=state]");
         if (state) state.textContent = data.label;
         var acts = card.querySelector(".m-acts");
