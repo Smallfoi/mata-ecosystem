@@ -339,21 +339,31 @@ function pvBuildColors(card) {
   const list = (names.filter(Boolean).length ? names : dots).filter(Boolean);
 
   pvColor = null;
+  // Есть снимки цветов — квадратные плитки с фото, как у Nike: выбираешь вещь,
+  // а не кружок. Название выбранного цвета — рядом с подписью «Цвет».
+  // Снимков нет ни у одного — прежние кнопки «точка + название».
+  const tiles = list.some((name) => (pvPhotos[name] || [])[0]);
+  wrap.classList.toggle("pv-colors--tiles", tiles);
   wrap.innerHTML = list
     .map((name, i) => {
       const gone = out.includes(name);
       const dot = dots[i] || "#8a93a3";
-      // Кружок-мини-фото честнее точки: видно, как вещь выглядит в этом цвете,
-      // ещё до нажатия. Снимка нет — остаётся цветная точка.
       const shot = (pvPhotos[name] || [])[0];
-      const face = shot
-        ? `<i class="pv-color-shot" style="background-image:url('${shot.t}')"></i>`
-        : `<i style="--c:${dot}"></i>`;
+      const safe = escapeHtml(name);
+      const dis = gone ? ' disabled aria-disabled="true"' : "";
+      if (tiles) {
+        const face = shot
+          ? `<img src="${escapeHtml(shot.t)}" alt="" loading="lazy">`
+          : `<i style="--c:${dot}"></i>`;
+        return `<button type="button" class="pv-color pv-color--tile${gone ? " is-out" : ""}"` +
+          ` data-color="${safe}" title="${safe}" aria-label="Цвет: ${safe}"${dis}>${face}</button>`;
+      }
       return `<button type="button" class="pv-color${gone ? " is-out" : ""}"` +
-        ` data-color="${name}"${gone ? " disabled aria-disabled=\"true\"" : ""}>` +
-        `${face}<span>${name}</span></button>`;
+        ` data-color="${safe}"${dis}><i style="--c:${dot}"></i><span>${safe}</span></button>`;
     })
     .join("");
+  const nameEl = pvModal.querySelector("[data-pv-color-name]");
+  const showName = (n) => { if (nameEl) nameEl.textContent = tiles && n ? n : ""; };
 
   // Один цвет — выбирать нечего, отмечаем сразу.
   const buttons = wrap.querySelectorAll("button:not([disabled])");
@@ -362,16 +372,21 @@ function pvBuildColors(card) {
       wrap.querySelectorAll("button").forEach((x) => x.classList.remove("is-selected"));
       b.classList.add("is-selected");
       pvColor = b.dataset.color;
+      showName(pvColor);
       pvShowPhotos(pvColor);            // выбрал синий — видишь синий
     });
   });
   // Первый доступный цвет отмечаем сразу — как у Nike и STAW: карточка обязана
   // открыться показанной вещью, а не пустой галереей. Размер человек выбирает
   // сам: это настоящее решение, а цвет всегда виден на фото.
+  // Цвет, выбранный миниатюрой в ленте, — главнее первого по списку.
   if (buttons.length) {
-    buttons[0].classList.add("is-selected");
-    pvColor = buttons[0].dataset.color;
+    const picked = card.dataset.pickColor;
+    const first = [...buttons].find((b) => b.dataset.color === picked) || buttons[0];
+    first.classList.add("is-selected");
+    pvColor = first.dataset.color;
   }
+  showName(pvColor);
 }
 
 function pvBuildSizes(card) {
@@ -404,6 +419,124 @@ function pvBuildSizes(card) {
   });
 }
 
+// ── Описание по паспорту товара (утверждён 24.11.2026) ───────────────────────
+// Текст приходит одним полем: заголовок, вступление и разделы «Технологии:»,
+// «Посадка и размер:», «Кому подойдёт:», «Частые вопросы», «Характеристики:».
+// Простынёй он отодвигал кнопку «В корзину» за экран. Теперь как у Nike/Adidas/
+// ANTA: сначала покупка, ниже — короткое вступление и свёрнутые разделы
+// (владелец, 25.11.2026). Раздел узнаём только по строке-заголовку; не нашли
+// ни одного — показываем текст как есть, свёрнутым до трёх строк.
+const PV_KNOWN = ["технологии", "посадка и размер", "кому подойдёт", "кому подойдет",
+  "частые вопросы", "характеристики", "ткань и технологии", "состав и уход",
+  "материалы", "уход"];
+
+function pvSectionTitle(line) {
+  if (!line || line.startsWith("•") || line.length > 40) return "";
+  const bare = line.replace(/:$/, "").trim();
+  if (PV_KNOWN.includes(bare.toLowerCase())) return bare;
+  // Незнакомый заголовок раздела — короткая строка с двоеточием на конце.
+  if (line.endsWith(":") && bare.length >= 3 && bare.length <= 32 && !/[.?!]/.test(bare)) return bare;
+  return "";
+}
+
+function pvParseDesc(text) {
+  const lines = String(text || "").replace(/\r/g, "").split("\n");
+  const intro = [];
+  const sections = [];
+  let cur = null;
+  for (const raw of lines) {
+    const line = raw.trim();
+    const title = pvSectionTitle(line);
+    if (title) {
+      cur = { title, lines: [] };
+      sections.push(cur);
+    } else if (cur) {
+      if (line) cur.lines.push(line);
+    } else if (line) {
+      intro.push(line);
+    }
+  }
+  return { intro, sections };
+}
+
+function pvSectionHtml(sec) {
+  const t = sec.title.toLowerCase();
+  const strip = (l) => l.replace(/^•\s*/, "");
+  // Характеристики: «• Верх: сетка» → таблица «параметр — значение».
+  if (t === "характеристики" || t === "состав и уход") {
+    const rows = sec.lines.map((l) => {
+      const b = strip(l);
+      const i = b.indexOf(":");
+      return i > 0 && i < 40
+        ? `<dt>${escapeHtml(b.slice(0, i))}</dt><dd>${escapeHtml(b.slice(i + 1).trim())}</dd>`
+        : `<dd class="pv-spec-wide">${escapeHtml(b)}</dd>`;
+    });
+    return `<dl class="pv-spec">${rows.join("")}</dl>`;
+  }
+  // Частые вопросы: строка-вопрос (на «?») и ответ под ней.
+  if (t === "частые вопросы") {
+    return sec.lines
+      .map((l) => (l.endsWith("?")
+        ? `<p class="pv-faq-q">${escapeHtml(strip(l))}</p>`
+        : `<p class="pv-faq-a">${escapeHtml(strip(l))}</p>`))
+      .join("");
+  }
+  // Остальное — пункты. «Пена PG7 — мягкая…» → название пункта жирным.
+  let html = "";
+  let list = [];
+  const flush = () => { if (list.length) { html += `<ul>${list.join("")}</ul>`; list = []; } };
+  sec.lines.forEach((l) => {
+    if (!l.startsWith("•")) { flush(); html += `<p>${escapeHtml(l)}</p>`; return; }
+    const b = strip(l);
+    const k = b.indexOf(" — ");
+    list.push(k > 0 && k < 60
+      ? `<li><b>${escapeHtml(b.slice(0, k))}</b> — ${escapeHtml(b.slice(k + 3))}</li>`
+      : `<li>${escapeHtml(b)}</li>`);
+  });
+  flush();
+  return html;
+}
+
+function pvRenderDetails(text) {
+  const box = pvModal.querySelector("[data-pv-details]");
+  if (!box) return;
+  const { intro, sections } = pvParseDesc(text);
+  if (!intro.length && !sections.length) { box.innerHTML = ""; box.hidden = true; return; }
+  box.hidden = false;
+  // Вступление: первая строка паспорта — заголовок, дальше абзац. Если разделов
+  // нет (текст не по паспорту) — весь текст идёт абзацем.
+  const lead = sections.length && intro.length > 1 ? intro[0] : "";
+  const body = (lead ? intro.slice(1) : intro).join("\n");
+  let html = "";
+  if (lead || body) {
+    html += `<div class="pv-lead">` +
+      (lead ? `<p class="pv-lead-title">${escapeHtml(lead)}</p>` : "") +
+      (body ? `<p class="pv-lead-text" data-pv-lead-text>${escapeHtml(body)}</p>` +
+        `<button type="button" class="pv-more" data-pv-more hidden>Читать полностью</button>` : "") +
+      `</div>`;
+  }
+  sections.forEach((sec) => {
+    if (!sec.lines.length) return;
+    html += `<details class="pv-acc"><summary>${escapeHtml(sec.title)}</summary>` +
+      `<div class="pv-acc-body">${pvSectionHtml(sec)}</div></details>`;
+  });
+  box.innerHTML = html;
+  const textEl = box.querySelector("[data-pv-lead-text]");
+  const more = box.querySelector("[data-pv-more]");
+  if (textEl && more) {
+    textEl.classList.add("is-clamped");
+    // Кнопка нужна, только если текст правда обрезан. Меряем после показа окна.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (textEl.scrollHeight > textEl.clientHeight + 2) more.hidden = false;
+      else textEl.classList.remove("is-clamped");
+    }));
+    more.addEventListener("click", () => {
+      const open = !textEl.classList.toggle("is-clamped");
+      more.textContent = open ? "Свернуть" : "Читать полностью";
+    });
+  }
+}
+
 function openQuickView(card) {
   if (!pvModal || !card) return;
   pvCurrent = { name: card.dataset.name, price: Number(card.dataset.price) };
@@ -426,7 +559,7 @@ function openQuickView(card) {
   pvModal.querySelector("[data-pv-cat]").textContent = card.dataset.cat || "";
   pvModal.querySelector("[data-pv-name]").textContent = card.dataset.name || "";
   pvModal.querySelector("[data-pv-price]").textContent = formatPrice(Number(card.dataset.price));
-  pvModal.querySelector("[data-pv-desc]").textContent = card.dataset.desc || "";
+  pvRenderDetails(card.dataset.desc || "");
   const stockEl = pvModal.querySelector("[data-pv-stock]");
   const stock = card.dataset.stock || "В наличии";
   stockEl.textContent = stock;
@@ -478,6 +611,33 @@ function bindQuickView() {
         pick();
       }
     });
+  });
+
+  // Миниатюры цветов в ленте (как у Nike): наведение показывает вещь в этом цвете,
+  // нажатие закрепляет выбор — фото карточки остаётся этим цветом, и окно товара
+  // откроется сразу с ним. Окно по нажатию НЕ открываем: человек сравнивает цвета.
+  document.querySelectorAll("[data-swatch]:not([data-bound])").forEach((el) => {
+    el.setAttribute("data-bound", "1");
+    const card = el.closest(".product-card");
+    const img = card && card.querySelector(".product-media img");
+    if (!card || !img) return;
+    if (!card.dataset.baseImg) card.dataset.baseImg = img.getAttribute("src") || "";
+    const show = (src) => { if (src && img.getAttribute("src") !== src) img.src = src; };
+    const pinned = () => {
+      const sel = card.querySelector(".product-swatch.is-selected");
+      return (sel && sel.dataset.swatchImg) || card.dataset.baseImg;
+    };
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      card.querySelectorAll(".product-swatch").forEach((x) => x.classList.remove("is-selected"));
+      el.classList.add("is-selected");
+      card.dataset.pickColor = el.dataset.swatch;
+      show(el.dataset.swatchImg);
+    });
+    if (window.matchMedia && window.matchMedia("(hover: hover)").matches) {
+      el.addEventListener("mouseenter", () => show(el.dataset.swatchImg));
+      el.addEventListener("mouseleave", () => show(pinned()));
+    }
   });
 
   document.querySelectorAll("[data-quick-view]:not([data-bound])").forEach((el) => {
