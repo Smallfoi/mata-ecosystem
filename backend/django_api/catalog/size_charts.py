@@ -1,0 +1,86 @@
+"""Таблица размеров к карточке модели (D-138, владелец 25.11.2026).
+
+Порядок поиска:
+1. своя таблица модели (`models` в size_chart_data.json, ключ — начало артикула 1С;
+   сейчас это мерки изделий STAW с их сайта);
+2. таблица бренда по типу вещи (обувь / верх) и полу.
+
+Пол: у ANTA его видно по артикулу (812… — мужская обувь, 822… — женская, 852…/862… —
+мужская/женская одежда; сверено с anta-sport.ru), у остальных — по словам «муж»/«жен»
+в названии. Пол не определили — отдаём обе таблицы, человек выберет сам.
+Таблицы для брюк/шорт у брендов по обхвату груди не подходят — их не показываем.
+
+Данные — только опубликованные брендами, без пересчётов (см. `_comment` в JSON).
+"""
+from __future__ import annotations
+
+import json
+from functools import lru_cache
+from pathlib import Path
+
+DATA = Path(__file__).with_name("size_chart_data.json")
+
+FOOTWEAR = {"кроссовки", "ботинки", "кеды", "обувь"}
+TOPS = {"майка", "футболка", "лонгслив", "ветровка", "жилет", "куртка", "термобелье", "поло", "толстовка"}
+
+# Артикул ANTA: первые две цифры — группа товара.
+_ANTA_GENDER = {"81": ("footwear", "men"), "82": ("footwear", "women"),
+                "85": ("top", "men"), "86": ("top", "women")}
+
+
+@lru_cache(maxsize=1)
+def _data() -> dict:
+    return json.loads(DATA.read_text(encoding="utf-8"))
+
+
+def _kind(category_name: str) -> str:
+    name = (category_name or "").strip().lower()
+    if name in FOOTWEAR:
+        return "footwear"
+    if name in TOPS:
+        return "top"
+    return ""
+
+
+def _gender(brand: str, article: str, name: str, kind: str) -> str:
+    if brand == "ANTA":
+        hit = _ANTA_GENDER.get((article or "").strip()[:2])
+        if hit and hit[0] == kind:
+            return hit[1]
+    low = (name or "").lower()
+    if "жен" in low:
+        return "women"
+    if "муж" in low:
+        return "men"
+    return ""
+
+
+def _table(t: dict) -> dict:
+    return {
+        "title": t.get("title", ""),
+        "columns": t["columns"],
+        "rows": t["rows"],
+        "match": t.get("match", 0),
+        "note": t.get("note", ""),
+        "source": t.get("source", ""),
+    }
+
+
+def chart_for(*, brand: str, article: str, name: str, category_name: str) -> dict | None:
+    """Таблица для карточки: {"tables": [...]} или None, если её нет."""
+    data = _data()
+    art = (article or "").strip().upper()
+    for prefix, table in data.get("models", {}).items():
+        if art.startswith(prefix.upper()):
+            return {"tables": [_table(table)]}
+
+    brand = (brand or "").strip().upper()
+    kind = _kind(category_name)
+    group = data.get("brands", {}).get(brand, {}).get(kind)
+    if not group:
+        return None
+    gender = _gender(brand, article, name, kind)
+    if gender and gender in group:
+        return {"tables": [_table(group[gender])]}
+    order = [g for g in ("men", "women") if g in group]
+    return {"tables": [_table(group[g]) for g in order]} if order else None

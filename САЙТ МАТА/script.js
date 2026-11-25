@@ -373,6 +373,7 @@ function pvBuildColors(card) {
       b.classList.add("is-selected");
       pvColor = b.dataset.color;
       showName(pvColor);
+      pvShowArticle();
       pvShowPhotos(pvColor);            // выбрал синий — видишь синий
       pvRenderSizes();                  // и размеры — те, что есть в синем
     });
@@ -436,6 +437,7 @@ function pvRenderSizes() {
       wrap.querySelectorAll("button").forEach((x) => x.classList.remove("is-selected"));
       b.classList.add("is-selected");
       pvSize = b.dataset.size;
+      pvMarkGuideRow();
     });
   });
 }
@@ -558,6 +560,124 @@ function pvRenderDetails(text) {
   }
 }
 
+// ── Артикул и таблица размеров (владелец, 25.11.2026; D-138) ────────────────────
+let pvExtra = {};     // {sizeChart, articles: {цвет: артикул}, article} — из catalog.js
+
+// Артикул выбранного цвета мелко под названием, как у ANTA: по нему вещь
+// находят на сайте бренда. Нажатие копирует.
+function pvShowArticle() {
+  const el = pvModal.querySelector("[data-pv-article]");
+  if (!el) return;
+  const art = ((pvExtra.articles || {})[pvColor || ""]) || pvExtra.article || "";
+  el.hidden = !art;
+  el.textContent = art ? `Артикул: ${art}` : "";
+  el.dataset.copy = art;
+  el.title = art ? "Скопировать артикул" : "";
+}
+
+function pvNorm(v) {
+  return String(v || "").trim().replace(",", ".").toUpperCase();
+}
+
+function pvGuideTable(t) {
+  const head = t.columns.map((c) => `<th scope="col">${escapeHtml(c)}</th>`).join("");
+  const rows = t.rows.map((r) => {
+    const key = pvNorm(r[t.match || 0]);
+    return `<tr data-sg-key="${escapeHtml(key)}">` +
+      r.map((c, i) => (i === (t.match || 0)
+        ? `<th scope="row">${escapeHtml(c || "—")}</th>`
+        : `<td>${escapeHtml(c || "—")}</td>`)).join("") + "</tr>";
+  }).join("");
+  let src = "";
+  if (t.source) {
+    src = /^https?:\/\//.test(t.source)
+      ? `<a href="${escapeHtml(t.source)}" target="_blank" rel="noopener">Источник — сайт бренда</a>`
+      : `Источник: ${escapeHtml(t.source)}`;
+  }
+  return `<div class="pv-sg-scroll"><table class="pv-sg-table"><thead><tr>${head}</tr></thead>` +
+    `<tbody>${rows}</tbody></table></div>` +
+    (t.note ? `<p class="pv-sg-note">${escapeHtml(t.note)}</p>` : "") +
+    (src ? `<p class="pv-sg-src">${src}</p>` : "");
+}
+
+// Подсветить строку выбранного размера (у обуви наш размер — EU, первая колонка).
+function pvMarkGuideRow() {
+  const body = pvModal.querySelector("[data-pv-sg-body]");
+  if (!body) return;
+  const want = pvNorm(pvSize);
+  body.querySelectorAll("tr[data-sg-key]").forEach((tr) => {
+    const keys = tr.dataset.sgKey.split(" / ");
+    tr.classList.toggle("is-picked", Boolean(want) && keys.includes(want));
+  });
+}
+
+function pvSetupSizeGuide() {
+  const open = pvModal.querySelector("[data-pv-sg-open]");
+  const body = pvModal.querySelector("[data-pv-sg-body]");
+  const chart = pvExtra.sizeChart;
+  const tables = (chart && Array.isArray(chart.tables)) ? chart.tables : [];
+  if (open) open.hidden = !tables.length;
+  if (!body) return;
+  if (!tables.length) { body.innerHTML = ""; return; }
+  // Пол не определён — обе таблицы, переключателем (как «Мужчины / Женщины» у Nike).
+  const tabs = tables.length > 1
+    ? `<div class="pv-sg-tabs" role="tablist">` + tables.map((t, i) =>
+      `<button type="button" role="tab" data-sg-tab="${i}" aria-selected="${i === 0}"` +
+      `${i === 0 ? ' class="is-active"' : ""}>${escapeHtml(t.title.split("·").pop().trim())}</button>`).join("") +
+      `</div>`
+    : `<p class="pv-sg-title">${escapeHtml(tables[0].title)}</p>`;
+  body.innerHTML = tabs + tables.map((t, i) =>
+    `<div class="pv-sg-pane" data-sg-pane="${i}"${i ? " hidden" : ""}>${pvGuideTable(t)}</div>`).join("");
+  body.querySelectorAll("[data-sg-tab]").forEach((b) => b.addEventListener("click", () => {
+    body.querySelectorAll("[data-sg-tab]").forEach((x) => {
+      const on = x === b;
+      x.classList.toggle("is-active", on);
+      x.setAttribute("aria-selected", String(on));
+    });
+    body.querySelectorAll("[data-sg-pane]").forEach((p) => { p.hidden = p.dataset.sgPane !== b.dataset.sgTab; });
+  }));
+  pvMarkGuideRow();
+}
+
+if (pvModal) {
+  const sg = pvModal.querySelector("[data-pv-sg]");
+  const openBtn = pvModal.querySelector("[data-pv-sg-open]");
+  const card = pvModal.querySelector(".pv-card");
+  const closeSg = () => {
+    if (sg) sg.hidden = true;
+    if (card) card.classList.remove("is-sg-open");
+    if (openBtn) openBtn.focus();
+  };
+  if (openBtn && sg) {
+    openBtn.addEventListener("click", () => {
+      pvMarkGuideRow();
+      // На телефоне окно прокручивается целиком: панель лежит поверх его верха,
+      // поэтому поднимаем окно и замираем прокрутку под панелью.
+      if (card) { card.scrollTop = 0; card.classList.add("is-sg-open"); }
+      sg.hidden = false;
+      const x = sg.querySelector("[data-pv-sg-close]");
+      if (x) x.focus();
+    });
+    sg.addEventListener("click", (e) => { if (e.target === sg) closeSg(); });
+    sg.querySelector("[data-pv-sg-close]").addEventListener("click", closeSg);
+    sg.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.stopPropagation(); closeSg(); }
+    });
+  }
+  const art = pvModal.querySelector("[data-pv-article]");
+  if (art) {
+    art.addEventListener("click", () => {
+      const v = art.dataset.copy;
+      if (!v || !navigator.clipboard) return;
+      navigator.clipboard.writeText(v).then(() => {
+        art.textContent = "Артикул скопирован";
+        art.classList.add("is-copied");
+        setTimeout(() => { art.classList.remove("is-copied"); pvShowArticle(); }, 1400);
+      }).catch(() => {});
+    });
+  }
+}
+
 function openQuickView(card) {
   if (!pvModal || !card) return;
   pvCurrent = { name: card.dataset.name, price: Number(card.dataset.price) };
@@ -581,6 +701,7 @@ function openQuickView(card) {
   pvModal.querySelector("[data-pv-name]").textContent = card.dataset.name || "";
   pvModal.querySelector("[data-pv-price]").textContent = formatPrice(Number(card.dataset.price));
   pvRenderDetails(card.dataset.desc || "");
+  pvExtra = (window.MATA_MODEL_EXTRA || {})[card.dataset.id] || {};
   const stockEl = pvModal.querySelector("[data-pv-stock]");
   const stock = card.dataset.stock || "В наличии";
   stockEl.textContent = stock;
@@ -590,6 +711,8 @@ function openQuickView(card) {
   pvBuildColors(card);
   pvBuildSizes(card);
   pvShowPhotos(pvColor);                // один цвет — галерея открыта сразу
+  pvShowArticle();
+  pvSetupSizeGuide();
   pvPrefetch();
   pvModal.classList.add("is-open");
   pvModal.setAttribute("aria-hidden", "false");
@@ -605,6 +728,10 @@ function pvWarn(text) {
 
 function closeQuickView() {
   if (!pvModal) return;
+  const sgPanel = pvModal.querySelector("[data-pv-sg]");
+  if (sgPanel) sgPanel.hidden = true;
+  const pvCardEl = pvModal.querySelector(".pv-card");
+  if (pvCardEl) pvCardEl.classList.remove("is-sg-open");
   pvModal.classList.remove("is-open");
   pvModal.setAttribute("aria-hidden", "true");
 }

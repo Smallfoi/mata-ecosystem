@@ -343,7 +343,7 @@ class ModelPhotoTests(TestCase):
         """Две сотни карточек не должны превратиться в две сотни запросов."""
         for i in range(3):
             self._photo("ЧЕРНЫЙ", i, f"b{i}")
-        with self.assertNumQueries(2):        # товары + фото
+        with self.assertNumQueries(3):        # товары + фото + категории (D-138)
             self.client.get("/v1/models")
 
     def test_old_position_photo_still_works(self):

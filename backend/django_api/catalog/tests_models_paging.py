@@ -21,8 +21,9 @@ from django.test.utils import CaptureQueriesContext
 from catalog.models import Product, ProductPhoto
 from catalog.tests_models_api import make
 
-# Бюджет запросов к БД на один ответ списка: позиции + фото. Не растёт с каталогом.
-QUERY_BUDGET = 2
+# Бюджет запросов к БД на один ответ списка: позиции + фото + названия категорий
+# (для таблицы размеров, D-138). Не растёт с каталогом.
+QUERY_BUDGET = 3
 
 
 def make_models(count, start=0):

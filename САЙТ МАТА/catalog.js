@@ -86,8 +86,19 @@
 
   // Карточка модели (/v1/models) → те же поля, что ждёт вёрстка карточки.
   // Одна карточка на модель: внутри цвета, у каждого свои размеры с наличием.
+  // Тяжёлое для окна товара (таблица размеров, артикулы цветов) — в словарь по id
+  // модели, а не в атрибуты карточки: две сотни таблиц в разметке — сотни килобайт.
+  window.MATA_MODEL_EXTRA = window.MATA_MODEL_EXTRA || {};
+
   function fromModel(card) {
     var colors = Array.isArray(card.colors) ? card.colors : [];
+    var articles = {};
+    colors.forEach(function (c) { if (c.name && c.article) articles[c.name] = c.article; });
+    window.MATA_MODEL_EXTRA[card.key] = {
+      sizeChart: card.sizeChart || null,
+      articles: articles,
+      article: card.article || ""
+    };
     var named = colors.filter(function (c) { return String(c.name || "").trim(); });
     var sizes = Array.isArray(card.sizes) ? card.sizes.slice() : [];
     var available = {};
