@@ -374,6 +374,7 @@ function pvBuildColors(card) {
       pvColor = b.dataset.color;
       showName(pvColor);
       pvShowPhotos(pvColor);            // выбрал синий — видишь синий
+      pvRenderSizes();                  // и размеры — те, что есть в синем
     });
   });
   // Первый доступный цвет отмечаем сразу — как у Nike и STAW: карточка обязана
@@ -389,25 +390,45 @@ function pvBuildColors(card) {
   showName(pvColor);
 }
 
+let pvSizesAll = [];   // все размеры модели — порядок кнопок не скачет между цветами
+let pvSizesOut = [];   // размеры без остатка по модели целиком (запасной путь)
+
+// Есть ли размер в наличии в ВЫБРАННОМ цвете. Остаток приходит по позициям
+// склада (цвет × размер): у серо-оранжевого может быть только 40.5, а у чёрного —
+// 40.5 и 42. Разбивки по цветам нет (старые карточки) — судим по модели.
+function pvSizeInStock(size) {
+  const byColor = pvVariants[pvColor || ""] || (pvColor ? null : pvVariants[""]);
+  if (!Object.keys(pvVariants).length || !byColor) return !pvSizesOut.includes(size);
+  const v = byColor[size];
+  return Boolean(v) && v[2] !== 0;
+}
+
 function pvBuildSizes(card) {
-  const wrap = pvModal.querySelector("[data-pv-sizes]");
-  const sizes = (card.dataset.sizes || "")
+  pvSizesAll = (card.dataset.sizes || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  // Размеры, которых нет на складе (остаток по размерам из 1С): показываем, но
-  // выбрать нельзя. Спрятать их — значит заставить человека гадать, был ли его размер.
-  const out = (card.dataset.outofstock || "")
+  pvSizesOut = (card.dataset.outofstock || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   pvSize = null;
-  wrap.innerHTML = sizes
+  pvRenderSizes();
+}
+
+// Размеры, которых нет в выбранном цвете: показываем зачёркнутыми, выбрать нельзя.
+// Спрятать — значит заставить человека гадать, был ли его размер. Выбранный
+// размер переживает смену цвета, если он есть и в новом цвете.
+function pvRenderSizes() {
+  const wrap = pvModal.querySelector("[data-pv-sizes]");
+  if (!wrap) return;
+  if (pvSize && !pvSizeInStock(pvSize)) pvSize = null;
+  wrap.innerHTML = pvSizesAll
     .map((s) => {
-      const gone = out.includes(s);
+      const gone = !pvSizeInStock(s);
       return `<button type="button" data-size="${s}"${
         gone ? ' class="is-out" disabled aria-disabled="true"' : ""
-      }>${s}</button>`;
+      }${!gone && s === pvSize ? ' class="is-selected"' : ""}>${s}</button>`;
     })
     .join("");
   wrap.querySelectorAll("button:not([disabled])").forEach((b) => {
@@ -597,8 +618,18 @@ function bindQuickView() {
     const pick = () => {
       openQuickView(card);
       const wanted = el.dataset.quickSize;
-      const button = pvModal.querySelector(
+      const find = () => pvModal.querySelector(
         `[data-pv-sizes] button[data-size="${CSS.escape(wanted)}"]:not([disabled])`);
+      // Размер есть у модели, но не в первом цвете — переключаемся на цвет, где он есть.
+      if (!find()) {
+        const colors = [...pvModal.querySelectorAll("[data-pv-colors] button:not([disabled])")];
+        const fit = colors.find((b) => {
+          const v = (pvVariants[b.dataset.color] || {})[wanted];
+          return v && v[2] !== 0;
+        });
+        if (fit) fit.click();
+      }
+      const button = find();
       if (button) button.click();
     };
     el.addEventListener("click", (e) => {
@@ -670,7 +701,7 @@ if (pvModal) {
     // сочетания. Без него сервер не сверит заказ с каталогом и откажет (D-94).
     const byColor = pvVariants[pvColor || ""] || pvVariants[""] || {};
     const variant = byColor[pvSize || ""] || byColor[""];
-    if (Object.keys(pvVariants).length && !variant) {
+    if (Object.keys(pvVariants).length && (!variant || variant[2] === 0)) {
       return pvWarn("Этого сочетания нет в наличии");
     }
 

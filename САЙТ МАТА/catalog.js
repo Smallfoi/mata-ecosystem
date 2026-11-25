@@ -51,7 +51,9 @@
     return "#8a93a3";
   }
 
-  // Позиции склада по цвету и размеру: {«ЧЁРНЫЙ»: {«41»: ["p1", 4490]}}.
+  // Позиции склада по цвету и размеру: {«ЧЁРНЫЙ»: {«41»: ["p1", 4490, 1]}}.
+  // Третье число — есть ли позиция на складе (1/0): размеры в окне товара
+  // считаются по ВЫБРАННОМУ цвету, а не по модели целиком (владелец, 25.11.2026).
   // Именно id позиции уходит в заказ: карточка на витрине — это модель, а склад
   // собирает конкретную вещь. Размер или цвет могут быть пустыми — тогда ключ «».
   function variantsByColor(colors) {
@@ -60,7 +62,8 @@
       var bySize = {};
       (c.sizes || []).forEach(function (v) {
         if (!v || !v.productId) return;
-        bySize[String(v.size || "")] = [String(v.productId), Number(v.price) || 0];
+        bySize[String(v.size || "")] = [String(v.productId), Number(v.price) || 0,
+          v.inStock === false ? 0 : 1];
       });
       if (Object.keys(bySize).length) out[c.name] = bySize;
     });
