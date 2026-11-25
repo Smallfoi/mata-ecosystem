@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from common.throttling import PUBLIC_READ
 
 from . import photos as photolib
+from . import size_charts as sizecharts
 from .models import Product
 
 # Порядок размеров: по алфавиту вышло бы «L, M, S, XL».
@@ -105,7 +106,16 @@ def _model_rating(items):
     return round(best.rating or 0, 1), (best.review_count or 0)
 
 
-def build_card(items, photos: dict | None = None) -> dict:
+def _category_names(ids) -> dict:
+    """{id: название} категорий одним запросом — для подбора таблицы размеров."""
+    from .models import Category
+    ids = {i for i in ids if i}
+    if not ids:
+        return {}
+    return dict(Category.objects.filter(id__in=ids).values_list("id", "name"))
+
+
+def build_card(items, photos: dict | None = None, category_names: dict | None = None) -> dict:
     """Собрать карточку модели из складских позиций одной модели.
 
     `photos` — снимки этой модели по цветам (`catalog.photos.by_model`). Их отдают
@@ -119,9 +129,13 @@ def build_card(items, photos: dict | None = None) -> dict:
 
     for product in items:
         for color in _variant_colors(product):
-            entry = colors.setdefault(color, {"name": color, "imageUrl": "",
+            entry = colors.setdefault(color, {"name": color, "article": "", "imageUrl": "",
                                               "cardUrl": "", "thumbUrl": "", "photos": [],
                                               "sizes": [], "inStock": False})
+            # Артикул цвета из 1С (у каждого цвета свой: 812625546-1, -2…). Покупатель
+            # находит по нему вещь на сайте бренда (владелец, 25.11.2026).
+            if not entry["article"] and (product.article or "").strip():
+                entry["article"] = product.article.strip()
             if not entry["photos"]:
                 entry["photos"] = [p.to_json() for p in photolib.pick(photos, color)]
             if not entry["imageUrl"]:
@@ -159,6 +173,12 @@ def build_card(items, photos: dict | None = None) -> dict:
     card_img = next((c["cardUrl"] for c in colors.values() if c["cardUrl"]), image)
     thumb = next((c["thumbUrl"] for c in colors.values() if c["thumbUrl"]), image)
     rating, review_count = _model_rating(items)
+    if category_names is None:
+        category_names = _category_names([first.category_id])
+    article_any = next((p.article for p in items if (p.article or "").strip()), "")
+    size_chart = sizecharts.chart_for(
+        brand=first.brand or "", article=article_any, name=first.name or "",
+        category_name=category_names.get(first.category_id, ""))
 
     return {
         "key": first.shop_model_key or first.id,
@@ -182,6 +202,8 @@ def build_card(items, photos: dict | None = None) -> dict:
         "variantCount": len(items),
         "sizes": sizes_all,
         "colors": list(colors.values()),
+        # Таблица размеров (D-138): своя таблица модели или таблица бренда; null — нет.
+        "sizeChart": size_chart,
     }
 
 
@@ -199,7 +221,8 @@ def build_cards(queryset, offset: int = 0, limit: int | None = None):
     keys = list(groups.keys())
     keys = keys[offset:] if limit is None else keys[offset:offset + limit]
     photos = photolib.by_model(keys) if keys else {}
-    return [build_card(groups[key], photos.get(key)) for key in keys], total
+    names = _category_names({groups[k][0].category_id for k in keys})
+    return [build_card(groups[key], photos.get(key), names) for key in keys], total
 
 
 # Потолок страницы `/v1/models?limit=`. Без `limit` отдаём весь список, как раньше:
