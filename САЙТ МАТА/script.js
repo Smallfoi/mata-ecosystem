@@ -614,8 +614,7 @@ function bindQuickView() {
   });
 
   // Миниатюры цветов в ленте (как у Nike): наведение показывает вещь в этом цвете,
-  // нажатие закрепляет выбор — фото карточки остаётся этим цветом, и окно товара
-  // откроется сразу с ним. Окно по нажатию НЕ открываем: человек сравнивает цвета.
+  // нажатие открывает карточку товара сразу в этом цвете (владелец, 25.11.2026).
   document.querySelectorAll("[data-swatch]:not([data-bound])").forEach((el) => {
     el.setAttribute("data-bound", "1");
     const card = el.closest(".product-card");
@@ -633,6 +632,7 @@ function bindQuickView() {
       el.classList.add("is-selected");
       card.dataset.pickColor = el.dataset.swatch;
       show(el.dataset.swatchImg);
+      openQuickView(card);
     });
     if (window.matchMedia && window.matchMedia("(hover: hover)").matches) {
       el.addEventListener("mouseenter", () => show(el.dataset.swatchImg));

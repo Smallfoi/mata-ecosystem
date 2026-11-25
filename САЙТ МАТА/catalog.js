@@ -153,14 +153,14 @@
     return abs(p.cardUrl || p.imageUrl || p.thumbUrl || "");
   }
 
-  // Миниатюры цветов для ленты. Только когда цветов больше одного и хотя бы у одного
-  // есть снимок: один цвет и так виден на главном фото. Показываем до SWATCH_MAX,
-  // остальные — счётчиком «+N» (он открывает карточку, где видны все).
+  // Миниатюры цветов для ленты: у цвета есть снимок — фото, нет — кружок
+  // (правило владельца, 25.11.2026). Ни у одного цвета снимков нет — остаются
+  // прежние точки. Показываем до SWATCH_MAX, остальные — «+N» (открывает карточку).
   var SWATCH_MAX = 4;
   function swatchesHtml(p) {
     var names = Array.isArray(p.colorNames) ? p.colorNames : [];
     var shots = p.photos || {};
-    if (names.length < 2) return "";
+    if (!names.length) return "";
     var anyShot = names.some(function (n) { return shots[n] && shots[n][0]; });
     if (!anyShot) return "";
     var out = Array.isArray(p.outColors) ? p.outColors : [];
