@@ -153,6 +153,38 @@
     return abs(p.cardUrl || p.imageUrl || p.thumbUrl || "");
   }
 
+  // Миниатюры цветов для ленты. Только когда цветов больше одного и хотя бы у одного
+  // есть снимок: один цвет и так виден на главном фото. Показываем до SWATCH_MAX,
+  // остальные — счётчиком «+N» (он открывает карточку, где видны все).
+  var SWATCH_MAX = 4;
+  function swatchesHtml(p) {
+    var names = Array.isArray(p.colorNames) ? p.colorNames : [];
+    var shots = p.photos || {};
+    if (names.length < 2) return "";
+    var anyShot = names.some(function (n) { return shots[n] && shots[n][0]; });
+    if (!anyShot) return "";
+    var out = Array.isArray(p.outColors) ? p.outColors : [];
+    var dots = Array.isArray(p.colors) ? p.colors : [];
+    var items = names.slice(0, SWATCH_MAX).map(function (n, i) {
+      var shot = (shots[n] || [])[0];
+      var gone = out.indexOf(n) !== -1;
+      var face = shot
+        ? '<img src="' + esc(shot.t) + '" alt="" loading="lazy" decoding="async" />'
+        : '<i style="--c:' + esc(dots[i] || "#8a93a3") + '"></i>';
+      return '<button type="button" class="product-swatch' + (gone ? " is-out" : "") + '"' +
+        ' data-swatch="' + esc(n) + '"' +
+        (shot ? ' data-swatch-img="' + esc(shot.u) + '"' : "") +
+        ' aria-label="Цвет: ' + esc(n) + (gone ? " (нет в наличии)" : "") + '"' +
+        ' title="' + esc(n) + '">' + face + "</button>";
+    });
+    var more = names.length - SWATCH_MAX;
+    if (more > 0) {
+      items.push('<span class="product-swatch-more" data-quick-view role="button" tabindex="0"' +
+        ' aria-label="Ещё ' + more + ' цв.">+' + more + "</span>");
+    }
+    return '<div class="product-swatches" role="group" aria-label="Цвета">' + items.join("") + "</div>";
+  }
+
   function cardHtml(p) {
     var img = imgUrl(p);
     var thumb = cardImgUrl(p) || img;
@@ -183,6 +215,7 @@
     var colorDots = colors
       .map(function (c) { return '<i style="--c:' + esc(c) + '"></i>'; })
       .join("");
+    var swatches = swatchesHtml(p);
     // Остаток по размерам приходит из 1С (stockBySize). Пусто — разбивки нет,
     // и тогда доступны все размеры: прятать имеющийся хуже, чем показать лишний.
     var bySize = p.stockBySize && typeof p.stockBySize === "object" ? p.stockBySize : null;
@@ -224,7 +257,12 @@
         ? '<div class="product-rating">★ ' + (Number(p.rating) || 0).toFixed(1) +
           ' <span>(' + Number(p.reviewCount) + ")</span></div>"
         : "") +
-      (colorDots ? '<div class="product-colors" aria-hidden="true">' + colorDots + "</div>" : "") +
+      // Несколько цветов со снимками — миниатюры, как у Nike: видно вещь в каждом
+      // цвете прямо в ленте, нажал — фото карточки сменилось (владелец, 25.11.2026).
+      // Снимков нет — прежние точки.
+      (swatches
+        ? swatches
+        : colorDots ? '<div class="product-colors" aria-hidden="true">' + colorDots + "</div>" : "") +
       (sizeChips ? '<div class="product-sizes" aria-hidden="true">' + sizeChips + "</div>" : "") +
       '<div class="product-bottom">' +
       '<span class="product-price">' + priceFmt(p.price) + "</span>" +
