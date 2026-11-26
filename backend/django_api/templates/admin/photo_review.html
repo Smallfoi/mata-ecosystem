@@ -23,7 +23,17 @@
   остаётся у нас для рекламы и на витрину НЕ попадает (вкладка «Маркетинг», там же
   кнопка скачивания). «Переделать» — напишите,
   что исправить («принт перенесён на перед», «не та ткань»): замечание уйдёт в промт новой
-  попытки. «Отклонить» — брак, причина сохранится в журнале.
+  попытки. «Улучшить снимок» — обработать исходник без ИИ: белый фон, единый кадр, резкость.
+  «Отклонить» — брак, причина сохранится в журнале. «Удалить» — убрать снимок совсем,
+  вместе с файлами; принятые на витрину так не удаляются.
+</div>
+{% endif %}
+
+{% if can_edit and items and show == "failed" or can_edit and items and show == "rejected" %}
+<div class="m-row">
+  <button type="button" class="m-btn bad" data-role="clear" data-status="{{ show }}">
+    Очистить вкладку</button>
+  <span class="m-small m-muted">Удалит все снимки этой вкладки вместе с файлами</span>
 </div>
 {% endif %}
 
@@ -75,6 +85,9 @@
                       title="Обработать исходник без ИИ: белый фон, единый кадр, резкость"
                       >Улучшить снимок</button>
               <button type="button" class="m-btn bad" data-act="reject">Отклонить</button>
+              <button type="button" class="m-btn bad" data-act="delete"
+                      title="Убрать снимок совсем: из списка и из хранилища"
+                      >Удалить</button>
             </div>
           {% elif it.status == "failed" or it.status == "rejected" %}
             <textarea class="m-input" rows="2" data-role="note" placeholder="Замечание к новой попытке (необязательно)"></textarea>
@@ -86,6 +99,9 @@
               <button type="button" class="m-btn" data-act="retry" data-track="{{ it.ai_track }}"
                       title="Нарисовать картинку заново по этому снимку — ракурс и детали могут измениться"
                       >Сгенерировать заново</button>
+              <button type="button" class="m-btn bad" data-act="delete"
+                      title="Убрать снимок совсем: из списка и из хранилища"
+                      >Удалить</button>
             </div>
           {% endif %}
         {% endif %}

@@ -533,8 +533,9 @@ UNFOLD = {
                     {"title": "Импорт контента", "icon": "cloud_download",
                      "link": reverse_lazy("content_import"),
                      "permission": _tab("content_import")},
-                    # Фотопайплайн: партии исходников по артикулу → ИИ → проверка.
-                    {"title": "Фотопайплайн", "icon": "auto_awesome",
+                    # Партии исходников по артикулу → обработка или генерация → проверка.
+                    # Название видимое: «пайплайн» — жаргон, владелец просил по-русски.
+                    {"title": "Обработка фото", "icon": "auto_awesome",
                      "link": reverse_lazy("photo_pipeline"),
                      "permission": _tab("photo_pipeline")},
                     {"title": "Проверка фото", "icon": "fact_check",

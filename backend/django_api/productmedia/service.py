@@ -228,6 +228,43 @@ def generate(job, note=None, from_statuses=CLAIM_QUEUED):
     return job
 
 
+# Удалять можно только то, что НЕ ушло на витрину. Принятый снимок уже скопирован
+# в карточку товара, и строка задания — единственный след, откуда он взялся.
+REMOVABLE = (PhotoJob.STATUS_FAILED, PhotoJob.STATUS_REJECTED,
+             PhotoJob.STATUS_REVIEW, PhotoJob.STATUS_SKIPPED)
+
+
+def remove(job) -> str:
+    """Убрать задание совсем: файлы из хранилища и строку. Возвращает текст ошибки или "".
+
+    Файлы удаляем явно: при удалении строки Django их не трогает, и в S3 остались бы
+    исходник и мастер — мусор, за который мы платим и который содержит чужие снимки.
+    """
+    if job.status not in REMOVABLE:
+        return "этот снимок удалить нельзя — он уже на витрине или в работе"
+    for field in (job.source, job.master, job.webp):
+        try:
+            if field:
+                field.delete(save=False)
+        except Exception:                    # noqa: BLE001 — нет файла в хранилище
+            pass
+    job.delete()
+    return ""
+
+
+def remove_all(status) -> int:
+    """Очистить вкладку: все задания одного статуса. Технические прогоны не трогаем."""
+    if status not in REMOVABLE:
+        return 0
+    count = 0
+    rows = (PhotoJob.objects.filter(status=status)
+            .exclude(batch__note=PhotoBatch.NOTE_TEST))
+    for job in rows:
+        if not remove(job):
+            count += 1
+    return count
+
+
 def approve(job, user=None):
     """«Принять»: выложить результат в галерею витрины → «На витрине».
 
