@@ -634,6 +634,7 @@ function pvShowPhotos(color) {
     img.src = url;
     if (media) media.classList.remove("is-empty");
   }
+  pdpSlides(url ? list : []);
   if (!strip) return;
   if (list.length < 2) {
     strip.hidden = true;
@@ -653,6 +654,32 @@ function pvShowPhotos(color) {
       img.src = list[i].u;
     });
   });
+}
+
+// Галерея страницы товара: первый снимок — [data-pv-img], остальные — следом.
+// На компьютере сетка, на телефоне листаются пальцем; счётчик «2 / 5».
+function pdpSlides(list) {
+  const box = pvModal.querySelector("[data-pdp-slides]");
+  const count = pvModal.querySelector("[data-pdp-count]");
+  if (!box) return;
+  box.querySelectorAll("img:not([data-pv-img])").forEach((el) => el.remove());
+  const name = (pvCard && pvCard.dataset.name) || "";
+  list.slice(1).forEach((ph, i) => {
+    const el = document.createElement("img");
+    el.src = ph.u;
+    el.alt = `${name} — фото ${i + 2}`;
+    el.loading = "lazy";
+    el.decoding = "async";
+    box.appendChild(el);
+  });
+  box.scrollLeft = 0;
+  if (!count) return;
+  count.hidden = list.length < 2;
+  count.textContent = `1 / ${list.length}`;
+  box.onscroll = () => {
+    const i = Math.round(box.scrollLeft / Math.max(1, box.clientWidth));
+    count.textContent = `${Math.min(list.length, i + 1)} / ${list.length}`;
+  };
 }
 
 // Первый снимок каждого цвета — в кэш браузера, пока он свободен. Тогда
@@ -1083,7 +1110,11 @@ function pvOpenRouteProduct() {
     const m = location.pathname.match(/^\/product\/([^/]+)\/?$/);
     if (m) card = document.querySelector(`.product-card[data-slug="${CSS.escape(m[1])}"]`);
   }
-  if (!card) return false;
+  if (!card) {
+    // Товара нет в каталоге (снят с продажи) — показываем главную, а не пустую страницу.
+    if (window.STAW && window.STAW.catalogFinal) document.documentElement.classList.remove("route-product");
+    return false;
+  }
   window.MATA_ROUTE = {};
   openQuickView(card, { fromHistory: true });
   return true;
@@ -1361,11 +1392,7 @@ if (pvModal) {
     if (!rel) return;
     const card = document.querySelector(`.product-card[data-id="${CSS.escape(rel.dataset.relId)}"]`);
     if (!card) return;
-    const scroller = pvModal.querySelector(".pv-card");
-    openQuickView(card);
-    if (scroller) scroller.scrollTop = 0;
-    const info = pvModal.querySelector(".pv-info");
-    if (info) info.scrollTop = 0;
+    openQuickView(card);        // pdpEnter прокрутит к началу нового товара
   });
 }
 
@@ -1416,9 +1443,14 @@ function openQuickView(card, opts) {
   pvRenderRelated(card);
   pvRenderPerks();
   pvLoadPerks().then(() => { if (pvCard === card) pvRenderPerks(); });
+  const crumb = pvModal.querySelector("[data-pdp-crumb]");
+  if (crumb) crumb.textContent = card.dataset.cat || "";
+  // Сначала запись в историю — пока прокрутка ещё в каталоге: браузер хранит её
+  // в записи, и «назад» вернёт туда же. Потом уже страница товара с начала.
+  if (!opts.fromHistory) pvRouteOpen(card);
+  pdpEnter();
   pvModal.classList.add("is-open");
   pvModal.setAttribute("aria-hidden", "false");
-  if (!opts.fromHistory) pvRouteOpen(card);
   document.title = `${card.dataset.name || "Товар"} — МАТА`;
   document.dispatchEvent(new CustomEvent("mata:pv-open", { detail: { card } }));
 }
@@ -1441,8 +1473,92 @@ function closeQuickView(opts) {
   if (pvCardEl) pvCardEl.classList.remove("is-sg-open");
   pvModal.classList.remove("is-open");
   pvModal.setAttribute("aria-hidden", "true");
+  if (wasOpen) pdpLeave(opts && opts.noRestore);
   if (wasOpen && !(opts && opts.fromHistory)) pvRouteClose();
 }
+
+// ── Режим страницы товара ────────────────────────────────────────────────────
+// Главная скрыта (body.pdp-open), страница товара — в потоке. Место в каталоге
+// запоминаем: «назад» возвращает туда же, где человек выбрал товар.
+let pdpReturnY = 0;
+let pdpFromRoute = false;     // пришли по ссылке прямо на товар — «назад» ведёт в каталог
+function pdpScrollTo(y) {
+  const lenis = window.MATA_LENIS;
+  // Сразу и синхронно (Lenis двигает страницу только на следующем кадре, а
+  // ScrollTrigger.refresh() запоминает прокрутку в момент вызова и возвращает её).
+  window.scrollTo({ top: y, behavior: "instant" });
+  if (lenis) {
+    // Высота страницы только что сменилась (главная скрыта/показана) — без resize()
+    // Lenis упирается в старую высоту и «назад» приезжал в начало, а не в каталог.
+    lenis.resize();
+    lenis.scrollTo(y, { immediate: true, force: true });
+  }
+}
+// Место в каталоге возвращаем сами: браузерное восстановление прокрутки при «назад»
+// срабатывает раньше, чем главная снова видна, и сбрасывает страницу в начало.
+// ScrollTrigger при каждом refresh возвращает scrollRestoration в «как было» —
+// говорим ему самому, что «как было» = manual.
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+try { if (window.ScrollTrigger) window.ScrollTrigger.clearScrollMemory("manual"); } catch (e) { /* без ST */ }
+function pdpTop() {
+  const hdr = document.querySelector("[data-header]");
+  const h = hdr ? Math.round(hdr.getBoundingClientRect().height) : 72;
+  document.documentElement.style.setProperty("--pdp-top", `${h + 12}px`);
+}
+function pdpRefresh() {
+  if (window.ScrollTrigger) window.ScrollTrigger.refresh();
+}
+function pdpEnter() {
+  const already = document.body.classList.contains("pdp-open");
+  const fromRoute = document.documentElement.classList.contains("route-product");
+  if (!already) {
+    pdpReturnY = fromRoute ? 0 : window.scrollY;
+    pdpFromRoute = fromRoute;
+  }
+  document.documentElement.classList.remove("route-product");
+  document.body.classList.add("pdp-open");
+  pdpTop();
+  pdpScrollTo(0);               // новый товар — с начала страницы
+  if (!already) { pdpRefresh(); pdpScrollTo(0); }
+}
+function pdpLeave(noRestore) {
+  document.body.classList.remove("pdp-open");
+  document.documentElement.classList.remove("route-product");
+  if (noRestore) { pdpRefresh(); return; }
+  const cat = pdpFromRoute && document.getElementById("catalog");
+  const y = cat ? cat.getBoundingClientRect().top + window.scrollY - 8 : pdpReturnY;
+  pdpScrollTo(y);
+  pdpRefresh();
+  // ScrollTrigger при замере ставит прокрутку в 0, и Lenis подхватывает этот 0 —
+  // ещё раз после refresh, чтобы Lenis встал туда же.
+  pdpScrollTo(y);
+}
+// Подстраховка прямого захода: каталог не ответил — через 12 с показать главную
+// (там сообщение «Каталог не загрузился»), а не вечную заготовку товара.
+if (document.documentElement.classList.contains("route-product")) {
+  setTimeout(() => {
+    if (!document.body.classList.contains("pdp-open")) {
+      document.documentElement.classList.remove("route-product");
+    }
+  }, 12000);
+}
+// Ссылки-якоря (#catalog в нижнем меню, пункты шапки) со страницы товара: сначала
+// закрыть товар, потом ехать к разделу главной — иначе цель скрыта и клик «мёртвый».
+document.addEventListener("click", (e) => {
+  if (!document.body.classList.contains("pdp-open")) return;
+  const a = e.target.closest && e.target.closest('a[href^="#"]');
+  if (!a) return;
+  const id = a.getAttribute("href");
+  if (!id || id.length < 2) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  closeQuickView({ noRestore: true });
+  setTimeout(() => {
+    let t = null;
+    try { t = document.querySelector(id); } catch (err) { t = null; }
+    if (t) pdpScrollTo(t.getBoundingClientRect().top + window.scrollY - 8);
+  }, 60);
+}, true);
 
 function bindQuickView() {
   // Размер прямо на карточке: открываем окно и отмечаем выбранное. Иначе человек
@@ -1545,12 +1661,10 @@ if (pvModal) {
     addToCart(parts.join(" · "),
               variant ? variant[1] : pvCurrent.price,
               variant ? variant[0] : "");
-    closeQuickView();
+    // Страница товара остаётся на месте — корзина выезжает поверх (как у Nike).
     if (!cartPanel.classList.contains("is-open")) toggleCart();
   });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && pvModal.classList.contains("is-open")) closeQuickView();
-  });
+  // Escape страницу не закрывает: это страница, а не окно (назад — кнопкой/жестом).
 }
 
 // ── Оформление заказа (checkout) ─────────────────────────────────────────────
@@ -3048,6 +3162,10 @@ if (srch) {
   const cat = document.getElementById("catalog");
   if (!bar || !cat || !("IntersectionObserver" in window)) return;
   const mark = (inCatalog) => {
+    // Страница товара — это раздел «Каталог» (главная скрыта, наблюдатель видит
+    // «каталог не на экране» и без этого подсветил бы «Главную»).
+    if (document.body.classList.contains("pdp-open") ||
+        document.documentElement.classList.contains("route-product")) inCatalog = true;
     bar.querySelectorAll("[data-tab]").forEach((el) => {
       const on = el.dataset.tab === (inCatalog ? "catalog" : "home");
       el.classList.toggle("is-active", on);

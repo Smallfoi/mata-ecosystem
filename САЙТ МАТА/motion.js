@@ -53,6 +53,8 @@
       },
       smoothWheel: true,
     });
+    // Страница товара переходит в начало / обратно в каталог мгновенно (script.js).
+    window.MATA_LENIS = lenis;
 
     if (ScrollTrigger) {
       lenis.on("scroll", ScrollTrigger.update);
@@ -89,8 +91,9 @@
   // Lenis (фон замирает), а внутренний скролл окна идёт нативно через
   // data-lenis-prevent на самих окнах/панелях.
   if (lenis) {
+    // pv-modal — страница товара в потоке (26.11), Lenis на ней работает как обычно.
     var MODALS = [
-      "pv-modal", "pr-modal", "co-modal", "cart-panel", "mobile-nav", "eco-modal",
+      "pr-modal", "co-modal", "cart-panel", "mobile-nav", "eco-modal",
       "lg-modal",
     ];
     // Помечаем существующие окна/панели, чтобы их колесо не перехватывал Lenis.

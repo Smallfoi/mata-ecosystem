@@ -1230,7 +1230,8 @@ html.js.motion-off .hero .brand-wordmark span {
   text-transform: uppercase;
 }
 
-.pv-info h3 {
+.pv-info h3,
+.pv-info .pv-title {
   margin-bottom: 10px;
   font-size: clamp(24px, 2.4vw, 34px);
 }
@@ -4636,4 +4637,211 @@ html:has(.eco-modal.is-open) {
   .mode-card { padding-left: 12px; padding-right: 12px; }
   .mode-card h3 { font-size: clamp(14px, 4.6vw, 17px); }
   .mode-card p { hyphens: auto; -webkit-hyphens: auto; }
+}
+
+/* ══ Страница товара (владелец 26.11: «полноценная страница, как у ANTA и NIKE») ══
+   Та же разметка .pv-*, но не окно поверх главной, а страница в потоке: главная
+   скрыта, товар — между шапкой и подвалом, прокрутка обычная (адресная строка
+   телефона прячется, «назад» работает). html.route-product — прямой заход по
+   /product/<slug>/: Django уже подставил фото, название и цену. */
+body.pdp-open main#top,
+html.route-product main#top { display: none; }
+
+.pv-modal.is-open,
+html.route-product .pv-modal {
+  position: static;
+  display: block;
+  padding: calc(var(--pdp-top, 84px)) 0 0;
+}
+.pv-modal .pv-backdrop { display: none; }
+
+.pv-modal .pv-card {
+  display: block;
+  width: min(1360px, 100%);
+  max-height: none;
+  margin: 0 auto;
+  padding: 0 var(--pad-x) clamp(40px, 6vw, 88px);
+  overflow: visible;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+}
+
+.pdp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+  grid-template-areas: "media info";
+  column-gap: clamp(24px, 4vw, 64px);
+}
+
+/* Верхняя строка: «‹ Каталог» слева, «поделиться» и «в избранное» справа. */
+.pdp-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  margin-bottom: 12px;
+  padding-right: 100px; /* место под кнопки «поделиться» и ♡ */
+}
+.pv-modal .pv-close.pdp-back {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: 40px;
+  padding: 0 16px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pdp-back:hover { border-color: var(--ink); }
+.pdp-back:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.pdp-crumb {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pv-modal .pv-share { top: 4px; right: calc(var(--pad-x) + 48px); }
+.pv-modal .pv-fav { top: 4px; right: var(--pad-x); }
+
+/* Галерея: все снимки выбранного цвета сеткой в две колонки (как у Nike). */
+.pv-modal .pv-media {
+  grid-area: media;
+  position: relative;
+  display: block;
+  background: transparent;
+}
+.pdp-slides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.pv-modal .pdp-slides img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #f3f1ec;
+}
+/* Один снимок — во всю колонку, но не выше экрана. */
+.pv-modal .pdp-slides img:only-child {
+  grid-column: 1 / -1;
+  aspect-ratio: auto;
+  height: min(78vh, 860px);
+}
+/* Нечётный хвост — по центру, а не дыра справа. */
+.pv-modal .pdp-slides img:last-child:nth-child(odd):not(:only-child) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: calc(50% - 4px);
+}
+.pv-modal .pv-thumbs { display: none; }
+.pv-modal .pv-media.is-empty { min-height: 420px; border-radius: 12px; background: #f3f1ec; }
+.pdp-count {
+  display: none;
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(17, 19, 23, 0.72);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.pdp-count[hidden] { display: none; }
+
+/* Блок покупки — закреплён, пока листаешь фото. Он короткий (без описания). */
+.pv-modal .pv-info {
+  grid-area: info;
+  align-self: start;
+  position: sticky;
+  top: calc(var(--pdp-top, 84px) + 8px);
+  max-height: none;
+  padding: 4px 0 0;
+  overflow: visible;
+}
+.pv-modal .pv-title {
+  margin: 0 0 10px;
+  font-size: clamp(26px, 2.6vw, 38px);
+  line-height: 1.1;
+}
+
+/* Описание, отзывы, похожие — во всю ширину под первым экраном. */
+.pdp-more {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); /* иначе колонка растёт под ленту похожих */
+  gap: 8px;
+  margin-top: clamp(32px, 5vw, 64px);
+}
+/* Текст — шириной для чтения; лента похожих — во всю ширину страницы. */
+.pdp-more .pv-details,
+.pdp-more .pv-reviews { max-width: 880px; }
+.pdp-more .pv-details { margin: 0; }
+.pv-reviews:empty { display: none; }
+.pv-modal .pv-related { margin-top: 28px; }
+.pv-modal .pv-related h2 { margin: 0 0 14px; font-size: clamp(20px, 2vw, 26px); }
+.pv-modal .pv-related-row { grid-auto-columns: clamp(150px, 20vw, 220px); }
+
+/* transform у карточки (анимация бывшего окна) делает её «рамкой» для position:
+   fixed — таблица размеров растягивалась на всю страницу. На странице он не нужен. */
+.pv-modal.is-open .pv-card,
+html.route-product .pv-modal .pv-card { transform: none; }
+/* И без своего слоя (z-index: 1 у бывшего окна): иначе таблица размеров внутри
+   неё оказывалась ниже шапки и нижнего меню. */
+.pv-modal .pv-card { z-index: auto; }
+/* Таблица размеров — поверх страницы, а не внутри карточки. */
+.pv-modal .pv-sg { position: fixed; z-index: 90; }
+html:has(.pv-sg:not([hidden])) { overflow: hidden; }
+
+/* Телефон: одна колонка, фото листаются пальцем во всю ширину экрана. */
+@media (max-width: 760px) {
+  .pv-modal.is-open,
+  html.route-product .pv-modal { padding-top: var(--pdp-top, 72px); }
+  .pv-modal .pv-card { padding: 0 12px 32px; }
+  .pdp-hero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "media" "info";
+  }
+  .pdp-count { display: block; }
+  .pdp-bar { margin-bottom: 8px; }
+  .pv-modal .pv-share { right: 60px; }
+  .pv-modal .pv-fav { right: 12px; }
+  .pv-modal .pv-media { margin: 0 -12px; }
+  .pdp-slides {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .pdp-slides::-webkit-scrollbar { display: none; }
+  .pv-modal .pdp-slides img,
+  .pv-modal .pdp-slides img:only-child,
+  .pv-modal .pdp-slides img:last-child:nth-child(odd):not(:only-child) {
+    flex: 0 0 100%;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 5;
+    border-radius: 0;
+    scroll-snap-align: start;
+  }
+  .pv-modal .pv-info { position: static; padding-top: 18px; }
+  .pdp-more { margin-top: 24px; }
+  .pv-modal .pv-related-row { grid-auto-columns: 42%; }
 }

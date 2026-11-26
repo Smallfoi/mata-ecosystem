@@ -339,6 +339,9 @@
     var noPhoto = products.filter(function (p) { return !(cardImgUrl(p) || imgUrl(p)); });
     grid.innerHTML = withPhoto.concat(noPhoto).map(cardHtml).join("");
     grid.removeAttribute("aria-busy");
+    // Каталог пришёл целиком: страница товара по прямой ссылке может решить, что
+    // товара нет, и показать главную (script.js, pvOpenRouteProduct).
+    if (window.STAW) window.STAW.catalogFinal = true;
     // Переинициализируем интеракции (фильтр/корзина/анимации) для новых карточек.
     if (window.STAW && typeof window.STAW.onCatalogRendered === "function") {
       window.STAW.onCatalogRendered();
@@ -456,6 +459,8 @@
           .then(render)
           .catch(function () {
             // Сеть или сервер недоступны — честное сообщение вместо вечных заглушек.
+            // Прямой заход на товар — показать главную с этим сообщением.
+            document.documentElement.classList.remove("route-product");
             var grid = document.querySelector("[data-product-grid]");
             if (!grid) return;
             grid.removeAttribute("aria-busy");
@@ -718,7 +723,8 @@
   // поддержки :has() и от того, html или body является скролл-контейнером.
   function lockScrollUnderModals() {
     var MODALS = [
-      "pv-modal", "pr-modal", "co-modal", "cart-panel", "mobile-nav", "eco-modal", "cat-fpanel", "srch",
+      // pv-modal — уже не окно, а страница товара (26.11): её прокрутку не блокируем.
+      "pr-modal", "co-modal", "cart-panel", "mobile-nav", "eco-modal", "cat-fpanel", "srch",
     ];
     function anyOpen() {
       for (var i = 0; i < MODALS.length; i++) {
