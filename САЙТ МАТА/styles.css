@@ -653,6 +653,9 @@ html.js.motion-off .hero .brand-wordmark span {
   min-height: 86vh;
   display: grid;
   place-items: center;
+  /* minmax(0, 1fr): иначе колонка растягивается под самое длинное слово заголовка
+     и на 320px вылезает за экран. */
+  grid-template-columns: minmax(0, 1fr);
   padding: 96px clamp(18px, 5vw, 72px);
 }
 
@@ -3253,7 +3256,7 @@ html.lenis body {
 @media (max-width: 1080px) {
   .cinema-grid,
   .product-story {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* Каталог остаётся сеткой: в одну колонку карточка занимала почти весь экран,
@@ -4482,8 +4485,10 @@ html:has(.eco-modal.is-open) {
   .catalog-bar .filters {
     flex-wrap: nowrap;
     overflow-x: auto;
-    margin-inline: calc(-1 * var(--pad-x, 18px));
-    padding: 0 var(--pad-x, 18px) 2px;
+    /* Без отрицательных полей: --pad-x (5vw) шире реальных полей секции (12px) —
+       ряд вылезал на 4px за экран, и Safari на iPhone уменьшал всю страницу. */
+    margin-inline: 0;
+    padding: 0 0 2px;
     scrollbar-width: none;
   }
   .catalog-bar .filters::-webkit-scrollbar { display: none; }
@@ -4610,3 +4615,25 @@ html:has(.eco-modal.is-open) {
 @media (max-width: 720px) { .product-skeleton { border-radius: 14px; } }
 /* «Scroll» героя — нажимаемая область не меньше 24 px (Lighthouse: target-size). */
 .hero-scroll { min-height: 32px; padding: 8px 0; }
+
+/* Телефон: ничто не шире экрана (замечание владельца 26.11 — «на телефоне как большая
+   страница»). Safari до iOS 16 не знает overflow-x: clip — запасной hidden. «SCROLL» на
+   телефоне не нужен (есть нижнее меню) и налезал на кнопку «Философия бренда». */
+@supports not (overflow-x: clip) {
+  html, body { overflow-x: hidden; }
+}
+@media (max-width: 640px) {
+  .hero-scroll { display: none; }
+}
+/* Узкий телефон (320–400px): заголовок 42px не вмещал «идеального» — слово резалось
+   краем экрана. 11vw: самое длинное слово заголовков помещается и на 320px. */
+@media (max-width: 400px) {
+  h2 { font-size: clamp(30px, 11vw, 42px); }
+}
+/* Карточки RUN/TRAIL/RACE/EVERYDAY на 320px: «EVERYDAY» и «Соревновательный» не
+   вмещались в 102px текста — поля меньше, заголовок от ширины, перенос по слогам. */
+@media (max-width: 380px) {
+  .mode-card { padding-left: 12px; padding-right: 12px; }
+  .mode-card h3 { font-size: clamp(14px, 4.6vw, 17px); }
+  .mode-card p { hyphens: auto; -webkit-hyphens: auto; }
+}
