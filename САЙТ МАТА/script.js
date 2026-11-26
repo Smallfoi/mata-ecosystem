@@ -1484,6 +1484,10 @@ let pdpReturnY = 0;
 let pdpFromRoute = false;     // пришли по ссылке прямо на товар — «назад» ведёт в каталог
 function pdpScrollTo(y) {
   const lenis = window.MATA_LENIS;
+  // Нажали на товар, пока страница докручивалась по инерции (колёсико, тачпад) —
+  // Lenis доигрывал старую прокрутку уже на странице товара, и она открывалась
+  // внизу (владелец 27.11). Гасим инерцию; намеренно остановленный Lenis не будим.
+  if (lenis && !lenis.isStopped) { lenis.stop(); lenis.start(); }
   // Сразу и синхронно (Lenis двигает страницу только на следующем кадре, а
   // ScrollTrigger.refresh() запоминает прокрутку в момент вызова и возвращает её).
   window.scrollTo({ top: y, behavior: "instant" });
@@ -1520,6 +1524,10 @@ function pdpEnter() {
   pdpTop();
   pdpScrollTo(0);               // новый товар — с начала страницы
   if (!already) { pdpRefresh(); pdpScrollTo(0); }
+  // Телефон: нативная инерция может доехать ещё кадр-другой — проверить и вернуть.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (document.body.classList.contains("pdp-open") && window.scrollY > 0) pdpScrollTo(0);
+  }));
 }
 function pdpLeave(noRestore) {
   document.body.classList.remove("pdp-open");
