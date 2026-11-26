@@ -986,20 +986,7 @@ class RetrySwitchesModeTests(TestCase):
         self.assertEqual(job.track, "catalog")
 
 
-# Файлы пайплайна лежат в хранилище `private`, а не в default: один MEDIA_ROOT его не
-# перенаправляет (Django сбрасывает кэш хранилищ только при смене STORAGES), и тест
-# полез бы в настоящий каталог медиа — в CI он недоступен для записи.
-_DEL_MEDIA = tempfile.mkdtemp()
-_DEL_STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage",
-                "OPTIONS": {"location": _DEL_MEDIA}},
-    "private": {"BACKEND": "django.core.files.storage.FileSystemStorage",
-                "OPTIONS": {"location": _DEL_MEDIA}},
-    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
-}
-
-
-@override_settings(MEDIA_ROOT=_DEL_MEDIA, STORAGES=_DEL_STORAGES)
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class DeleteJobsTests(TestCase):
     """Удаление снимков со страницы проверки (просьба владельца 25.11.2026).
 
