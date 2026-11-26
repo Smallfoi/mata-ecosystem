@@ -676,7 +676,7 @@
   // поддержки :has() и от того, html или body является скролл-контейнером.
   function lockScrollUnderModals() {
     var MODALS = [
-      "pv-modal", "pr-modal", "co-modal", "cart-panel", "mobile-nav", "eco-modal",
+      "pv-modal", "pr-modal", "co-modal", "cart-panel", "mobile-nav", "eco-modal", "cat-fpanel",
     ];
     function anyOpen() {
       for (var i = 0; i < MODALS.length; i++) {

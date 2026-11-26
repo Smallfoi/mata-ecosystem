@@ -25,20 +25,310 @@ function applyCatalog() {
     button.classList.toggle("is-active", f === currentFilter || f === currentTab);
   });
   const q = currentSearch.trim().toLowerCase();
+  const base = [];
   document.querySelectorAll(".product-card").forEach((card) => {
     const cats = (card.dataset.category || "").split(" ");
     const okCat = currentFilter === "all" || cats.indexOf(currentFilter) !== -1;
     const h3 = card.querySelector("h3");
     const name = (card.dataset.name || (h3 ? h3.textContent : "") || "").toLowerCase();
     const okSearch = !q || name.indexOf(q) !== -1;
-    card.classList.toggle("is-hidden", !(okCat && okSearch));
+    if (okCat && okSearch) base.push(card);
+    card.classList.toggle("is-hidden", !(okCat && okSearch && fltPass(card)));
   });
+  fltRefresh(base);
 }
 
 function applyFilter(category, tab) {
   currentFilter = category;
   currentTab = tab || category;
   applyCatalog();
+}
+
+// ── Фильтры каталога: пол, размер в наличии, цена, бренд (аудит 25.11.2026, пункт 2) ──
+// Работают поверх вкладок и поиска: карточка видна, если прошла всё сразу. Счётчики
+// у вариантов считаются «как если бы этот фильтр сняли» — так видно, сколько товаров
+// даст каждый выбор, и ни один вариант не ведёт в пустоту. Состояние — в адресе
+// (?pol=men&brand=ANTA&size=42…): подборкой можно поделиться, «назад» её не теряет.
+const flt = { gender: "", brands: new Set(), sizes: new Set(), min: null, max: null, flags: new Set() };
+const fltBar = document.querySelector("[data-fbar]");
+const fltPanel = document.querySelector("[data-fpanel]");
+
+const FLT_LETTERS = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "2XL", "XXXL", "3XL", "4XL", "5XL"];
+function fltSizeKey(s) {
+  const n = parseFloat(String(s).replace(",", "."));
+  if (!Number.isNaN(n) && /^\d/.test(s)) return [1, n, s];
+  const i = FLT_LETTERS.indexOf(String(s).toUpperCase());
+  return i >= 0 ? [0, i, s] : [2, 0, s];
+}
+function fltSizeSort(a, b) {
+  const x = fltSizeKey(a), y = fltSizeKey(b);
+  return x[0] - y[0] || x[1] - y[1] || String(x[2]).localeCompare(String(y[2]), "ru");
+}
+
+function fltList(v) {
+  return String(v || "").split(",").map((s) => s.trim()).filter(Boolean);
+}
+// Размеры карточки, которые есть на складе хотя бы в одном цвете.
+function fltCardSizes(card) {
+  const out = new Set(fltList(card.dataset.outofstock));
+  return fltList(card.dataset.sizes).filter((s) => !out.has(s));
+}
+function fltIsSale(card) {
+  return Number(card.dataset.oldPrice) > Number(card.dataset.price);
+}
+
+function fltPass(card, skip) {
+  if (skip !== "gender" && flt.gender) {
+    const g = card.dataset.gender || "";
+    const adult = flt.gender === "men" || flt.gender === "women";
+    if (!(g === flt.gender || (adult && g === "unisex"))) return false;
+  }
+  if (skip !== "brand" && flt.brands.size && !flt.brands.has(card.dataset.brand || "")) return false;
+  if (skip !== "size" && flt.sizes.size && !fltCardSizes(card).some((s) => flt.sizes.has(s))) return false;
+  if (skip !== "price") {
+    const price = Number(card.dataset.price) || 0;
+    if (flt.min != null && price < flt.min) return false;
+    if (flt.max != null && price > flt.max) return false;
+  }
+  if (skip !== "flags") {
+    if (flt.flags.has("stock") && /скоро/i.test(card.dataset.stock || "")) return false;
+    if (flt.flags.has("new") && card.dataset.new !== "1") return false;
+    if (flt.flags.has("sale") && !fltIsSale(card)) return false;
+  }
+  return true;
+}
+
+function fltActiveCount() {
+  return (flt.gender ? 1 : 0) + flt.brands.size + flt.sizes.size +
+    (flt.min != null || flt.max != null ? 1 : 0) + flt.flags.size;
+}
+
+function fltPlural(n, one, few, many) {
+  const a = n % 10, b = n % 100;
+  if (a === 1 && b !== 11) return one;
+  if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return few;
+  return many;
+}
+
+function fltPriceLabel() {
+  const f = (v) => new Intl.NumberFormat("ru-RU").format(v);
+  if (flt.min != null && flt.max != null) return `${f(flt.min)} – ${f(flt.max)} ₽`;
+  if (flt.min != null) return `от ${f(flt.min)} ₽`;
+  return `до ${f(flt.max)} ₽`;
+}
+
+const FLT_GENDER = { men: "Мужское", women: "Женское", kids: "Детское" };
+const FLT_FLAGS = { stock: "Только в наличии", new: "Новинки", sale: "Со скидкой" };
+
+// Опции панели и счётчики: base — карточки, прошедшие вкладку и поиск.
+function fltRefresh(base) {
+  if (!fltBar) return;
+  const visible = base.filter((c) => fltPass(c));
+  const n = visible.length;
+  const countEl = fltBar.querySelector("[data-fcount]");
+  if (countEl) countEl.textContent = `${n} ${fltPlural(n, "товар", "товара", "товаров")}`;
+  const apply = fltPanel && fltPanel.querySelector("[data-fapply]");
+  if (apply) apply.textContent = n ? `Показать ${n} ${fltPlural(n, "товар", "товара", "товаров")}` : "Ничего не найдено";
+  const badge = fltBar.querySelector("[data-fbadge]");
+  const k = fltActiveCount() - (flt.gender ? 1 : 0);
+  if (badge) { badge.hidden = !k; badge.textContent = k; }
+
+  // Пол: «Детское» — только если такие товары есть в этой вкладке.
+  const byGender = base.filter((c) => fltPass(c, "gender"));
+  const kids = fltBar.querySelector('[data-g="kids"]');
+  if (kids) kids.hidden = !byGender.some((c) => c.dataset.gender === "kids") && flt.gender !== "kids";
+  fltBar.querySelectorAll("[data-g]").forEach((b) => {
+    const on = b.dataset.g === flt.gender;
+    b.classList.toggle("is-active", on);
+    b.setAttribute("aria-pressed", String(on));
+  });
+
+  if (fltPanel) {
+    // Размеры — из товаров, прошедших остальные фильтры; выбранные остаются в списке.
+    const sizeCount = {};
+    base.filter((c) => fltPass(c, "size")).forEach((c) =>
+      fltCardSizes(c).forEach((s) => { sizeCount[s] = (sizeCount[s] || 0) + 1; }));
+    flt.sizes.forEach((s) => { if (!(s in sizeCount)) sizeCount[s] = 0; });
+    const sizes = Object.keys(sizeCount).sort(fltSizeSort);
+    const sizeBox = fltPanel.querySelector("[data-fsizes]");
+    sizeBox.innerHTML = sizes.length
+      ? sizes.map((s) => `<button type="button" class="cat-fsize${flt.sizes.has(s) ? " is-on" : ""}"` +
+          ` data-size="${escapeHtml(s)}" aria-pressed="${flt.sizes.has(s)}"` +
+          `${sizeCount[s] || flt.sizes.has(s) ? "" : " disabled"}>${escapeHtml(s)}</button>`).join("")
+      : '<p class="cat-fempty">У этих товаров нет размеров</p>';
+
+    const brandCount = {};
+    base.filter((c) => fltPass(c, "brand")).forEach((c) => {
+      const b = c.dataset.brand;
+      if (b) brandCount[b] = (brandCount[b] || 0) + 1;
+    });
+    flt.brands.forEach((b) => { if (!(b in brandCount)) brandCount[b] = 0; });
+    const brands = Object.keys(brandCount).sort((a, b) => brandCount[b] - brandCount[a] || a.localeCompare(b));
+    fltPanel.querySelector("[data-fbrands]").innerHTML = brands.map((b) =>
+      `<button type="button" class="${flt.brands.has(b) ? "is-on" : ""}" data-brand="${escapeHtml(b)}"` +
+      ` aria-pressed="${flt.brands.has(b)}"${brandCount[b] || flt.brands.has(b) ? "" : " disabled"}>` +
+      `${escapeHtml(b)} <span>${brandCount[b]}</span></button>`).join("");
+
+    fltPanel.querySelectorAll("[data-flag]").forEach((b) => {
+      const on = flt.flags.has(b.dataset.flag);
+      b.classList.toggle("is-on", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    const fmin = fltPanel.querySelector("[data-fmin]");
+    const fmax = fltPanel.querySelector("[data-fmax]");
+    if (document.activeElement !== fmin) fmin.value = flt.min != null ? flt.min : "";
+    if (document.activeElement !== fmax) fmax.value = flt.max != null ? flt.max : "";
+    fltPanel.querySelectorAll("[data-preset]").forEach((b) => {
+      const [lo, hi] = b.dataset.preset.split("-");
+      const on = (flt.min != null ? String(flt.min) : "0") === (lo || "0") &&
+        (flt.max != null ? String(flt.max) : "") === (hi || "");
+      b.classList.toggle("is-on", on && (flt.min != null || flt.max != null));
+    });
+  }
+
+  // Выбранное — чипами под панелью: видно, что отобрано, и снять можно одним нажатием.
+  const chips = [];
+  flt.sizes.forEach((s) => chips.push(["size", s, `Размер ${s}`]));
+  if (flt.min != null || flt.max != null) chips.push(["price", "", fltPriceLabel()]);
+  flt.brands.forEach((b) => chips.push(["brand", b, b]));
+  flt.flags.forEach((f) => chips.push(["flag", f, FLT_FLAGS[f] || f]));
+  const chipBox = fltBar.querySelector("[data-fchips]");
+  chipBox.innerHTML = chips.map(([t, v, label]) =>
+    `<button type="button" class="cat-chip" data-chip="${t}" data-v="${escapeHtml(v)}"` +
+    ` aria-label="Убрать фильтр: ${escapeHtml(label)}">${escapeHtml(label)} <span aria-hidden="true">×</span></button>`)
+    .join("") + (chips.length ? '<button type="button" class="cat-chip cat-chip--reset" data-freset>Сбросить всё</button>' : "");
+
+  // Пусто — говорим об этом и даём выход, а не оставляем белое поле.
+  const grid = document.querySelector("[data-product-grid]");
+  if (grid) {
+    let empty = grid.querySelector("[data-fnone]");
+    if (!n && base.length) {
+      if (!empty) {
+        empty = document.createElement("div");
+        empty.className = "cat-none";
+        empty.setAttribute("data-fnone", "");
+        empty.innerHTML = '<p>По этим фильтрам ничего не нашлось.</p>' +
+          '<button type="button" class="btn btn-ghost btn-ghost-dark" data-freset>Сбросить фильтры</button>';
+        grid.appendChild(empty);
+      }
+    } else if (empty) {
+      empty.remove();
+    }
+  }
+  fltSaveUrl();
+}
+
+// ── Адрес ─────────────────────────────────────────────────────────────────────
+function fltSaveUrl() {
+  if (/^\/product\//.test(location.pathname)) return;   // адрес товара не трогаем
+  const p = new URLSearchParams(location.search);
+  ["pol", "brand", "size", "price", "flag"].forEach((k) => p.delete(k));
+  if (flt.gender) p.set("pol", flt.gender);
+  if (flt.brands.size) p.set("brand", [...flt.brands].join(","));
+  if (flt.sizes.size) p.set("size", [...flt.sizes].join(","));
+  if (flt.min != null || flt.max != null) p.set("price", `${flt.min != null ? flt.min : ""}-${flt.max != null ? flt.max : ""}`);
+  if (flt.flags.size) p.set("flag", [...flt.flags].join(","));
+  const qs = p.toString();
+  const url = location.pathname + (qs ? "?" + qs : "") + location.hash;
+  if (url !== location.pathname + location.search + location.hash) {
+    try { history.replaceState(history.state, "", url); } catch (e) { /* file:// */ }
+  }
+}
+
+function fltLoadUrl() {
+  const p = new URLSearchParams(location.search);
+  const g = p.get("pol");
+  flt.gender = FLT_GENDER[g] ? g : "";
+  flt.brands = new Set(fltList(p.get("brand")));
+  flt.sizes = new Set(fltList(p.get("size")));
+  flt.flags = new Set(fltList(p.get("flag")).filter((f) => FLT_FLAGS[f]));
+  const price = (p.get("price") || "").split("-");
+  const num = (v) => (v !== undefined && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : null);
+  flt.min = num(price[0]);
+  flt.max = num(price[1]);
+}
+
+function fltReset() {
+  flt.gender = "";
+  flt.brands.clear();
+  flt.sizes.clear();
+  flt.flags.clear();
+  flt.min = flt.max = null;
+  applyCatalog();
+}
+
+function fltOpen(open) {
+  if (!fltPanel) return;
+  fltPanel.classList.toggle("is-open", open);
+  fltPanel.setAttribute("aria-hidden", String(!open));
+  if (open) {
+    const x = fltPanel.querySelector(".cat-fx");
+    if (x) x.focus();
+  } else {
+    const btn = fltBar && fltBar.querySelector("[data-fopen]");
+    if (btn) btn.focus({ preventScroll: true });
+  }
+}
+
+function fltToggle(set, v) {
+  if (set.has(v)) set.delete(v); else set.add(v);
+}
+
+fltLoadUrl();
+
+if (fltBar) {
+  fltBar.addEventListener("click", (e) => {
+    const g = e.target.closest("[data-g]");
+    if (g) { flt.gender = g.dataset.g; applyCatalog(); return; }
+    if (e.target.closest("[data-fopen]")) { fltOpen(true); return; }
+    const chip = e.target.closest("[data-chip]");
+    if (chip) {
+      const v = chip.dataset.v;
+      if (chip.dataset.chip === "size") flt.sizes.delete(v);
+      if (chip.dataset.chip === "brand") flt.brands.delete(v);
+      if (chip.dataset.chip === "flag") flt.flags.delete(v);
+      if (chip.dataset.chip === "price") flt.min = flt.max = null;
+      applyCatalog();
+      return;
+    }
+    if (e.target.closest("[data-freset]")) fltReset();
+  });
+}
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-fnone] [data-freset]")) fltReset();
+});
+
+if (fltPanel) {
+  fltPanel.addEventListener("click", (e) => {
+    if (e.target.closest("[data-fclose]")) { fltOpen(false); return; }
+    if (e.target.closest("[data-freset]")) { fltReset(); return; }
+    const size = e.target.closest("[data-size]");
+    if (size) { fltToggle(flt.sizes, size.dataset.size); applyCatalog(); return; }
+    const brand = e.target.closest("[data-brand]");
+    if (brand) { fltToggle(flt.brands, brand.dataset.brand); applyCatalog(); return; }
+    const flag = e.target.closest("[data-flag]");
+    if (flag) { fltToggle(flt.flags, flag.dataset.flag); applyCatalog(); return; }
+    const preset = e.target.closest("[data-preset]");
+    if (preset) {
+      const [lo, hi] = preset.dataset.preset.split("-");
+      const same = preset.classList.contains("is-on");
+      flt.min = same || !lo || lo === "0" ? null : Number(lo);
+      flt.max = same || !hi ? null : Number(hi);
+      applyCatalog();
+    }
+  });
+  const onPrice = () => {
+    const v = (el) => (el.value.trim() === "" ? null : Math.max(0, Number(el.value)));
+    flt.min = v(fltPanel.querySelector("[data-fmin]"));
+    flt.max = v(fltPanel.querySelector("[data-fmax]"));
+    if (flt.min != null && flt.max != null && flt.min > flt.max) [flt.min, flt.max] = [flt.max, flt.min];
+    applyCatalog();
+  };
+  fltPanel.querySelector("[data-fmin]").addEventListener("change", onPrice);
+  fltPanel.querySelector("[data-fmax]").addEventListener("change", onPrice);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && fltPanel.classList.contains("is-open")) fltOpen(false);
+  });
 }
 
 function toggleCart() {
