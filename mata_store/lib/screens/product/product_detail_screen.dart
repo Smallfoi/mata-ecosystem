@@ -93,6 +93,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _showAddedToCartSheet(ordered);
   }
 
+  /// Таблица размеров бренда или модели (D-138) — шторкой снизу, как на сайте.
+  void _showSizeGuide(Product product) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (_) =>
+          _SizeGuideSheet(tables: product.sizeTables, selected: _selectedSize),
+    );
+  }
+
   void _showErrorSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -110,10 +123,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: false,
+      // Размера и цвета у вещи может не быть (гель, бутылка): «!» здесь ронял экран.
       builder: (_) => _AddedToCartSheet(
         product: product,
-        size: _selectedSize!,
-        color: _selectedColor!,
+        size: _selectedSize ?? '',
+        color: _selectedColor ?? '',
       ),
     );
   }
@@ -251,6 +265,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         isAvailable: (size) =>
                             product.hasSizeInColor(size, _selectedColor),
                         onSelected: (s) => setState(() => _selectedSize = s),
+                        onGuide: product.sizeTables.isEmpty
+                            ? null
+                            : () => _showSizeGuide(product),
                       ),
                       if (product.sizes.isNotEmpty) const SizedBox(height: 20),
                       if (product.colors.isNotEmpty) _ColorSelector(
@@ -460,11 +477,15 @@ class _SizeSelector extends StatelessWidget {
   /// Есть ли размер на складе (остаток по размерам приходит из 1С).
   final bool Function(String size) isAvailable;
 
+  /// «Таблица размеров» — только если у бренда/модели она есть.
+  final VoidCallback? onGuide;
+
   const _SizeSelector({
     required this.sizes,
     required this.selected,
     required this.onSelected,
     required this.isAvailable,
+    this.onGuide,
   });
 
   @override
@@ -492,6 +513,26 @@ class _SizeSelector extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppColors.black,
+                ),
+              ),
+            ],
+            if (onGuide != null) ...[
+              const Spacer(),
+              GestureDetector(
+                onTap: onGuide,
+                behavior: HitTestBehavior.opaque,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: RemoteText(
+                    'app.product.sizeGuide',
+                    'Таблица размеров',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.black,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1322,6 +1363,161 @@ class _ReviewFormState extends State<_ReviewForm> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// Таблица размеров (D-138): одна вёрстка для всех брендов — равные колонки, единица
+/// измерения второй строкой, строка выбранного размера подсвечена. Две таблицы — пол
+/// не определён, переключатель «мужская / женская».
+class _SizeGuideSheet extends StatefulWidget {
+  final List<SizeTable> tables;
+  final String? selected;
+  const _SizeGuideSheet({required this.tables, required this.selected});
+
+  @override
+  State<_SizeGuideSheet> createState() => _SizeGuideSheetState();
+}
+
+class _SizeGuideSheetState extends State<_SizeGuideSheet> {
+  int _tab = 0;
+
+  static String _norm(String v) => v.trim().replaceAll(',', '.').toUpperCase();
+
+  Widget _head(String column) {
+    final i = column.lastIndexOf(', ');
+    final name = i > 0 ? column.substring(0, i) : column;
+    final unit = i > 0 ? column.substring(i + 2) : '';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+      child: Column(
+        children: [
+          Text(name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.grey600)),
+          if (unit.isNotEmpty)
+            Text(unit,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 9, color: AppColors.grey600)),
+        ],
+      ),
+    );
+  }
+
+  TableRow _row(SizeTable t, List<String> r, String want) {
+    final key = t.match < r.length ? _norm(r[t.match]) : '';
+    final picked = want.isNotEmpty && key.split(' / ').contains(want);
+    return TableRow(
+      decoration: picked ? const BoxDecoration(color: AppColors.black) : null,
+      children: [
+        for (var i = 0; i < t.columns.length; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(
+              i < r.length && r[i].isNotEmpty ? r[i] : '—',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: i == t.match ? FontWeight.w800 : FontWeight.w500,
+                color: picked ? AppColors.white : AppColors.black,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.tables[_tab.clamp(0, widget.tables.length - 1)];
+    final want = widget.selected == null ? '' : _norm(widget.selected!);
+    const line = BorderSide(color: AppColors.grey200);
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.86),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: RemoteText('app.product.sizeGuideTitle', 'Таблица размеров',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: widget.tables.length > 1
+                  ? Wrap(
+                      spacing: 8,
+                      children: [
+                        for (var i = 0; i < widget.tables.length; i++)
+                          ChoiceChip(
+                            label: Text(widget.tables[i].title.split('·').last.trim()),
+                            selected: i == _tab,
+                            onSelected: (_) => setState(() => _tab = i),
+                          ),
+                      ],
+                    )
+                  : Text(t.title,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.grey600)),
+            ),
+            const SizedBox(height: 10),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Table(
+                        defaultColumnWidth: const FlexColumnWidth(),
+                        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                        border: const TableBorder(
+                          horizontalInside: line,
+                          top: line,
+                          bottom: line,
+                          left: line,
+                          right: line,
+                        ),
+                        children: [
+                          TableRow(
+                            decoration: const BoxDecoration(color: AppColors.grey100),
+                            children: t.columns.map(_head).toList(),
+                          ),
+                          for (final r in t.rows) _row(t, r, want),
+                        ],
+                      ),
+                    ),
+                    if (t.note.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(t.note,
+                          style: const TextStyle(fontSize: 12, color: AppColors.grey600)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

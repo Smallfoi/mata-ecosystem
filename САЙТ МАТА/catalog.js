@@ -217,6 +217,10 @@
     return out.length ? '<span class="product-badges">' + out.join("") + "</span>" : "";
   }
 
+  function isOneSize(s) {
+    return /^(б\/?р|без размера|f|free|one ?size|os|uni)$/i.test(String(s).trim());
+  }
+
   function cardHtml(p) {
     var img = imgUrl(p);
     var thumb = cardImgUrl(p) || img;
@@ -240,7 +244,9 @@
     var catLabel = p.categoryLabel || p.brand || "";
     // Размеры показываем ТОЛЬКО настоящие: раньше при пустом списке подставлялись
     // S/M/L/XL, и у геля с бутылкой появлялись размеры, которых не бывает.
-    var sizes = Array.isArray(p.sizes) ? p.sizes.filter(Boolean) : [];
+    // «Б/Р», «F», «ONE SIZE» — это не размер, а его отсутствие: выбирать нечего
+    // (раньше у сумки и баффа была кнопка «Б/Р», без которой не клали в корзину).
+    var sizes = Array.isArray(p.sizes) ? p.sizes.filter(function (s) { return s && !isOneSize(s); }) : [];
     var colors = Array.isArray(p.colors) && p.colors.length ? p.colors : [];
     var stock = p.inStock === false ? "Скоро в продаже" : "В наличии";
     var stockCls = p.inStock === false ? " product-stock--soon" : "";
@@ -313,7 +319,8 @@
       (isSale(p) ? '<s>' + priceFmt(p.oldPrice) + "</s> " : "") + priceFmt(p.price) + "</span>" +
       '<span class="product-stock' + stockCls + '">' + esc(stock) + "</span>" +
       "</div>" +
-      (sizes.length || colors.length
+      // Выбирать нечего (один цвет, без размера) — сразу «В корзину».
+      (sizes.length || colors.length > 1 || (colors.length === 1 && !only)
         ? '<span class="product-more" data-quick-view role="button" tabindex="0">' +
           "Размеры и цвета →</span>"
         : '<button class="product-add" type="button" data-add-cart="' + esc(p.name) +

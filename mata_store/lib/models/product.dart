@@ -67,6 +67,49 @@ class ProductVariant {
       };
 }
 
+/// Таблица размеров бренда или модели (D-138): колонки, строки, колонка нашего
+/// размера ([match]) — по ней подсвечивается выбранный размер.
+class SizeTable {
+  final String title;
+  final List<String> columns;
+  final List<List<String>> rows;
+  final int match;
+  final String note;
+
+  const SizeTable({
+    required this.title,
+    required this.columns,
+    required this.rows,
+    this.match = 0,
+    this.note = '',
+  });
+
+  factory SizeTable.fromJson(Map<String, dynamic> j) => SizeTable(
+        title: (j['title'] ?? '').toString(),
+        columns: (j['columns'] as List? ?? const []).map((e) => '$e').toList(),
+        rows: (j['rows'] as List? ?? const [])
+            .map((r) => (r as List).map((e) => '${e ?? ''}').toList())
+            .toList(),
+        match: (j['match'] as num?)?.toInt() ?? 0,
+        note: (j['note'] ?? '').toString(),
+      );
+
+  Map<String, dynamic> toJson() =>
+      {'title': title, 'columns': columns, 'rows': rows, 'match': match, 'note': note};
+
+  /// Таблицы из `sizeChart` карточки (`null` или `{tables: [...]}`).
+  static List<SizeTable> listFrom(dynamic chart) {
+    final tables = chart is Map ? chart['tables'] : null;
+    if (tables is! List) return const [];
+    return tables.whereType<Map>().map((t) => SizeTable.fromJson(t.cast<String, dynamic>())).toList();
+  }
+}
+
+/// «Б/Р», «F», «ONE SIZE» — это не размер, а его отсутствие: выбирать нечего.
+bool isOneSize(String s) => RegExp(r'^(б/?р|без размера|f|free|one ?size|os|uni)$',
+        caseSensitive: false)
+    .hasMatch(s.trim());
+
 class Product {
   final String id;
   final String name;
@@ -100,6 +143,9 @@ class Product {
   /// модели (в 1С цвет ещё не заполнен).
   final Map<String, List<ProductPhoto>> photosByColor;
 
+  /// Таблицы размеров (D-138); пусто — у бренда/модели таблицы нет.
+  final List<SizeTable> sizeTables;
+
   const Product({
     required this.id,
     required this.name,
@@ -121,6 +167,7 @@ class Product {
     this.cardUrl = '',
     this.thumbUrl = '',
     this.photosByColor = const {},
+    this.sizeTables = const [],
   });
 
   bool get isOnSale => oldPrice != null && oldPrice! > price;
@@ -154,6 +201,11 @@ class Product {
       final sizeOk = v.size == size || (v.size.isEmpty && size.isEmpty);
       final colorOk = v.color == color || (v.color.isEmpty && color.isEmpty);
       if (sizeOk && colorOk) return v;
+    }
+    // Размера у вещи нет («Б/Р») — у цвета одна позиция, её и берём.
+    if (size.isEmpty) {
+      final same = variants.where((v) => v.color == color || (v.color.isEmpty && color.isEmpty));
+      if (same.length == 1) return same.first;
     }
     return null;
   }
@@ -224,6 +276,7 @@ class Product {
         cardUrl: cardUrl,
         thumbUrl: thumbUrl,
         photosByColor: photosByColor,
+        sizeTables: sizeTables,
       );
 
   Map<String, dynamic> toJson() => {
@@ -248,6 +301,7 @@ class Product {
         'thumbUrl': thumbUrl,
         'photosByColor': photosByColor.map(
             (k, v) => MapEntry(k, v.map((p) => p.toJson()).toList())),
+        'sizeTables': sizeTables.map((t) => t.toJson()).toList(),
       };
 
   factory Product.fromJson(Map<String, dynamic> j) => Product(
@@ -275,6 +329,7 @@ class Product {
             .map((e) => ProductVariant.fromJson(
                 e as Map<String, dynamic>, (e['color'] ?? '').toString()))
             .toList(),
+        sizeTables: SizeTable.listFrom({'tables': j['sizeTables']}),
       );
 
   /// Карточка модели из `/v1/models`: один товар — много цветов и размеров.
@@ -306,7 +361,11 @@ class Product {
       oldPrice: j['oldPrice'] == null ? null : (j['oldPrice'] as num).toDouble(),
       imageUrls: image.isEmpty ? const [] : [image],
       description: (j['description'] ?? '').toString(),
-      sizes: (j['sizes'] as List? ?? const []).map((e) => e.toString()).toList(),
+      // «Б/Р» — не размер: кнопки «Б/Р», без которой не положить в корзину, быть не должно.
+      sizes: (j['sizes'] as List? ?? const [])
+          .map((e) => e.toString())
+          .where((s) => !isOneSize(s))
+          .toList(),
       // Только НАЗВАННЫЕ цвета: 1С заполнила строку не везде, а пустой кружок
       // выбрать нельзя — он превращался в пустую кнопку.
       colors: colors
@@ -322,6 +381,7 @@ class Product {
       cardUrl: (j['cardUrl'] ?? '').toString(),
       thumbUrl: (j['thumbUrl'] ?? '').toString(),
       photosByColor: photos,
+      sizeTables: SizeTable.listFrom(j['sizeChart']),
     );
   }
 }

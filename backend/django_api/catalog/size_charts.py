@@ -22,10 +22,12 @@ DATA = Path(__file__).with_name("size_chart_data.json")
 
 FOOTWEAR = {"кроссовки", "ботинки", "кеды", "обувь"}
 TOPS = {"майка", "футболка", "лонгслив", "ветровка", "жилет", "куртка", "термобелье", "поло", "толстовка"}
+# Низ — своя таблица (талия и рост), таблица по обхвату груди к нему не подходит.
+BOTTOMS = {"шорты", "брюки", "тайтсы", "леггинсы", "велосипедка"}
 
 # Артикул ANTA: первые две цифры — группа товара.
 _ANTA_GENDER = {"81": ("footwear", "men"), "82": ("footwear", "women"),
-                "85": ("top", "men"), "86": ("top", "women")}
+                "85": ("apparel", "men"), "86": ("apparel", "women")}
 
 
 @lru_cache(maxsize=1)
@@ -39,13 +41,16 @@ def _kind(category_name: str) -> str:
         return "footwear"
     if name in TOPS:
         return "top"
+    if name in BOTTOMS:
+        return "bottom"
     return ""
 
 
 def _gender(brand: str, article: str, name: str, kind: str) -> str:
     if brand == "ANTA":
         hit = _ANTA_GENDER.get((article or "").strip()[:2])
-        if hit and hit[0] == kind:
+        # 85/86 — одежда целиком: и верх, и низ.
+        if hit and (hit[0] == kind or (hit[0] == "apparel" and kind in ("top", "bottom"))):
             return hit[1]
     low = (name or "").lower()
     if "жен" in low:

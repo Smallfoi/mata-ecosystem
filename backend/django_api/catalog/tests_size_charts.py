@@ -46,10 +46,20 @@ class ChartForTests(SimpleTestCase):
         self.assertEqual(chart["tables"][0]["columns"][0], "Размер")
         self.assertIn("stawrunning.com", chart["tables"][0]["source"])
 
-    def test_no_chart_for_bottoms_and_unknown_brands(self):
-        """Таблица по обхвату груди к брюкам не подходит — лучше никакой, чем неверная."""
-        self.assertIsNone(chart_for(brand="ANTA", article="852000000-1", name="Брюки",
-                                    category_name="Брюки"))
+    def test_bottoms_get_waist_table_not_chest(self):
+        """Низу — таблица по талии (ANTA, 26.11.2026); таблица по груди к брюкам не подходит."""
+        men = chart_for(brand="ANTA", article="852515507C-1", name="Шорты мужские ANTA",
+                        category_name="Шорты")
+        women = chart_for(brand="ANTA", article="862647311N-1", name="Брюки", category_name="Брюки")
+        self.assertEqual(titles(men), ["ANTA · мужской низ"])
+        self.assertEqual(titles(women), ["ANTA · женский низ"])
+        self.assertEqual(men["tables"][0]["columns"][2], "Обхват талии, см")
+        self.assertIn(["M", "48-50", "80-84", "170-175"], men["tables"][0]["rows"])
+
+    def test_no_chart_where_brand_publishes_none(self):
+        """У BMAI таблицы одежды нет — не выдумываем; у питания размеров нет вовсе."""
+        self.assertIsNone(chart_for(brand="BMAI", article="", name="Шорты мужские BMAI",
+                                    category_name="Шорты"))
         self.assertIsNone(chart_for(brand="SIS", article="", name="Гель", category_name="Гели"))
 
 
