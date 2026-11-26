@@ -34,8 +34,12 @@ final appRouter = GoRouter(
             GoRoute(
               path: '/catalog',
               builder: (context, state) {
-                final categoryId = state.uri.queryParameters['category'];
-                return CatalogScreen(initialCategory: categoryId);
+                final q = state.uri.queryParameters;
+                return CatalogScreen(
+                  initialCategory: q['category'],
+                  initialTab: q['tab'],
+                  initialGroup: q['group'],
+                );
               },
             ),
           ],

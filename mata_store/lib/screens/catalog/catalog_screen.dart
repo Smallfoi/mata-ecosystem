@@ -72,7 +72,12 @@ class CatalogFilters {
 class CatalogScreen extends StatefulWidget {
   final String? initialCategory;
 
-  const CatalogScreen({super.key, this.initialCategory});
+  /// Раздел витрины с главной (плитки категорий): вкладка и группа (D-133).
+  final String? initialTab;
+  final String? initialGroup;
+
+  const CatalogScreen(
+      {super.key, this.initialCategory, this.initialTab, this.initialGroup});
 
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();
@@ -95,11 +100,34 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   void initState() {
     super.initState();
-    final initial = widget.initialCategory;
-    if (initial != null && initial != 'all') _pendingCategory = initial;
+    _applyRoute();
     // Переключение «Просмотр⇄Правка» из конструктора → пересобрать экран
     // (в правке — редактор порядка, в просмотре — обычный каталог).
     consoleEditNotifier.addListener(_onEditToggle);
+  }
+
+  /// Параметры перехода. Экран каталога живёт в своей ветке оболочки и не
+  /// пересоздаётся — повторный переход с другой плиткой приходит в didUpdateWidget.
+  void _applyRoute() {
+    final tab = widget.initialTab;
+    if (tab != null && tab.isNotEmpty) {
+      _selectedTab = tab;
+      _selectedGroup = widget.initialGroup;
+      _pendingCategory = null;
+      return;
+    }
+    final initial = widget.initialCategory;
+    if (initial != null && initial != 'all') _pendingCategory = initial;
+  }
+
+  @override
+  void didUpdateWidget(covariant CatalogScreen old) {
+    super.didUpdateWidget(old);
+    if (old.initialTab != widget.initialTab ||
+        old.initialGroup != widget.initialGroup ||
+        old.initialCategory != widget.initialCategory) {
+      _applyRoute();
+    }
   }
 
   void _onEditToggle() {

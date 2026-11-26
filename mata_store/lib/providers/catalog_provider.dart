@@ -66,6 +66,22 @@ class CatalogProvider extends ChangeNotifier {
     return (null, null);
   }
 
+  /// Обложка раздела — фото НАШЕГО товара, а не сток (владелец 26.11): сначала
+  /// выбранный вручную товар [preferId], иначе первый товар раздела с фото (порядок
+  /// витрины). Нет ни одного фото — пустая строка (плитку не показываем).
+  String coverFor(Iterable<String> categoryIds, {String? preferId}) {
+    final ids = categoryIds.toSet();
+    if (preferId != null) {
+      for (final p in _products) {
+        if (p.id == preferId && p.firstImage.isNotEmpty) return p.firstImage;
+      }
+    }
+    for (final p in _products) {
+      if (ids.contains(p.categoryId) && p.firstImage.isNotEmpty) return p.firstImage;
+    }
+    return '';
+  }
+
   /// Товары вкладки, а внутри неё — группы. `tabId == 'all'` — весь каталог.
   List<Product> byShowcase(String tabId, {String? groupId}) {
     if (tabId == 'all') return _products;

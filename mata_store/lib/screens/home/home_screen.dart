@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:mata_ui/mata_ui.dart';
+import '../../models/showcase.dart';
 import '../../providers/catalog_provider.dart';
 import '../../providers/notifications_provider.dart';
 import '../../theme/app_theme.dart';
@@ -57,8 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _BannerCarousel(
               controller: _bannerController,
             ).animate().fadeIn(duration: 600.ms),
-
-            const SizedBox(height: 32),
 
             _SectionHeader(title: 'КАТЕГОРИИ', contentKey: 'app.home.catTitle')
                 .animate(delay: 100.ms)
@@ -159,9 +158,17 @@ class _BannerCarousel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final banners = context.watch<CatalogProvider>().banners;
+    final catalog = context.watch<CatalogProvider>();
+    final banners = catalog.banners;
     if (banners.isEmpty) {
-      return Container(height: 440, color: AppColors.grey100);
+      // Пока грузится — место под баннер; загрузилось и баннеров нет (владелец снял
+      // демо-баннеры 26.11) — без пустой серой плашки на пол-экрана.
+      return catalog.isReady
+          ? const SizedBox(height: 16)
+          : Container(
+              height: 440,
+              color: AppColors.grey100,
+              margin: const EdgeInsets.only(bottom: 32));
     }
     return Column(
       children: [
@@ -184,6 +191,7 @@ class _BannerCarousel extends StatelessWidget {
             dotColor: AppColors.grey200,
           ),
         ),
+        const SizedBox(height: 32),
       ],
     );
   }
@@ -368,60 +376,59 @@ class _SectionHeader extends StatelessWidget {
 // ─── Category cards ───────────────────────────────────────────────────────────
 
 class _CategoryCards extends StatelessWidget {
-  static const _data = [
-    (
-      id: 'tshirts',
-      name: 'Футболки',
-      key: 'app.cat.tshirts',
-      img: 'assets/images/products/1521572163474-6864f9cf17ab.jpg',
-    ),
-    (
-      id: 'hoodies',
-      name: 'Худи',
-      key: 'app.cat.hoodies',
-      img: 'assets/images/products/1620799140408-edc6dcb6d633.jpg',
-    ),
-    (
-      id: 'shoes',
-      name: 'Кроссовки',
-      key: 'app.cat.shoes',
-      img: 'assets/images/products/1542291026-7eec264c27ff.jpg',
-    ),
-    (
-      id: 'jackets',
-      name: 'Куртки',
-      key: 'app.cat.jackets',
-      img: 'assets/images/products/1591047139829-d91aecb6caea.jpg',
-    ),
-    (
-      id: 'pants',
-      name: 'Брюки',
-      key: 'app.cat.pants',
-      img: 'assets/images/products/1506629082955-511b1aa562c8.jpg',
-    ),
-    (
-      id: 'accessories',
-      name: 'Аксессуары',
-      key: 'app.cat.accessories',
-      img: 'assets/images/products/1553062407-98eeb64c6a62.jpg',
-    ),
-  ];
+  // Разделы витрины (D-133) и ручной выбор лучшего фото НАШЕГО товара на обложку
+  // (владелец 26.11: «заменить на наши — самую удачную и хорошего качества»).
+  // Раньше тут были стоковые фото (в «Кроссовках» — Nike) и id-заглушки tshirts/
+  // hoodies, которых нет в 1С: плитка открывала пустой каталог.
+  // Товар пропал/без фото — обложкой станет первый товар раздела с фото; раздел
+  // без единого фото не показывается. Поверх всего — фото из Конструктора.
+  static const _picks = <String, String>{
+    'sneakers': '812625546', // ANTA WALK 3.0
+    'tees': '26SADT013', // STAW, футболка
+    'longsleeves': '26SACT006', // STAW, лонгслив
+    'jackets': '26SAJK007', // STAW, ветровка
+    'pants': '26SACK007', // STAW, брюки
+    'boots': '812538965C', // ANTA RIDGES 2.0
+    'glasses': '14110025007', // Rockbros SHADOW
+    'gels': '702456', // SIS GO + Electrolyte
+  };
 
   @override
   Widget build(BuildContext context) {
+    final catalog = context.watch<CatalogProvider>();
+    final cards = <({String tab, String group, String name, String img})>[];
+    void add(String tab, ShowcaseGroup g) {
+      final img = catalog.coverFor(g.categoryIds, preferId: _picks[g.id]);
+      if (img.isNotEmpty) cards.add((tab: tab, group: g.id, name: g.name, img: img));
+    }
+    // Сначала выбранные разделы в задуманном порядке, затем остальные непустые.
+    for (final id in _picks.keys) {
+      for (final t in catalog.showcase) {
+        for (final g in t.groups) {
+          if (g.id == id) add(t.id, g);
+        }
+      }
+    }
+    for (final t in catalog.showcase) {
+      for (final g in t.groups) {
+        if (!_picks.containsKey(g.id)) add(t.id, g);
+      }
+    }
+    if (cards.isEmpty) return const SizedBox(height: 190);
     return SizedBox(
       height: 190,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _data.length,
+        itemCount: cards.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
-          final cat = _data[i];
+          final cat = cards[i];
           return _CategoryCard(
-                id: cat.id,
+                tab: cat.tab,
+                group: cat.group,
                 name: cat.name,
-                contentKey: cat.key,
+                contentKey: 'app.cat.${cat.group}',
                 imageUrl: cat.img,
               )
               .animate(delay: ((i < 6 ? i : 6) * 70).ms)
@@ -434,12 +441,14 @@ class _CategoryCards extends StatelessWidget {
 }
 
 class _CategoryCard extends StatefulWidget {
-  final String id;
+  final String tab;
+  final String group;
   final String name;
   final String contentKey;
   final String imageUrl;
   const _CategoryCard({
-    required this.id,
+    required this.tab,
+    required this.group,
     required this.name,
     required this.contentKey,
     required this.imageUrl,
@@ -455,7 +464,7 @@ class _CategoryCardState extends State<_CategoryCard> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.go('/catalog?category=${widget.id}'),
+      onTap: () => context.go('/catalog?tab=${widget.tab}&group=${widget.group}'),
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) => setState(() => _pressed = false),
       onTapCancel: () => setState(() => _pressed = false),
@@ -471,7 +480,7 @@ class _CategoryCardState extends State<_CategoryCard> {
             children: [
               RemoteImage(
                 '${widget.contentKey}.img',
-                fallbackAsset: widget.imageUrl,
+                fallbackUrl: widget.imageUrl,
                 width: 118,
                 height: 190,
               ),
