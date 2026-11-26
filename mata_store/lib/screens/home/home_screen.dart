@@ -33,7 +33,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final catalog = context.watch<CatalogProvider>();
-    final featured = catalog.featured;
+    // «Рекомендуем»: отмеченные в админке; не отмечено ничего — товары с фото в
+    // порядке витрины (как на сайте), а не пустая полоса на пол-экрана (26.11).
+    final featured = catalog.featured.isNotEmpty
+        ? catalog.featured
+        : catalog.products.where((p) => p.firstImage.isNotEmpty).take(10).toList();
     final newProducts = catalog.newProducts;
 
     return Scaffold(
@@ -85,18 +89,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 .fadeIn(duration: 400.ms)
                 .slideX(begin: 0.08, curve: Curves.easeOut),
 
-            const SizedBox(height: 36),
-
-            _SectionHeader(
-                  title: 'НОВИНКИ',
-                  contentKey: 'app.home.newTitle',
-                  onTap: () => context.go('/catalog'),
-                )
-                .animate(delay: 340.ms)
-                .fadeIn(duration: 400.ms)
-                .slideX(begin: -0.15, curve: Curves.easeOut),
-            const SizedBox(height: 14),
-            _NewProductsGrid(products: newProducts),
+            // Новинок нет — раздела нет (заголовок над пустотой выглядит как поломка).
+            if (newProducts.isNotEmpty) ...[
+              const SizedBox(height: 36),
+              _SectionHeader(
+                    title: 'НОВИНКИ',
+                    contentKey: 'app.home.newTitle',
+                    onTap: () => context.go('/catalog'),
+                  )
+                  .animate(delay: 340.ms)
+                  .fadeIn(duration: 400.ms)
+                  .slideX(begin: -0.15, curve: Curves.easeOut),
+              const SizedBox(height: 14),
+              _NewProductsGrid(products: newProducts),
+            ],
 
             const SizedBox(height: 48),
           ],
@@ -473,7 +479,7 @@ class _CategoryCardState extends State<_CategoryCard> {
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOut,
         child: SizedBox(
-          width: 118,
+          width: 136,
           height: 190,
           child: Stack(
             fit: StackFit.expand,
@@ -481,7 +487,7 @@ class _CategoryCardState extends State<_CategoryCard> {
               RemoteImage(
                 '${widget.contentKey}.img',
                 fallbackUrl: widget.imageUrl,
-                width: 118,
+                width: 136,
                 height: 190,
               ),
               Container(
@@ -502,7 +508,8 @@ class _CategoryCardState extends State<_CategoryCard> {
                   widget.contentKey,
                   widget.name,
                   upper: true,
-                  maxLines: 1,
+                  // «Футболки и майки», «Куртки и ветровки» — в две строки, не «ФУТБОЛК…».
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12.5,
