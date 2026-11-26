@@ -3098,6 +3098,7 @@ html.js.motion-off .hero .brand-wordmark span {
   display: flex;
   gap: 10px;
 }
+.footer-social[hidden] { display: none; }
 
 .footer-social a {
   display: grid;

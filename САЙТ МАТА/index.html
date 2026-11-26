@@ -3,10 +3,10 @@
   <head>
     <!-- Стартует загрузку правок и прячет «старую» вёрстку до их применения.
          Должен идти ПЕРВЫМ: смысл в том, чтобы успеть до отрисовки. -->
-    <script src="boot.js?v=20261126h"></script>
+    <script src="boot.js?v=20261126i"></script>
     <!-- Правки применяются как можно раньше: качается параллельно с
          разметкой, выполняется сразу после её разбора. -->
-    <script defer src="content.js?v=20261126h"></script>
+    <script defer src="content.js?v=20261126i"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>МАТА — интернет-магазин спортивной одежды, обуви и аксессуаров</title>
@@ -41,8 +41,8 @@
     />
     <meta name="twitter:image" content="media/staw-hero.jpg" />
 
-    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126h" />
-    <link rel="stylesheet" href="styles.css?v=20261126h" />
+    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126i" />
+    <link rel="stylesheet" href="styles.css?v=20261126i" />
     <script>
       // Прогрессивное улучшение: помечаем, что JS активен (под этим классом hero
       // стартует скрытым и анимируется через motion.js). Страховка: если motion-слой
@@ -636,7 +636,7 @@
         <nav class="pr-menu" data-pr-menu>
           <button class="pr-item" type="button" data-pr-edit>Редактировать профиль</button>
           <button class="pr-item" type="button" data-pr-orders>Мои заказы</button>
-          <a class="pr-item" href="#">Поддержка</a>
+          <a class="pr-item" href="/legal/?doc=contacts" data-legal="contacts">Поддержка</a>
           <a class="pr-item" href="/legal/?doc=privacy" data-legal="privacy">Политика конфиденциальности</a>
           <a class="pr-item" href="/legal/?doc=pd_consent" data-legal="pd_consent">Обработка персональных данных</a>
         </nav>
@@ -873,22 +873,26 @@
           <p data-edit="footer.brandText">Спортивная одежда для бега, тренировки и города. Двигайся каждый день.</p>
           <div class="footer-apps">
             <span data-edit="footer.appsLabel">Экосистема</span>
-            <a href="#" data-edit="footer.app1">«Квартал» — бег</a>
-            <a href="#" data-edit="footer.app2">МАТА Store</a>
+            <!-- Приложения — страница скачивания (Android); в магазинах приложений их пока нет. -->
+            <a href="/app.html" data-edit="footer.app1">«Квартал» — бег</a>
+            <a href="/app.html" data-edit="footer.app2">МАТА Store</a>
           </div>
         </div>
 
         <nav class="footer-col" aria-label="Каталог">
           <h4 data-edit="footer.catTitle">Каталог</h4>
-          <a href="#catalog" data-edit="footer.cat1">Все товары</a>
-          <a href="#catalog" data-edit="footer.cat2">Бег</a>
-          <a href="#catalog" data-edit="footer.cat3">Верх</a>
-          <a href="#catalog" data-edit="footer.cat4">Низ</a>
+          <!-- Ведут в настоящие вкладки витрины (аудит, пункт 8): раньше «Бег/Верх/Низ»
+               открывали каталог без отбора. -->
+          <a href="/?tab=all#catalog" data-tab-link="all" data-edit="footer.cat1">Все товары</a>
+          <a href="/?tab=shoes#catalog" data-tab-link="shoes" data-edit="footer.cat2">Обувь</a>
+          <a href="/?tab=clothing#catalog" data-tab-link="clothing" data-edit="footer.cat3">Одежда</a>
+          <a href="/?tab=accessories#catalog" data-tab-link="accessories" data-edit="footer.cat4">Аксессуары</a>
+          <a href="/?tab=nutrition#catalog" data-tab-link="nutrition" data-edit="footer.cat5">Питание</a>
         </nav>
 
         <nav class="footer-col" aria-label="Бренд">
           <h4 data-edit="footer.brandTitle">Бренд</h4>
-          <a href="#philosophy" data-edit="footer.brand1">Философия</a>
+          <a href="/philosophy/" data-edit="footer.brand1">Философия</a>
           <a href="#loyalty" data-edit="footer.brand2">Экосистема и баллы</a>
         </nav>
 
@@ -897,7 +901,6 @@
           <a href="/legal/?doc=contacts" data-legal="contacts" data-edit="footer.help1">Контакты</a>
           <a href="/legal/?doc=delivery" data-legal="delivery" data-edit="footer.help2">Доставка и оплата</a>
           <a href="/legal/?doc=returns" data-legal="returns" data-edit="footer.help3">Возврат и обмен</a>
-          <a href="#" data-edit="footer.help4">Размерная сетка</a>
         </nav>
 
         <div class="footer-sub">
@@ -914,7 +917,9 @@
             <button type="submit" aria-label="Подписаться">→</button>
           </form>
           <p class="footer-sub-note" data-sub-note></p>
-          <div class="footer-social">
+          <!-- Соцсети скрыты, пока нет адресов (были ссылки «#» в никуда) — владелец даст
+               адреса, впишем и уберём hidden. -->
+          <div class="footer-social" hidden>
             <a href="#" aria-label="Telegram" data-edit="footer.social1">TG</a>
             <a href="#" aria-label="VK" data-edit="footer.social2">VK</a>
             <a href="#" aria-label="YouTube" data-edit="footer.social3">YT</a>
@@ -955,33 +960,33 @@
 
     <!-- Единый журнал ошибок экосистемы (D-32): JS-ошибки сайта → GlitchTip.
          Подключаем ПЕРВЫМ, чтобы ловить ошибки остальных скриптов. -->
-    <script src="observability.js?v=20261126h"></script>
+    <script src="observability.js?v=20261126i"></script>
     <!-- Motion-слой (premium): плавный скролл Lenis + сцены GSAP/ScrollTrigger.
          Загружается с CDN; при недоступности сайт работает без анимаций (фолбэк).
          Стоит СРАЗУ после журнала ошибок, до остальных скриптов: герой стартует скрытым
          и проявляется анимацией motion.js — раньше он ждал корзину, каталог и окно входа
          (на телефоне 0,6–0,8 с пустого экрана после отрисовки страницы, замер 17.11.2026). -->
-    <script src="/vendor/gsap.min.js?v=20261126h"></script>
-    <script src="/vendor/ScrollTrigger.min.js?v=20261126h"></script>
-    <script src="/vendor/lenis.min.js?v=20261126h"></script>
-    <script src="motion.js?v=20261126h"></script>
-    <script src="script.js?v=20261126h"></script>
+    <script src="/vendor/gsap.min.js?v=20261126i"></script>
+    <script src="/vendor/ScrollTrigger.min.js?v=20261126i"></script>
+    <script src="/vendor/lenis.min.js?v=20261126i"></script>
+    <script src="motion.js?v=20261126i"></script>
+    <script src="script.js?v=20261126i"></script>
     <!-- Динамический каталог из общего backend (наполняет сетку товарами). -->
-    <script src="catalog.js?v=20261126h"></script>
+    <script src="catalog.js?v=20261126i"></script>
     <!-- Промо-баннеры из админки (/banners) → стрип под hero. -->
-    <script src="promo.js?v=20261126h"></script>
+    <script src="promo.js?v=20261126i"></script>
     <!-- Юр-документы из админки (/legal/documents) → модалка по ссылкам. -->
-    <script src="legal.js?v=20261126h"></script>
+    <script src="legal.js?v=20261126i"></script>
     <!-- Экосистема: единый аккаунт + общие баллы (самодостаточный модуль). -->
-    <script src="ecosystem.js?v=20261126h"></script>
+    <script src="ecosystem.js?v=20261126i"></script>
     <!-- Отмена и возврат заказа в окне профиля (D-123). -->
-    <script src="returns.js?v=20261126h"></script>
+    <script src="returns.js?v=20261126i"></script>
     <!-- Мини-CMS: тексты/фото сайта из бэкенда (задаются в «Конструкторе»). -->
     <!-- Режим редактирования для «Конструктора» (активен только при ?edit=1 внутри его окна).
          Редактор (76 КБ) посетителям не нужен — грузим его только в Конструкторе. Условие то
          же, что в самом editor.js; document.write — чтобы файл, как и раньше, выполнился
          синхронно, до DOMContentLoaded (на нём держится часть правок). -->
-    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261126h"><\/script>');</script>
+    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261126i"><\/script>');</script>
 
   </body>
 </html>

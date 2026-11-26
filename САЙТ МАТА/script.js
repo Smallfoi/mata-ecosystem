@@ -3033,12 +3033,47 @@ if (srch) {
   mark(false);
 })();
 
+
+// Ссылки на вкладки витрины (подвал, ?tab= в адресе): нажатие на той же странице
+// переключает вкладку без перезагрузки — как нажатие самой вкладки в каталоге.
+function tabOpen(tab) {
+  // ?tab= в адресе — одноразовый вход; дальше вкладку переключают на странице.
+  const p = new URLSearchParams(location.search);
+  if (p.has("tab")) {
+    p.delete("tab");
+    const qs = p.toString();
+    try { history.replaceState(history.state, "", location.pathname + (qs ? "?" + qs : "") + location.hash); } catch (e) { /* file:// */ }
+  }
+  const btn = document.querySelector(`[data-filters] [data-filter="${CSS.escape(tab)}"]`);
+  if (btn && !btn.hidden) btn.click(); else applyFilter("all");
+}
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("[data-tab-link]");
+  if (!a || /^\/product\//.test(location.pathname) || e.metaKey || e.ctrlKey) return;
+  e.preventDefault();
+  tabOpen(a.dataset.tabLink);
+  const cat = document.getElementById("catalog");
+  if (cat) cat.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+let tabFromUrl = new URLSearchParams(location.search).get("tab");
+
 window.STAW.onCatalogRendered = function () {
   observeReveals();
   bindAddButtons();
   bindQuickView();
   applyCatalog();
   favPaint();
+  if (tabFromUrl) {
+    // Вкладки раскладываются после ответа /showcase — ждём, пока карточки получат вкладку.
+    const tab = tabFromUrl;
+    tabFromUrl = null;
+    let tries = 0;
+    const wait = () => {
+      const ready = tab === "all" || document.querySelector(`.product-card[data-category~="${CSS.escape(tab)}"]`);
+      if (ready || ++tries > 20) tabOpen(tab); else setTimeout(wait, 250);
+    };
+    wait();
+  }
   pvOpenRouteProduct();
 };
 
