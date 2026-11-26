@@ -104,6 +104,7 @@ function fltPass(card, skip) {
     if (flt.flags.has("stock") && /скоро/i.test(card.dataset.stock || "")) return false;
     if (flt.flags.has("new") && card.dataset.new !== "1") return false;
     if (flt.flags.has("sale") && !fltIsSale(card)) return false;
+    if (flt.flags.has("fav") && !favSet.has(card.dataset.id || "")) return false;
   }
   return true;
 }
@@ -128,7 +129,7 @@ function fltPriceLabel() {
 }
 
 const FLT_GENDER = { men: "Мужское", women: "Женское", kids: "Детское" };
-const FLT_FLAGS = { stock: "Только в наличии", new: "Новинки", sale: "Со скидкой" };
+const FLT_FLAGS = { stock: "Только в наличии", new: "Новинки", sale: "Со скидкой", fav: "Избранное" };
 
 // Опции панели и счётчики: base — карточки, прошедшие вкладку и поиск.
 function fltRefresh(base) {
@@ -217,10 +218,15 @@ function fltRefresh(base) {
         empty = document.createElement("div");
         empty.className = "cat-none";
         empty.setAttribute("data-fnone", "");
-        empty.innerHTML = '<p>По этим фильтрам ничего не нашлось.</p>' +
-          '<button type="button" class="btn btn-ghost btn-ghost-dark" data-freset>Сбросить фильтры</button>';
         grid.appendChild(empty);
       }
+      // Только «Избранное» и оно пустое — подсказать, как добавить, а не «ничего не нашлось».
+      const favOnly = flt.flags.has("fav") && fltActiveCount() === 1 && !favSet.size;
+      empty.innerHTML = favOnly
+        ? '<p>В избранном пока ничего нет — нажмите ♡ на товаре, он появится здесь.</p>' +
+          '<button type="button" class="btn btn-ghost btn-ghost-dark" data-freset>Весь каталог</button>'
+        : '<p>По этим фильтрам ничего не нашлось.</p>' +
+          '<button type="button" class="btn btn-ghost btn-ghost-dark" data-freset>Сбросить фильтры</button>';
     } else if (empty) {
       empty.remove();
     }
@@ -1080,6 +1086,103 @@ function pvShare() {
 }
 
 
+
+// ── Избранное (аудит 25.11.2026, пункт 6) ──────────────────────────────────────────
+// Одно на сайт и приложение Store — на едином аккаунте (/v1/favorites). Гость копит
+// у себя в браузере; вошёл — список гостя сливается в аккаунт и в браузере очищается
+// (на общем компьютере чужое избранное не останется после выхода).
+const FAV_GUEST = "mata_fav_guest";
+const FAV_ACC = "mata_fav_acc";
+let favSet = new Set();
+
+function favToken() {
+  try { return localStorage.getItem("staw_jwt"); } catch (e) { return null; }
+}
+function favRead(key) {
+  try { return new Set(JSON.parse(localStorage.getItem(key) || "[]")); } catch (e) { return new Set(); }
+}
+function favWrite(key, set) {
+  try { localStorage.setItem(key, JSON.stringify([...set])); } catch (e) { /* приватный режим */ }
+}
+function favApi(path, method, body) {
+  const api = window.STAW && window.STAW.api;
+  if (typeof api !== "function") return Promise.reject(new Error("нет api"));
+  return api(path, { method: method || "GET", body });
+}
+
+function favPaint() {
+  document.querySelectorAll("[data-fav]").forEach((b) => {
+    const card = b.closest(".product-card");
+    const id = card ? card.dataset.id : (pvCard && pvCard.dataset.id);
+    const on = Boolean(id) && favSet.has(id);
+    b.classList.toggle("is-on", on);
+    b.setAttribute("aria-pressed", String(on));
+    b.setAttribute("aria-label", on ? "Убрать из избранного" : "В избранное");
+  });
+  const n = favSet.size;
+  document.querySelectorAll("[data-fav-count]").forEach((el) => {
+    el.textContent = n;
+    el.hidden = !n;
+  });
+}
+
+function favToggle(id) {
+  if (!id) return;
+  const on = !favSet.has(id);
+  if (on) favSet.add(id); else favSet.delete(id);
+  const logged = Boolean(favToken());
+  favWrite(logged ? FAV_ACC : FAV_GUEST, favSet);
+  favPaint();
+  if (flt.flags.has("fav")) applyCatalog();     // сняли сердце в «Избранном» — вещь уходит
+  if (logged) {
+    favApi(`/favorites/${encodeURIComponent(id)}`, on ? "PUT" : "DELETE")
+      .then((r) => { if (r && Array.isArray(r.keys)) { favSet = new Set(r.keys); favWrite(FAV_ACC, favSet); favPaint(); } })
+      .catch(() => {});
+  }
+}
+
+// Вход: слить избранное гостя в аккаунт; уже вошёл — взять актуальное с сервера.
+function favSync() {
+  if (!favToken()) return;
+  const guest = favRead(FAV_GUEST);
+  const req = guest.size
+    ? favApi("/favorites/merge", "POST", { keys: [...guest] })
+    : favApi("/favorites");
+  req.then((r) => {
+    if (!r || !Array.isArray(r.keys)) return;
+    favSet = new Set(r.keys);
+    favWrite(FAV_ACC, favSet);
+    try { localStorage.removeItem(FAV_GUEST); } catch (e) { /* ничего */ }
+    favPaint();
+    if (flt.flags.has("fav")) applyCatalog();
+  }).catch(() => {});
+}
+
+// Показать избранное: тот же каталог с отбором «Избранное» — чип «×» его снимает.
+function favShow() {
+  flt.flags.add("fav");
+  applyFilter("all");
+  const cat = document.getElementById("catalog");
+  if (cat) cat.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+favSet = favToken() ? favRead(FAV_ACC) : favRead(FAV_GUEST);
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fav]");
+  if (b) {
+    e.preventDefault();
+    e.stopPropagation();
+    const card = b.closest(".product-card");
+    favToggle(card ? card.dataset.id : (pvCard && pvCard.dataset.id));
+    return;
+  }
+  if (e.target.closest("[data-fav-open]")) favShow();
+}, true);
+window.addEventListener("staw-auth", favSync);
+// ecosystem.js поднимает api после загрузки — синхронизируемся, когда он готов.
+window.addEventListener("load", () => setTimeout(favSync, 300));
+favPaint();
+
 // ── Баллы, доставка, возврат в окне товара (аудит 25.11.2026, пункт 4) ───────────
 // Баллы — наше главное отличие от Nike/ANTA, и раньше в карточке его не было видно.
 // Ставка — по уровню покупателя (гость — базовый), исключения «без начисления» — те
@@ -1217,6 +1320,7 @@ function openQuickView(card, opts) {
   pvSetupSizeGuide();
   pvPrefetch();
   pvShare();
+  favPaint();
   pvRenderPerks();
   pvLoadPerks().then(() => { if (pvCard === card) pvRenderPerks(); });
   pvModal.classList.add("is-open");
@@ -2869,6 +2973,7 @@ window.STAW.onCatalogRendered = function () {
   bindAddButtons();
   bindQuickView();
   applyCatalog();
+  favPaint();
   pvOpenRouteProduct();
 };
 

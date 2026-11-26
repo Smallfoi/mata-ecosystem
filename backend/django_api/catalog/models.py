@@ -329,6 +329,23 @@ class Review(models.Model):
         verbose_name_plural = "Отзывы"
 
 
+class Favorite(models.Model):
+    """Избранное на едином аккаунте (аудит сайта 26.11.2026, пункт 6): одно на сайт и
+    приложение Store. Ключ — модель витрины (`/v1/models` → key): у модели много
+    позиций склада, а нравится покупателю вещь целиком."""
+
+    user_id = models.CharField(max_length=40, db_index=True, verbose_name="Пользователь (ID)")
+    model_key = models.CharField(max_length=80, verbose_name="Модель (ключ витрины)")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Добавлено")
+
+    class Meta:
+        db_table = "catalog_favorites"
+        unique_together = (("user_id", "model_key"),)
+        ordering = ["-created_at"]
+        verbose_name = "Избранное"
+        verbose_name_plural = "Избранное"
+
+
 class SiteContent(models.Model):
     """Редактируемый контент сайта (мини-CMS для «Конструктора»): тексты и фото
     шапки/hero/секций. Ключ → текст/фото. Сайт читает через GET /v1/site/content и

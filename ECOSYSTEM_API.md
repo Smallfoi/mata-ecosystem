@@ -566,6 +566,11 @@ GET  /loyalty/partners  → партнёры программы на карте 
                         (тот же телефон или то же устройство) отклоняется.
                         Бонус пригласившему (BONUS_REFERRAL = 100, не больше CAP_REFERRALS_MONTH = 3
                         в месяц) — когда первый заказ приглашённого вышел из удержания без возврата.
+GET    /favorites              (Bearer) → { keys: [ключ модели] }  избранное аккаунта, новые первыми
+PUT    /favorites/<key>        (Bearer) → { keys }   добавить (повтор — не ошибка; не больше 500)
+DELETE /favorites/<key>        (Bearer) → { keys }   убрать
+POST   /favorites/merge {keys} (Bearer) → { keys }   слить избранное гостя после входа
+                        Одно на сайт и Store (26.11.2026); ключ — key из /v1/models.
 GET  /loyalty/rules     → публично, без токена (26.11.2026): { enabled: false } |
                         { enabled: true, levels: [{ key, title, purchaseRate }],
                           noAccrual: { products: [id], categories: [id с подкатегориями],
