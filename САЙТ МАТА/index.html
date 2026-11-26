@@ -3,10 +3,10 @@
   <head>
     <!-- Стартует загрузку правок и прячет «старую» вёрстку до их применения.
          Должен идти ПЕРВЫМ: смысл в том, чтобы успеть до отрисовки. -->
-    <script src="boot.js?v=20261126e"></script>
+    <script src="boot.js?v=20261126f"></script>
     <!-- Правки применяются как можно раньше: качается параллельно с
          разметкой, выполняется сразу после её разбора. -->
-    <script defer src="content.js?v=20261126e"></script>
+    <script defer src="content.js?v=20261126f"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>МАТА — интернет-магазин спортивной одежды, обуви и аксессуаров</title>
@@ -41,8 +41,8 @@
     />
     <meta name="twitter:image" content="media/staw-hero.jpg" />
 
-    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126e" />
-    <link rel="stylesheet" href="styles.css?v=20261126e" />
+    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126f" />
+    <link rel="stylesheet" href="styles.css?v=20261126f" />
     <script>
       // Прогрессивное улучшение: помечаем, что JS активен (под этим классом hero
       // стартует скрытым и анимируется через motion.js). Страховка: если motion-слой
@@ -63,6 +63,10 @@
         <a href="#loyalty" data-edit="nav.loyalty">Экосистема</a>
       </nav>
       <div class="header-actions">
+        <!-- Поиск по каталогу из любой точки страницы (аудит, пункт 5). -->
+        <button class="hdr-search" type="button" data-search-open aria-label="Поиск по каталогу">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+        </button>
         <button class="cart-button" type="button" data-cart-toggle aria-label="Корзина">
           <svg class="cart-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
             <path
@@ -122,7 +126,7 @@
             <a class="btn btn-ghost" href="philosophy/" data-sid="a2" data-edit="hero.btn2">Философия бренда</a>
           </div>
         </div>
-        <a class="hero-scroll" href="#philosophy" data-anim="hero" aria-label="Листать вниз">
+        <a class="hero-scroll" href="#catalog" data-anim="hero" aria-label="Листать вниз">
           <span data-edit="hero.scroll">Scroll</span>
           <i class="hero-scroll-line" aria-hidden="true"></i>
         </a>
@@ -133,141 +137,8 @@
         <div class="promo-track" data-promo-track></div>
       </section>
 
-      <section class="brand-motion scene" aria-label="Бренд МАТА" data-edit-bg="motion">
-        <div class="brand-motion-word" aria-hidden="true">
-          <!-- Две ОДИНАКОВЫЕ группы для бесшовной бегущей строки: сдвиг ровно на -50%
-               ставит вторую группу точно на место первой — стыка/скачка не видно. -->
-          <div class="brand-motion-set">
-            <span data-edit="brand.word">МАТА</span>
-            <span data-edit="brand.word">МАТА</span>
-            <span data-edit="brand.word">МАТА</span>
-          </div>
-          <div class="brand-motion-set">
-            <span data-edit="brand.word">МАТА</span>
-            <span data-edit="brand.word">МАТА</span>
-            <span data-edit="brand.word">МАТА</span>
-          </div>
-        </div>
-        <div class="brand-motion-copy reveal">
-          <p class="eyebrow" data-edit="brand.eyebrow">Brand signal</p>
-          <h2 data-edit="brand.title">Движение как стиль. Функция как основа.</h2>
-        </div>
-      </section>
-
-      <section class="statement scene" id="philosophy" data-edit-bg="philosophy">
-        <div class="statement-inner reveal">
-          <p class="eyebrow" data-edit="philosophy.eyebrow">Философия</p>
-          <h2 data-edit="philosophy.title">Не ждать идеального момента. Начинать движение сейчас.</h2>
-          <p data-edit="philosophy.text">
-            МАТА создаёт одежду для активного ритма: бег, тренировка, прогулка, дорога, выходной маршрут. Это вещи,
-            которые не выглядят как случайная экипировка, но работают как спортивный слой: дышат, сохнут, держат форму
-            и остаются частью повседневного образа.
-          </p>
-          <a class="btn btn-ghost" href="philosophy/" data-edit="philosophy.more">Читать философию бренда</a>
-        </div>
-      </section>
-
-      <section class="cinema scene" data-edit-bg="cinema">
-        <div class="cinema-copy reveal">
-          <p class="eyebrow" data-edit="cinema.eyebrow">Sport / Street / Outdoor</p>
-          <h2 data-edit="cinema.title">Один гардероб для разных скоростей.</h2>
-        </div>
-        <div class="cinema-grid" data-sortable="cinema">
-          <article class="cinema-card reveal" data-sid="c1" data-hideable="cinema1">
-            <img src="media/staw-clean-02.jpg" alt="Беговой образ МАТА" loading="lazy" data-edit-img="cinema.img1" />
-            <div>
-              <h3 data-edit="cinema.card1">Бег</h3>
-            </div>
-          </article>
-          <article class="cinema-card reveal" data-sid="c2" data-hideable="cinema2">
-            <img src="media/staw-clean-11.jpg" alt="Беговые шорты МАТА" loading="lazy" data-edit-img="cinema.img2" />
-            <div>
-              <h3 data-edit="cinema.card2">Тренировка</h3>
-            </div>
-          </article>
-          <article class="cinema-card reveal" data-sid="c3" data-hideable="cinema3">
-            <img src="media/staw-clean-17.jpg" alt="Городская спортивная одежда МАТА" loading="lazy" data-edit-img="cinema.img3" />
-            <div>
-              <h3 data-edit="cinema.card3">Город</h3>
-            </div>
-          </article>
-        </div>
-        <!-- Шаблон нового блока «кино» (репитер: «➕ Добавить блок» в конструкторе). -->
-        <template data-block-template="cinema">
-          <article class="cinema-card" data-sid="{sid}" data-hideable="{sid}">
-            <img src="media/staw-clean-01.jpg" alt="МАТА" loading="lazy" data-edit-img="cinema.{sid}.img" />
-            <div>
-              <h3 data-edit="cinema.{sid}.title">Новый блок</h3>
-            </div>
-          </article>
-        </template>
-      </section>
-
-      <section class="product-story scene" id="system" data-edit-bg="system">
-        <div class="sticky-copy">
-          <p class="eyebrow reveal" data-edit="system.eyebrow">МАТА System</p>
-          <h2 class="reveal" data-edit="system.title">Лёгкость, вентиляция, чистый силуэт.</h2>
-          <p class="reveal" data-edit="system.text">
-            В основе — быстросохнущие ткани, вентиляционные зоны, антибактериальные обработки, эластичные посадки и
-            спокойная графика. МАТА выглядит современно, потому что не перегружает форму: вещь работает, а не спорит с
-            образом.
-          </p>
-        </div>
-        <div class="feature-stack" data-sortable="features">
-          <article class="feature-panel reveal" data-sid="f1" data-hideable="feature1" data-edit-bg="feature1">
-            <h3 data-edit="feature1.title">Быстросохнущие материалы</h3>
-            <p data-edit="feature1.text">Для жары, темпа и длинной городской активности.</p>
-          </article>
-          <article class="feature-panel reveal" data-sid="f2" data-hideable="feature2" data-edit-bg="feature2">
-            <h3 data-edit="feature2.title">Посадка для движения</h3>
-            <p data-edit="feature2.text">Свобода шага, лёгкий вес, продуманная вентиляция.</p>
-          </article>
-          <article class="feature-panel reveal" data-sid="f3" data-hideable="feature3" data-edit-bg="feature3">
-            <h3 data-edit="feature3.title">Городская эстетика</h3>
-            <p data-edit="feature3.text">Спортивная функция без ощущения формы только для зала.</p>
-          </article>
-        </div>
-        <!-- Шаблон нового блока-фичи (репитер). -->
-        <template data-block-template="features">
-          <article class="feature-panel" data-sid="{sid}" data-hideable="{sid}" data-edit-bg="{sid}">
-            <h3 data-edit="features.{sid}.title">Новый блок</h3>
-            <p data-edit="features.{sid}.text">Описание — нажмите, чтобы изменить.</p>
-          </article>
-        </template>
-      </section>
-
-      <section class="brand-modes scene" id="modes" data-edit-bg="modes">
-        <div class="section-heading reveal">
-          <p class="eyebrow" data-edit="modes.eyebrow">Один бренд — четыре ритма</p>
-          <h2 data-edit="modes.title">RUN · TRAIL · RACE · EVERYDAY</h2>
-        </div>
-        <div class="modes-grid" data-sortable="modes">
-          <article class="mode-card reveal" data-sid="m1" data-hideable="mode1" data-edit-bg="mode1">
-            <h3 data-edit="mode1.title">RUN</h3>
-            <p data-edit="mode1.text">Городской бег: лёгкие ткани, вентиляция и чистый силуэт для ежедневных пробежек.</p>
-          </article>
-          <article class="mode-card reveal" data-sid="m2" data-hideable="mode2" data-edit-bg="mode2">
-            <h3 data-edit="mode2.title">TRAIL</h3>
-            <p data-edit="mode2.text">Лёгкий outdoor: защита, посадка и материалы для маршрутов за городом.</p>
-          </article>
-          <article class="mode-card reveal" data-sid="m3" data-hideable="mode3" data-edit-bg="mode3">
-            <h3 data-edit="mode3.title">RACE</h3>
-            <p data-edit="mode3.text">Соревновательный темп: минимум веса, максимум скорости и аэродинамики.</p>
-          </article>
-          <article class="mode-card reveal" data-sid="m4" data-hideable="mode4" data-edit-bg="mode4">
-            <h3 data-edit="mode4.title">EVERYDAY</h3>
-            <p data-edit="mode4.text">Городская повседневность: спортивная функция в одежде, которую носишь каждый день.</p>
-          </article>
-        </div>
-        <!-- Шаблон нового блока-режима (репитер). -->
-        <template data-block-template="modes">
-          <article class="mode-card" data-sid="{sid}" data-hideable="{sid}" data-edit-bg="{sid}">
-            <h3 data-edit="modes.{sid}.title">НОВЫЙ</h3>
-            <p data-edit="modes.{sid}.text">Описание режима — нажмите, чтобы изменить.</p>
-          </article>
-        </template>
-      </section>
-
+      <!-- Каталог — сразу после первого экрана (аудит 25.11.2026, пункт 5): на телефоне
+           до первого товара было 7–8 экранов прокрутки. История бренда — ниже каталога. -->
       <section class="catalog scene" id="catalog">
         <div class="section-heading reveal">
           <p class="eyebrow" data-edit="catalog.eyebrow">Shop the motion</p>
@@ -440,6 +311,142 @@
           </article>
         </div>
       </section>
+
+      <section class="brand-motion scene" aria-label="Бренд МАТА" data-edit-bg="motion">
+        <div class="brand-motion-word" aria-hidden="true">
+          <!-- Две ОДИНАКОВЫЕ группы для бесшовной бегущей строки: сдвиг ровно на -50%
+               ставит вторую группу точно на место первой — стыка/скачка не видно. -->
+          <div class="brand-motion-set">
+            <span data-edit="brand.word">МАТА</span>
+            <span data-edit="brand.word">МАТА</span>
+            <span data-edit="brand.word">МАТА</span>
+          </div>
+          <div class="brand-motion-set">
+            <span data-edit="brand.word">МАТА</span>
+            <span data-edit="brand.word">МАТА</span>
+            <span data-edit="brand.word">МАТА</span>
+          </div>
+        </div>
+        <div class="brand-motion-copy reveal">
+          <p class="eyebrow" data-edit="brand.eyebrow">Brand signal</p>
+          <h2 data-edit="brand.title">Движение как стиль. Функция как основа.</h2>
+        </div>
+      </section>
+
+      <section class="statement scene" id="philosophy" data-edit-bg="philosophy">
+        <div class="statement-inner reveal">
+          <p class="eyebrow" data-edit="philosophy.eyebrow">Философия</p>
+          <h2 data-edit="philosophy.title">Не ждать идеального момента. Начинать движение сейчас.</h2>
+          <p data-edit="philosophy.text">
+            МАТА создаёт одежду для активного ритма: бег, тренировка, прогулка, дорога, выходной маршрут. Это вещи,
+            которые не выглядят как случайная экипировка, но работают как спортивный слой: дышат, сохнут, держат форму
+            и остаются частью повседневного образа.
+          </p>
+          <a class="btn btn-ghost" href="philosophy/" data-edit="philosophy.more">Читать философию бренда</a>
+        </div>
+      </section>
+
+      <section class="cinema scene" data-edit-bg="cinema">
+        <div class="cinema-copy reveal">
+          <p class="eyebrow" data-edit="cinema.eyebrow">Sport / Street / Outdoor</p>
+          <h2 data-edit="cinema.title">Один гардероб для разных скоростей.</h2>
+        </div>
+        <div class="cinema-grid" data-sortable="cinema">
+          <article class="cinema-card reveal" data-sid="c1" data-hideable="cinema1">
+            <img src="media/staw-clean-02.jpg" alt="Беговой образ МАТА" loading="lazy" data-edit-img="cinema.img1" />
+            <div>
+              <h3 data-edit="cinema.card1">Бег</h3>
+            </div>
+          </article>
+          <article class="cinema-card reveal" data-sid="c2" data-hideable="cinema2">
+            <img src="media/staw-clean-11.jpg" alt="Беговые шорты МАТА" loading="lazy" data-edit-img="cinema.img2" />
+            <div>
+              <h3 data-edit="cinema.card2">Тренировка</h3>
+            </div>
+          </article>
+          <article class="cinema-card reveal" data-sid="c3" data-hideable="cinema3">
+            <img src="media/staw-clean-17.jpg" alt="Городская спортивная одежда МАТА" loading="lazy" data-edit-img="cinema.img3" />
+            <div>
+              <h3 data-edit="cinema.card3">Город</h3>
+            </div>
+          </article>
+        </div>
+        <!-- Шаблон нового блока «кино» (репитер: «➕ Добавить блок» в конструкторе). -->
+        <template data-block-template="cinema">
+          <article class="cinema-card" data-sid="{sid}" data-hideable="{sid}">
+            <img src="media/staw-clean-01.jpg" alt="МАТА" loading="lazy" data-edit-img="cinema.{sid}.img" />
+            <div>
+              <h3 data-edit="cinema.{sid}.title">Новый блок</h3>
+            </div>
+          </article>
+        </template>
+      </section>
+
+      <section class="product-story scene" id="system" data-edit-bg="system">
+        <div class="sticky-copy">
+          <p class="eyebrow reveal" data-edit="system.eyebrow">МАТА System</p>
+          <h2 class="reveal" data-edit="system.title">Лёгкость, вентиляция, чистый силуэт.</h2>
+          <p class="reveal" data-edit="system.text">
+            В основе — быстросохнущие ткани, вентиляционные зоны, антибактериальные обработки, эластичные посадки и
+            спокойная графика. МАТА выглядит современно, потому что не перегружает форму: вещь работает, а не спорит с
+            образом.
+          </p>
+        </div>
+        <div class="feature-stack" data-sortable="features">
+          <article class="feature-panel reveal" data-sid="f1" data-hideable="feature1" data-edit-bg="feature1">
+            <h3 data-edit="feature1.title">Быстросохнущие материалы</h3>
+            <p data-edit="feature1.text">Для жары, темпа и длинной городской активности.</p>
+          </article>
+          <article class="feature-panel reveal" data-sid="f2" data-hideable="feature2" data-edit-bg="feature2">
+            <h3 data-edit="feature2.title">Посадка для движения</h3>
+            <p data-edit="feature2.text">Свобода шага, лёгкий вес, продуманная вентиляция.</p>
+          </article>
+          <article class="feature-panel reveal" data-sid="f3" data-hideable="feature3" data-edit-bg="feature3">
+            <h3 data-edit="feature3.title">Городская эстетика</h3>
+            <p data-edit="feature3.text">Спортивная функция без ощущения формы только для зала.</p>
+          </article>
+        </div>
+        <!-- Шаблон нового блока-фичи (репитер). -->
+        <template data-block-template="features">
+          <article class="feature-panel" data-sid="{sid}" data-hideable="{sid}" data-edit-bg="{sid}">
+            <h3 data-edit="features.{sid}.title">Новый блок</h3>
+            <p data-edit="features.{sid}.text">Описание — нажмите, чтобы изменить.</p>
+          </article>
+        </template>
+      </section>
+
+      <section class="brand-modes scene" id="modes" data-edit-bg="modes">
+        <div class="section-heading reveal">
+          <p class="eyebrow" data-edit="modes.eyebrow">Один бренд — четыре ритма</p>
+          <h2 data-edit="modes.title">RUN · TRAIL · RACE · EVERYDAY</h2>
+        </div>
+        <div class="modes-grid" data-sortable="modes">
+          <article class="mode-card reveal" data-sid="m1" data-hideable="mode1" data-edit-bg="mode1">
+            <h3 data-edit="mode1.title">RUN</h3>
+            <p data-edit="mode1.text">Городской бег: лёгкие ткани, вентиляция и чистый силуэт для ежедневных пробежек.</p>
+          </article>
+          <article class="mode-card reveal" data-sid="m2" data-hideable="mode2" data-edit-bg="mode2">
+            <h3 data-edit="mode2.title">TRAIL</h3>
+            <p data-edit="mode2.text">Лёгкий outdoor: защита, посадка и материалы для маршрутов за городом.</p>
+          </article>
+          <article class="mode-card reveal" data-sid="m3" data-hideable="mode3" data-edit-bg="mode3">
+            <h3 data-edit="mode3.title">RACE</h3>
+            <p data-edit="mode3.text">Соревновательный темп: минимум веса, максимум скорости и аэродинамики.</p>
+          </article>
+          <article class="mode-card reveal" data-sid="m4" data-hideable="mode4" data-edit-bg="mode4">
+            <h3 data-edit="mode4.title">EVERYDAY</h3>
+            <p data-edit="mode4.text">Городская повседневность: спортивная функция в одежде, которую носишь каждый день.</p>
+          </article>
+        </div>
+        <!-- Шаблон нового блока-режима (репитер). -->
+        <template data-block-template="modes">
+          <article class="mode-card" data-sid="{sid}" data-hideable="{sid}" data-edit-bg="{sid}">
+            <h3 data-edit="modes.{sid}.title">НОВЫЙ</h3>
+            <p data-edit="modes.{sid}.text">Описание режима — нажмите, чтобы изменить.</p>
+          </article>
+        </template>
+      </section>
+
 
       <section class="loyalty scene" id="loyalty" data-edit-bg="loyalty">
         <div class="loyalty-inner" data-sortable="loyaltyInner">
@@ -752,6 +759,46 @@
       </div>
     </div>
 
+    <!-- Поиск: строка сверху и мгновенные результаты из каталога (аудит, пункт 5). -->
+    <div class="srch" data-srch aria-hidden="true">
+      <div class="srch-backdrop" data-srch-close></div>
+      <div class="srch-panel" role="dialog" aria-modal="true" aria-label="Поиск по каталогу">
+        <div class="srch-row">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+          <input class="srch-input" type="search" data-srch-input placeholder="Кроссовки, ANTA, артикул…" aria-label="Что ищем" autocomplete="off" enterkeyhint="search" />
+          <button class="srch-x" type="button" data-srch-close aria-label="Закрыть поиск">×</button>
+        </div>
+        <div class="srch-results" data-srch-results></div>
+      </div>
+    </div>
+
+    <!-- Нижнее меню на телефоне, как у Nike и ANTA (аудит, пункт 5). -->
+    <nav class="tabbar" data-tabbar aria-label="Быстрое меню">
+      <a class="tabbar-item" href="#top" data-tab="home">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5V20h-5v-5.5H9V20H4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+        <span data-edit="tabbar.home">Главная</span>
+      </a>
+      <a class="tabbar-item" href="#catalog" data-tab="catalog">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+        <span data-edit="tabbar.catalog">Каталог</span>
+      </a>
+      <button class="tabbar-item" type="button" data-cart-toggle data-tab="cart">
+        <span class="tabbar-ico">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M3 4h2l2.3 11.3a1 1 0 0 0 1 .8h8a1 1 0 0 0 1-.8L20 7H6"/><circle cx="9.5" cy="20" r="1.4" fill="currentColor"/><circle cx="17.5" cy="20" r="1.4" fill="currentColor"/></svg>
+          <b class="tabbar-badge" data-cart-count hidden>0</b>
+        </span>
+        <span data-edit="tabbar.cart">Корзина</span>
+      </button>
+      <button class="tabbar-item" type="button" data-eco-login-cta data-tab="login">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span data-edit="tabbar.login">Войти</span>
+      </button>
+      <button class="tabbar-item" type="button" data-eco-auth-only data-eco-profile-cta data-tab="profile" hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span data-edit="tabbar.profile">Профиль</span>
+      </button>
+    </nav>
+
     <!-- Панель фильтров: справа на компьютере, снизу на телефоне. Вне секции каталога —
          у её предков есть transform (анимация появления), fixed внутри них ломается. -->
     <div class="cat-fpanel" data-fpanel aria-hidden="true">
@@ -887,33 +934,33 @@
 
     <!-- Единый журнал ошибок экосистемы (D-32): JS-ошибки сайта → GlitchTip.
          Подключаем ПЕРВЫМ, чтобы ловить ошибки остальных скриптов. -->
-    <script src="observability.js?v=20261126e"></script>
+    <script src="observability.js?v=20261126f"></script>
     <!-- Motion-слой (premium): плавный скролл Lenis + сцены GSAP/ScrollTrigger.
          Загружается с CDN; при недоступности сайт работает без анимаций (фолбэк).
          Стоит СРАЗУ после журнала ошибок, до остальных скриптов: герой стартует скрытым
          и проявляется анимацией motion.js — раньше он ждал корзину, каталог и окно входа
          (на телефоне 0,6–0,8 с пустого экрана после отрисовки страницы, замер 17.11.2026). -->
-    <script src="/vendor/gsap.min.js?v=20261126e"></script>
-    <script src="/vendor/ScrollTrigger.min.js?v=20261126e"></script>
-    <script src="/vendor/lenis.min.js?v=20261126e"></script>
-    <script src="motion.js?v=20261126e"></script>
-    <script src="script.js?v=20261126e"></script>
+    <script src="/vendor/gsap.min.js?v=20261126f"></script>
+    <script src="/vendor/ScrollTrigger.min.js?v=20261126f"></script>
+    <script src="/vendor/lenis.min.js?v=20261126f"></script>
+    <script src="motion.js?v=20261126f"></script>
+    <script src="script.js?v=20261126f"></script>
     <!-- Динамический каталог из общего backend (наполняет сетку товарами). -->
-    <script src="catalog.js?v=20261126e"></script>
+    <script src="catalog.js?v=20261126f"></script>
     <!-- Промо-баннеры из админки (/banners) → стрип под hero. -->
-    <script src="promo.js?v=20261126e"></script>
+    <script src="promo.js?v=20261126f"></script>
     <!-- Юр-документы из админки (/legal/documents) → модалка по ссылкам. -->
-    <script src="legal.js?v=20261126e"></script>
+    <script src="legal.js?v=20261126f"></script>
     <!-- Экосистема: единый аккаунт + общие баллы (самодостаточный модуль). -->
-    <script src="ecosystem.js?v=20261126e"></script>
+    <script src="ecosystem.js?v=20261126f"></script>
     <!-- Отмена и возврат заказа в окне профиля (D-123). -->
-    <script src="returns.js?v=20261126e"></script>
+    <script src="returns.js?v=20261126f"></script>
     <!-- Мини-CMS: тексты/фото сайта из бэкенда (задаются в «Конструкторе»). -->
     <!-- Режим редактирования для «Конструктора» (активен только при ?edit=1 внутри его окна).
          Редактор (76 КБ) посетителям не нужен — грузим его только в Конструкторе. Условие то
          же, что в самом editor.js; document.write — чтобы файл, как и раньше, выполнился
          синхронно, до DOMContentLoaded (на нём держится часть правок). -->
-    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261126e"><\/script>');</script>
+    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261126f"><\/script>');</script>
 
   </body>
 </html>
