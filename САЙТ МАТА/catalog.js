@@ -252,6 +252,7 @@
     var desc = p.description || "";
     return (
       '<article class="product-card reveal" data-id="' + esc(p.id) + '" data-cat-id="' + esc(cat) + '"' +
+      (thumb ? "" : ' data-nophoto="1"') +
       ' data-category="' + esc(cardCategories(cat, showcaseIndex(SHOWCASE))) + '"' +
       ' data-name="' + esc(p.name) + '" data-price="' + Number(p.price) + '"' +
       (p.slug ? ' data-slug="' + esc(p.slug) + '"' : "") +
@@ -270,7 +271,10 @@
       ' data-stock="' + esc(stock) + '" data-desc="' + esc(desc) + '">' +
       '<div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее: ' +
       esc(p.name) + '">' +
-      (thumb ? '<img src="' + esc(thumb) + '" alt="' + esc(p.name) + '" loading="lazy" />' : "") +
+      (thumb
+        ? '<img src="' + esc(thumb) + '" alt="' + esc(p.name) + '" loading="lazy" />'
+        // Фото ещё не загрузили: аккуратная заглушка, а не пустой серый квадрат.
+        : '<span class="product-nophoto" aria-hidden="true"><b>МАТА</b><small>Фото скоро</small></span>') +
       "</div>" +
       '<div class="product-info" data-quick-view tabindex="0" role="button">' +
       (catLabel ? '<p class="product-cat">' + esc(catLabel) + "</p>" : "") +
@@ -303,7 +307,11 @@
   function render(products) {
     var grid = document.querySelector("[data-product-grid]");
     if (!grid || !Array.isArray(products) || products.length === 0) return;
-    grid.innerHTML = products.map(cardHtml).join("");
+    // Товары без фото — в конец (аудит 25.11.2026, пункт 3): пустая плитка рядом с
+    // кроссовком выглядит как сломанный сайт. Порядок внутри обеих частей — витринный.
+    var withPhoto = products.filter(function (p) { return cardImgUrl(p) || imgUrl(p); });
+    var noPhoto = products.filter(function (p) { return !(cardImgUrl(p) || imgUrl(p)); });
+    grid.innerHTML = withPhoto.concat(noPhoto).map(cardHtml).join("");
     // Переинициализируем интеракции (фильтр/корзина/анимации) для новых карточек.
     if (window.STAW && typeof window.STAW.onCatalogRendered === "function") {
       window.STAW.onCatalogRendered();
