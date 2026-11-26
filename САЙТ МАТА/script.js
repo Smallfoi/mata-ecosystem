@@ -576,11 +576,16 @@ function pvShowPhotos(color) {
   const hasGalleries = Object.keys(pvPhotos).length > 0;
   const media = pvModal.querySelector(".pv-media");
 
-  if (!list.length && hasGalleries) {
+  const url = list.length ? list[0].u : (hasGalleries ? "" : pvFallback);
+  if (!url) {
+    // Снимка нет: заглушка вместо битой картинки с подписью-alt (аудит, пункт 3).
     img.removeAttribute("src");
-    if (media) media.classList.add("is-empty");
+    if (media) {
+      media.classList.add("is-empty");
+      media.dataset.empty = hasGalleries ? "Фото этого цвета пока нет" : "Фото товара скоро появится";
+    }
   } else {
-    img.src = list.length ? list[0].u : pvFallback;
+    img.src = url;
     if (media) media.classList.remove("is-empty");
   }
   if (!strip) return;
@@ -1077,7 +1082,7 @@ function openQuickView(card, opts) {
   } catch (e) {
     pvVariants = {};
   }
-  img.src = pvFallback;
+  if (pvFallback) img.src = pvFallback; else img.removeAttribute("src");
   img.alt = card.dataset.name || "";
   pvModal.querySelector("[data-pv-cat]").textContent = card.dataset.cat || "";
   pvModal.querySelector("[data-pv-name]").textContent = card.dataset.name || "";
@@ -1651,6 +1656,10 @@ function applySort(mode) {
     if (c.dataset.order === undefined) c.dataset.order = String(i);
   });
   cards.sort((a, b) => {
+    // Без фото — всегда в конце, при любой сортировке (аудит, пункт 3).
+    const na = a.dataset.nophoto === "1" ? 1 : 0;
+    const nb = b.dataset.nophoto === "1" ? 1 : 0;
+    if (na !== nb) return na - nb;
     const pa = Number(a.dataset.price) || 0;
     const pb = Number(b.dataset.price) || 0;
     if (mode === "price-asc") return pa - pb;

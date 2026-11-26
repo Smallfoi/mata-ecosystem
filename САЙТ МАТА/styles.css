@@ -3692,7 +3692,7 @@ html:has(.eco-modal.is-open) {
 .pv-media.is-empty { position: relative; min-height: 320px; }
 .pv-media.is-empty img { visibility: hidden; }
 .pv-media.is-empty::after {
-  content: "Фото этого цвета пока нет";
+  content: attr(data-empty);
   position: absolute; inset: 0; display: flex; align-items: center;
   justify-content: center; color: var(--muted, #6b7280); font-size: 14px;
 }
@@ -4241,3 +4241,19 @@ html:has(.eco-modal.is-open) {
 @media (prefers-reduced-motion: reduce) {
   .cat-fsheet, .cat-fbackdrop { transition: none; }
 }
+
+/* Плитка товара без фото (аудит 25.11.2026, пункт 3): знак МАТА и «Фото скоро»
+   вместо пустого квадрата. Такие товары стоят в конце списка. */
+.product-nophoto {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #f3f1ec;
+  color: rgba(17, 19, 23, 0.32);
+}
+.product-nophoto b { font-size: clamp(18px, 2.4vw, 28px); font-weight: 900; letter-spacing: 0.08em; }
+.product-nophoto small { color: var(--muted); font-size: 12px; font-weight: 700; }
