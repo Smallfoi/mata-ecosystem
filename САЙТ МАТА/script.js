@@ -180,8 +180,15 @@ function fltRefresh(base) {
       ` aria-pressed="${flt.brands.has(b)}"${brandCount[b] || flt.brands.has(b) ? "" : " disabled"}>` +
       `${escapeHtml(b)} <span>${brandCount[b]}</span></button>`).join("");
 
+    const flagBase = base.filter((c) => fltPass(c, "flags"));
+    const flagCount = {
+      new: flagBase.filter((c) => c.dataset.new === "1").length,
+      sale: flagBase.filter(fltIsSale).length,
+    };
     fltPanel.querySelectorAll("[data-flag]").forEach((b) => {
       const on = flt.flags.has(b.dataset.flag);
+      // «Новинки» и «Со скидкой» — только когда такие товары есть: пустой выбор не нужен.
+      if (b.dataset.flag in flagCount) b.hidden = !flagCount[b.dataset.flag] && !on;
       b.classList.toggle("is-on", on);
       b.setAttribute("aria-pressed", String(on));
     });
@@ -1281,6 +1288,59 @@ function pvRenderPerks() {
   box.hidden = false;
 }
 
+
+// ── Похожие товары в окне товара (аудит 25.11.2026, пункт 7) ─────────────────────
+// Та же группа витрины («Кроссовки», «Футболки»…), подходящий пол, в наличии, с фото;
+// ближе по цене — раньше. Как «Рекомендуем» у ANTA, но только из того, что можно купить.
+function pvRelated(card) {
+  const groups = (card.dataset.category || "").split(" ").filter((c) => c.indexOf("g-") === 0);
+  const cats = (card.dataset.category || "").split(" ").filter(Boolean);
+  const g = card.dataset.gender || "";
+  const price = Number(card.dataset.price) || 0;
+  const fits = (c) => {
+    const cg = c.dataset.gender || "";
+    if (!g || !cg || g === "unisex" || cg === "unisex") return true;
+    return g === cg;
+  };
+  const same = (c) => {
+    const cc = (c.dataset.category || "").split(" ");
+    return groups.length ? groups.some((x) => cc.includes(x)) : cats.some((x) => cc.includes(x));
+  };
+  return [...document.querySelectorAll(".product-card")]
+    .filter((c) => c !== card && c.dataset.id !== card.dataset.id && c.dataset.nophoto !== "1" &&
+      !/скоро/i.test(c.dataset.stock || "") && same(c) && fits(c))
+    .sort((a, b) => Math.abs(Number(a.dataset.price) - price) - Math.abs(Number(b.dataset.price) - price))
+    .slice(0, 6);
+}
+
+function pvRenderRelated(card) {
+  const box = pvModal && pvModal.querySelector("[data-pv-related]");
+  if (!box) return;
+  const list = pvRelated(card);
+  box.hidden = !list.length;
+  box.querySelector("[data-pv-related-row]").innerHTML = list.map((c) => {
+    const img = c.querySelector(".product-media img");
+    return `<button type="button" class="pv-rel" data-rel-id="${escapeHtml(c.dataset.id)}">` +
+      `<span class="pv-rel-img">${img ? `<img src="${escapeHtml(img.getAttribute("src"))}" alt="" loading="lazy">` : ""}</span>` +
+      `<small>${escapeHtml(c.dataset.brand || "")}</small><b>${escapeHtml(c.dataset.name || "")}</b>` +
+      `<span>${formatPrice(Number(c.dataset.price) || 0)}</span></button>`;
+  }).join("");
+}
+
+if (pvModal) {
+  pvModal.addEventListener("click", (e) => {
+    const rel = e.target.closest("[data-rel-id]");
+    if (!rel) return;
+    const card = document.querySelector(`.product-card[data-id="${CSS.escape(rel.dataset.relId)}"]`);
+    if (!card) return;
+    const scroller = pvModal.querySelector(".pv-card");
+    openQuickView(card);
+    if (scroller) scroller.scrollTop = 0;
+    const info = pvModal.querySelector(".pv-info");
+    if (info) info.scrollTop = 0;
+  });
+}
+
 function openQuickView(card, opts) {
   if (!pvModal || !card) return;
   opts = opts || {};
@@ -1304,7 +1364,11 @@ function openQuickView(card, opts) {
   img.alt = card.dataset.name || "";
   pvModal.querySelector("[data-pv-cat]").textContent = card.dataset.cat || "";
   pvModal.querySelector("[data-pv-name]").textContent = card.dataset.name || "";
-  pvModal.querySelector("[data-pv-price]").textContent = formatPrice(Number(card.dataset.price));
+  // Скидка — старая цена зачёркнута рядом с текущей (аудит, пункт 7).
+  const oldPrice = Number(card.dataset.oldPrice) || 0;
+  pvModal.querySelector("[data-pv-price]").innerHTML =
+    (oldPrice > Number(card.dataset.price) ? `<s>${formatPrice(oldPrice)}</s> ` : "") +
+    formatPrice(Number(card.dataset.price));
   pvRenderDetails(card.dataset.desc || "");
   pvExtra = (window.MATA_MODEL_EXTRA || {})[card.dataset.id] || {};
   const stockEl = pvModal.querySelector("[data-pv-stock]");
@@ -1321,6 +1385,7 @@ function openQuickView(card, opts) {
   pvPrefetch();
   pvShare();
   favPaint();
+  pvRenderRelated(card);
   pvRenderPerks();
   pvLoadPerks().then(() => { if (pvCard === card) pvRenderPerks(); });
   pvModal.classList.add("is-open");

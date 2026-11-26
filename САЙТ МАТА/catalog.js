@@ -202,6 +202,21 @@
     return '<div class="product-swatches" role="group" aria-label="Цвета">' + items.join("") + "</div>";
   }
 
+  // Метки «Новинка» и «−N%» (аудит, пункт 7): появляются сами, когда товар отметили
+  // новинкой в админке или в 1С стоит старая цена выше текущей.
+  function isSale(p) {
+    return Number(p.oldPrice) > Number(p.price) && Number(p.price) > 0;
+  }
+  function badgesHtml(p) {
+    var out = [];
+    if (isSale(p)) {
+      out.push('<span class="product-badge product-badge--sale">−' +
+        Math.round((1 - Number(p.price) / Number(p.oldPrice)) * 100) + "%</span>");
+    }
+    if (p.isNew) out.push('<span class="product-badge">Новинка</span>');
+    return out.length ? '<span class="product-badges">' + out.join("") + "</span>" : "";
+  }
+
   function cardHtml(p) {
     var img = imgUrl(p);
     var thumb = cardImgUrl(p) || img;
@@ -273,6 +288,7 @@
       esc(p.name) + '">' +
       // Избранное — на едином аккаунте (аудит, пункт 6): сайт и Store видят одно и то же.
       '<button type="button" class="product-fav" data-fav aria-pressed="false" aria-label="В избранное"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>' +
+      badgesHtml(p) +
       (thumb
         ? '<img src="' + esc(thumb) + '" alt="' + esc(p.name) + '" loading="lazy" />'
         // Фото ещё не загрузили: аккуратная заглушка, а не пустой серый квадрат.
@@ -293,7 +309,8 @@
         : colorDots ? '<div class="product-colors" aria-hidden="true">' + colorDots + "</div>" : "") +
       (sizeChips ? '<div class="product-sizes" aria-hidden="true">' + sizeChips + "</div>" : "") +
       '<div class="product-bottom">' +
-      '<span class="product-price">' + priceFmt(p.price) + "</span>" +
+      '<span class="product-price">' +
+      (isSale(p) ? '<s>' + priceFmt(p.oldPrice) + "</s> " : "") + priceFmt(p.price) + "</span>" +
       '<span class="product-stock' + stockCls + '">' + esc(stock) + "</span>" +
       "</div>" +
       (sizes.length || colors.length
