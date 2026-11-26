@@ -8,9 +8,9 @@
       name="description"
       content="Юридические документы МАТА: политика конфиденциальности, пользовательское соглашение, оферта, правила программы лояльности."
     />
-    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126k" />
+    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126m" />
     <!-- Общие стили сайта: цвета, шрифты, типографика. -->
-    <link rel="stylesheet" href="../styles.css?v=20261126k" />
+    <link rel="stylesheet" href="../styles.css?v=20261126m" />
     <style>
       /* Страница документа. Отдельный адрес нужен для ссылок наружу: партнёрские
          программы (Garmin, Suunto) и проверка приложения в App Store требуют
@@ -33,6 +33,10 @@
         font-family: var(--font-display);
         font-size: clamp(26px, 4vw, 40px);
         line-height: 1.15;
+      }
+      /* «конфиденциальности» в 26px не вмещалось в узкий телефон (320px). */
+      @media (max-width: 480px) {
+        .doc-title { font-size: clamp(18px, 5.8vw, 26px); hyphens: auto; -webkit-hyphens: auto; }
       }
       .doc-meta {
         margin: 0 0 clamp(24px, 4vw, 40px);
@@ -83,7 +87,7 @@
 
     <!-- Загрузка документов и разбор markdown — те же, что у модалки на главной
          (legal.js экспортирует их в window.STAW_LEGAL). Второй реализации нет. -->
-    <script src="../legal.js?v=20261126k"></script>
-    <script src="../legal-page.js?v=20261126k"></script>
+    <script src="../legal.js?v=20261126m"></script>
+    <script src="../legal-page.js?v=20261126m"></script>
   </body>
 </html>
