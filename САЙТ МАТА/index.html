@@ -3,10 +3,10 @@
   <head>
     <!-- Стартует загрузку правок и прячет «старую» вёрстку до их применения.
          Должен идти ПЕРВЫМ: смысл в том, чтобы успеть до отрисовки. -->
-    <script src="boot.js?v=20261126j"></script>
+    <script src="boot.js?v=20261126k"></script>
     <!-- Правки применяются как можно раньше: качается параллельно с
          разметкой, выполняется сразу после её разбора. -->
-    <script defer src="content.js?v=20261126j"></script>
+    <script defer src="content.js?v=20261126k"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>МАТА — интернет-магазин спортивной одежды, обуви и аксессуаров</title>
@@ -41,8 +41,8 @@
     />
     <meta name="twitter:image" content="media/staw-hero.jpg" />
 
-    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126j" />
-    <link rel="stylesheet" href="styles.css?v=20261126j" />
+    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126k" />
+    <link rel="stylesheet" href="styles.css?v=20261126k" />
     <script>
       // Прогрессивное улучшение: помечаем, что JS активен (под этим классом hero
       // стартует скрытым и анимируется через motion.js). Страховка: если motion-слой
@@ -130,7 +130,7 @@
             <a class="btn btn-ghost" href="philosophy/" data-sid="a2" data-edit="hero.btn2">Философия бренда</a>
           </div>
         </div>
-        <a class="hero-scroll" href="#catalog" data-anim="hero" aria-label="Листать вниз">
+        <a class="hero-scroll" href="#catalog" data-anim="hero" aria-label="Scroll — к каталогу">
           <span data-edit="hero.scroll">Scroll</span>
           <i class="hero-scroll-line" aria-hidden="true"></i>
         </a>
@@ -193,126 +193,16 @@
             </label>
           </div>
         </div>
-        <div class="product-grid" data-product-grid>
-          <article class="product-card reveal" data-category="clothing"
-            data-name="COOLMAX Race Vest" data-price="1790" data-cat="Бег / верх"
-            data-img="media/staw-clean-01.jpg" data-sizes="S,M,L,XL"
-            data-colors="#2b2f36,#ece9e1,#57bcd8" data-stock="В наличии"
-            data-desc="Вентилируемый беговой жилет для темпа, марафона и летних тренировок. Лёгкая сетка, быстрое высыхание, чистая спортивная посадка.">
-            <div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее:COOLMAX Race Vest">
-              <img src="media/staw-clean-01.jpg" alt="МАТА COOLMAX беговой жилет" loading="lazy" />            </div>
-            <div class="product-info">
-              <p class="product-cat">Бег / верх</p>
-              <h3>COOLMAX Race Vest</h3>
-              <div class="product-colors" aria-hidden="true"><i style="--c:#2b2f36"></i><i style="--c:#ece9e1"></i><i style="--c:#57bcd8"></i></div>
-              <div class="product-sizes" aria-hidden="true"><span>S</span><span>M</span><span>L</span><span>XL</span></div>
-              <div class="product-bottom">
-                <span class="product-price">1 790 ₽</span>
-                <span class="product-stock">В наличии</span>
-              </div>
-              <button class="product-add" type="button" data-add-cart="COOLMAX Race Vest" data-price="1790">В корзину</button>
-            </div>
-          </article>
-
-          <article class="product-card reveal" data-category="clothing"
-            data-name="Run 2.0 Two-in-One Shorts" data-price="2790" data-cat="Бег / низ"
-            data-img="media/staw-clean-06.jpg" data-sizes="S,M,L,XL"
-            data-colors="#6b5e57,#2b2f36,#8a93a3" data-stock="В наличии"
-            data-desc="Двухслойные беговые шорты с внутренним слоем. Подходят для тренировок, длинных пробежек и марафонского режима.">
-            <div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее:Run 2.0 Two-in-One Shorts">
-              <img src="media/staw-clean-06.jpg" alt="МАТА Run 2.0 беговые шорты" loading="lazy" />            </div>
-            <div class="product-info">
-              <p class="product-cat">Бег / низ</p>
-              <h3>Run 2.0 Two-in-One Shorts</h3>
-              <div class="product-colors" aria-hidden="true"><i style="--c:#6b5e57"></i><i style="--c:#2b2f36"></i><i style="--c:#8a93a3"></i></div>
-              <div class="product-sizes" aria-hidden="true"><span>S</span><span>M</span><span>L</span><span>XL</span></div>
-              <div class="product-bottom">
-                <span class="product-price">2 790 ₽</span>
-                <span class="product-stock">В наличии</span>
-              </div>
-              <button class="product-add" type="button" data-add-cart="Run 2.0 Two-in-One Shorts" data-price="2790">В корзину</button>
-            </div>
-          </article>
-
-          <article class="product-card reveal" data-category="clothing"
-            data-name="City Motion Tee" data-price="1490" data-cat="Верх"
-            data-img="media/staw-clean-05.jpg" data-sizes="XS,S,M,L,XL"
-            data-colors="#7d5d6a,#ece9e1,#20252b" data-stock="В наличии"
-            data-desc="Базовая футболка для бега и города: лёгкая ткань, спокойная графика, универсальный силуэт.">
-            <div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее:City Motion Tee">
-              <img src="media/staw-clean-05.jpg" alt="МАТА городская беговая футболка" loading="lazy" />            </div>
-            <div class="product-info">
-              <p class="product-cat">Верх</p>
-              <h3>City Motion Tee</h3>
-              <div class="product-colors" aria-hidden="true"><i style="--c:#7d5d6a"></i><i style="--c:#ece9e1"></i><i style="--c:#20252b"></i></div>
-              <div class="product-sizes" aria-hidden="true"><span>XS</span><span>S</span><span>M</span><span>L</span><span>XL</span></div>
-              <div class="product-bottom">
-                <span class="product-price">1 490 ₽</span>
-                <span class="product-stock">В наличии</span>
-              </div>
-              <button class="product-add" type="button" data-add-cart="City Motion Tee" data-price="1490">В корзину</button>
-            </div>
-          </article>
-
-          <article class="product-card reveal" data-category="clothing"
-            data-name="Statement Pace Tee" data-price="1690" data-cat="Бег / верх"
-            data-img="media/staw-clean-11.jpg" data-sizes="S,M,L,XL"
-            data-colors="#8aa06a,#2b2f36" data-stock="В наличии"
-            data-desc="Футболка для темповых тренировок: графичный вид, спортивная посадка и материал, рассчитанный на активное движение.">
-            <div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее:Statement Pace Tee">
-              <img src="media/staw-clean-11.jpg" alt="МАТА беговая футболка с графикой" loading="lazy" />            </div>
-            <div class="product-info">
-              <p class="product-cat">Бег / верх</p>
-              <h3>Statement Pace Tee</h3>
-              <div class="product-colors" aria-hidden="true"><i style="--c:#8aa06a"></i><i style="--c:#2b2f36"></i></div>
-              <div class="product-sizes" aria-hidden="true"><span>S</span><span>M</span><span>L</span><span>XL</span></div>
-              <div class="product-bottom">
-                <span class="product-price">1 690 ₽</span>
-                <span class="product-stock">В наличии</span>
-              </div>
-              <button class="product-add" type="button" data-add-cart="Statement Pace Tee" data-price="1690">В корзину</button>
-            </div>
-          </article>
-
-          <article class="product-card reveal" data-category="clothing"
-            data-name="Marathon Training Shorts" data-price="2490" data-cat="Низ"
-            data-img="media/staw-clean-09.jpg" data-sizes="S,M,L,XL"
-            data-colors="#b9b3c7,#2b2f36" data-stock="В наличии"
-            data-desc="Лёгкие шорты для регулярных тренировок: быстро сохнут, не утяжеляют образ, держат спортивную геометрию.">
-            <div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее:Marathon Training Shorts">
-              <img src="media/staw-clean-09.jpg" alt="МАТА марафонские беговые шорты" loading="lazy" />            </div>
-            <div class="product-info">
-              <p class="product-cat">Низ</p>
-              <h3>Marathon Training Shorts</h3>
-              <div class="product-colors" aria-hidden="true"><i style="--c:#b9b3c7"></i><i style="--c:#2b2f36"></i></div>
-              <div class="product-sizes" aria-hidden="true"><span>S</span><span>M</span><span>L</span><span>XL</span></div>
-              <div class="product-bottom">
-                <span class="product-price">2 490 ₽</span>
-                <span class="product-stock">В наличии</span>
-              </div>
-              <button class="product-add" type="button" data-add-cart="Marathon Training Shorts" data-price="2490">В корзину</button>
-            </div>
-          </article>
-
-          <article class="product-card reveal" data-category="clothing"
-            data-name="Everyday Training Layer" data-price="3190" data-cat="Верх"
-            data-img="media/staw-clean-17.jpg" data-sizes="S,M,L,XL"
-            data-colors="#7a6b86,#20252b,#ece9e1" data-stock="Скоро в продаже"
-            data-desc="Лёгкий слой для дороги, разминки и прохладного вечера. Работает как спортивная вещь, выглядит как городской слой.">
-            <div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее:Everyday Training Layer">
-              <img src="media/staw-clean-17.jpg" alt="МАТА лёгкий спортивный слой" loading="lazy" />            </div>
-            <div class="product-info">
-              <p class="product-cat">Верх</p>
-              <h3>Everyday Training Layer</h3>
-              <div class="product-colors" aria-hidden="true"><i style="--c:#7a6b86"></i><i style="--c:#20252b"></i><i style="--c:#ece9e1"></i></div>
-              <div class="product-sizes" aria-hidden="true"><span>S</span><span>M</span><span>L</span><span>XL</span></div>
-              <div class="product-bottom">
-                <span class="product-price">3 190 ₽</span>
-                <span class="product-stock product-stock--soon">Скоро в продаже</span>
-              </div>
-              <button class="product-add" type="button" data-add-cart="Everyday Training Layer" data-price="3190">В корзину</button>
-            </div>
-          </article>
+        <!-- Карточки рисует catalog.js из API. Пока грузится — лёгкие заглушки (раньше здесь
+             стояли 6 демо-товаров с фото по 60–110 КБ: после переноса каталога наверх они
+             качались при каждом заходе, а при сбое API показывали несуществующие товары). -->
+        <div class="product-grid" data-product-grid aria-busy="true">
+          <div class="product-skeleton" aria-hidden="true"><span></span><i></i><i></i></div>
+          <div class="product-skeleton" aria-hidden="true"><span></span><i></i><i></i></div>
+          <div class="product-skeleton" aria-hidden="true"><span></span><i></i><i></i></div>
+          <div class="product-skeleton" aria-hidden="true"><span></span><i></i><i></i></div>
+          <div class="product-skeleton" aria-hidden="true"><span></span><i></i><i></i></div>
+          <div class="product-skeleton" aria-hidden="true"><span></span><i></i><i></i></div>
         </div>
       </section>
 
@@ -960,33 +850,33 @@
 
     <!-- Единый журнал ошибок экосистемы (D-32): JS-ошибки сайта → GlitchTip.
          Подключаем ПЕРВЫМ, чтобы ловить ошибки остальных скриптов. -->
-    <script src="observability.js?v=20261126j"></script>
+    <script src="observability.js?v=20261126k"></script>
     <!-- Motion-слой (premium): плавный скролл Lenis + сцены GSAP/ScrollTrigger.
          Загружается с CDN; при недоступности сайт работает без анимаций (фолбэк).
          Стоит СРАЗУ после журнала ошибок, до остальных скриптов: герой стартует скрытым
          и проявляется анимацией motion.js — раньше он ждал корзину, каталог и окно входа
          (на телефоне 0,6–0,8 с пустого экрана после отрисовки страницы, замер 17.11.2026). -->
-    <script src="/vendor/gsap.min.js?v=20261126j"></script>
-    <script src="/vendor/ScrollTrigger.min.js?v=20261126j"></script>
-    <script src="/vendor/lenis.min.js?v=20261126j"></script>
-    <script src="motion.js?v=20261126j"></script>
-    <script src="script.js?v=20261126j"></script>
+    <script src="/vendor/gsap.min.js?v=20261126k"></script>
+    <script src="/vendor/ScrollTrigger.min.js?v=20261126k"></script>
+    <script src="/vendor/lenis.min.js?v=20261126k"></script>
+    <script src="motion.js?v=20261126k"></script>
+    <script src="script.js?v=20261126k"></script>
     <!-- Динамический каталог из общего backend (наполняет сетку товарами). -->
-    <script src="catalog.js?v=20261126j"></script>
+    <script src="catalog.js?v=20261126k"></script>
     <!-- Промо-баннеры из админки (/banners) → стрип под hero. -->
-    <script src="promo.js?v=20261126j"></script>
+    <script src="promo.js?v=20261126k"></script>
     <!-- Юр-документы из админки (/legal/documents) → модалка по ссылкам. -->
-    <script src="legal.js?v=20261126j"></script>
+    <script src="legal.js?v=20261126k"></script>
     <!-- Экосистема: единый аккаунт + общие баллы (самодостаточный модуль). -->
-    <script src="ecosystem.js?v=20261126j"></script>
+    <script src="ecosystem.js?v=20261126k"></script>
     <!-- Отмена и возврат заказа в окне профиля (D-123). -->
-    <script src="returns.js?v=20261126j"></script>
+    <script src="returns.js?v=20261126k"></script>
     <!-- Мини-CMS: тексты/фото сайта из бэкенда (задаются в «Конструкторе»). -->
     <!-- Режим редактирования для «Конструктора» (активен только при ?edit=1 внутри его окна).
          Редактор (76 КБ) посетителям не нужен — грузим его только в Конструкторе. Условие то
          же, что в самом editor.js; document.write — чтобы файл, как и раньше, выполнился
          синхронно, до DOMContentLoaded (на нём держится часть правок). -->
-    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261126j"><\/script>');</script>
+    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261126k"><\/script>');</script>
 
   </body>
 </html>
