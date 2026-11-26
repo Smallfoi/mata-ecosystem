@@ -56,6 +56,7 @@ MODELS = (
     ("deviceTokens", "notifications.DeviceToken", ("user_id",), DELETE),
     ("devices", "notifications.DeviceAccount", ("user_id",), DELETE),
     ("reviews", "catalog.Review", ("user_id",), DELETE),
+    ("favorites", "catalog.Favorite", ("user_id",), DELETE),
     ("consents", "legal.UserConsent", ("user_id",), DELETE),
     ("clubMemberships", "clubs.ClubMember", ("user_id",), DELETE),
     ("clubJoinRequests", "clubs.ClubJoinRequest", ("user_id",), DELETE),

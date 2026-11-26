@@ -4489,3 +4489,46 @@ html:has(.eco-modal.is-open) {
   .catalog-sort > span { display: none; }
   .catalog-sort select { max-width: 46vw; }
 }
+
+/* ── Избранное (аудит 25.11.2026, пункт 6) ──────────────────────────────────── */
+.product-fav, .pv-fav {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 253, 248, 0.9);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 200ms ease, color 200ms ease;
+}
+.product-fav { top: 10px; right: 10px; width: 36px; height: 36px; }
+.pv-fav { top: 14px; right: 110px; width: 40px; height: 40px; }
+.product-fav:hover, .pv-fav:hover { transform: scale(1.06); }
+.product-fav:focus-visible, .pv-fav:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+.product-fav.is-on, .pv-fav.is-on { color: #c2255c; }
+.product-fav.is-on path, .pv-fav.is-on path, .hdr-fav.is-on path { fill: currentColor; }
+.hdr-fav { position: relative; }
+.hdr-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent-2);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 18px;
+  text-align: center;
+}
+.hdr-badge[hidden] { display: none; }
+@media (max-width: 720px) {
+  .product-fav { top: 6px; right: 6px; width: 32px; height: 32px; }
+  .product-fav svg { width: 16px; height: 16px; }
+  /* На телефоне избранное — в нижнем меню; в шапке — знак, поиск, бургер. */
+  .site-header .hdr-fav { display: none; }
+}

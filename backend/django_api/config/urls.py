@@ -13,6 +13,7 @@ admin.site.index_title = "Управление: каталог, заказы, к
 
 from accounts import views as account_views
 from catalog import models_api
+from catalog import favorites_api
 from catalog import site_pages
 from catalog import views as catalog_views
 from config.admin_views import (
@@ -221,6 +222,10 @@ urlpatterns = [
     path("v1/products/price-range", catalog_views.product_price_range),
     path("v1/products", catalog_views.products),
     # Витрина карточками моделей: один товар — много цветов и размеров (D-94).
+    # Избранное на едином аккаунте — сайт и Store (аудит сайта, пункт 6).
+    path("v1/favorites", favorites_api.favorites),
+    path("v1/favorites/merge", favorites_api.favorites_merge),
+    path("v1/favorites/<path:key>", favorites_api.favorite_item),
     path("v1/models", models_api.models_list),
     path("v1/models/<path:key>", models_api.model_card),
     path("v1/products/<str:pid>", catalog_views.product_detail),

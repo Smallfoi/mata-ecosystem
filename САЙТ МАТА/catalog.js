@@ -271,6 +271,8 @@
       ' data-stock="' + esc(stock) + '" data-desc="' + esc(desc) + '">' +
       '<div class="product-media" data-quick-view tabindex="0" role="button" aria-label="Подробнее: ' +
       esc(p.name) + '">' +
+      // Избранное — на едином аккаунте (аудит, пункт 6): сайт и Store видят одно и то же.
+      '<button type="button" class="product-fav" data-fav aria-pressed="false" aria-label="В избранное"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>' +
       (thumb
         ? '<img src="' + esc(thumb) + '" alt="' + esc(p.name) + '" loading="lazy" />'
         // Фото ещё не загрузили: аккуратная заглушка, а не пустой серый квадрат.

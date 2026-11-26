@@ -108,7 +108,15 @@ void main() async {
           },
         ),
         ChangeNotifierProvider(create: (_) => CartProvider(prefs)),
-        ChangeNotifierProvider(create: (_) => WishlistProvider(prefs)),
+        // Избранное на едином аккаунте — общее с сайтом (/v1/favorites).
+        ChangeNotifierProxyProvider<AuthProvider, WishlistProvider>(
+          create: (_) => WishlistProvider(prefs,
+              remote: api == null ? null : ApiFavoritesRemote(api)),
+          update: (_, auth, wishlist) {
+            wishlist!.syncAuth(auth.isLoggedIn, userId: auth.user?.id);
+            return wishlist;
+          },
+        ),
         // Редактируемые тексты приложения (мини-CMS, ключи app.*): фолбэк — текущий
         // текст; правятся в «Конструкторе», подтягиваются в проде.
         ChangeNotifierProvider(create: (_) => RemoteContentProvider(api)),
