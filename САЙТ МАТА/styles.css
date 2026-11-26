@@ -1169,6 +1169,25 @@ html.js.motion-off .hero .brand-wordmark span {
   line-height: 1;
 }
 
+/* «Поделиться» — рядом с крестиком, тот же круг (D-139). */
+.pv-share {
+  position: absolute;
+  top: 14px;
+  right: 62px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 253, 248, 0.9);
+  color: var(--ink);
+  cursor: pointer;
+}
+.pv-share[hidden] { display: none; }
+.pv-share.is-copied { color: #2e8b6f; border-color: #2e8b6f; }
+
 .pv-media {
   background: #f3f1ec;
   display: flex;

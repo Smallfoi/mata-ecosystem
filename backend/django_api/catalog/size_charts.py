@@ -55,6 +55,30 @@ def _gender(brand: str, article: str, name: str, kind: str) -> str:
     return ""
 
 
+def gender_of(*, brand: str, article: str, name: str) -> str:
+    """Для кого модель — для фильтра «Пол» на витрине (аудит 25.11.2026, D-139).
+
+    men / women / unisex / kids / "" (не определить). ANTA — по артикулу
+    (81/85 — мужское, 82/86 — женское), остальные — по словам в названии из 1С.
+    """
+    low = (name or "").lower()
+    if "детск" in low or "дет." in low:
+        return "kids"
+    if "унисекс" in low or "unisex" in low:
+        return "unisex"
+    if (brand or "").upper() == "ANTA":
+        prefix = (article or "").strip()[:2]
+        if prefix in ("81", "85"):
+            return "men"
+        if prefix in ("82", "86"):
+            return "women"
+    if "жен" in low:
+        return "women"
+    if "муж" in low:
+        return "men"
+    return ""
+
+
 def _table(t: dict) -> dict:
     return {
         "title": t.get("title", ""),

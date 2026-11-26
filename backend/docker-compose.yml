@@ -24,6 +24,8 @@ x-django-volumes: &django-volumes
   - ../mata_store/assets/images/products:/srv/media/products:ro
   # Загруженные через админку фото — отдельный записываемый том (/media/uploads/*).
   - media_uploads:/srv/media/uploads
+  # Сайт (только чтение): страница товара /product/<slug>/ строится из его index.html (D-139).
+  - "../САЙТ МАТА:/site:ro"
 
 services:
   db:
