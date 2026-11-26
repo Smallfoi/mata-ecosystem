@@ -566,6 +566,11 @@ GET  /loyalty/partners  → партнёры программы на карте 
                         (тот же телефон или то же устройство) отклоняется.
                         Бонус пригласившему (BONUS_REFERRAL = 100, не больше CAP_REFERRALS_MONTH = 3
                         в месяц) — когда первый заказ приглашённого вышел из удержания без возврата.
+GET  /loyalty/rules     → публично, без токена (26.11.2026): { enabled: false } |
+                        { enabled: true, levels: [{ key, title, purchaseRate }],
+                          noAccrual: { products: [id], categories: [id с подкатегориями],
+                                       brands: [в нижнем регистре] } }
+                        Витрина считает «+N баллов за покупку» = floor(цена × purchaseRate уровня).
 POST /loyalty/redeem-preview  { items: [{ productId, quantity }], deliveryCost? }
                         → программа выключена: { programV1: false, available, redeemMin: 50, maxPercent: 30 }
                         → включена: { programV1: true, level, available, eligibleTotal, ceiling,
