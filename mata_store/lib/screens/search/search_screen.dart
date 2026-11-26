@@ -431,20 +431,10 @@ class _RecentItem extends StatelessWidget {
 }
 
 class _CategoryCards extends StatelessWidget {
-  static final _categoryImages = {
-    'tshirts': 'assets/images/products/1521572163474-6864f9cf17ab.jpg',
-    'hoodies': 'assets/images/products/1620799140408-edc6dcb6d633.jpg',
-    'pants': 'assets/images/products/1506629082955-511b1aa562c8.jpg',
-    'jackets': 'assets/images/products/1591047139829-d91aecb6caea.jpg',
-    'shoes': 'assets/images/products/1542291026-7eec264c27ff.jpg',
-    'accessories': 'assets/images/products/1553062407-98eeb64c6a62.jpg',
-  };
-
   @override
   Widget build(BuildContext context) {
-    final cats = context
-        .watch<CatalogProvider>()
-        .categories
+    final catalog = context.watch<CatalogProvider>();
+    final cats = catalog.categories
         .where((c) => c.id != 'all')
         .toList();
 
@@ -464,7 +454,8 @@ class _CategoryCards extends StatelessWidget {
           final cat = cats[index];
           return _CategoryCard(
             category: cat,
-            imageUrl: _categoryImages[cat.id] ?? '',
+            // Фото первого товара категории (порядок витрины), а не сток (26.11).
+            imageUrl: catalog.coverFor([cat.id]),
           );
         },
       ),
@@ -489,7 +480,7 @@ class _CategoryCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          RemoteImage('app.search.cat.${category.id}.img', fallbackAsset: imageUrl),
+          RemoteImage('app.search.cat.${category.id}.img', fallbackUrl: imageUrl),
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
