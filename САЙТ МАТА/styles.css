@@ -1244,6 +1244,7 @@ html.js.motion-off .hero .brand-wordmark span {
   line-height: 1.5;
 }
 
+.pv-row[hidden] { display: none; }
 .pv-row {
   display: flex;
   align-items: center;

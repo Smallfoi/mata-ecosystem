@@ -746,6 +746,9 @@ function pvBuildSizes(card) {
 function pvRenderSizes() {
   const wrap = pvModal.querySelector("[data-pv-sizes]");
   if (!wrap) return;
+  // Нет размеров (гель, сумка, «Б/Р») — строки «Размер» нет вовсе, а не пустая подпись.
+  const row = wrap.closest(".pv-row");
+  if (row) row.hidden = !pvSizesAll.length;
   if (pvSize && !pvSizeInStock(pvSize)) pvSize = null;
   wrap.innerHTML = pvSizesAll
     .map((s) => {
@@ -1219,9 +1222,16 @@ function pvLoadPerks() {
 }
 
 // Цена выбранного сочетания (у размеров бывает своя), иначе — цена модели.
-function pvCurrentPrice() {
+// Позиция склада для выбранного цвета и размера. Размера у вещи нет («Б/Р») —
+// у цвета одна позиция, её и берём.
+function pvVariantNow() {
   const byColor = pvVariants[pvColor || ""] || pvVariants[""] || {};
-  const v = byColor[pvSize || ""];
+  const keys = Object.keys(byColor);
+  return byColor[pvSize || ""] || byColor[""] || (keys.length === 1 ? byColor[keys[0]] : undefined);
+}
+
+function pvCurrentPrice() {
+  const v = pvVariantNow();
   return v ? Number(v[1]) : (pvCurrent ? pvCurrent.price : 0);
 }
 
@@ -1230,8 +1240,7 @@ function pvAccrues(card) {
   const brand = String(card.dataset.brand || "").split(/\s+/).filter(Boolean).join(" ").toLowerCase();
   if (brand && (ex.brands || []).includes(brand)) return false;
   if ((ex.categories || []).includes(card.dataset.catId || "")) return false;
-  const byColor = pvVariants[pvColor || ""] || pvVariants[""] || {};
-  const v = byColor[pvSize || ""];
+  const v = pvVariantNow();
   if (v && (ex.products || []).includes(v[0])) return false;
   return true;
 }
@@ -1506,8 +1515,7 @@ if (pvModal) {
 
     // Склад собирает конкретную вещь, поэтому в заказ уходит id ПОЗИЦИИ выбранного
     // сочетания. Без него сервер не сверит заказ с каталогом и откажет (D-94).
-    const byColor = pvVariants[pvColor || ""] || pvVariants[""] || {};
-    const variant = byColor[pvSize || ""] || byColor[""];
+    const variant = pvVariantNow();
     if (Object.keys(pvVariants).length && (!variant || variant[2] === 0)) {
       return pvWarn("Этого сочетания нет в наличии");
     }
