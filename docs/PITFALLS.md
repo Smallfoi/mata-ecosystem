@@ -3,6 +3,15 @@
 То, что уже сломалось или не сработало, и как с этим жить. **Перед работой прочитать
 целиком.** Нашёл новое — допиши сюда, чтобы второй агент не наступил на те же грабли.
 
+## Прокси с mata-club.ru в Django: Host только api.mata-club.ru (26.11.2026)
+
+На проде `DJANGO_ALLOWED_HOSTS` пускает только `api.mata-club.ru` (комментарий в settings
+про «api.mata-club.ru,mata-club.ru» не соответствует .env). Новые `/product/` и
+`/sitemap.xml` на mata-club.ru с `proxy_set_header Host $host` получили **400 Bad Request**.
+**Решение:** в таких location — `proxy_set_header Host api.mata-club.ru;`. Тесты Django это
+не ловят (в тестах ALLOWED_HOSTS шире) — после выкладки нового пути на сайт проверять
+его `curl` на проде.
+
 ## Квартал: 401 при восстановлении сессии глотался — «вошедший» с мёртвым токеном (22.11.2026)
 
 `restoreSession` ловил любые ошибки `/auth/me` одним `catch (_)` (задумано «нет сети —

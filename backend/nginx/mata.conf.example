@@ -177,9 +177,11 @@ server {
     # подставляются название, картинка и разметка Product, которые нужны поисковикам
     # и превью ссылок в мессенджерах (они JavaScript не выполняют). Основа страницы —
     # тот же index.html сайта. ^~ — чтобы не перехватил regex-блок картинок/скриптов.
+    # Host — api.mata-club.ru: Django на проде принимает только его (DJANGO_ALLOWED_HOSTS),
+    # с Host: mata-club.ru он отвечал 400 (26.11.2026). Ссылки страница строит сама.
     location ^~ /product/ {
         proxy_pass http://web:8000;
-        proxy_set_header Host $host;
+        proxy_set_header Host api.mata-club.ru;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -188,7 +190,7 @@ server {
     }
     location = /sitemap.xml {
         proxy_pass http://web:8000;
-        proxy_set_header Host $host;
+        proxy_set_header Host api.mata-club.ru;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
