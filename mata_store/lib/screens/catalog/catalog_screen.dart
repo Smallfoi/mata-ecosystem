@@ -151,6 +151,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
       base = catalog.byShowcase(_selectedTab, groupId: _selectedGroup);
     }
     var products = base.where(_filters.matches).toList();
+    // Товары без фото — в конец, как на сайте (аудит, пункт 3): пустая плитка первой
+    // выглядит как поломка. Порядок внутри обеих частей — витринный (сортировка устойчива).
+    if (_sortBy == 'default') {
+      products = [
+        ...products.where((p) => p.firstImage.isNotEmpty),
+        ...products.where((p) => p.firstImage.isEmpty),
+      ];
+    }
     switch (_sortBy) {
       case 'price_asc':
         products.sort((a, b) => a.price.compareTo(b.price));
