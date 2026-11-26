@@ -168,7 +168,7 @@ def photo_pipeline(request):
         })
     return TemplateResponse(request, "admin/photo_pipeline.html", {
         **admin.site.each_context(request),
-        "title": "Фотопайплайн",
+        "title": "Обработка фото",
         "batches": batches,
         "tracks": PhotoBatch.TRACK_CHOICES,
         "review_link": reverse("photo_review"),
@@ -193,6 +193,17 @@ SHOW = {
 def _decide(request):
     if not _can_edit(request):
         return _err("нет прав на проверку", 403)
+
+    # «Очистить вкладку»: снимков в «Ошибках» накапливаются десятки, и убирать их
+    # по одному — работа ради работы.
+    if request.POST.get("action") == "delete_all":
+        status = request.POST.get("status") or ""
+        if status not in service.REMOVABLE:
+            return _err("эту вкладку очищать нельзя")
+        n = service.remove_all(status)
+        StaffAudit.write(request, "фото: очищена вкладка «%s» (%s шт.)" % (status, n))
+        return JsonResponse({"ok": True, "removed": n})
+
     job = PhotoJob.objects.select_related("product").filter(pk=request.POST.get("job")).first()
     if job is None:
         return _err("снимок не найден", 404)
@@ -227,6 +238,13 @@ def _decide(request):
         service.redo(job, note or (job.note if action == "retry" else ""), request.user)
         tasks.regenerate_job.delay(job.pk)
         StaffAudit.write(request, "фотопайплайн: переделать %s (%s)" % (label, note[:80]))
+    elif action == "delete":
+        label_before = label
+        err = service.remove(job)
+        if err:
+            return _err(err)
+        StaffAudit.write(request, "фото: удалён снимок %s" % label_before)
+        return JsonResponse({"ok": True, "removed": 1})
     elif action == "reject":
         service.reject(job, note, request.user)
         StaffAudit.write(request, "фотопайплайн: отклонён %s (%s)" % (label, note[:80]))
