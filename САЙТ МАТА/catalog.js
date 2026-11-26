@@ -338,6 +338,7 @@
     var withPhoto = products.filter(function (p) { return cardImgUrl(p) || imgUrl(p); });
     var noPhoto = products.filter(function (p) { return !(cardImgUrl(p) || imgUrl(p)); });
     grid.innerHTML = withPhoto.concat(noPhoto).map(cardHtml).join("");
+    grid.removeAttribute("aria-busy");
     // Переинициализируем интеракции (фильтр/корзина/анимации) для новых карточек.
     if (window.STAW && typeof window.STAW.onCatalogRendered === "function") {
       window.STAW.onCatalogRendered();
@@ -453,7 +454,14 @@
         fetch(API + "/products" + tail)
           .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
           .then(render)
-          .catch(function () { /* офлайн — остаются статичные карточки */ });
+          .catch(function () {
+            // Сеть или сервер недоступны — честное сообщение вместо вечных заглушек.
+            var grid = document.querySelector("[data-product-grid]");
+            if (!grid) return;
+            grid.removeAttribute("aria-busy");
+            grid.innerHTML = '<div class="cat-none"><p>Каталог сейчас не загрузился. Проверьте ' +
+              'интернет и обновите страницу.</p></div>';
+          });
       });
   }
 

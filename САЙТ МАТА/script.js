@@ -7,7 +7,22 @@ const cartItems = document.querySelector("[data-cart-items]");
 const cartCount = document.querySelector("[data-cart-count]");
 const cartTotal = document.querySelector("[data-cart-total]");
 
-const cart = [];
+// Корзина переживает перезагрузку и новую вкладку (ссылка на товар открывается
+// отдельно): раньше жила только в памяти страницы. Цену при заказе всё равно
+// сверяет сервер по id позиции (D-37), устаревшая цена в корзине заказ не исказит.
+const CART_KEY = "mata_cart_v1";
+const cart = (() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
+    return Array.isArray(saved)
+      ? saved.filter((i) => i && i.name && Number(i.qty) > 0)
+        .map((i) => ({ id: String(i.id || ""), name: String(i.name), price: Number(i.price) || 0, qty: Number(i.qty) }))
+      : [];
+  } catch (e) { return []; }
+})();
+function saveCart() {
+  try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (e) { /* приватный режим */ }
+}
 let currentFilter = "all";
 let currentTab = "all";
 let currentSearch = "";
@@ -379,6 +394,7 @@ function addToCart(name, price, id) {
 }
 
 function renderCart() {
+  saveCart();
   const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
   // Счётчик в шапке и в нижнем меню телефона.
   document.querySelectorAll("[data-cart-count]").forEach((el) => {
@@ -488,7 +504,10 @@ function observeReveals() {
 function bindAddButtons() {
   document.querySelectorAll("[data-add-cart]:not([data-bound])").forEach((button) => {
     button.setAttribute("data-bound", "1");
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (e) => {
+      // Кнопка лежит внутри области «открыть товар» — без этого поверх корзины
+      // открывалось ещё и окно товара.
+      e.stopPropagation();
       addToCart(button.dataset.addCart, button.dataset.price, button.dataset.productId);
       if (!cartPanel.classList.contains("is-open")) {
         toggleCart();
@@ -1383,7 +1402,7 @@ function openQuickView(card, opts) {
   const stockEl = pvModal.querySelector("[data-pv-stock]");
   const stock = card.dataset.stock || "В наличии";
   stockEl.textContent = stock;
-  stockEl.style.color = /скоро/i.test(stock) ? "var(--muted)" : "#2e8b6f";
+  stockEl.style.color = /скоро/i.test(stock) ? "var(--muted)" : "#287860";
   const hint = pvModal.querySelector("[data-pv-hint]");
   if (hint) hint.classList.remove("is-shown");
   pvBuildColors(card);

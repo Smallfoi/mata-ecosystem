@@ -55,7 +55,7 @@
           ">" +
           '<div class="promo-card-body">' +
           (b.subtitle ? '<p class="promo-sub">' + esc(b.subtitle) + "</p>" : "") +
-          '<h3 class="promo-title">' + title + "</h3>" +
+          '<h2 class="promo-title">' + title + "</h2>" +
           (b.action ? '<span class="promo-cta">' + esc(b.action) + " →</span>" : "") +
           "</div></article>"
         );
