@@ -4257,3 +4257,27 @@ html:has(.eco-modal.is-open) {
 }
 .product-nophoto b { font-size: clamp(18px, 2.4vw, 28px); font-weight: 900; letter-spacing: 0.08em; }
 .product-nophoto small { color: var(--muted); font-size: 12px; font-weight: 700; }
+
+/* Баллы, доставка, возврат под кнопкой «В корзину» (аудит 25.11.2026, пункт 4). */
+.pv-perks {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 14px 0 2px;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+.pv-perks[hidden] { display: none; }
+.pv-perk {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.pv-perk svg { flex: 0 0 18px; margin-top: 1px; color: var(--muted); }
+.pv-perk small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+.pv-perk a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.pv-perk--points svg { color: #2e8b6f; }
+.pv-perk--points b { color: #2e8b6f; }

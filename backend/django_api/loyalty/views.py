@@ -336,3 +336,25 @@ def partners(request):
     if city:
         qs = qs.filter(city__iexact=city)
     return Response({"partners": [p.to_json() for p in qs[:500]]})
+
+
+@api_view(["GET"])
+def rules(request):
+    """Правила начисления за покупку — публично, без токена (аудит сайта 26.11.2026,
+    пункт 4): карточка товара показывает «+N баллов» и гостю. Ставки по уровням и
+    исключения «без начисления» (товары, категории 1С с подкатегориями, бренды) — те
+    же, по которым начисляет `v1.on_order_paid`. Выключена программа — enabled=false,
+    витрина строку не показывает."""
+    if not config.enabled():
+        return Response({"enabled": False})
+    acc = v1.exclusion_rules()["accrual"]
+    return Response({
+        "enabled": True,
+        "levels": [{"key": lv["key"], "title": lv["title"], "purchaseRate": lv["purchaseRate"]}
+                   for lv in _levels_table()],
+        "noAccrual": {
+            "products": sorted(acc["products"]),
+            "categories": sorted(acc["categories"]),
+            "brands": sorted(acc["brands"]),      # уже в нижнем регистре, пробелы схлопнуты
+        },
+    })

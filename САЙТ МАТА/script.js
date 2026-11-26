@@ -671,6 +671,7 @@ function pvBuildColors(card) {
       pvShowArticle();
       pvShowPhotos(pvColor);            // выбрал синий — видишь синий
       pvRenderSizes();                  // и размеры — те, что есть в синем
+      pvRenderPerks();
     });
   });
   // Первый доступный цвет отмечаем сразу — как у Nike и STAW: карточка обязана
@@ -733,6 +734,7 @@ function pvRenderSizes() {
       b.classList.add("is-selected");
       pvSize = b.dataset.size;
       pvMarkGuideRow();
+      pvRenderPerks();             // у размера бывает своя цена — пересчитать баллы
     });
   });
 }
@@ -1063,6 +1065,105 @@ function pvShare() {
   };
 }
 
+
+// ── Баллы, доставка, возврат в окне товара (аудит 25.11.2026, пункт 4) ───────────
+// Баллы — наше главное отличие от Nike/ANTA, и раньше в карточке его не было видно.
+// Ставка — по уровню покупателя (гость — базовый), исключения «без начисления» — те
+// же, что у сервера при оплате (/v1/loyalty/rules). Доставка — способы из админки.
+let pvRules = null;       // /loyalty/rules: {enabled, levels, noAccrual}
+let pvShipping = null;    // /shipping-options: [{name, price, freeFrom, …}]
+let pvPerksLoading = null;
+
+function pvApiGet(path) {
+  const api = window.STAW && window.STAW.api;
+  if (typeof api === "function") return api(path);
+  const host = location.hostname;
+  const dev = host === "localhost" || host === "127.0.0.1" || host === "";
+  const base = window.STAW_API_BASE || (dev ? "http://127.0.0.1:8000/v1" : "https://api.mata-club.ru/v1");
+  return fetch(base + path).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+}
+
+function pvLoadPerks() {
+  if (!pvPerksLoading) {
+    pvPerksLoading = Promise.all([
+      pvApiGet("/loyalty/rules").then((r) => { pvRules = r; }).catch(() => { pvRules = { enabled: false }; }),
+      pvApiGet("/shipping-options").then((r) => { pvShipping = (r && r.options) || []; })
+        .catch(() => { pvShipping = []; }),
+    ]);
+  }
+  return pvPerksLoading;
+}
+
+// Цена выбранного сочетания (у размеров бывает своя), иначе — цена модели.
+function pvCurrentPrice() {
+  const byColor = pvVariants[pvColor || ""] || pvVariants[""] || {};
+  const v = byColor[pvSize || ""];
+  return v ? Number(v[1]) : (pvCurrent ? pvCurrent.price : 0);
+}
+
+function pvAccrues(card) {
+  const ex = (pvRules && pvRules.noAccrual) || {};
+  const brand = String(card.dataset.brand || "").split(/\s+/).filter(Boolean).join(" ").toLowerCase();
+  if (brand && (ex.brands || []).includes(brand)) return false;
+  if ((ex.categories || []).includes(card.dataset.catId || "")) return false;
+  const byColor = pvVariants[pvColor || ""] || pvVariants[""] || {};
+  const v = byColor[pvSize || ""];
+  if (v && (ex.products || []).includes(v[0])) return false;
+  return true;
+}
+
+function pvPointsWord(n) {
+  const a = n % 10, b = n % 100;
+  if (a === 1 && b !== 11) return "балл";
+  if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return "балла";
+  return "баллов";
+}
+
+const PV_ICON = {
+  points: '<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>',
+  truck: '<path d="M3 6h11v9H3zM14 9h4l3 3v3h-7"/><circle cx="7" cy="17" r="1.8"/><circle cx="17" cy="17" r="1.8"/>',
+  store: '<path d="M4 9l1.5-4h13L20 9M4 9v10h16V9M4 9h16M9 19v-5h6v5"/>',
+  back: '<path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-2"/>',
+};
+function pvIcon(name) {
+  return `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor"` +
+    ` stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${PV_ICON[name]}</svg>`;
+}
+
+function pvRenderPerks() {
+  const box = pvModal && pvModal.querySelector("[data-pv-perks]");
+  if (!box || !pvCard) return;
+  const card = pvCard;
+  const rows = [];
+  if (pvRules && pvRules.enabled && Array.isArray(pvRules.levels) && pvRules.levels.length) {
+    const eco = window.STAW && window.STAW.ecoV1;
+    const idx = Math.max(0, Math.min(Number(eco && eco.levelIndex) || 0, pvRules.levels.length - 1));
+    const lv = pvRules.levels[idx];
+    if (pvAccrues(card)) {
+      const pts = Math.floor(pvCurrentPrice() * Number(lv.purchaseRate || 0));
+      if (pts > 0) {
+        const pct = Math.round(Number(lv.purchaseRate) * 100);
+        rows.push(`<li class="pv-perk pv-perk--points">${pvIcon("points")}<span><b>+${pts} ${pvPointsWord(pts)}</b>` +
+          ` за покупку <small>${pct}% · уровень «${escapeHtml(lv.title)}» · 1 балл = 1 ₽</small></span></li>`);
+      }
+    } else {
+      rows.push(`<li class="pv-perk">${pvIcon("points")}<span>За этот товар баллы не начисляются</span></li>`);
+    }
+  }
+  (pvShipping || []).forEach((o) => {
+    const price = Number(o.price) || 0;
+    let cost = price > 0 ? formatPrice(price) : "бесплатно";
+    if (price > 0 && o.freeFrom != null) cost += `, бесплатно от ${formatPrice(Number(o.freeFrom))}`;
+    rows.push(`<li class="pv-perk">${pvIcon(o.kind === "pickup" ? "store" : "truck")}` +
+      `<span>${escapeHtml(o.name || "")} — ${escapeHtml(cost)}</span></li>`);
+  });
+  // Срок — из документа «Возврат и обмен» (ст. 26.1 ЗоЗПП): 7 дней после получения.
+  rows.push(`<li class="pv-perk">${pvIcon("back")}<span>Возврат в течение 7 дней · ` +
+    `<a href="/legal/?doc=returns" data-legal="returns">условия</a></span></li>`);
+  box.innerHTML = rows.join("");
+  box.hidden = false;
+}
+
 function openQuickView(card, opts) {
   if (!pvModal || !card) return;
   opts = opts || {};
@@ -1102,6 +1203,8 @@ function openQuickView(card, opts) {
   pvSetupSizeGuide();
   pvPrefetch();
   pvShare();
+  pvRenderPerks();
+  pvLoadPerks().then(() => { if (pvCard === card) pvRenderPerks(); });
   pvModal.classList.add("is-open");
   pvModal.setAttribute("aria-hidden", "false");
   if (!opts.fromHistory) pvRouteOpen(card);

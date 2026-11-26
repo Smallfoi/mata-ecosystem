@@ -9,4 +9,5 @@ urlpatterns = [
     path("redeem-preview", views.redeem_preview),
     path("partners", views.partners),
     path("referral", views.referral),
+    path("rules", views.rules),
 ]
