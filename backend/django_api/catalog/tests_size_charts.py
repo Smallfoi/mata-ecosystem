@@ -92,6 +92,30 @@ class ChartForTests(SimpleTestCase):
         self.assertIn("2XL", [r[0] for r in t["rows"]])
 
 
+    def test_anta_underwear_gets_the_waist_table(self):
+        """Бельё — по обхвату талии: до 26.11.2026 карточки трусов шли совсем без таблицы.
+
+        Артикул белья начинается на 89 — пол по нему не читается (81/82/85/86 —
+        обувь и одежда), поэтому отдаём обе таблицы, человек выберет свою.
+        """
+        chart = chart_for(brand="ANTA", article="892618971", name="Нижнее белье ANTA",
+                          category_name="Трусы")
+        self.assertEqual(titles(chart), ["ANTA · мужской низ", "ANTA · женский низ"])
+        self.assertIn("Обхват талии, см", chart["tables"][0]["columns"])
+
+    def test_anta_underwear_with_gender_in_the_name_gets_one_table(self):
+        chart = chart_for(brand="ANTA", article="892548972", name="Трусы мужские ANTA",
+                          category_name="Трусы")
+        self.assertEqual(titles(chart), ["ANTA · мужской низ"])
+
+    def test_socks_and_bags_stay_without_a_table(self):
+        """Носкам и сумкам сетку бренд не публикует — лучше без таблицы, чем чужая."""
+        for category in ("Носки", "Сумка"):
+            self.assertIsNone(chart_for(brand="ANTA", article="892547337R",
+                                        name="Носки Средние ANTA", category_name=category),
+                              category)
+
+
 class CardFieldsTests(TestCase):
     def test_card_has_colour_article_and_size_chart(self):
         Category.objects.create(id="shoes", name="Кроссовки")
