@@ -2,7 +2,8 @@
 
 Порядок поиска:
 1. своя таблица модели (`models` в size_chart_data.json, ключ — начало артикула 1С;
-   сейчас это мерки изделий STAW с их сайта);
+   мерки изделий STAW с их сайта; у BMAI — таблица со страницы каждой модели на bmai.com,
+   26.11.2026: у карбоновых и обычных колодок сетки разные);
 2. таблица бренда по типу вещи (обувь / верх) и полу.
 
 Пол: у ANTA его видно по артикулу (812… — мужская обувь, 822… — женская, 852…/862… —
@@ -99,9 +100,12 @@ def chart_for(*, brand: str, article: str, name: str, category_name: str) -> dic
     """Таблица для карточки: {"tables": [...]} или None, если её нет."""
     data = _data()
     art = (article or "").strip().upper()
-    for prefix, table in data.get("models", {}).items():
+    for prefix, entry in data.get("models", {}).items():
         if art.startswith(prefix.upper()):
-            return {"tables": [_table(table)]}
+            # Своя таблица модели: одна или несколько ({"tables": [...]}, напр. муж + жен,
+            # когда пол модели из 1С не определить).
+            tables = entry["tables"] if "tables" in entry else [entry]
+            return {"tables": [_table(t) for t in tables]}
 
     brand = (brand or "").strip().upper()
     kind = _kind(category_name)
