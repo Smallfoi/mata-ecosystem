@@ -116,6 +116,9 @@
       .map(function (c) { return c.name; });
     return {
       id: card.key,
+      slug: card.slug || "",
+      gender: card.gender || "",
+      isNew: Boolean(card.isNew),
       name: card.name,
       brand: card.brand,
       categoryId: card.categoryId,
@@ -251,6 +254,11 @@
       '<article class="product-card reveal" data-id="' + esc(p.id) + '" data-cat-id="' + esc(cat) + '"' +
       ' data-category="' + esc(cardCategories(cat, showcaseIndex(SHOWCASE))) + '"' +
       ' data-name="' + esc(p.name) + '" data-price="' + Number(p.price) + '"' +
+      (p.slug ? ' data-slug="' + esc(p.slug) + '"' : "") +
+      (p.gender ? ' data-gender="' + esc(p.gender) + '"' : "") +
+      (p.brand ? ' data-brand="' + esc(p.brand) + '"' : "") +
+      (p.isNew ? ' data-new="1"' : "") +
+      (Number(p.oldPrice) > Number(p.price) ? ' data-old-price="' + Number(p.oldPrice) + '"' : "") +
       ' data-cat="' + esc(catLabel) + '" data-img="' + esc(img) + '"' +
       (gallery ? ' data-photos="' + esc(gallery) + '"' : "") +
       (variants ? ' data-variants="' + esc(variants) + '"' : "") +
@@ -617,17 +625,15 @@
       .then(function (d) { rvRender(box, pid, d); })
       .catch(function () { box.innerHTML = ""; });
   }
+  // Окно товара открывается не только нажатием на карточку: миниатюрой цвета,
+  // размером, по адресу /product/… и кнопкой «назад». Слушаем само открытие.
   function mountReviews() {
-    document.addEventListener("click", function (e) {
-      var qv = e.target.closest("[data-quick-view]");
-      if (!qv) return;
-      var card = qv.closest(".product-card");
+    document.addEventListener("mata:pv-open", function (e) {
+      var card = e.detail && e.detail.card;
       var pid = card && card.getAttribute("data-id");
       if (!pid) return;
-      setTimeout(function () {
-        var box = rvBox();
-        if (box) rvLoad(box, pid);
-      }, 40);
+      var box = rvBox();
+      if (box) rvLoad(box, pid);
     });
   }
   function injectReviewStyles() {

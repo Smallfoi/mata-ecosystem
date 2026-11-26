@@ -679,8 +679,99 @@ if (pvModal) {
   }
 }
 
-function openQuickView(card) {
+// ── Адрес товара /product/<slug>/ (аудит 25.11.2026, пункт 1; D-139) ─────────────
+// Открыл товар — адрес в строке сменился: ссылкой можно поделиться, «назад» в
+// браузере закрывает окно, а не уводит с сайта. Сервер отдаёт по этому адресу
+// главную с шапкой товара (catalog/site_pages.py) — и мы сразу открываем окно.
+// Пришли по адресу товара — в <title> название товара от сервера; закрыли окно —
+// возвращаем заголовок главной, а не оставляем товарный.
+const PV_HOME_TITLE = /^\/product\//.test(location.pathname)
+  ? "МАТА — интернет-магазин спортивной одежды, обуви и аксессуаров"
+  : document.title;
+let pvPushed = false;     // окно открыли мы и положили запись в историю
+let pvCard = null;        // открытая карточка
+
+function pvProductPath(card) {
+  const slug = card && card.dataset.slug;
+  return slug ? `/product/${slug}/` : "";
+}
+
+function pvRouteOpen(card) {
+  const path = pvProductPath(card);
+  if (!path || location.pathname === path) return;
+  history.pushState({ pv: card.dataset.id }, "", path + location.search);
+  pvPushed = true;
+}
+
+function pvRouteClose() {
+  if (!/^\/product\//.test(location.pathname)) return;
+  if (pvPushed) {
+    pvPushed = false;
+    history.back();          // popstate закроет окно; адрес — тот, что был до товара
+  } else {
+    // Пришли по ссылке прямо на товар: закрыли — остаёмся на главной, без перезагрузки.
+    history.replaceState(null, "", "/" + location.search);
+  }
+  document.title = PV_HOME_TITLE;
+}
+
+window.addEventListener("popstate", (e) => {
+  const key = e.state && e.state.pv;
+  if (key) {
+    const card = document.querySelector(`.product-card[data-id="${CSS.escape(key)}"]`);
+    if (card) { pvPushed = true; openQuickView(card, { fromHistory: true }); }
+    return;
+  }
+  pvPushed = false;
+  if (pvModal && pvModal.classList.contains("is-open")) closeQuickView({ fromHistory: true });
+  document.title = PV_HOME_TITLE;
+});
+
+// Пришли по адресу товара: открыть его окно, как только каталог нарисован.
+function pvOpenRouteProduct() {
+  const route = window.MATA_ROUTE || {};
+  let card = null;
+  if (route.product) {
+    card = document.querySelector(`.product-card[data-id="${CSS.escape(route.product)}"]`);
+  } else {
+    const m = location.pathname.match(/^\/product\/([^/]+)\/?$/);
+    if (m) card = document.querySelector(`.product-card[data-slug="${CSS.escape(m[1])}"]`);
+  }
+  if (!card) return false;
+  window.MATA_ROUTE = {};
+  openQuickView(card, { fromHistory: true });
+  return true;
+}
+
+// «Поделиться»: на телефоне — системное меню, на компьютере — ссылка в буфер.
+function pvShare() {
+  const btn = pvModal.querySelector("[data-pv-share]");
+  if (!btn || !pvCard) return;
+  const path = pvProductPath(pvCard);
+  btn.hidden = !path;
+  btn.onclick = () => {
+    const url = location.origin + path;
+    const title = pvCard.dataset.name || "МАТА";
+    if (navigator.share) {
+      navigator.share({ title, url }).catch(() => {});
+      return;
+    }
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(url).then(() => {
+      btn.classList.add("is-copied");
+      btn.setAttribute("aria-label", "Ссылка скопирована");
+      setTimeout(() => {
+        btn.classList.remove("is-copied");
+        btn.setAttribute("aria-label", "Поделиться");
+      }, 1400);
+    }).catch(() => {});
+  };
+}
+
+function openQuickView(card, opts) {
   if (!pvModal || !card) return;
+  opts = opts || {};
+  pvCard = card;
   pvCurrent = { name: card.dataset.name, price: Number(card.dataset.price) };
   const img = pvModal.querySelector("[data-pv-img]");
   pvFallback = card.dataset.img || "";
@@ -715,8 +806,12 @@ function openQuickView(card) {
   pvShowArticle();
   pvSetupSizeGuide();
   pvPrefetch();
+  pvShare();
   pvModal.classList.add("is-open");
   pvModal.setAttribute("aria-hidden", "false");
+  if (!opts.fromHistory) pvRouteOpen(card);
+  document.title = `${card.dataset.name || "Товар"} — МАТА`;
+  document.dispatchEvent(new CustomEvent("mata:pv-open", { detail: { card } }));
 }
 
 function pvWarn(text) {
@@ -727,14 +822,17 @@ function pvWarn(text) {
   setTimeout(() => el.classList.remove("is-shown"), 2500);
 }
 
-function closeQuickView() {
+function closeQuickView(opts) {
   if (!pvModal) return;
+  const wasOpen = pvModal.classList.contains("is-open");
+  pvCard = null;
   const sgPanel = pvModal.querySelector("[data-pv-sg]");
   if (sgPanel) sgPanel.hidden = true;
   const pvCardEl = pvModal.querySelector(".pv-card");
   if (pvCardEl) pvCardEl.classList.remove("is-sg-open");
   pvModal.classList.remove("is-open");
   pvModal.setAttribute("aria-hidden", "true");
+  if (wasOpen && !(opts && opts.fromHistory)) pvRouteClose();
 }
 
 function bindQuickView() {
@@ -814,7 +912,7 @@ function bindQuickView() {
 
 if (pvModal) {
   pvModal.querySelectorAll("[data-pv-close]").forEach((b) =>
-    b.addEventListener("click", closeQuickView),
+    b.addEventListener("click", () => closeQuickView()),
   );
   pvModal.querySelector("[data-pv-add]").addEventListener("click", () => {
     if (!pvCurrent) return;
@@ -2261,6 +2359,7 @@ window.STAW.onCatalogRendered = function () {
   bindAddButtons();
   bindQuickView();
   applyCatalog();
+  pvOpenRouteProduct();
 };
 
 window.addEventListener("scroll", updateHeader, { passive: true });

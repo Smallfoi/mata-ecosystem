@@ -285,6 +285,9 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Прод — отдаёт реальный веб-сервер/CDN.
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.environ.get("DJANGO_MEDIA_ROOT", "/srv/media")
+# Статика сайта mata-club.ru (САЙТ МАТА) только для чтения: страница товара /product/<slug>/
+# строится из живого index.html сайта (D-139). Prod и dev монтируют её в /site.
+SITE_DIR = os.environ.get("DJANGO_SITE_DIR", "/site")
 
 # Хранилище медиа (D-31): S3/Object Storage при заданных MEDIA_S3_* (прод), иначе
 # локальный диск (dev/CI). Загрузки строят URL через default_storage.url() → работают

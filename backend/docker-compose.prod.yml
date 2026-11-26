@@ -92,6 +92,9 @@ services:
       # Юр-документы (docs/legal/*.md в корне репо, вне build-контекста web) — read-only,
       # для manage.py publish_legal. git reset обновляет файлы на месте (каталог не удаляется).
       - ../docs/legal:/legal_docs:ro
+      # Сайт (только чтение): страница товара /product/<slug>/ строится из живого
+      # index.html (D-139). Тот же каталог, что autodeploy копирует в /opt/mata-site.
+      - "../САЙТ МАТА:/site:ro"
     expose:
       - "8000"   # только внутри сети compose; наружу — через nginx
     # Готовность (аудит E05): /v1/health/ready отдаёт 200 только при живых БД и кэше.

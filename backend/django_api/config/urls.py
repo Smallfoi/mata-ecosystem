@@ -13,6 +13,7 @@ admin.site.index_title = "Управление: каталог, заказы, к
 
 from accounts import views as account_views
 from catalog import models_api
+from catalog import site_pages
 from catalog import views as catalog_views
 from config.admin_views import (
     admin_storage,
@@ -61,6 +62,10 @@ from staff import views as staff_views
 
 urlpatterns = [
     # Конструктор (live-превью + правка + публикация). Отдельные «Превью» убраны.
+    # Страницы сайта mata-club.ru, которые отдаёт сервер (D-139): адрес товара и карта
+    # сайта для поисковиков. nginx проксирует сюда только /product/ и /sitemap.xml.
+    path("product/<path:slug>", site_pages.product_page, name="site_product"),
+    path("sitemap.xml", site_pages.sitemap, name="site_sitemap"),
     path("admin/merch/", merch_console, name="merch_console"),
     path("admin/merch/products", merch_products, name="merch_products"),
     path("admin/merch/reorder", merch_reorder, name="merch_reorder"),

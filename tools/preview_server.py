@@ -28,7 +28,8 @@ import urllib.error
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from functools import partial
 
-BACKEND = "http://localhost:8000"
+# Бэкенд для /media/*, /product/* и /sitemap.xml; MATA_PREVIEW_BACKEND — другой порт.
+BACKEND = os.environ.get("MATA_PREVIEW_BACKEND", "http://localhost:8000")
 BASE_PREFIX = ""   # префикс base href сборки, напр. "/mata-app-preview" (см. заголовок)
 
 
@@ -133,6 +134,10 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
             self._serve_kill_sw()
             return True
         if p.startswith("/media/") and not os.path.isfile(self.translate_path(self.path)):
+            self._proxy_media()
+            return True
+        # Страница товара и карта сайта — от Django, как на проде (nginx, D-139).
+        if p.startswith("/product/") or p == "/sitemap.xml":
             self._proxy_media()
             return True
         return False

@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from common.throttling import PUBLIC_READ
 
 from . import photos as photolib
+from . import site_pages
 from . import size_charts as sizecharts
 from .models import Product
 
@@ -204,6 +205,11 @@ def build_card(items, photos: dict | None = None, category_names: dict | None = 
         "colors": list(colors.values()),
         # Таблица размеров (D-138): своя таблица модели или таблица бренда; null — нет.
         "sizeChart": size_chart,
+        # Адрес страницы товара на сайте: /product/<slug>/ (D-139).
+        "slug": site_pages.model_slug(first.shop_title or "", first.shop_model_key or first.id),
+        # Для кого: men / women / unisex / kids / "" — фильтр «Пол» (D-139).
+        "gender": sizecharts.gender_of(brand=first.brand or "", article=article_any,
+                                       name=first.shop_title or first.name or ""),
     }
 
 
