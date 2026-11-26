@@ -3,10 +3,10 @@
   <head>
     <!-- Стартует загрузку правок и прячет «старую» вёрстку до их применения.
          Должен идти ПЕРВЫМ: смысл в том, чтобы успеть до отрисовки. -->
-    <script src="boot.js?v=20261126b"></script>
+    <script src="boot.js?v=20261126c"></script>
     <!-- Правки применяются как можно раньше: качается параллельно с
          разметкой, выполняется сразу после её разбора. -->
-    <script defer src="content.js?v=20261126b"></script>
+    <script defer src="content.js?v=20261126c"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>МАТА — интернет-магазин спортивной одежды, обуви и аксессуаров</title>
@@ -41,8 +41,8 @@
     />
     <meta name="twitter:image" content="media/staw-hero.jpg" />
 
-    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126b" />
-    <link rel="stylesheet" href="styles.css?v=20261126b" />
+    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126c" />
+    <link rel="stylesheet" href="styles.css?v=20261126c" />
     <script>
       // Прогрессивное улучшение: помечаем, что JS активен (под этим классом hero
       // стартует скрытым и анимируется через motion.js). Страховка: если motion-слой
@@ -282,6 +282,23 @@
             <button class="filter" type="button" data-filter="nutrition" data-sid="nutrition" data-edit="filter.nutrition">Питание</button>
           </div>
           <div class="subfilters" data-subfilters hidden role="group" aria-label="Группы вкладки"></div>
+          <!-- Фильтры каталога (аудит 25.11.2026, пункт 2): пол — всегда на виду, как
+               «Мужчинам / Женщинам» у Nike и ANTA; размер, цена, бренд — в панели. -->
+          <div class="cat-filterbar" data-fbar>
+            <div class="cat-gender" role="group" aria-label="Для кого" data-fgender>
+              <button type="button" class="is-active" data-g="" aria-pressed="true" data-edit="filter.gender.all">Все</button>
+              <button type="button" data-g="men" aria-pressed="false" data-edit="filter.gender.men">Мужское</button>
+              <button type="button" data-g="women" aria-pressed="false" data-edit="filter.gender.women">Женское</button>
+              <button type="button" data-g="kids" aria-pressed="false" data-edit="filter.gender.kids" hidden>Детское</button>
+            </div>
+            <button class="cat-fopen" type="button" data-fopen aria-haspopup="dialog">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+              <span data-edit="filter.open">Фильтры</span>
+              <b class="cat-fbadge" data-fbadge hidden></b>
+            </button>
+            <p class="cat-count" data-fcount aria-live="polite"></p>
+            <div class="cat-chips" data-fchips></div>
+          </div>
           <div class="catalog-tools">
             <input
               class="catalog-search"
@@ -732,6 +749,52 @@
       </div>
     </div>
 
+    <!-- Панель фильтров: справа на компьютере, снизу на телефоне. Вне секции каталога —
+         у её предков есть transform (анимация появления), fixed внутри них ломается. -->
+    <div class="cat-fpanel" data-fpanel aria-hidden="true">
+      <div class="cat-fbackdrop" data-fclose></div>
+      <div class="cat-fsheet" role="dialog" aria-modal="true" aria-label="Фильтры каталога">
+        <div class="cat-fhead">
+          <h3 data-edit="filter.title">Фильтры</h3>
+          <button class="cat-fx" type="button" data-fclose aria-label="Закрыть">×</button>
+        </div>
+        <div class="cat-fbody">
+          <section class="cat-fgroup" data-fgroup="size">
+            <h4 data-edit="filter.size">Размер в наличии</h4>
+            <div class="cat-fopts" data-fsizes></div>
+          </section>
+          <section class="cat-fgroup">
+            <h4 data-edit="filter.price">Цена, ₽</h4>
+            <div class="cat-fprice">
+              <input type="number" inputmode="numeric" min="0" step="100" placeholder="от" aria-label="Цена от" data-fmin />
+              <span aria-hidden="true">—</span>
+              <input type="number" inputmode="numeric" min="0" step="100" placeholder="до" aria-label="Цена до" data-fmax />
+            </div>
+            <div class="cat-fopts" data-fpresets>
+              <button type="button" data-preset="0-3000">до 3 000</button>
+              <button type="button" data-preset="3000-7000">3 000 – 7 000</button>
+              <button type="button" data-preset="7000-12000">7 000 – 12 000</button>
+              <button type="button" data-preset="12000-">от 12 000</button>
+            </div>
+          </section>
+          <section class="cat-fgroup" data-fgroup="brand">
+            <h4 data-edit="filter.brand">Бренд</h4>
+            <div class="cat-fopts" data-fbrands></div>
+          </section>
+          <section class="cat-fgroup">
+            <h4 data-edit="filter.more">Ещё</h4>
+            <div class="cat-fopts" data-fflags>
+              <button type="button" data-flag="stock" aria-pressed="false">Только в наличии</button>
+            </div>
+          </section>
+        </div>
+        <div class="cat-ffoot">
+          <button class="cat-freset" type="button" data-freset>Сбросить</button>
+          <button class="cat-fapply" type="button" data-fclose data-fapply>Показать</button>
+        </div>
+      </div>
+    </div>
+
     <footer class="site-footer">
       <div class="footer-top">
         <div class="footer-brand">
@@ -821,33 +884,33 @@
 
     <!-- Единый журнал ошибок экосистемы (D-32): JS-ошибки сайта → GlitchTip.
          Подключаем ПЕРВЫМ, чтобы ловить ошибки остальных скриптов. -->
-    <script src="observability.js?v=20261126b"></script>
+    <script src="observability.js?v=20261126c"></script>
     <!-- Motion-слой (premium): плавный скролл Lenis + сцены GSAP/ScrollTrigger.
          Загружается с CDN; при недоступности сайт работает без анимаций (фолбэк).
          Стоит СРАЗУ после журнала ошибок, до остальных скриптов: герой стартует скрытым
          и проявляется анимацией motion.js — раньше он ждал корзину, каталог и окно входа
          (на телефоне 0,6–0,8 с пустого экрана после отрисовки страницы, замер 17.11.2026). -->
-    <script src="/vendor/gsap.min.js?v=20261126b"></script>
-    <script src="/vendor/ScrollTrigger.min.js?v=20261126b"></script>
-    <script src="/vendor/lenis.min.js?v=20261126b"></script>
-    <script src="motion.js?v=20261126b"></script>
-    <script src="script.js?v=20261126b"></script>
+    <script src="/vendor/gsap.min.js?v=20261126c"></script>
+    <script src="/vendor/ScrollTrigger.min.js?v=20261126c"></script>
+    <script src="/vendor/lenis.min.js?v=20261126c"></script>
+    <script src="motion.js?v=20261126c"></script>
+    <script src="script.js?v=20261126c"></script>
     <!-- Динамический каталог из общего backend (наполняет сетку товарами). -->
-    <script src="catalog.js?v=20261126b"></script>
+    <script src="catalog.js?v=20261126c"></script>
     <!-- Промо-баннеры из админки (/banners) → стрип под hero. -->
-    <script src="promo.js?v=20261126b"></script>
+    <script src="promo.js?v=20261126c"></script>
     <!-- Юр-документы из админки (/legal/documents) → модалка по ссылкам. -->
-    <script src="legal.js?v=20261126b"></script>
+    <script src="legal.js?v=20261126c"></script>
     <!-- Экосистема: единый аккаунт + общие баллы (самодостаточный модуль). -->
-    <script src="ecosystem.js?v=20261126b"></script>
+    <script src="ecosystem.js?v=20261126c"></script>
     <!-- Отмена и возврат заказа в окне профиля (D-123). -->
-    <script src="returns.js?v=20261126b"></script>
+    <script src="returns.js?v=20261126c"></script>
     <!-- Мини-CMS: тексты/фото сайта из бэкенда (задаются в «Конструкторе»). -->
     <!-- Режим редактирования для «Конструктора» (активен только при ?edit=1 внутри его окна).
          Редактор (76 КБ) посетителям не нужен — грузим его только в Конструкторе. Условие то
          же, что в самом editor.js; document.write — чтобы файл, как и раньше, выполнился
          синхронно, до DOMContentLoaded (на нём держится часть правок). -->
-    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261126b"><\/script>');</script>
+    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261126c"><\/script>');</script>
 
   </body>
 </html>
