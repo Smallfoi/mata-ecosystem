@@ -580,7 +580,14 @@ function pvNorm(v) {
 }
 
 function pvGuideTable(t) {
-  const head = t.columns.map((c) => `<th scope="col">${escapeHtml(c)}</th>`).join("");
+  // «Длина стопы, см» → название сверху, единица мелко под ним: все колонки равной
+  // ширины, длинный заголовок не раздвигает свою колонку.
+  const head = t.columns.map((c) => {
+    const m = String(c).match(/^(.*),\s*([^,]+)$/);
+    return m
+      ? `<th scope="col">${escapeHtml(m[1])}<span class="pv-sg-unit">${escapeHtml(m[2])}</span></th>`
+      : `<th scope="col">${escapeHtml(c)}</th>`;
+  }).join("");
   const rows = t.rows.map((r) => {
     const key = pvNorm(r[t.match || 0]);
     return `<tr data-sg-key="${escapeHtml(key)}">` +
@@ -588,16 +595,10 @@ function pvGuideTable(t) {
         ? `<th scope="row">${escapeHtml(c || "—")}</th>`
         : `<td>${escapeHtml(c || "—")}</td>`)).join("") + "</tr>";
   }).join("");
-  let src = "";
-  if (t.source) {
-    src = /^https?:\/\//.test(t.source)
-      ? `<a href="${escapeHtml(t.source)}" target="_blank" rel="noopener">Источник — сайт бренда</a>`
-      : `Источник: ${escapeHtml(t.source)}`;
-  }
+  // Источник таблицы покупателю не показываем (владелец, 26.11) — он остаётся в данных.
   return `<div class="pv-sg-scroll"><table class="pv-sg-table"><thead><tr>${head}</tr></thead>` +
     `<tbody>${rows}</tbody></table></div>` +
-    (t.note ? `<p class="pv-sg-note">${escapeHtml(t.note)}</p>` : "") +
-    (src ? `<p class="pv-sg-src">${src}</p>` : "");
+    (t.note ? `<p class="pv-sg-note">${escapeHtml(t.note)}</p>` : "");
 }
 
 // Подсветить строку выбранного размера (у обуви наш размер — EU, первая колонка).
