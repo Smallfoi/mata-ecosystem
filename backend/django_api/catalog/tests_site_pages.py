@@ -35,6 +35,8 @@ INDEX = """<!doctype html>
   </head>
   <body>
     <main id="top"></main>
+    <div class="pv-modal"><img data-pv-img src="" alt="" fetchpriority="high" />
+      <h1 class="pv-title" data-pv-name></h1><span class="pv-price" data-pv-price></span></div>
   </body>
 </html>
 """
@@ -107,6 +109,17 @@ class ProductPageTests(TestCase):
         self.assertEqual(ld["brand"]["name"], "ANTA")
         self.assertIn('"product": "812625546"', page)
         self.assertIn("<noscript>", page)
+
+    def test_product_page_opens_as_page_with_prefilled_product(self):
+        """Страница товара (26.11): с первого кадра товар, а не главная — класс
+        route-product и название/цена в разметке до ответа каталога."""
+        Product.objects.filter(id="p1").update(image_urls=["products/walk.webp"])
+        page = self.client.get("/product/anta-walk-3-0-812625546/").content.decode()
+        self.assertIn('<html lang="ru" class="route-product">', page)
+        self.assertIn('<h1 class="pv-title" data-pv-name>ANTA WALK 3.0</h1>', page)
+        self.assertIn('data-pv-price>9 000 ₽</span>', page)
+        self.assertIn('<img data-pv-img src="https://api.mata-club.ru/media/products/walk.webp" alt="ANTA WALK 3.0"', page)
+        self.assertIn('<link rel="preload" as="image" href="https://api.mata-club.ru/media/products/walk.webp"', page)
 
     def test_old_slug_redirects_by_key(self):
         resp = self.client.get("/product/staroe-nazvanie-812625546/")

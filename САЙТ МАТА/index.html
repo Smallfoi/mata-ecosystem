@@ -3,10 +3,10 @@
   <head>
     <!-- Стартует загрузку правок и прячет «старую» вёрстку до их применения.
          Должен идти ПЕРВЫМ: смысл в том, чтобы успеть до отрисовки. -->
-    <script src="boot.js?v=20261126m"></script>
+    <script src="boot.js?v=20261126n"></script>
     <!-- Правки применяются как можно раньше: качается параллельно с
          разметкой, выполняется сразу после её разбора. -->
-    <script defer src="content.js?v=20261126m"></script>
+    <script defer src="content.js?v=20261126n"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>МАТА — интернет-магазин спортивной одежды, обуви и аксессуаров</title>
@@ -41,8 +41,8 @@
     />
     <meta name="twitter:image" content="media/staw-hero.jpg" />
 
-    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126m" />
-    <link rel="stylesheet" href="styles.css?v=20261126m" />
+    <link rel="stylesheet" href="/fonts/fonts.css?v=20261126n" />
+    <link rel="stylesheet" href="styles.css?v=20261126n" />
     <script>
       // Прогрессивное улучшение: помечаем, что JS активен (под этим классом hero
       // стартует скрытым и анимируется через motion.js). Страховка: если motion-слой
@@ -600,11 +600,21 @@
       </div>
     </div>
 
-    <!-- Быстрый просмотр товара (наполняется из data-* карточки в script.js). -->
+    <!-- Страница товара /product/<slug>/ (владелец 26.11: «полноценная страница, как у
+         ANTA и Nike», а не окно поверх главной). Наполняется из data-* карточки в
+         script.js; при открытии главная скрывается, страница товара встаёт в поток
+         между шапкой и подвалом. Прямой заход: Django подставляет фото/название/цену
+         заранее (html.route-product) — без мелькания главной. -->
     <div class="pv-modal" data-pv-modal aria-hidden="true">
       <div class="pv-backdrop" data-pv-close></div>
-      <div class="pv-card" role="dialog" aria-modal="true" aria-label="Карточка товара">
-        <button class="pv-close" type="button" data-pv-close aria-label="Закрыть">×</button>
+      <article class="pv-card" aria-label="Товар">
+        <nav class="pdp-bar" aria-label="Навигация">
+          <button class="pv-close pdp-back" type="button" data-pv-close aria-label="Назад к каталогу">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Каталог</span>
+          </button>
+          <span class="pdp-crumb" data-pdp-crumb></span>
+        </nav>
         <!-- Ссылка на товар (/product/…): на телефоне — меню «Поделиться», на компьютере — в буфер. -->
         <button class="pv-share" type="button" data-pv-share aria-label="Поделиться" title="Поделиться" hidden>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
@@ -612,8 +622,16 @@
         <button class="pv-fav" type="button" data-fav aria-pressed="false" aria-label="В избранное" title="Избранное">
           <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
         </button>
+        <!-- Первый экран: фото + блок покупки. Отдельная обёртка — чтобы закреплённый
+             блок покупки останавливался на ней, а не наезжал на описание ниже. -->
+        <div class="pdp-hero">
         <div class="pv-media">
-          <img data-pv-img src="" alt="" />
+          <!-- Галерея: на компьютере — все снимки цвета сеткой, на телефоне — листаются
+               пальцем (scroll-snap) со счётчиком. Первый снимок — [data-pv-img]. -->
+          <div class="pdp-slides" data-pdp-slides>
+            <img data-pv-img src="" alt="" fetchpriority="high" />
+          </div>
+          <span class="pdp-count" data-pdp-count hidden></span>
           <!-- Лента миниатюр текущего цвета: снимки соседних цветов не качаем,
                пока цвет не выбрали (D-99). -->
           <div class="pv-thumbs" data-pv-thumbs hidden></div>
@@ -630,7 +648,7 @@
         </div>
         <div class="pv-info">
           <p class="pv-cat" data-pv-cat></p>
-          <h3 data-pv-name></h3>
+          <h1 class="pv-title" data-pv-name></h1>
           <!-- Артикул выбранного цвета (из 1С): по нему вещь находят на сайте бренда. -->
           <button class="pv-article" type="button" data-pv-article hidden></button>
           <span class="pv-price" data-pv-price></span>
@@ -649,16 +667,22 @@
           <!-- Баллы за покупку, доставка, возврат — под кнопкой, как у ANTA (аудит, пункт 4).
                Наполняет script.js (pvRenderPerks) из /loyalty/rules и /shipping-options. -->
           <ul class="pv-perks" data-pv-perks hidden></ul>
-          <!-- Описание по паспорту: вступление + свёрнутые разделы (script.js,
-               pvRenderDetails). Под кнопкой — сначала покупка, как у Nike/Adidas. -->
+        </div>
+        </div>
+        <!-- Ниже блока покупки — во всю ширину, как у ANTA: описание, отзывы, похожие.
+             В закреплённой колонке длинное описание было бы недосягаемо. -->
+        <div class="pdp-more">
+          <!-- Описание по паспорту: вступление + свёрнутые разделы (pvRenderDetails). -->
           <div class="pv-details" data-pv-details hidden></div>
+          <!-- Отзывы дорисовывает catalog.js (rvBox). -->
+          <div class="pv-reviews" data-pv-reviews></div>
           <!-- Похожие товары (аудит, пункт 7): та же группа витрины и пол, в наличии. -->
           <section class="pv-related" data-pv-related hidden>
-            <h4>Похожие товары</h4>
+            <h2>Похожие товары</h2>
             <div class="pv-related-row" data-pv-related-row></div>
           </section>
         </div>
-      </div>
+      </article>
     </div>
 
     <!-- Поиск: строка сверху и мгновенные результаты из каталога (аудит, пункт 5). -->
@@ -850,33 +874,33 @@
 
     <!-- Единый журнал ошибок экосистемы (D-32): JS-ошибки сайта → GlitchTip.
          Подключаем ПЕРВЫМ, чтобы ловить ошибки остальных скриптов. -->
-    <script src="observability.js?v=20261126m"></script>
+    <script src="observability.js?v=20261126n"></script>
     <!-- Motion-слой (premium): плавный скролл Lenis + сцены GSAP/ScrollTrigger.
          Загружается с CDN; при недоступности сайт работает без анимаций (фолбэк).
          Стоит СРАЗУ после журнала ошибок, до остальных скриптов: герой стартует скрытым
          и проявляется анимацией motion.js — раньше он ждал корзину, каталог и окно входа
          (на телефоне 0,6–0,8 с пустого экрана после отрисовки страницы, замер 17.11.2026). -->
-    <script src="/vendor/gsap.min.js?v=20261126m"></script>
-    <script src="/vendor/ScrollTrigger.min.js?v=20261126m"></script>
-    <script src="/vendor/lenis.min.js?v=20261126m"></script>
-    <script src="motion.js?v=20261126m"></script>
-    <script src="script.js?v=20261126m"></script>
+    <script src="/vendor/gsap.min.js?v=20261126n"></script>
+    <script src="/vendor/ScrollTrigger.min.js?v=20261126n"></script>
+    <script src="/vendor/lenis.min.js?v=20261126n"></script>
+    <script src="motion.js?v=20261126n"></script>
+    <script src="script.js?v=20261126n"></script>
     <!-- Динамический каталог из общего backend (наполняет сетку товарами). -->
-    <script src="catalog.js?v=20261126m"></script>
+    <script src="catalog.js?v=20261126n"></script>
     <!-- Промо-баннеры из админки (/banners) → стрип под hero. -->
-    <script src="promo.js?v=20261126m"></script>
+    <script src="promo.js?v=20261126n"></script>
     <!-- Юр-документы из админки (/legal/documents) → модалка по ссылкам. -->
-    <script src="legal.js?v=20261126m"></script>
+    <script src="legal.js?v=20261126n"></script>
     <!-- Экосистема: единый аккаунт + общие баллы (самодостаточный модуль). -->
-    <script src="ecosystem.js?v=20261126m"></script>
+    <script src="ecosystem.js?v=20261126n"></script>
     <!-- Отмена и возврат заказа в окне профиля (D-123). -->
-    <script src="returns.js?v=20261126m"></script>
+    <script src="returns.js?v=20261126n"></script>
     <!-- Мини-CMS: тексты/фото сайта из бэкенда (задаются в «Конструкторе»). -->
     <!-- Режим редактирования для «Конструктора» (активен только при ?edit=1 внутри его окна).
          Редактор (76 КБ) посетителям не нужен — грузим его только в Конструкторе. Условие то
          же, что в самом editor.js; document.write — чтобы файл, как и раньше, выполнился
          синхронно, до DOMContentLoaded (на нём держится часть правок). -->
-    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261126m"><\/script>');</script>
+    <script>if (/[?&]edit=1(&|$)/.test(location.search) && window.parent !== window) document.write('<script src="editor.js?v=20261126n"><\/script>');</script>
 
   </body>
 </html>

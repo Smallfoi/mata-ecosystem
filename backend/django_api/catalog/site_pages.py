@@ -164,7 +164,19 @@ def render_product(page: str, card: dict, url: str) -> str:
             f'    <script>window.MATA_ROUTE = {{"product": {json.dumps(card["key"], ensure_ascii=False)}}};'
             f"</script>\n"
             f'    <script type="application/ld+json">{_json_ld(card, url, image, summary)}</script>')
+    if image:
+        # Главное фото страницы товара — первым в очереди загрузки (LCP).
+        head += f'\n    <link rel="preload" as="image" href="{e(image)}" fetchpriority="high" />'
     page = page.replace("<head>", "<head>\n    " + head, 1)
+    # Страница товара (владелец 26.11): с первого кадра — товар, а не главная.
+    # Скрипт снимет класс, когда откроет товар (или покажет главную, если его нет).
+    page = page.replace('<html lang="ru">', '<html lang="ru" class="route-product">', 1)
+    page = page.replace('<img data-pv-img src="" alt=""',
+                        f'<img data-pv-img src="{e(image)}" alt="{e(name)}"', 1)
+    page = page.replace('<h1 class="pv-title" data-pv-name></h1>',
+                        f'<h1 class="pv-title" data-pv-name>{e(name)}</h1>', 1)
+    page = page.replace('<span class="pv-price" data-pv-price></span>',
+                        f'<span class="pv-price" data-pv-price>{e(price)}</span>', 1)
     page = _set_meta(page, r"<title>.*?</title>", f"<title>{e(title)}</title>")
     page = _set_meta(page, r'<meta\s+name="description"\s+content="[^"]*"\s*/>',
                      f'<meta name="description" content="{e(desc)}" />')
