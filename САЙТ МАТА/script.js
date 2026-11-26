@@ -29,13 +29,23 @@ function applyCatalog() {
   document.querySelectorAll(".product-card").forEach((card) => {
     const cats = (card.dataset.category || "").split(" ");
     const okCat = currentFilter === "all" || cats.indexOf(currentFilter) !== -1;
-    const h3 = card.querySelector("h3");
-    const name = (card.dataset.name || (h3 ? h3.textContent : "") || "").toLowerCase();
-    const okSearch = !q || name.indexOf(q) !== -1;
+    const okSearch = !q || cardSearchText(card).indexOf(q) !== -1;
     if (okCat && okSearch) base.push(card);
     card.classList.toggle("is-hidden", !(okCat && okSearch && fltPass(card)));
   });
   fltRefresh(base);
+}
+
+// По чему ищется товар: название, бренд, ключ модели, артикулы цветов, категория.
+// Раньше — только название: «812625546» или «ANTA» с артикулом не находились.
+function cardSearchText(card) {
+  if (card._search) return card._search;
+  const h3 = card.querySelector("h3");
+  const extra = (window.MATA_MODEL_EXTRA || {})[card.dataset.id] || {};
+  const arts = Object.values(extra.articles || {}).join(" ");
+  card._search = [card.dataset.name || (h3 ? h3.textContent : ""), card.dataset.brand, card.dataset.id,
+    extra.article, arts, card.dataset.cat].filter(Boolean).join(" ").toLowerCase();
+  return card._search;
 }
 
 function applyFilter(category, tab) {
@@ -357,7 +367,11 @@ function addToCart(name, price, id) {
 
 function renderCart() {
   const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
-  cartCount.textContent = totalQty;
+  // Счётчик в шапке и в нижнем меню телефона.
+  document.querySelectorAll("[data-cart-count]").forEach((el) => {
+    el.textContent = totalQty;
+    if (el.classList.contains("tabbar-badge")) el.hidden = !totalQty;
+  });
 
   const cb = document.querySelector("[data-checkout]");
   if (cb) cb.disabled = cart.length === 0;
@@ -2756,6 +2770,100 @@ bindQuickView();
 
 // Вызывается из catalog.js после отрисовки товаров из API.
 window.STAW = window.STAW || {};
+
+// ── Поиск из шапки и нижнее меню (аудит 25.11.2026, пункт 5) ─────────────────────
+// Ищем по тому, что уже нарисовано в каталоге: название, бренд, ключ модели, артикулы
+// цветов, подпись категории. Результаты — сразу, по мере набора; «Показать все» —
+// тот же запрос в каталоге.
+const srch = document.querySelector("[data-srch]");
+const srchInput = srch && srch.querySelector("[data-srch-input]");
+const srchResults = srch && srch.querySelector("[data-srch-results]");
+
+function srchOpen(open) {
+  if (!srch) return;
+  srch.classList.toggle("is-open", open);
+  srch.setAttribute("aria-hidden", String(!open));
+  if (open) {
+    srchInput.value = currentSearch || "";
+    srchRender();
+    setTimeout(() => srchInput.focus(), 60);
+  }
+}
+
+function srchRender() {
+  const q = srchInput.value.trim().toLowerCase();
+  if (!q) {
+    srchResults.innerHTML = '<p class="srch-hint">Название, бренд или артикул — например, «WALK» или «812625546».</p>';
+    return;
+  }
+  const hits = [...document.querySelectorAll(".product-card")].filter((c) => cardSearchText(c).includes(q));
+  if (!hits.length) {
+    srchResults.innerHTML = `<p class="srch-hint">По запросу «${escapeHtml(srchInput.value.trim())}» ничего не нашлось.</p>`;
+    return;
+  }
+  const rows = hits.slice(0, 8).map((c) => {
+    const img = c.querySelector(".product-media img");
+    const src = img ? img.getAttribute("src") : "";
+    return `<button type="button" class="srch-item" data-srch-id="${escapeHtml(c.dataset.id || "")}">` +
+      (src ? `<img src="${escapeHtml(src)}" alt="" loading="lazy">` : '<span class="srch-noimg" aria-hidden="true">МАТА</span>') +
+      `<span class="srch-text"><small>${escapeHtml(c.dataset.brand || c.dataset.cat || "")}</small>` +
+      `<b>${escapeHtml(c.dataset.name || "")}</b></span>` +
+      `<span class="srch-price">${formatPrice(Number(c.dataset.price) || 0)}</span></button>`;
+  }).join("");
+  const n = hits.length;
+  srchResults.innerHTML = rows +
+    `<button type="button" class="srch-all" data-srch-all>Показать все ${n} ${fltPlural(n, "товар", "товара", "товаров")} в каталоге</button>`;
+}
+
+function srchToCatalog() {
+  const q = srchInput.value.trim();
+  srchOpen(false);
+  if (searchInput) searchInput.value = q;
+  currentSearch = q;
+  applyFilter("all");
+  const cat = document.getElementById("catalog");
+  if (cat) cat.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+if (srch) {
+  document.querySelectorAll("[data-search-open]").forEach((b) => b.addEventListener("click", () => srchOpen(true)));
+  srch.addEventListener("click", (e) => {
+    if (e.target.closest("[data-srch-close]")) { srchOpen(false); return; }
+    if (e.target.closest("[data-srch-all]")) { srchToCatalog(); return; }
+    const item = e.target.closest("[data-srch-id]");
+    if (item) {
+      const card = document.querySelector(`.product-card[data-id="${CSS.escape(item.dataset.srchId)}"]`);
+      srchOpen(false);
+      if (card) openQuickView(card);
+    }
+  });
+  srchInput.addEventListener("input", srchRender);
+  srchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); srchToCatalog(); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && srch.classList.contains("is-open")) srchOpen(false);
+  });
+}
+
+// Нижнее меню: подсвечиваем «Каталог», пока каталог на экране, иначе «Главная».
+(function tabbarActive() {
+  const bar = document.querySelector("[data-tabbar]");
+  const cat = document.getElementById("catalog");
+  if (!bar || !cat || !("IntersectionObserver" in window)) return;
+  const mark = (inCatalog) => {
+    bar.querySelectorAll("[data-tab]").forEach((el) => {
+      const on = el.dataset.tab === (inCatalog ? "catalog" : "home");
+      el.classList.toggle("is-active", on);
+      if (on) el.setAttribute("aria-current", "page"); else el.removeAttribute("aria-current");
+    });
+  };
+  new IntersectionObserver((entries) => mark(entries[0].isIntersecting), {
+    rootMargin: "-40% 0px -40% 0px",
+  }).observe(cat);
+  mark(false);
+})();
+
 window.STAW.onCatalogRendered = function () {
   observeReveals();
   bindAddButtons();
