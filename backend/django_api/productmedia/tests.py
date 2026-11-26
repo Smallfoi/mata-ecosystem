@@ -984,3 +984,84 @@ class RetrySwitchesModeTests(TestCase):
         self.assertFalse(r.json()["ok"])
         job.refresh_from_db()
         self.assertEqual(job.track, "catalog")
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class DeleteJobsTests(TestCase):
+    """Удаление снимков со страницы проверки (просьба владельца 25.11.2026).
+
+    Накопившиеся «Ошибки» и «Отклонено» нельзя было убрать ничем, кроме админки
+    Django. Удаляем вместе с файлами: строка уходит, а исходник и мастер иначе
+    остались бы лежать в S3.
+    """
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from common.testutils import login_admin
+        get_user_model().objects.create_superuser("owner_del", "del@t.dev", "OwnerPass!2026")
+        login_admin(self.client, "owner_del", "OwnerPass!2026")
+        Product.objects.create(id="dl1", name="Кроссовки", category_id="c", price=9000,
+                               article="DL-1", colors=["Белый"], model_key="DL")
+
+    def _job(self, status):
+        from django.core.files.base import ContentFile
+        from productmedia.models import PhotoBatch, PhotoJob
+        batch = PhotoBatch.objects.create(track=PhotoBatch.TRACK_SHOWCASE)
+        job = PhotoJob.objects.create(batch=batch, article="DL-1", product_id="dl1",
+                                      track=PhotoBatch.TRACK_SHOWCASE, status=status)
+        job.source.save("src.png", ContentFile(b"\x89PNG source"), save=True)
+        return job
+
+    def _post(self, **data):
+        from django.urls import reverse
+        return self.client.post(reverse("photo_review"), data).json()
+
+    def test_failed_card_can_be_deleted_with_its_file(self):
+        from django.core.files.storage import default_storage
+        from productmedia.models import PhotoJob
+
+        job = self._job(PhotoJob.STATUS_FAILED)
+        name = job.source.name
+        self.assertTrue(default_storage.exists(name))
+
+        self.assertTrue(self._post(action="delete", job=job.pk)["ok"])
+        self.assertFalse(PhotoJob.objects.filter(pk=job.pk).exists())
+        self.assertFalse(default_storage.exists(name))
+
+    def test_rejected_and_review_can_be_deleted_too(self):
+        from productmedia.models import PhotoJob
+
+        for status in (PhotoJob.STATUS_REJECTED, PhotoJob.STATUS_REVIEW):
+            job = self._job(status)
+            self.assertTrue(self._post(action="delete", job=job.pk)["ok"], status)
+            self.assertFalse(PhotoJob.objects.filter(pk=job.pk).exists(), status)
+
+    def test_published_photo_is_protected(self):
+        """Принятый снимок уже на витрине: строка — единственный след, откуда он."""
+        from productmedia.models import PhotoJob
+
+        job = self._job(PhotoJob.STATUS_DONE)
+        answer = self._post(action="delete", job=job.pk)
+        self.assertFalse(answer["ok"])
+        self.assertIn("нельзя", answer["error"])
+        self.assertTrue(PhotoJob.objects.filter(pk=job.pk).exists())
+
+    def test_clear_tab_removes_only_that_status(self):
+        from productmedia.models import PhotoJob
+
+        failed = [self._job(PhotoJob.STATUS_FAILED) for _ in range(3)]
+        kept = self._job(PhotoJob.STATUS_REVIEW)
+
+        answer = self._post(action="delete_all", status="failed")
+        self.assertEqual(answer["removed"], 3)
+        self.assertEqual(PhotoJob.objects.count(), 1)
+        self.assertTrue(PhotoJob.objects.filter(pk=kept.pk).exists())
+        del failed
+
+    def test_clear_tab_refuses_the_showcase_tab(self):
+        from productmedia.models import PhotoJob
+
+        job = self._job(PhotoJob.STATUS_DONE)
+        answer = self._post(action="delete_all", status="done")
+        self.assertFalse(answer["ok"])
+        self.assertTrue(PhotoJob.objects.filter(pk=job.pk).exists())
