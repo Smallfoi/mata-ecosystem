@@ -18,6 +18,10 @@ import 'remote_anim.dart';
 class RemoteImage extends StatelessWidget {
   final String contentKey;
   final String? fallbackAsset;
+
+  /// Сетевое фото по умолчанию (фото товара), пока в Конструкторе ничего не задано.
+  /// Приоритетнее [fallbackAsset].
+  final String? fallbackUrl;
   final BoxFit fit;
   final double? width;
   final double? height;
@@ -25,6 +29,7 @@ class RemoteImage extends StatelessWidget {
   const RemoteImage(
     this.contentKey, {
     this.fallbackAsset,
+    this.fallbackUrl,
     this.fit = BoxFit.cover,
     this.width,
     this.height,
@@ -43,7 +48,8 @@ class RemoteImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<RemoteContentProvider>();
-    final url = prov.imageUrl(contentKey);
+    final own = prov.imageUrl(contentKey);
+    final url = own.isNotEmpty ? own : (fallbackUrl ?? '');
     final boxFit = prov.fit(contentKey) == 'contain' ? BoxFit.contain : fit;
     final align = _align(prov.focal(contentKey));
 
