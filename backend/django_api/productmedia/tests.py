@@ -986,6 +986,7 @@ class RetrySwitchesModeTests(TestCase):
         self.assertEqual(job.track, "catalog")
 
 
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class DeleteJobsTests(TestCase):
     """Удаление снимков со страницы проверки (просьба владельца 25.11.2026).
 
