@@ -173,6 +173,9 @@ def build_card(items, photos: dict | None = None, category_names: dict | None = 
     image = next((c["imageUrl"] for c in colors.values() if c["imageUrl"]), "")
     card_img = next((c["cardUrl"] for c in colors.values() if c["cardUrl"]), image)
     thumb = next((c["thumbUrl"] for c in colors.values() if c["thumbUrl"]), image)
+    # Разметка обложки ленты — того же снимка, что и cardUrl (27.11.2026).
+    card_color = next((c for c in colors.values() if c["cardUrl"]), None)
+    card_fit = (card_color["photos"][0].get("fit") or {}) if card_color and card_color["photos"] else {}
     rating, review_count = _model_rating(items)
     if category_names is None:
         category_names = _category_names([first.category_id])
@@ -193,6 +196,7 @@ def build_card(items, photos: dict | None = None, category_names: dict | None = 
         "oldPrice": first.old_price,
         "imageUrl": image,
         "cardUrl": card_img,
+        "cardFit": card_fit,
         "thumbUrl": thumb,
         "description": first.description,
         "rating": rating,

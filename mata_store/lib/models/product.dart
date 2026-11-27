@@ -1,3 +1,5 @@
+import 'photo_fit.dart';
+
 /// Снимок витрины в двух размерах (D-99).
 ///
 /// `url` — витринный webp для галереи, `thumb` — миниатюра для ленты каталога и
@@ -11,10 +13,14 @@ class ProductPhoto {
   final String card;
   final String thumb;
 
+  /// Где на снимке товар (27.11.2026); null — не размечен, показываем целиком.
+  final PhotoFit? fit;
+
   const ProductPhoto({
     required this.url,
     required this.thumb,
     this.card = '',
+    this.fit,
   });
 
   factory ProductPhoto.fromJson(Map<String, dynamic> j) {
@@ -24,10 +30,15 @@ class ProductPhoto {
       return v.isEmpty ? url : v;
     }
 
-    return ProductPhoto(url: url, card: pick('card'), thumb: pick('thumb'));
+    return ProductPhoto(
+        url: url, card: pick('card'), thumb: pick('thumb'),
+        fit: PhotoFit.fromJson(j['fit']));
   }
 
-  Map<String, dynamic> toJson() => {'url': url, 'card': card, 'thumb': thumb};
+  Map<String, dynamic> toJson() => {
+        'url': url, 'card': card, 'thumb': thumb,
+        if (fit != null) 'fit': fit!.toJson(),
+      };
 }
 
 /// Вариант модели: сочетание цвета и размера — это отдельная позиция на складе.
@@ -139,6 +150,9 @@ class Product {
   final String cardUrl;
   final String thumbUrl;
 
+  /// Разметка обложки ленты — того же снимка, что [cardUrl] (27.11.2026).
+  final PhotoFit? cardFit;
+
   /// Снимки по цветам: выбрал чёрный — смотришь чёрный. Ключ «» — общие снимки
   /// модели (в 1С цвет ещё не заполнен).
   final Map<String, List<ProductPhoto>> photosByColor;
@@ -166,6 +180,7 @@ class Product {
     this.variants = const [],
     this.cardUrl = '',
     this.thumbUrl = '',
+    this.cardFit,
     this.photosByColor = const {},
     this.sizeTables = const [],
   });
@@ -242,6 +257,14 @@ class Product {
   /// Картинка для плитки каталога: средний размер. Миниатюра там растягивалась и
   /// выглядела мылом (владелец, 02.10.2026); полноразмерный снимок в ленту брать
   /// тоже нельзя — это мегабайты трафика на две сотни карточек.
+  /// Разметка снимка, который показывает [coverCard].
+  PhotoFit? get coverCardFit {
+    if (cardUrl.isNotEmpty) return cardFit;
+    final common = photosByColor.values.where((l) => l.isNotEmpty);
+    if (common.isNotEmpty) return common.first.first.fit;
+    return null;
+  }
+
   String get coverCard {
     if (cardUrl.isNotEmpty) return cardUrl;
     final common = photosByColor.values.where((l) => l.isNotEmpty);
@@ -275,6 +298,7 @@ class Product {
         variants: variants,
         cardUrl: cardUrl,
         thumbUrl: thumbUrl,
+        cardFit: cardFit,
         photosByColor: photosByColor,
         sizeTables: sizeTables,
       );
@@ -299,6 +323,7 @@ class Product {
         'variants': variants.map((v) => v.toJson()).toList(),
         'cardUrl': cardUrl,
         'thumbUrl': thumbUrl,
+        if (cardFit != null) 'cardFit': cardFit!.toJson(),
         'photosByColor': photosByColor.map(
             (k, v) => MapEntry(k, v.map((p) => p.toJson()).toList())),
         'sizeTables': sizeTables.map((t) => t.toJson()).toList(),
@@ -325,6 +350,7 @@ class Product {
         ),
         cardUrl: (j['cardUrl'] ?? '').toString(),
         thumbUrl: (j['thumbUrl'] ?? '').toString(),
+        cardFit: PhotoFit.fromJson(j['cardFit']),
         variants: (j['variants'] as List? ?? const [])
             .map((e) => ProductVariant.fromJson(
                 e as Map<String, dynamic>, (e['color'] ?? '').toString()))
@@ -380,6 +406,7 @@ class Product {
       variants: variants,
       cardUrl: (j['cardUrl'] ?? '').toString(),
       thumbUrl: (j['thumbUrl'] ?? '').toString(),
+      cardFit: PhotoFit.fromJson(j['cardFit']),
       photosByColor: photos,
       sizeTables: SizeTable.listFrom(j['sizeChart']),
     );

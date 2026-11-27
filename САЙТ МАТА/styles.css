@@ -977,8 +977,10 @@ html.js.motion-off .hero .brand-wordmark span {
 /* — Медиа карточки + «быстрый просмотр» — */
 /* Квадрат 1:1, как у Nike и Puma: кроссовок — широкий предмет, в портрете 4:5
    он терял 140px высоты на пустые поля. Карточка без фото держит тот же квадрат —
-   сетка не рвётся. Фото вписывается cover: у товарных фото на светлом фоне сверху
-   и снизу всегда есть воздух, его и режем. */
+   сетка не рвётся. Фото — ЦЕЛИКОМ (владелец 27.11.2026): обрезка «по центру»
+   резала подошвы ANTA и головы моделей STAW. По разметке снимка (data-fit, см.
+   fitApply в script.js) товар встаёт в центр рамки с полями цвета фона; без
+   разметки — просто вписывается (contain). */
 .product-media {
   position: relative;
   aspect-ratio: 1 / 1;
@@ -992,7 +994,7 @@ html.js.motion-off .hero .brand-wordmark span {
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   transition: transform 900ms var(--ease-staw);
 }
@@ -4583,13 +4585,14 @@ html:has(.eco-modal.is-open) {
   scroll-snap-align: start;
 }
 .pv-rel-img {
+  position: relative;
   display: block;
   aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: 12px;
   background: #f3f1ec;
 }
-.pv-rel-img img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 300ms ease; }
+.pv-rel-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; transition: transform 300ms ease; }
 .pv-rel:hover .pv-rel-img img { transform: scale(1.04); }
 .pv-rel:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; border-radius: 12px; }
 .pv-rel small { margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -4727,23 +4730,32 @@ html.route-product .pv-modal {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
-.pv-modal .pdp-slides img {
+/* Рамка снимка: внутри неё фото стоит целиком (fitApply в script.js). */
+.pv-modal .pdp-slide {
+  position: relative;
   display: block;
+  overflow: hidden;
   width: 100%;
-  height: auto;
   aspect-ratio: 4 / 5;
-  object-fit: cover;
   border-radius: 12px;
   background: #f3f1ec;
 }
+.pv-modal .pdp-slide img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 /* Один снимок — во всю колонку, но не выше экрана. */
-.pv-modal .pdp-slides img:only-child {
+.pv-modal .pdp-slide:only-child {
   grid-column: 1 / -1;
   aspect-ratio: auto;
   height: min(78vh, 860px);
 }
 /* Нечётный хвост — по центру, а не дыра справа. */
-.pv-modal .pdp-slides img:last-child:nth-child(odd):not(:only-child) {
+.pv-modal .pdp-slide:last-child:nth-child(odd):not(:only-child) {
   grid-column: 1 / -1;
   justify-self: center;
   width: calc(50% - 4px);
@@ -4831,9 +4843,9 @@ html:has(.pv-sg:not([hidden])) { overflow: hidden; }
     overscroll-behavior-x: contain;
   }
   .pdp-slides::-webkit-scrollbar { display: none; }
-  .pv-modal .pdp-slides img,
-  .pv-modal .pdp-slides img:only-child,
-  .pv-modal .pdp-slides img:last-child:nth-child(odd):not(:only-child) {
+  .pv-modal .pdp-slide,
+  .pv-modal .pdp-slide:only-child,
+  .pv-modal .pdp-slide:last-child:nth-child(odd):not(:only-child) {
     flex: 0 0 100%;
     width: 100%;
     height: auto;
@@ -4844,4 +4856,15 @@ html:has(.pv-sg:not([hidden])) { overflow: hidden; }
   .pv-modal .pv-info { position: static; padding-top: 18px; }
   .pdp-more { margin-top: 24px; }
   .pv-modal .pv-related-row { grid-auto-columns: 42%; }
+}
+
+/* ── Фото по разметке снимка (владелец 27.11.2026) ─────────────────────────────
+   left/top/width/height ставит fitApply (script.js) в процентах рамки; рамка
+   берёт цвет фона снимка, поэтому края фото не видны. */
+img.fit-img {
+  right: auto !important;
+  bottom: auto !important;
+  max-width: none !important;
+  aspect-ratio: auto !important;
+  object-fit: fill !important;
 }
