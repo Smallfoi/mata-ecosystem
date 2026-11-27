@@ -6,7 +6,7 @@
 """
 from django.core.files.base import ContentFile
 
-from productmedia.images import make_webp
+from productmedia.images import make_webp, measure
 
 from .models import ProductPhoto
 
@@ -40,8 +40,17 @@ def store_photo(model_key: str, color: str, data: bytes, base: str) -> ProductPh
     photo.image.save(f"{base}.webp", ContentFile(make_webp(data, FULL_PX)), save=False)
     photo.card.save(f"{base}-c.webp", ContentFile(make_webp(data, CARD_PX)), save=False)
     photo.thumb.save(f"{base}-t.webp", ContentFile(make_webp(data, THUMB_PX)), save=False)
+    photo.fit = measure_safe(data)
     photo.save()
     return photo
+
+
+def measure_safe(data: bytes) -> dict:
+    """Разметка снимка; не вышло — пусто: снимок покажется целиком, но загрузка не падает."""
+    try:
+        return measure(data)
+    except Exception:  # noqa: BLE001 — битая картинка не должна ронять загрузку
+        return {}
 
 
 def ensure_card(photo: ProductPhoto) -> bool:

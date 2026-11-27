@@ -602,6 +602,78 @@ document.querySelectorAll("[data-eco-profile-cta]").forEach((btn) => {
   });
 });
 
+// ── Фото целиком по центру рамки (владелец 27.11.2026) ───────────────────────
+// Снимки у брендов разные: у ANTA кадр вытянутый и кроссовок в нижней трети,
+// у STAW модель в полный рост, у очков квадрат. Обрезка «по центру» резала
+// подошвы, головы и края. Сервер при загрузке меряет снимок (fit: где товар —
+// box долями, цвет фона bg, пропорции ar), а здесь товар вписывается в рамку
+// целиком, с полями цвета фона. Товар обрезан краем самого снимка (модель по
+// пояс) — этим краем он и встаёт к краю рамки, а не висит посередине.
+// Тот же расчёт — в приложении (mata_store/lib/widgets/product_image.dart).
+const FIT_PAD = 0.07;     // поле вокруг товара, доля рамки
+const FIT_MAX = 2.5;      // крупнее не тянем: снимки ~1000 px, дальше мыло
+function fitLayout(fit, F) {
+  if (!fit || !fit.ar || !Array.isArray(fit.box) || !(F > 0)) return null;
+  const [L, T, R, B] = fit.box;
+  const ar = fit.ar;
+  const eL = L <= 0.01, eT = T <= 0.01, eR = R >= 0.99, eB = B >= 0.99;
+  const aw = 1 - (eL ? 0 : FIT_PAD) - (eR ? 0 : FIT_PAD);
+  const ah = 1 - (eT ? 0 : FIT_PAD) - (eB ? 0 : FIT_PAD);
+  const k = Math.min(aw / Math.max(0.01, R - L), (ah * ar) / (Math.max(0.01, B - T) * F), FIT_MAX);
+  const hk = (k * F) / ar;
+  const x = eL && !eR ? -L * k : eR && !eL ? 1 - R * k : 0.5 - ((L + R) / 2) * k;
+  const y = eT && !eB ? -T * hk : eB && !eT ? 1 - B * hk : 0.5 - ((T + B) / 2) * hk;
+  return { x, y, k, hk };
+}
+const fitObserver = window.ResizeObserver
+  ? new ResizeObserver((entries) => entries.forEach((e) => {
+    const img = e.target.querySelector(":scope > img[data-fit]");
+    if (img) fitApply(img);
+  }))
+  : null;
+function fitApply(img) {
+  const frame = img.parentElement;
+  let fit = null;
+  try { fit = img.dataset.fit ? JSON.parse(img.dataset.fit) : null; } catch (e) { fit = null; }
+  if (!fit || !frame) {
+    img.classList.remove("fit-img");
+    img.style.left = img.style.top = img.style.width = img.style.height = "";
+    img.style.webkitMaskImage = img.style.maskImage = "";
+    if (frame) frame.style.backgroundColor = "";
+    return;
+  }
+  if (fitObserver && !frame.dataset.fitObs) { frame.dataset.fitObs = "1"; fitObserver.observe(frame); }
+  const fw = frame.clientWidth, fh = frame.clientHeight;
+  const g = fw && fh ? fitLayout(fit, fw / fh) : null;
+  if (!g) return;           // рамка ещё скрыта — пересчитает наблюдатель размеров
+  img.classList.add("fit-img");
+  img.style.left = `${(g.x * 100).toFixed(2)}%`;
+  img.style.top = `${(g.y * 100).toFixed(2)}%`;
+  img.style.width = `${(g.k * 100).toFixed(2)}%`;
+  img.style.height = `${(g.hk * 100).toFixed(2)}%`;
+  frame.style.backgroundColor = fit.bg || "";
+  // Фон снимка бывает с лёгким градиентом — край фото внутри рамки тогда виден
+  // полосой. Растворяем только те края, что видны (у края рамки — не трогаем).
+  const F = 6;   // ширина растворения, % снимка
+  const sides = [g.x > 0.002, g.x + g.k < 0.998, g.y > 0.002, g.y + g.hk < 0.998];
+  const grad = (dir, a, b) => `linear-gradient(${dir}, ${a ? "transparent" : "#000"} 0, #000 ${a ? F : 0}%, #000 ${b ? 100 - F : 100}%, ${b ? "transparent" : "#000"} 100%)`;
+  const mask = sides.some(Boolean) ? `${grad("to right", sides[0], sides[1])}, ${grad("to bottom", sides[2], sides[3])}` : "";
+  img.style.webkitMaskImage = img.style.maskImage = mask;
+  img.style.webkitMaskComposite = mask ? "source-in" : "";
+  img.style.maskComposite = mask ? "intersect" : "";
+}
+function fitSet(img, fit) {
+  if (!img) return;
+  if (fit && fit.ar) img.dataset.fit = JSON.stringify(fit); else delete img.dataset.fit;
+  fitApply(img);
+}
+window.MATA_FIT = { set: fitSet, apply: fitApply, layout: fitLayout };
+// Карточки каталога рисуются строкой разметки с data-fit — раскладываем при загрузке.
+document.addEventListener("load", (e) => {
+  const t = e.target;
+  if (t && t.tagName === "IMG" && (t.dataset.fit || t.classList.contains("fit-img"))) fitApply(t);
+}, true);
+
 // ── Быстрый просмотр товара (quick view) ─────────────────────────────────────
 const pvModal = document.querySelector("[data-pv-modal]");
 let pvCurrent = null; // {name, price}
@@ -610,6 +682,7 @@ let pvColor = null;
 let pvPhotos = {};    // {цвет: [{u, t}]} — снимки карточки, по цветам (D-99)
 let pvVariants = {};  // {цвет: {размер: [id позиции, цена]}} — что уйдёт в заказ
 let pvFallback = "";  // обложка на случай, если у цвета снимков ещё нет
+let pvFallbackFit = null;
 
 // Показать снимки выбранного цвета: большое фото плюс лента миниатюр.
 // Снимков может не быть вовсе — тогда остаётся обложка, а ленту прячем.
@@ -632,6 +705,7 @@ function pvShowPhotos(color) {
     }
   } else {
     img.src = url;
+    fitSet(img, list.length ? list[0].f : pvFallbackFit);
     if (media) media.classList.remove("is-empty");
   }
   pdpSlides(url ? list : []);
@@ -652,6 +726,7 @@ function pvShowPhotos(color) {
       strip.querySelectorAll("button").forEach((x) => x.classList.remove("is-selected"));
       b.classList.add("is-selected");
       img.src = list[i].u;
+      fitSet(img, list[i].f);
     });
   });
 }
@@ -662,15 +737,20 @@ function pdpSlides(list) {
   const box = pvModal.querySelector("[data-pdp-slides]");
   const count = pvModal.querySelector("[data-pdp-count]");
   if (!box) return;
-  box.querySelectorAll("img:not([data-pv-img])").forEach((el) => el.remove());
+  // Каждый снимок — в своей рамке: внутри неё фото ставится целиком (fitSet).
+  box.querySelectorAll(".pdp-slide").forEach((el) => { if (!el.querySelector("[data-pv-img]")) el.remove(); });
   const name = (pvCard && pvCard.dataset.name) || "";
   list.slice(1).forEach((ph, i) => {
+    const frame = document.createElement("span");
+    frame.className = "pdp-slide";
     const el = document.createElement("img");
     el.src = ph.u;
     el.alt = `${name} — фото ${i + 2}`;
     el.loading = "lazy";
     el.decoding = "async";
-    box.appendChild(el);
+    frame.appendChild(el);
+    box.appendChild(frame);
+    fitSet(el, ph.f);
   });
   box.scrollLeft = 0;
   if (!count) return;
@@ -1379,8 +1459,9 @@ function pvRenderRelated(card) {
   box.hidden = !list.length;
   box.querySelector("[data-pv-related-row]").innerHTML = list.map((c) => {
     const img = c.querySelector(".product-media img");
+    const fit = img && img.getAttribute("data-fit");
     return `<button type="button" class="pv-rel" data-rel-id="${escapeHtml(c.dataset.id)}">` +
-      `<span class="pv-rel-img">${img ? `<img src="${escapeHtml(img.getAttribute("src"))}" alt="" loading="lazy">` : ""}</span>` +
+      `<span class="pv-rel-img">${img ? `<img src="${escapeHtml(img.getAttribute("src"))}" alt="" loading="lazy"${fit ? ` data-fit="${escapeHtml(fit)}"` : ""}>` : ""}</span>` +
       `<small>${escapeHtml(c.dataset.brand || "")}</small><b>${escapeHtml(c.dataset.name || "")}</b>` +
       `<span>${formatPrice(Number(c.dataset.price) || 0)}</span></button>`;
   }).join("");
@@ -1403,6 +1484,9 @@ function openQuickView(card, opts) {
   pvCurrent = { name: card.dataset.name, price: Number(card.dataset.price) };
   const img = pvModal.querySelector("[data-pv-img]");
   pvFallback = card.dataset.img || "";
+  // Обложка ленты и полноразмерная обложка — один и тот же снимок: разметка общая.
+  const coverImg = card.querySelector(".product-media img[data-fit]");
+  try { pvFallbackFit = coverImg ? JSON.parse(coverImg.dataset.fit) : null; } catch (e) { pvFallbackFit = null; }
   // Снимки по цветам едут в разметке карточки. Битый словарь не должен ронять
   // окно: без галереи оно просто покажет обложку.
   try {
@@ -1416,6 +1500,7 @@ function openQuickView(card, opts) {
     pvVariants = {};
   }
   if (pvFallback) img.src = pvFallback; else img.removeAttribute("src");
+  fitSet(img, pvFallback ? pvFallbackFit : null);
   img.alt = card.dataset.name || "";
   pvModal.querySelector("[data-pv-cat]").textContent = card.dataset.cat || "";
   pvModal.querySelector("[data-pv-name]").textContent = card.dataset.name || "";
@@ -1610,23 +1695,34 @@ function bindQuickView() {
     const card = el.closest(".product-card");
     const img = card && card.querySelector(".product-media img");
     if (!card || !img) return;
-    if (!card.dataset.baseImg) card.dataset.baseImg = img.getAttribute("src") || "";
-    const show = (src) => { if (src && img.getAttribute("src") !== src) img.src = src; };
+    if (!card.dataset.baseImg) {
+      card.dataset.baseImg = img.getAttribute("src") || "";
+      card.dataset.baseFit = img.getAttribute("data-fit") || "";
+    }
+    // Снимок другого цвета — со своей разметкой: товар на нём лежит по-другому.
+    const show = (src, fit) => {
+      if (!src || img.getAttribute("src") === src) return;
+      if (fit) img.setAttribute("data-fit", fit); else img.removeAttribute("data-fit");
+      img.src = src;
+      fitApply(img);
+    };
     const pinned = () => {
       const sel = card.querySelector(".product-swatch.is-selected");
-      return (sel && sel.dataset.swatchImg) || card.dataset.baseImg;
+      return sel && sel.dataset.swatchImg
+        ? [sel.dataset.swatchImg, sel.dataset.swatchFit || ""]
+        : [card.dataset.baseImg, card.dataset.baseFit || ""];
     };
     el.addEventListener("click", (e) => {
       e.stopPropagation();
       card.querySelectorAll(".product-swatch").forEach((x) => x.classList.remove("is-selected"));
       el.classList.add("is-selected");
       card.dataset.pickColor = el.dataset.swatch;
-      show(el.dataset.swatchImg);
+      show(el.dataset.swatchImg, el.dataset.swatchFit);
       openQuickView(card);
     });
     if (window.matchMedia && window.matchMedia("(hover: hover)").matches) {
-      el.addEventListener("mouseenter", () => show(el.dataset.swatchImg));
-      el.addEventListener("mouseleave", () => show(pinned()));
+      el.addEventListener("mouseenter", () => show(el.dataset.swatchImg, el.dataset.swatchFit));
+      el.addEventListener("mouseleave", () => show(...pinned()));
     }
   });
 

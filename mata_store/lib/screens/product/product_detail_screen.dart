@@ -365,8 +365,17 @@ class _ImageGallery extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Фото начинается НИЖЕ строки состояния и кнопки «назад» (владелец
+    // 27.11.2026): раньше оно уходило под часы и батарею, а кнопка лежала
+    // поверх снимка — верх товара закрывали, и фото казалось прилипшим к краю.
+    final mq = MediaQuery.of(context);
+    final head = mq.padding.top + kToolbarHeight;
+    final photoH = (mq.size.width < mq.size.height * 0.55)
+        ? mq.size.width
+        : mq.size.height * 0.55;
+    final thumbsH = photos.length > 1 ? 76.0 : 0.0;
     return SliverAppBar(
-      expandedHeight: photos.length > 1 ? 520 : 440,
+      expandedHeight: head + photoH + thumbsH - mq.padding.top,
       pinned: true,
       backgroundColor: AppColors.white,
       leading: GestureDetector(
@@ -383,6 +392,7 @@ class _ImageGallery extends StatelessWidget {
       flexibleSpace: FlexibleSpaceBar(
         background: Column(
           children: [
+            SizedBox(height: head),
             Expanded(
               child: Stack(
                 children: [
@@ -395,7 +405,8 @@ class _ImageGallery extends StatelessWidget {
                     itemCount: photos.length,
                     onPageChanged: onPageChanged,
                     itemBuilder: (context, index) {
-                      final image = ProductImage(path: photos[index].url);
+                      final image = ProductImage(
+                          path: photos[index].url, layout: photos[index].fit);
                       // Hero только на первом фото — совпадает с ProductCard
                       if (index == 0) {
                         return Hero(

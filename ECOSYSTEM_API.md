@@ -102,12 +102,14 @@
   "description": "…",
   "rating": 4.7, "reviewCount": 12,
   "thumbUrl": "https://cdn.mata-club.ru/p/frsm007-t.webp",
+  "cardFit": { "box": [0.08, 0.51, 0.94, 0.80], "bg": "#dfdbd8", "ar": 0.6675 },
   "isNew": false, "isFeatured": false, "inStock": true,
   "variantCount": 6,
   "sizes": ["S","M","L"],
   "colors": [
     { "name": "ЧЁРНЫЙ", "article": "FRSM007-1", "imageUrl": "…", "thumbUrl": "…", "inStock": true,
-      "photos": [ { "url": "…-1.webp", "thumb": "…-1-t.webp" } ],
+      "photos": [ { "url": "…-1.webp", "card": "…-1-c.webp", "thumb": "…-1-t.webp",
+                    "fit": { "box": [0.08, 0.51, 0.94, 0.80], "bg": "#dfdbd8", "ar": 0.6675 } } ],
       "sizes": [ { "size": "S", "productId": "p1", "price": 3990, "oldPrice": null, "inStock": true } ] }
   ],
   "sizeChart": { "tables": [ { "title": "ANTA · мужская обувь", "columns": ["EU","RUS","US","UK","Длина стопы, см","Обхват стопы, мм"],
@@ -117,6 +119,11 @@
   "gender": "men"
 }
 ```
+> **Разметка снимка (D-141, 27.11.2026).** `photos[].fit` — где на снимке товар: `box` —
+> рамка товара долями кадра [лево, верх, право, низ], `bg` — цвет фона, `ar` — ширина/высота.
+> `cardFit` — то же для снимка из `cardUrl`. `{}` — снимок не размечен (показывать целиком).
+> Клиенты ставят товар целиком в центр рамки с полями цвета фона. Поля добавлены — старые
+> клиенты их не читают.
 > **Адрес товара и пол (D-139, 26.11.2026).** `slug` — адрес страницы товара на сайте:
 > `https://mata-club.ru/product/<slug>/` (название транслитом + ключ модели; сменилось
 > название — старый адрес отвечает 301 на новый по ключу в конце). `gender` — для кого:

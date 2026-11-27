@@ -122,3 +122,54 @@ def showcase(master_bytes: bytes, *, size: int = SHOWCASE_PX,
     out = io.BytesIO()
     canvas.save(out, format="PNG", optimize=True)
     return out.getvalue()
+
+
+# ── Разметка снимка для витрины: где на нём товар (владелец 27.11.2026) ───────
+#
+# Снимки у брендов разные: у ANTA кадр вытянутый и кроссовок лежит в нижней
+# трети, у STAW модель в полный рост, у очков Rockbros квадрат. Рамка карточки
+# и страницы товара одна, и обрезка «по центру» резала подошвы, головы и края.
+# Поэтому при загрузке ОДИН раз меряем снимок, а сайт и приложение по этой
+# разметке ставят товар целиком в центр рамки, с полями цвета фона.
+
+MEASURE_PX = 300        # хватает для рамки товара с точностью до процента
+FLAT_SPREAD = 10        # средняя разница края с фоном; больше — фон не ровный (лайфстайл)
+
+
+def measure(data: bytes) -> dict:
+    """{"box": [лево, верх, право, низ] долями, "bg": "#rrggbb", "ar": ш/в}.
+
+    Фон не ровный (снимок на улице, в интерьере) — рамкой считаем весь кадр:
+    вырезать товар из сложного фона мы не умеем, такой снимок просто
+    показывается целиком.
+    """
+    im = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
+    if "A" in im.getbands() or im.mode == "P":
+        # Прозрачный фон (гели SIS) — на белом, как его и видит покупатель;
+        # простой convert("RGB") делал прозрачное чёрным.
+        rgba = im.convert("RGBA")
+        im = Image.new("RGB", rgba.size, WHITE)
+        im.paste(rgba, mask=rgba.getchannel("A"))
+    else:
+        im = im.convert("RGB")
+    ar = im.width / im.height
+    im.thumbnail((MEASURE_PX, MEASURE_PX))
+    w, h = im.size
+    bg = _corner_background(im)
+    diff = ImageChops.difference(im, Image.new("RGB", im.size, bg)).convert("L")
+    edges = [diff.crop(b) for b in ((0, 0, w, 2), (0, h - 2, w, h), (0, 0, 2, h), (w - 2, 0, w, h))]
+    spread = sum(sum(e.getdata()) / max(1, e.width * e.height) for e in edges) / 4
+    box = None
+    if spread <= FLAT_SPREAD:
+        mask = diff.point(lambda v: 255 if v > BG_TOLERANCE else 0)
+        # Убираем одиночные точки (шум сжатия, пылинки) — иначе рамка «до края».
+        mask = mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(3))
+        box = mask.getbbox()
+    if not box:
+        box = (0, 0, w, h)
+    l, t, r, b = box
+    return {
+        "box": [round(l / w, 3), round(t / h, 3), round(r / w, 3), round(b / h, 3)],
+        "bg": "#%02x%02x%02x" % bg,
+        "ar": round(ar, 4),
+    }

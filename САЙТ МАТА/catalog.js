@@ -78,7 +78,9 @@
       var list = Array.isArray(c.photos) ? c.photos : [];
       if (!list.length) return;
       out[c.name] = list.map(function (ph) {
-        return { u: abs(ph.url), t: abs(ph.thumb || ph.url) };
+        var o = { u: abs(ph.url), t: abs(ph.thumb || ph.url) };
+        if (ph.fit && ph.fit.ar) o.f = ph.fit;     // где на снимке товар (27.11.2026)
+        return o;
       });
     });
     return out;
@@ -132,6 +134,7 @@
       // снимки в ленту не берём — две сотни по 1600 px это мегабайты трафика.
       cardUrl: card.cardUrl || card.thumbUrl || card.imageUrl,
       thumbUrl: card.thumbUrl || card.imageUrl,
+      cardFit: card.cardFit && card.cardFit.ar ? card.cardFit : null,
       photos: photosByColor(colors),
       variants: variantsByColor(colors),
       description: card.description,
@@ -191,6 +194,7 @@
       return '<button type="button" class="product-swatch' + (gone ? " is-out" : "") + '"' +
         ' data-swatch="' + esc(n) + '"' +
         (shot ? ' data-swatch-img="' + esc(shot.u) + '"' : "") +
+        (shot && shot.f ? ' data-swatch-fit="' + esc(JSON.stringify(shot.f)) + '"' : "") +
         ' aria-label="Цвет: ' + esc(n) + (gone ? " (нет в наличии)" : "") + '"' +
         ' title="' + esc(n) + '">' + face + "</button>";
     });
@@ -296,7 +300,8 @@
       '<button type="button" class="product-fav" data-fav aria-pressed="false" aria-label="В избранное"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>' +
       badgesHtml(p) +
       (thumb
-        ? '<img src="' + esc(thumb) + '" alt="' + esc(p.name) + '" loading="lazy" />'
+        ? '<img src="' + esc(thumb) + '" alt="' + esc(p.name) + '" loading="lazy"' +
+          (p.cardFit && thumb === cardImgUrl(p) ? ' data-fit="' + esc(JSON.stringify(p.cardFit)) + '"' : "") + ' />'
         // Фото ещё не загрузили: аккуратная заглушка, а не пустой серый квадрат.
         : '<span class="product-nophoto" aria-hidden="true"><b>МАТА</b><small>Фото скоро</small></span>') +
       "</div>" +

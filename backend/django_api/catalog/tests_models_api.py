@@ -314,6 +314,23 @@ class ModelPhotoTests(TestCase):
         # Миниатюра остаётся — она для кружков выбора цвета и корзины.
         self.assertIn("cover-t.webp", card["thumbUrl"])
 
+    def test_photo_layout_goes_with_photo_and_feed_cover(self):
+        """Разметка снимка (где товар, фон, пропорции) едет к снимку и к обложке ленты:
+        по ней сайт и приложение ставят товар целиком в центр рамки (27.11.2026)."""
+        fit = {"box": [0.1, 0.5, 0.9, 0.8], "bg": "#dfdbd8", "ar": 0.6667}
+        row = self._photo("ЧЕРНЫЙ", 0, "cover")
+        row.fit = fit
+        row.save()
+        card = self._card()
+        self.assertEqual(card["colors"][0]["photos"][0]["fit"], fit)
+        self.assertEqual(card["cardFit"], fit)
+
+    def test_unmeasured_photo_has_empty_layout(self):
+        self._photo("ЧЕРНЫЙ", 0, "cover")
+        card = self._card()
+        self.assertEqual(card["colors"][0]["photos"][0]["fit"], {})
+        self.assertEqual(card["cardFit"], {})
+
     def test_old_photo_without_middle_size_falls_back_to_full(self):
         """Снимок залит до появления среднего размера: лучше тяжёлый, чем мыльный."""
         self._photo("ЧЕРНЫЙ", 0, "legacy", card=False)

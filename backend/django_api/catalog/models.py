@@ -467,6 +467,9 @@ class ProductPhoto(models.Model):
                              verbose_name="Снимок для ленты (webp)")
     thumb = models.ImageField(upload_to="uploads/photos/", blank=True,
                               verbose_name="Миниатюра (webp)")
+    # Где на снимке товар, цвет фона и пропорции (productmedia.images.measure):
+    # по ним сайт и приложение ставят товар целиком в центр рамки (27.11.2026).
+    fit = models.JSONField(default=dict, blank=True, verbose_name="Разметка снимка")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Загружено")
 
     class Meta:
@@ -487,4 +490,6 @@ class ProductPhoto(models.Model):
             "url": full,
             "card": self.card.url if self.card else full,
             "thumb": self.thumb.url if self.thumb else full,
+            # {} — снимок ещё не размечен: клиент покажет его целиком без центровки.
+            "fit": self.fit or {},
         }
